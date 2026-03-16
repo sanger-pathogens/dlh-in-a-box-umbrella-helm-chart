@@ -1,0 +1,29 @@
+global:
+  environment: prod
+  domain: prod.example.com
+  storage:
+    backend: externalS3
+    existingSecret: prod-external-s3
+    s3:
+      endpoint: https://s3.example.com
+      region: us-east-1
+      bucket: dlh-prod
+      pathStyleAccess: true
+
+prefect:
+  workers:
+    replicaCount: 3
+    workPool: kubernetes-prod
+    workQueue: critical
+
+vault:
+  enabled: true
+
+minio:
+  enabled: false
+
+datahub:
+  enabled: false
+
+hive:
+  enabled: false

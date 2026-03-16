@@ -1,0 +1,14 @@
+global:
+  storage:
+    backend: externalS3
+    existingSecret: external-s3-credentials
+    s3:
+      endpoint: https://s3-compatible.example.net
+      region: us-east-1
+      bucket: lakehouse-shared
+      pathStyleAccess: true
+      accessKeyKey: accessKey
+      secretKeyKey: secretKey
+
+minio:
+  enabled: false
