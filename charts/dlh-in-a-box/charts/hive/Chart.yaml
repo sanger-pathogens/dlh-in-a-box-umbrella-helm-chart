@@ -1,0 +1,6 @@
+apiVersion: v2
+name: hive
+description: Hive Metastore subchart for data lakehouse
+type: application
+version: 0.1.0
+appVersion: "0.1.0"

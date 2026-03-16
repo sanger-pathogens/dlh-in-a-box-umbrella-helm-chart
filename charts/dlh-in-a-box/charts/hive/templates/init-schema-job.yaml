@@ -1,0 +1,96 @@
+{{- range $catalogName, $catalog := .Values.dataCatalogs }}
+{{- $safeCatalog := include "hive.sanitize" $catalogName }}
+
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ include "hive.fullname" $ }}-schema-init-{{ $safeCatalog }}
+  namespace: {{ $.Release.Namespace }}
+  annotations:
+    "helm.sh/hook": post-install,post-upgrade
+    "helm.sh/hook-weight": "0"
+    "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded
+spec:
+  backoffLimit: 1
+  template:
+    metadata:
+      labels:
+        app: {{ include "hive.fullname" $ }}-schema-init
+        catalog: {{ $catalogName }}
+    spec:
+      restartPolicy: Never
+      initContainers:
+        - name: create-db-{{ $safeCatalog }}
+          image: postgres:15
+          command: ["/bin/sh", "-c"]
+          args:
+            - |
+              set -e
+              echo "Checking if database '{{ $catalogName }}' exists..."
+              if ! PGPASSWORD="$POSTGRES_PASSWORD" psql \
+                  -h "$POSTGRES_HOST" \
+                  -U "$POSTGRES_USER" \
+                  -p "$POSTGRES_PORT" \
+                  -d postgres \
+                  -tAc "SELECT 1 FROM pg_database WHERE datname='{{ $catalogName }}';" | grep -q 1; then
+                echo "Creating database '{{ $catalogName }}'..."
+                PGPASSWORD="$POSTGRES_PASSWORD" psql \
+                  -h "$POSTGRES_HOST" \
+                  -U "$POSTGRES_USER" \
+                  -p "$POSTGRES_PORT" \
+                  -d postgres \
+                  -c "CREATE DATABASE \"{{ $catalogName }}\""
+              else
+                echo "Database '{{ $catalogName }}' already exists."
+              fi
+          env:
+            - name: POSTGRES_USER
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "hive.fullname" $ }}-postgres-secret
+                  key: username
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "hive.fullname" $ }}-postgres-secret
+                  key: password
+            - name: POSTGRES_HOST
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ include "hive.fullname" $ }}-init-config
+                  key: POSTGRES_HOST
+            - name: POSTGRES_PORT
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ include "hive.fullname" $ }}-init-config
+                  key: POSTGRES_PORT
+      containers:
+        - name: hive-schema-init-{{ $safeCatalog }}
+          image: "{{ $.Values.schemainit.image.registry }}/{{ $.Values.schemainit.image.repository }}:{{ $.Values.schemainit.image.tag }}"
+          command: ["/bin/sh", "-c"]
+          args:
+            - |
+              set -e
+              echo "Checking if Hive schema '{{ $catalogName }}' is already initialized..."
+              if /opt/hive/bin/schematool -dbType postgres \
+                    -userName "$POSTGRES_USER" \
+                    -passWord "$POSTGRES_PASSWORD" \
+                    -url "jdbc:postgresql://$POSTGRES_HOST:$POSTGRES_PORT/{{ $catalogName }}" \
+                    -info; then
+                echo "Hive schema '{{ $catalogName }}' is already initialized. Skipping initSchema."
+              else
+                echo "Initializing Hive schema '{{ $catalogName }}'..."
+                /opt/hive/bin/schematool --verbose -initSchema -dbType postgres \
+                  -driver org.postgresql.Driver \
+                  -userName "$POSTGRES_USER" \
+                  -passWord "$POSTGRES_PASSWORD" \
+                  -url "jdbc:postgresql://$POSTGRES_HOST:$POSTGRES_PORT/{{ $catalogName }}"
+              fi
+          envFrom:
+            - secretRef:
+                name: {{ include "hive.fullname" $ }}-postgres-secret
+            - configMapRef:
+                name: {{ include "hive.fullname" $ }}-init-config
+
+{{- end }}

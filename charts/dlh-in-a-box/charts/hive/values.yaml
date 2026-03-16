@@ -1,0 +1,39 @@
+enabled: true
+
+metastore:
+  image:
+    registry: ""
+    repository: ""
+    tag: ""
+
+schemainit:
+  image:
+    registry: ""
+    repository: ""
+    tag: ""
+
+# PostgreSQL connection (external or deployed separately)
+postgres:
+  host: ""
+  port: "5432"
+  username: ""
+  password: ""
+  existingSecret: ""
+
+# S3 configuration
+s3:
+  endpoint: ""
+  accessKey: ""
+  secretKey: ""
+  existingSecret: ""
+
+# Warehouse directory base
+warehouseDir: ""
+
+# Data catalogs configuration (maps to schemas)
+dataCatalogs:
+  default:
+    type: deltaLake  # deltaLake or hive
+    authorizedUsers:
+      read: []
+      write: []

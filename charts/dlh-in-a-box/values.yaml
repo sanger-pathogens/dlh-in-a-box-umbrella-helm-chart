@@ -15,6 +15,14 @@ global:
       accessKeyKey: accessKey
       secretKeyKey: secretKey
 
+# Data catalogs configuration
+dataCatalogs:
+  default:
+    type: deltaLake  # deltaLake or hive
+    authorizedUsers:
+      read: []
+      write: []
+
 trino:
   enabled: true
 
@@ -30,7 +38,9 @@ prefect:
     resources: {}
 
 # Upstream Prefect chart values can be passed directly via these aliases.
-prefectServer: {}
+prefectServer:
+  postgresql:
+    enabled: true
 
 prefectWorker:
   worker:
@@ -45,12 +55,41 @@ minio:
 datahub:
   enabled: false
 
+# Upstream DataHub chart values
+datahubUpstream:
+  mysql:
+    enabled: true
+
 hive:
   enabled: false
-  implementation: placeholder
-  notes: >-
-    Hive Metastore support is intentionally lightweight in this initial scaffold.
-    Prefer an upstream chart or external managed metastore before adding local complexity.
+  metastore:
+    image:
+      registry: ""
+      repository: ""
+      tag: ""
+  schemainit:
+    image:
+      registry: ""
+      repository: ""
+      tag: ""
+  postgres:
+    host: ""
+    port: "5432"
+    username: ""
+    password: ""
+    existingSecret: ""
+  s3:
+    endpoint: ""
+    accessKey: ""
+    secretKey: ""
+    existingSecret: ""
+  warehouseDir: ""
+  dataCatalogs:
+    default:
+      type: deltaLake
+      authorizedUsers:
+        read: []
+        write: []
 
 vault:
   enabled: true

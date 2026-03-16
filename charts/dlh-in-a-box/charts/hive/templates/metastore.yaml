@@ -1,0 +1,88 @@
+{{- range $catalogName, $catalog := .Values.dataCatalogs }}
+{{- $safeCatalog := include "hive.sanitize" $catalogName }}
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "hive.fullname" $ }}-{{ $safeCatalog }}-metastore
+  namespace: {{ $.Release.Namespace }}
+spec:
+  ports:
+    - port: 9083
+      targetPort: 9083
+  selector:
+    app: {{ include "hive.fullname" $ }}-{{ $safeCatalog }}-metastore
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "hive.fullname" $ }}-{{ $safeCatalog }}-metastore
+  namespace: {{ $.Release.Namespace }}
+spec:
+  selector:
+    matchLabels:
+      app: {{ include "hive.fullname" $ }}-{{ $safeCatalog }}-metastore
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      labels:
+        app: {{ include "hive.fullname" $ }}-{{ $safeCatalog }}-metastore
+    spec:
+      containers:
+        - name: metastore
+          image: "{{ $.Values.metastore.image.registry }}/{{ $.Values.metastore.image.repository }}:{{ $.Values.metastore.image.tag }}"
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: schema_name
+              value: "{{ $catalogName }}"
+          envFrom:
+            - secretRef:
+                name: {{ include "hive.fullname" $ }}-postgres-secret
+            - secretRef:
+                name: {{ include "hive.fullname" $ }}-s3-secret
+            - configMapRef:
+                name: {{ include "hive.fullname" $ }}-init-config
+          ports:
+            - containerPort: 9083
+          command: ["/opt/hive-metastore/bin/start-metastore"]
+          args: ["-p", "9083"]
+          volumeMounts:
+            - name: metastore-cfg-vol
+              mountPath: /opt/hive-metastore/conf/metastore-site.xml
+              subPath: metastore-site.xml
+            - name: metastore-cfg-vol
+              mountPath: /opt/hadoop/etc/hadoop/core-site.xml
+              subPath: core-site.xml
+      volumes:
+        - name: metastore-cfg-vol
+          configMap:
+            name: {{ include "hive.fullname" $ }}-metastore-cfg-{{ $safeCatalog }}
+
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ include "hive.fullname" $ }}-{{ $safeCatalog }}-metastore-ingress
+  namespace: {{ $.Release.Namespace }}
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: {{ include "hive.fullname" $ }}-{{ $safeCatalog }}-metastore.{{ $.Values.global.domain }}
+      http:
+        paths:
+          - path: /
+            pathType: ImplementationSpecific
+            backend:
+              service:
+                name: {{ include "hive.fullname" $ }}-{{ $safeCatalog }}-metastore
+                port:
+                  number: 9083
+  tls:
+    - secretName: {{ $.Values.global.tlsSecretName }}
+      hosts:
+        - {{ include "hive.fullname" $ }}-{{ $safeCatalog }}-metastore.{{ $.Values.global.domain }}
+
+{{- end }}

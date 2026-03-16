@@ -1,0 +1,102 @@
+{{- range $catalogName, $catalog := .Values.dataCatalogs }}
+{{- $safeCatalog := include "hive.sanitize" $catalogName }}
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "hive.fullname" $ }}-metastore-cfg-{{ $safeCatalog }}
+  namespace: {{ $.Release.Namespace }}
+  labels:
+    app: {{ include "hive.fullname" $ }}-metastore
+    catalog: {{ $catalogName }}
+data:
+  core-site.xml: |
+    <configuration>
+      <property>
+        <name>fs.s3a.connection.ssl.enabled</name>
+        <value>true</value>
+      </property>
+      <property>
+        <name>fs.s3a.endpoint</name>
+        <value>{{ $.Values.s3.endpoint }}</value>
+      </property>
+      <property>
+        <name>fs.s3a.fast.upload</name>
+        <value>true</value>
+      </property>
+      <property>
+        <name>fs.s3a.access.key</name>
+        <value>{{ $.Values.s3.accessKey }}</value>
+      </property>
+      <property>
+        <name>fs.s3a.secret.key</name>
+        <value>{{ $.Values.s3.secretKey }}</value>
+      </property>
+    </configuration>
+
+  metastore-site.xml: |
+    <configuration>
+      <property>
+        <name>metastore.task.threads.always</name>
+        <value>org.apache.hadoop.hive.metastore.events.EventCleanerTask</value>
+      </property>
+      <property>
+        <name>metastore.expression.proxy</name>
+        <value>org.apache.hadoop.hive.metastore.DefaultPartitionExpressionProxy</value>
+      </property>
+      <property>
+        <name>javax.jdo.option.ConnectionDriverName</name>
+        <value>org.postgresql.Driver</value>
+      </property>
+      <property>
+        <name>javax.jdo.option.ConnectionURL</name>
+        <value>jdbc:postgresql://{{ $.Values.postgres.host }}:{{ $.Values.postgres.port }}/{{ $catalogName }}</value>
+      </property>
+      <property>
+        <name>javax.jdo.option.ConnectionUserName</name>
+        <value>{{ $.Values.postgres.username }}</value>
+      </property>
+      <property>
+        <name>javax.jdo.option.ConnectionPassword</name>
+        <value>{{ $.Values.postgres.password }}</value>
+      </property>
+      <property>
+        <name>datanucleus.connectionPoolingType</name>
+        <value>DBCP</value>
+      </property>
+      <property>
+        <name>datanucleus.connectionPool.maxActive</name>
+        <value>20</value>
+      </property>
+      <property>
+        <name>datanucleus.connectionPool.minIdle</name>
+        <value>0</value>
+      </property>
+      <property>
+        <name>datanucleus.connectionPool.maxIdle</name>
+        <value>1</value>
+      </property>
+      <property>
+        <name>metastore.warehouse.dir</name>
+        <value>{{ $.Values.warehouseDir }}/{{ $catalogName }}</value>
+      </property>
+      <property>
+        <name>metastore.thrift.port</name>
+        <value>9083</value>
+      </property>
+      <property>
+        <name>hive.metastore.server.max.threads</name>
+        <value>60</value>
+      </property>
+      <property>
+        <name>hive.metastore.server.min.threads</name>
+        <value>20</value>
+      </property>
+      <property>
+        <name>hive.views-execution.enabled</name>
+        <value>true</value>
+      </property>
+    </configuration>
+
+{{- end }}
