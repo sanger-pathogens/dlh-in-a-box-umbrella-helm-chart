@@ -1,0 +1,11 @@
+# Helm dependencies and lock files
+charts/dlh-in-a-box/charts/*.tgz
+
+# macOS and editor files
+.DS_Store
+*.swp
+*.swo
+
+# Temporary files
+*.tmp
+*.log

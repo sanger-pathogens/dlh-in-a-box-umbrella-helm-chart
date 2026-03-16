@@ -1,0 +1,56 @@
+global:
+  nameOverride: ""
+  fullnameOverride: ""
+  domain: ""
+  environment: ""
+  imagePullSecrets: []
+  storage:
+    backend: externalS3
+    existingSecret: ""
+    s3:
+      endpoint: ""
+      region: ""
+      bucket: ""
+      pathStyleAccess: true
+      accessKeyKey: accessKey
+      secretKeyKey: secretKey
+
+trino:
+  enabled: true
+
+prefect:
+  enabled: true
+  server:
+    enabled: true
+  workers:
+    enabled: true
+    replicaCount: 1
+    workPool: kubernetes-pool
+    workQueue: default
+    resources: {}
+
+# Upstream Prefect chart values can be passed directly via these aliases.
+prefectServer: {}
+
+prefectWorker:
+  worker:
+    apiConfig: server
+
+sparkOperator:
+  enabled: true
+
+minio:
+  enabled: false
+
+datahub:
+  enabled: false
+
+hive:
+  enabled: false
+  implementation: placeholder
+  notes: >-
+    Hive Metastore support is intentionally lightweight in this initial scaffold.
+    Prefer an upstream chart or external managed metastore before adding local complexity.
+
+vault:
+  enabled: true

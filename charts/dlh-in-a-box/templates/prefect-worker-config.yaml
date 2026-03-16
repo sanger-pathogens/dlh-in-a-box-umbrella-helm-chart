@@ -1,0 +1,12 @@
+{{- if and .Values.prefect.enabled .Values.prefect.workers.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "dlh-in-a-box.fullname" . }}-prefect-worker-config
+  labels:
+    {{- include "dlh-in-a-box.labels" . | nindent 4 }}
+data:
+  PREFECT_WORK_POOL_NAME: {{ .Values.prefect.workers.workPool | quote }}
+  PREFECT_WORK_QUEUE_NAME: {{ .Values.prefect.workers.workQueue | quote }}
+  PREFECT_WORKER_REPLICA_COUNT: {{ .Values.prefect.workers.replicaCount | quote }}
+{{- end }}

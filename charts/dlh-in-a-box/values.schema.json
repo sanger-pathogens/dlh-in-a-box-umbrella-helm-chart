@@ -1,0 +1,168 @@
+{
+  "$schema": "https://json-schema.org/draft-07/schema#",
+  "title": "dlh-in-a-box umbrella values schema",
+  "type": "object",
+  "additionalProperties": true,
+  "properties": {
+    "global": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "domain": {
+          "type": "string"
+        },
+        "environment": {
+          "type": "string",
+          "minLength": 0,
+          "maxLength": 64,
+          "pattern": "^[a-zA-Z0-9-]*$"
+        },
+        "storage": {
+          "type": "object",
+          "additionalProperties": true,
+          "required": [
+            "backend",
+            "existingSecret",
+            "s3"
+          ],
+          "properties": {
+            "backend": {
+              "type": "string",
+              "enum": [
+                "externalS3",
+                "minio"
+              ]
+            },
+            "existingSecret": {
+              "type": "string"
+            },
+            "s3": {
+              "type": "object",
+              "additionalProperties": true,
+              "required": [
+                "endpoint",
+                "region",
+                "bucket",
+                "pathStyleAccess",
+                "accessKeyKey",
+                "secretKeyKey"
+              ],
+              "properties": {
+                "endpoint": {
+                  "type": "string"
+                },
+                "region": {
+                  "type": "string"
+                },
+                "bucket": {
+                  "type": "string"
+                },
+                "pathStyleAccess": {
+                  "type": "boolean"
+                },
+                "accessKeyKey": {
+                  "type": "string"
+                },
+                "secretKeyKey": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "trino": {
+      "type": "object",
+      "required": ["enabled"],
+      "properties": {
+        "enabled": { "type": "boolean" }
+      }
+    },
+    "prefect": {
+      "type": "object",
+      "required": ["enabled", "server", "workers"],
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "server": {
+          "type": "object",
+          "required": ["enabled"],
+          "properties": {
+            "enabled": { "type": "boolean" }
+          }
+        },
+        "workers": {
+          "type": "object",
+          "required": ["enabled", "replicaCount", "workPool", "workQueue"],
+          "properties": {
+            "enabled": { "type": "boolean" },
+            "replicaCount": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "workPool": {
+              "type": "string",
+              "minLength": 1
+            },
+            "workQueue": {
+              "type": "string",
+              "minLength": 1
+            },
+            "resources": {
+              "type": "object"
+            }
+          }
+        }
+      }
+    },
+    "sparkOperator": {
+      "type": "object",
+      "required": ["enabled"],
+      "properties": {
+        "enabled": { "type": "boolean" }
+      }
+    },
+    "minio": {
+      "type": "object",
+      "required": ["enabled"],
+      "properties": {
+        "enabled": { "type": "boolean" }
+      }
+    },
+    "datahub": {
+      "type": "object",
+      "required": ["enabled"],
+      "properties": {
+        "enabled": { "type": "boolean" }
+      }
+    },
+    "hive": {
+      "type": "object",
+      "required": ["enabled", "implementation"],
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "implementation": {
+          "type": "string",
+          "enum": ["placeholder", "upstream", "external"]
+        }
+      }
+    },
+    "vault": {
+      "type": "object",
+      "required": ["enabled"],
+      "properties": {
+        "enabled": { "type": "boolean" }
+      }
+    }
+  },
+  "required": [
+    "global",
+    "trino",
+    "prefect",
+    "sparkOperator",
+    "minio",
+    "datahub",
+    "hive",
+    "vault"
+  ]
+}

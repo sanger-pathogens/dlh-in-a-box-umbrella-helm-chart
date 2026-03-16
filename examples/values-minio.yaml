@@ -1,0 +1,15 @@
+global:
+  storage:
+    backend: minio
+    existingSecret: ""
+
+minio:
+  enabled: true
+  auth:
+    existingSecret: minio-root-user
+
+datahub:
+  enabled: false
+
+hive:
+  enabled: false

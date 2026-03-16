@@ -1,0 +1,26 @@
+global:
+  environment: dev
+  domain: dev.local
+  storage:
+    backend: externalS3
+    existingSecret: dev-external-s3
+    s3:
+      endpoint: https://s3.example-dev.local
+      region: us-east-1
+      bucket: dlh-dev
+      pathStyleAccess: true
+
+prefect:
+  workers:
+    replicaCount: 1
+    workPool: kubernetes-dev
+    workQueue: default
+
+datahub:
+  enabled: false
+
+hive:
+  enabled: false
+
+minio:
+  enabled: false

@@ -1,0 +1,16 @@
+Thank you for installing {{ .Chart.Name }}.
+
+This is a true umbrella chart that composes upstream components.
+
+Enabled components:
+- Trino: {{ .Values.trino.enabled }}
+- Prefect server: {{ and .Values.prefect.enabled .Values.prefect.server.enabled }}
+- Prefect workers: {{ and .Values.prefect.enabled .Values.prefect.workers.enabled }}
+- Spark Operator: {{ .Values.sparkOperator.enabled }}
+- MinIO: {{ .Values.minio.enabled }}
+- DataHub: {{ .Values.datahub.enabled }}
+- Hive (placeholder): {{ .Values.hive.enabled }}
+- Vault: {{ .Values.vault.enabled }}
+
+Storage backend: {{ .Values.global.storage.backend }}
+Storage existing secret: {{ default "(none)" .Values.global.storage.existingSecret }}

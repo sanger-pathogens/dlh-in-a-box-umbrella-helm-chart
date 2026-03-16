@@ -1,0 +1,21 @@
+name: helm-lint
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Helm
+        uses: azure/setup-helm@v4
+
+      - name: Update dependencies
+        run: ./hack/helm-dependency-update.sh
+
+      - name: Lint chart
+        run: ./hack/lint.sh

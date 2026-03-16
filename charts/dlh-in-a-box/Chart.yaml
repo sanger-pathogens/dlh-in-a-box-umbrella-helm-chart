@@ -1,0 +1,63 @@
+apiVersion: v2
+name: dlh-in-a-box
+description: True umbrella Helm chart for modular data lakehouse platform infrastructure on Kubernetes.
+type: application
+version: 0.1.0
+appVersion: "0.1.0"
+home: https://github.com/example/dlh-in-a-box-umbrella-helm-chart
+sources:
+  - https://github.com/trinodb/charts
+  - https://github.com/PrefectHQ/prefect-helm
+  - https://github.com/bitnami/charts
+  - https://github.com/kubeflow/spark-operator
+  - https://github.com/acryldata/datahub-helm
+  - https://github.com/hashicorp/vault-helm
+keywords:
+  - lakehouse
+  - trino
+  - prefect
+  - spark
+  - datahub
+  - vault
+maintainers:
+  - name: dlh-in-a-box maintainers
+
+# This chart intentionally prefers upstream dependencies with minimal local templates.
+dependencies:
+  - name: trino
+    version: ">=0.14.0 <1.0.0"
+    repository: https://trinodb.github.io/charts
+    condition: trino.enabled
+
+  - name: prefect-server
+    alias: prefectServer
+    version: ">=2024.0.0 <2026.0.0"
+    repository: https://prefecthq.github.io/prefect-helm
+    condition: prefect.enabled,prefect.server.enabled
+
+  - name: prefect-worker
+    alias: prefectWorker
+    version: ">=2024.0.0 <2026.0.0"
+    repository: https://prefecthq.github.io/prefect-helm
+    condition: prefect.enabled,prefect.workers.enabled
+
+  - name: spark-operator
+    alias: sparkOperator
+    version: ">=1.1.0 <3.0.0"
+    repository: https://kubeflow.github.io/spark-operator
+    condition: sparkOperator.enabled
+
+  - name: minio
+    version: ">=14.0.0 <16.0.0"
+    repository: https://charts.bitnami.com/bitnami
+    condition: minio.enabled
+
+  - name: datahub
+    version: ">=0.3.0 <1.0.0"
+    repository: https://helm.datahubproject.io
+    condition: datahub.enabled
+
+  - name: vault
+    version: ">=0.27.0 <1.0.0"
+    repository: https://helm.releases.hashicorp.com
+    condition: vault.enabled
