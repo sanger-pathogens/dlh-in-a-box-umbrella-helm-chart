@@ -1,12 +1,50 @@
 # dlh-in-a-box-umbrella-helm-chart
 
-A true umbrella Helm chart for deploying a modular, open-source data lakehouse platform on Kubernetes.
+A true umbrella Helm chart for deploying an open-source data lakehouse platform on Kubernetes.
 
 ## Overview
 
-This repository packages platform infrastructure components as upstream Helm chart dependencies wherever practical, with minimal local templates for cross-component integration.
+This repository packages platform infrastructure components as upstream dependencies wherever practical, with minimal local templates for cross-component integration.
 
-It is intentionally **not** a monolithic custom chart and does not include pipeline code, Spark application code, or business logic.
+It is designed to be installable as a standalone umbrella chart and consumable as an OCI dependency from other repositories. It does not include pipeline code, Spark application code, or business logic.
+
+## Usage
+
+You can consume the chart in two ways.
+
+Direct install from the published OCI artifact:
+
+```bash
+helm install dlh \
+  oci://registry-1.docker.io/cv4551/dlh-in-a-box \
+  --version 0.1.0 \
+  -n data-lakehouse-local \
+  --create-namespace \
+  -f my-values.yaml
+```
+
+As a dependency from another repository:
+
+1. Add it to your `Chart.yaml`:
+   ```yaml
+   dependencies:
+     - name: dlh-in-a-box
+       version: 0.1.0
+       repository: oci://registry-1.docker.io/cv4551
+       condition: dlh-in-a-box.enabled
+   ```
+2. Run `helm dependency build`.
+3. Configure values in your `values.yaml` by merging with the provided examples from this repository.
+
+For local development from this repository:
+```bash
+./hack/helm-dependency-update.sh
+./hack/lint.sh
+helm upgrade --install dlh charts/dlh-in-a-box \
+  -n data-lakehouse-local \
+  --create-namespace \
+  -f examples/values-local.yaml
+```
 
 ## Components
 
@@ -19,7 +57,7 @@ The umbrella chart coordinates the following components:
 - Vault (default: enabled)
 - MinIO (default: disabled)
 - DataHub (default: disabled)
-- Hive Metastore (default: disabled; placeholder integration scaffold)
+- Hive Metastore (default: disabled; local implementation with multi-schema support)
 
 See [docs/components.md](docs/components.md) for details.
 
@@ -34,7 +72,30 @@ See [docs/components.md](docs/components.md) for details.
 
 See [docs/architecture.md](docs/architecture.md).
 
-## Storage model
+## Configuration
+
+### Data Catalogs
+
+Configure data catalogs in `global.dataCatalogs` to define schemas and their types:
+
+```yaml
+global:
+  dataCatalogs:
+    bronze:
+      type: deltaLake  # or hive
+      authorizedUsers:
+        read: ["user1", "analyst"]
+        write: ["admin", "etl"]
+    geospatial:
+      type: hive
+      authorizedUsers:
+        read: ["user1"]
+        write: ["admin"]
+```
+
+When `hive.enabled: true`, this will create metastore instances for each catalog and configure the Trino catalog config and access control rules to match.
+
+### Storage
 
 Default mode uses external S3-compatible storage. Optional in-cluster MinIO can be enabled.
 
@@ -42,6 +103,13 @@ Default mode uses external S3-compatible storage. Optional in-cluster MinIO can 
 - `global.storage.backend: minio` (when MinIO is enabled)
 
 See [docs/storage.md](docs/storage.md).
+
+### Databases
+
+Components deploy their own databases where possible:
+- Prefect: PostgreSQL (enabled via `prefectServer.postgresql.enabled`)
+- DataHub: MySQL (enabled via `datahubUpstream.mysql.enabled`)
+- Hive: PostgreSQL (deployed when `hive.enabled`)
 
 ## Secrets management
 
@@ -51,17 +119,23 @@ No secrets should be committed to Git. Use existing Kubernetes secrets and/or Va
 
 See [docs/secrets.md](docs/secrets.md).
 
-## Quick start
+## Quick start (for testing only)
+
+For local testing and development:
 
 ```bash
 ./hack/helm-dependency-update.sh
 ./hack/lint.sh
-helm install dlh charts/dlh-in-a-box -f examples/values-dev.yaml
+helm upgrade --install dlh charts/dlh-in-a-box \
+  -n data-lakehouse-local \
+  --create-namespace \
+  -f examples/values-local.yaml
 ```
 
 ## Example configurations
 
 - Development baseline: `examples/values-dev.yaml`
+- Local kind profile: `examples/values-local.yaml`
 - Production baseline: `examples/values-prod.yaml`
 - External S3-focused config: `examples/values-external-s3.yaml`
 - MinIO-enabled config: `examples/values-minio.yaml`
@@ -72,6 +146,7 @@ helm install dlh charts/dlh-in-a-box -f examples/values-dev.yaml
 - Prefer upstream chart configuration over custom templating.
 - Validate values with `values.schema.json`.
 - Use helper scripts under `hack/` for repeatable local checks.
+- OCI publication is automated via GitHub Actions in `.github/workflows/helm-publish.yaml`.
 
 ## Out of scope
 

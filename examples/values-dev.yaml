@@ -9,28 +9,16 @@ global:
       region: us-east-1
       bucket: dlh-dev
       pathStyleAccess: true
-
-dataCatalogs:
-  default:
-    type: deltaLake
-    authorizedUsers:
-      read: ["user1", "user2"]
-      write: ["admin"]
+  dataCatalogs:
+    default:
+      type: deltaLake
+      authorizedUsers:
+        read: ["user1", "user2"]
+        write: ["admin"]
 
 trino:
-  catalogs:
-    default: |
-      connector.name=delta_lake
-      hive.metastore.uri=thrift://dlh-default-metastore:9083
-      fs.native-s3.enabled=true
-      s3.aws-access-key=accesskey
-      s3.aws-secret-key=secretkey
-      s3.endpoint=https://s3.example-dev.local
-      s3.region=us-east-1
-      s3.path-style-access=true
-      delta.enable-non-concurrent-writes=true
-      delta.register-table-procedure.enabled=true
-      delta.metadata.cache-ttl=30s
+  accessControl:
+    type: configmap
 
 prefect:
   workers:

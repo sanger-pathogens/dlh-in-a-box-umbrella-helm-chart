@@ -1,0 +1,19 @@
+{{- $catalogs := (include "trino.dataCatalogs" . | fromYaml) | default (dict) -}}
+{{- $global := get .Values "global" | default (dict) -}}
+{{- $storage := get $global "storage" | default (dict) -}}
+{{- $s3 := get $storage "s3" | default (dict) -}}
+{{- if $catalogs }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ template "trino.catalog" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "trino.labels" . | nindent 4 }}
+    app.kubernetes.io/component: catalogs
+data:
+{{- range $catalogName, $catalog := $catalogs }}
+  {{ $catalogName }}.properties: |
+{{ include "trino.catalogProperties" (dict "catalogName" $catalogName "catalog" $catalog "s3" $s3) | indent 4 }}
+{{- end }}
+{{- end }}

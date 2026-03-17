@@ -1,4 +1,6 @@
-{{- range $catalogName, $catalog := .Values.dataCatalogs }}
+{{- if .Values.schemainit.job.enabled }}
+{{- $catalogs := default dict .Values.global.dataCatalogs }}
+{{- range $catalogName, $catalog := $catalogs }}
 {{- $safeCatalog := include "hive.sanitize" $catalogName }}
 
 ---
@@ -93,4 +95,5 @@ spec:
             - configMapRef:
                 name: {{ include "hive.fullname" $ }}-init-config
 
+{{- end }}
 {{- end }}

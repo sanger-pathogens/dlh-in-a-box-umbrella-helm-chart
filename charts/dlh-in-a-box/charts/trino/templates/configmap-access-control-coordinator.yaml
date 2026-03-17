@@ -1,0 +1,18 @@
+{{- if eq .Values.accessControl.type "configmap" }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ template "trino.fullname" . }}-access-control-volume-coordinator
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "trino.labels" . | nindent 4 }}
+    app.kubernetes.io/component: coordinator
+data:
+  rules.json: |-
+{{ $rules := get (.Values.accessControl.rules | default (dict)) "rules.json" }}
+{{- if $rules }}
+{{- $rules | indent 4 }}
+{{- else }}
+{{- include "trino.accessControlRules" . | indent 4 }}
+{{- end }}
+{{- end }}

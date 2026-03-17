@@ -60,11 +60,112 @@
                 "pathStyleAccess": {
                   "type": "boolean"
                 },
+                "accessKey": {
+                  "type": "string"
+                },
+                "secretKey": {
+                  "type": "string"
+                },
                 "accessKeyKey": {
                   "type": "string"
                 },
                 "secretKeyKey": {
                   "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "global": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "domain": {
+          "type": "string"
+        },
+        "environment": {
+          "type": "string",
+          "minLength": 0,
+          "maxLength": 64,
+          "pattern": "^[a-zA-Z0-9-]*$"
+        },
+        "storage": {
+          "type": "object",
+          "additionalProperties": true,
+          "required": [
+            "backend",
+            "existingSecret",
+            "s3"
+          ],
+          "properties": {
+            "backend": {
+              "type": "string",
+              "enum": [
+                "externalS3",
+                "minio"
+              ]
+            },
+            "existingSecret": {
+              "type": "string"
+            },
+            "s3": {
+              "type": "object",
+              "additionalProperties": true,
+              "required": [
+                "endpoint",
+                "region",
+                "bucket",
+                "pathStyleAccess",
+                "accessKeyKey",
+                "secretKeyKey"
+              ],
+              "properties": {
+                "endpoint": {
+                  "type": "string"
+                },
+                "region": {
+                  "type": "string"
+                },
+                "bucket": {
+                  "type": "string"
+                },
+                "pathStyleAccess": {
+                  "type": "boolean"
+                },
+                "accessKeyKey": {
+                  "type": "string"
+                },
+                "secretKeyKey": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "dataCatalogs": {
+          "type": "object",
+          "patternProperties": {
+            ".*": {
+              "type": "object",
+              "properties": {
+                "type": {
+                  "type": "string",
+                  "enum": ["deltaLake", "hive"]
+                },
+                "authorizedUsers": {
+                  "type": "object",
+                  "properties": {
+                    "read": {
+                      "type": "array",
+                      "items": { "type": "string" }
+                    },
+                    "write": {
+                      "type": "array",
+                      "items": { "type": "string" }
+                    }
+                  }
                 }
               }
             }
@@ -115,6 +216,14 @@
         }
       }
     },
+    "prefectServer": {
+      "type": "object",
+      "additionalProperties": true
+    },
+    "prefectWorker": {
+      "type": "object",
+      "additionalProperties": true
+    },
     "sparkOperator": {
       "type": "object",
       "required": ["enabled"],
@@ -136,14 +245,102 @@
         "enabled": { "type": "boolean" }
       }
     },
+    "datahubUpstream": {
+      "type": "object",
+      "additionalProperties": true
+    },
     "hive": {
       "type": "object",
-      "required": ["enabled", "implementation"],
+      "required": ["enabled"],
       "properties": {
         "enabled": { "type": "boolean" },
-        "implementation": {
-          "type": "string",
-          "enum": ["placeholder", "upstream", "external"]
+        "metastore": {
+          "type": "object",
+          "properties": {
+            "image": {
+              "type": "object",
+              "properties": {
+                "registry": { "type": "string" },
+                "repository": { "type": "string" },
+                "tag": { "type": "string" }
+              }
+            }
+          }
+        },
+        "schemainit": {
+          "type": "object",
+          "properties": {
+            "image": {
+              "type": "object",
+              "properties": {
+                "registry": { "type": "string" },
+                "repository": { "type": "string" },
+                "tag": { "type": "string" }
+              }
+            },
+            "job": {
+              "type": "object",
+              "properties": {
+                "enabled": { "type": "boolean" }
+              }
+            }
+          }
+        },
+        "postgres": {
+          "type": "object",
+          "properties": {
+            "host": { "type": "string" },
+            "port": { "type": "string" },
+            "username": { "type": "string" },
+            "password": { "type": "string" },
+            "existingSecret": { "type": "string" }
+          }
+        },
+        "s3": {
+          "type": "object",
+          "properties": {
+            "endpoint": { "type": "string" },
+            "accessKey": { "type": "string" },
+            "secretKey": { "type": "string" },
+            "pathStyleAccess": { "type": "boolean" },
+            "existingSecret": { "type": "string" }
+          }
+        },
+        "warehouseDir": { "type": "string" },
+        "ingress": {
+          "type": "object",
+          "properties": {
+            "enabled": { "type": "boolean" },
+            "className": { "type": "string" },
+            "tlsSecretName": { "type": "string" }
+          }
+        },
+        "dataCatalogs": {
+          "type": "object",
+          "patternProperties": {
+            ".*": {
+              "type": "object",
+              "properties": {
+                "type": {
+                  "type": "string",
+                  "enum": ["deltaLake", "hive"]
+                },
+                "authorizedUsers": {
+                  "type": "object",
+                  "properties": {
+                    "read": {
+                      "type": "array",
+                      "items": { "type": "string" }
+                    },
+                    "write": {
+                      "type": "array",
+                      "items": { "type": "string" }
+                    }
+                  }
+                }
+              }
+            }
+          }
         }
       }
     },

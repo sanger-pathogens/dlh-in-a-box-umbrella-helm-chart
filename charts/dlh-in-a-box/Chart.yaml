@@ -25,8 +25,8 @@ maintainers:
 # This chart intentionally prefers upstream dependencies with minimal local templates.
 dependencies:
   - name: trino
-    version: ">=0.14.0 <1.0.0"
-    repository: https://trinodb.github.io/charts
+    version: "0.34.0"
+    repository: file://charts/trino
     condition: trino.enabled
 
   - name: prefect-server
@@ -63,7 +63,8 @@ dependencies:
     condition: vault.enabled
 
   - name: hive
-    version: ">=0.1.0 <1.0.0"
+    version: "0.1.0"
+    repository: file://charts/hive
     condition: hive.enabled
 
   - name: postgresql

@@ -1,0 +1,30 @@
+dependencies:
+- name: trino
+  repository: file://charts/trino
+  version: 0.34.0
+- name: prefect-server
+  repository: https://prefecthq.github.io/prefect-helm
+  version: 2025.12.31221620
+- name: prefect-worker
+  repository: https://prefecthq.github.io/prefect-helm
+  version: 2025.12.31221620
+- name: spark-operator
+  repository: https://kubeflow.github.io/spark-operator
+  version: 2.4.0
+- name: minio
+  repository: https://charts.bitnami.com/bitnami
+  version: 15.0.7
+- name: datahub
+  repository: https://helm.datahubproject.io
+  version: 0.8.21
+- name: vault
+  repository: https://helm.releases.hashicorp.com
+  version: 0.32.0
+- name: hive
+  repository: file://charts/hive
+  version: 0.1.0
+- name: postgresql
+  repository: https://charts.bitnami.com/bitnami
+  version: 14.3.3
+digest: sha256:d050559ba98cbe2181a021154b2eb4c7bad92abd27aaadc370be0787003ba293
+generated: "2026-03-17T11:06:48.312988Z"

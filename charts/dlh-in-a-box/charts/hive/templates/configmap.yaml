@@ -1,4 +1,5 @@
-{{- range $catalogName, $catalog := .Values.dataCatalogs }}
+{{- $catalogs := default dict .Values.global.dataCatalogs }}
+{{- range $catalogName, $catalog := $catalogs }}
 {{- $safeCatalog := include "hive.sanitize" $catalogName }}
 
 ---
@@ -15,7 +16,7 @@ data:
     <configuration>
       <property>
         <name>fs.s3a.connection.ssl.enabled</name>
-        <value>true</value>
+        <value>{{ hasPrefix "https://" $.Values.s3.endpoint }}</value>
       </property>
       <property>
         <name>fs.s3a.endpoint</name>
@@ -32,6 +33,10 @@ data:
       <property>
         <name>fs.s3a.secret.key</name>
         <value>{{ $.Values.s3.secretKey }}</value>
+      </property>
+      <property>
+        <name>fs.s3a.path.style.access</name>
+        <value>{{ $.Values.s3.pathStyleAccess }}</value>
       </property>
     </configuration>
 

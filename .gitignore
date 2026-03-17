@@ -9,3 +9,7 @@ charts/dlh-in-a-box/charts/*.tgz
 # Temporary files
 *.tmp
 *.log
+dist/
+
+# Reference materials
+references/

@@ -11,6 +11,8 @@ schemainit:
     registry: ""
     repository: ""
     tag: ""
+  job:
+    enabled: false
 
 # PostgreSQL connection (external or deployed separately)
 postgres:
@@ -25,15 +27,22 @@ s3:
   endpoint: ""
   accessKey: ""
   secretKey: ""
+  pathStyleAccess: true
   existingSecret: ""
 
 # Warehouse directory base
 warehouseDir: ""
 
-# Data catalogs configuration (maps to schemas)
-dataCatalogs:
-  default:
-    type: deltaLake  # deltaLake or hive
-    authorizedUsers:
-      read: []
-      write: []
+ingress:
+  enabled: false
+  className: ""
+  tlsSecretName: ""
+
+# Data catalogs configuration is sourced from global.dataCatalogs in the umbrella chart.
+# If using this chart stand-alone, you can uncomment and populate:
+# dataCatalogs:
+#   default:
+#     type: deltaLake  # deltaLake or hive
+#     authorizedUsers:
+#       read: []
+#       write: []

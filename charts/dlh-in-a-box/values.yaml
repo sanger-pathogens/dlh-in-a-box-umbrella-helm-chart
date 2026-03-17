@@ -12,19 +12,23 @@ global:
       region: ""
       bucket: ""
       pathStyleAccess: true
+      accessKey: ""
+      secretKey: ""
       accessKeyKey: accessKey
       secretKeyKey: secretKey
 
-# Data catalogs configuration
-dataCatalogs:
-  default:
-    type: deltaLake  # deltaLake or hive
-    authorizedUsers:
-      read: []
-      write: []
+  # Data catalogs configuration (used to generate Hive metastores and Trino catalogs)
+  dataCatalogs:
+    default:
+      type: deltaLake  # deltaLake or hive
+      authorizedUsers:
+        read: []
+        write: []
 
 trino:
   enabled: true
+  accessControl:
+    type: configmap
 
 prefect:
   enabled: true
@@ -44,10 +48,15 @@ prefectServer:
 
 prefectWorker:
   worker:
-    apiConfig: server
+    apiConfig: selfHostedServer
+    config:
+      workPool: kubernetes-pool
+    selfHostedServerApiConfig:
+      apiUrl: http://prefect-server:4200/api
 
 sparkOperator:
   enabled: true
+  nameOverride: spark-operator
 
 minio:
   enabled: false
@@ -72,6 +81,8 @@ hive:
       registry: ""
       repository: ""
       tag: ""
+    job:
+      enabled: false
   postgres:
     host: ""
     port: "5432"
@@ -82,8 +93,13 @@ hive:
     endpoint: ""
     accessKey: ""
     secretKey: ""
+    pathStyleAccess: true
     existingSecret: ""
   warehouseDir: ""
+  ingress:
+    enabled: false
+    className: ""
+    tlsSecretName: ""
   dataCatalogs:
     default:
       type: deltaLake
@@ -93,3 +109,6 @@ hive:
 
 vault:
   enabled: true
+
+postgresql:
+  nameOverride: hive-postgresql
