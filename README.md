@@ -134,6 +134,13 @@ The umbrella chart keeps only the pieces that do not exist upstream or that need
 - `CONTRIBUTING.md`: contributor workflow, release flow, and dependency hygiene guidance
 - `.github/workflows/helm-publish.yaml`: GitHub Actions workflow that packages and publishes the chart to GHCR
 
+## Contribution model
+
+This repository can be made publicly visible for consumption and reuse without
+being open to unrestricted pull requests. Pull requests are limited to
+repository collaborators, and repository ownership is managed through
+`.github/CODEOWNERS`.
+
 ## Deployment modes
 
 ### Local validation
