@@ -27,6 +27,7 @@ This is an engineering-facing compliance record, not formal legal advice.
 | Spark Operator Helm chart | `2.4.0` | Apache-2.0 | Redistributed as an upstream chart archive | No local source modifications. |
 | Bitnami Helm charts | `minio 15.0.7`, `postgresql 14.3.3`, and bundled `common` and `redis` subcharts shipped by Bitnami and Prefect packages | Apache-2.0 | Redistributed as upstream chart archives and embedded subcharts inside those archives | No local source modifications. The umbrella chart package includes an Apache-2.0 license copy at `charts/dlh-in-a-box/LICENSE`. |
 | DataHub Helm chart and bundled subcharts | `0.8.21` plus bundled `datahub-gms`, `datahub-frontend`, `datahub-mae-consumer`, `datahub-mce-consumer`, `datahub-ingestion-cron`, and `acryl-datahub-actions` subcharts | Apache-2.0 | Redistributed as an upstream chart archive | The upstream `NOTICE` file is reproduced at `charts/dlh-in-a-box/third_party/datahub/NOTICE` because the Apache-2.0 redistribution terms require readable notice reproduction when a distributed work ships with a `NOTICE` file. |
+| `datahub-prerequisites` Helm chart and bundled dependency charts | `0.2.3` plus bundled Elasticsearch, MySQL, PostgreSQL, Kafka, Neo4j, OpenSearch, and related helper charts as shipped by the upstream dependency | Apache-2.0 | Redistributed as an upstream chart archive | Included so `dlh-in-a-box` can deploy a self-contained DataHub baseline when `datahub.enabled=true`. Upstream source is maintained in the DataHub Helm repository noted below. |
 | Vault Helm chart | `0.32.0` | MPL-2.0 | Redistributed as upstream dependency material in the repository and packaged chart | No local source modifications. The upstream dependency material carries `vault/LICENSE`; this repository also documents the upstream source and license below. |
 | Local Hive subchart | `0.1.0` | Apache-2.0 | Local source under `charts/dlh-in-a-box/charts/hive/` and packaged as a local subchart dependency | Covered by this repository's Apache-2.0 license. |
 
@@ -41,6 +42,7 @@ This is an engineering-facing compliance record, not formal legal advice.
 - DataHub Helm charts: `https://github.com/acryldata/datahub-helm`
 - DataHub license: `https://github.com/acryldata/datahub-helm/blob/master/LICENSE`
 - DataHub notice: `https://github.com/acryldata/datahub-helm/blob/master/NOTICE`
+- DataHub prerequisites chart: `https://github.com/acryldata/datahub-helm/tree/master/charts/prerequisites`
 - Vault Helm chart: `https://github.com/hashicorp/vault-helm`
 - Vault license: `https://github.com/hashicorp/vault-helm/blob/main/LICENSE`
 - Bitnami charts: `https://github.com/bitnami/charts`
