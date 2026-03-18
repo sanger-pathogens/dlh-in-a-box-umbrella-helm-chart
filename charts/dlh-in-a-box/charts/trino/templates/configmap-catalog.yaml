@@ -19,6 +19,6 @@ metadata:
 data:
 {{- range $catalogName, $catalog := $catalogs }}
   {{ $catalogName }}.properties: |
-{{ include "trino.catalogProperties" (dict "catalogName" $catalogName "catalog" $catalog "s3" $s3) | indent 4 }}
+{{ include "trino.catalogProperties" (dict "root" $ "catalogName" $catalogName "catalog" $catalog "s3" $s3) | indent 4 }}
 {{- end }}
 {{- end }}

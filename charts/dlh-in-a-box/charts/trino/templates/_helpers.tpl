@@ -174,14 +174,16 @@ Create the secret name for the group-provider file
 {{- end -}}
 
 {{- define "trino.catalogProperties" -}}
+{{- $root := .root -}}
 {{- $catalogName := .catalogName -}}
 {{- $catalog := .catalog -}}
 {{- $type := default "deltaLake" $catalog.type -}}
 {{- $safeCatalog := include "trino.sanitizeCatalogName" $catalogName -}}
 {{- $s3 := .s3 | default (dict) -}}
+{{- $hiveFullname := printf "%s-hive" $root.Release.Name -}}
 {{- if eq $type "deltaLake" }}
 connector.name=delta_lake
-hive.metastore.uri=thrift://hive-{{ $safeCatalog }}-metastore:9083
+hive.metastore.uri=thrift://{{ $hiveFullname }}-{{ $safeCatalog }}-metastore:9083
 fs.native-s3.enabled=true
 s3.aws-access-key={{ $s3.accessKey }}
 s3.aws-secret-key={{ $s3.secretKey }}
@@ -193,7 +195,7 @@ delta.register-table-procedure.enabled=true
 delta.metadata.cache-ttl=30s
 {{- else if eq $type "hive" }}
 connector.name=hive
-hive.metastore.uri=thrift://hive-{{ $safeCatalog }}-metastore:9083
+hive.metastore.uri=thrift://{{ $hiveFullname }}-{{ $safeCatalog }}-metastore:9083
 fs.native-s3.enabled=true
 s3.aws-access-key={{ $s3.accessKey }}
 s3.aws-secret-key={{ $s3.secretKey }}
