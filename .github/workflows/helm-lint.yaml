@@ -4,6 +4,9 @@ on:
   push:
   pull_request:
 
+permissions:
+  contents: read
+
 jobs:
   lint:
     runs-on: ubuntu-latest
@@ -19,3 +22,9 @@ jobs:
 
       - name: Lint chart
         run: ./hack/lint.sh
+
+      - name: Render chart
+        run: ./hack/template.sh
+
+      - name: Package chart
+        run: ./hack/package.sh
