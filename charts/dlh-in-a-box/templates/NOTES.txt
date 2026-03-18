@@ -9,6 +9,9 @@ Enabled components:
 - Spark Operator: {{ .Values.sparkOperator.enabled }}
 - MinIO: {{ .Values.minio.enabled }}
 - DataHub: {{ .Values.datahub.enabled }}
+{{- if .Values.datahub.enabled }}
+- DataHub prerequisites: bundled in this release
+{{- end }}
 - Hive Metastore: {{ .Values.hive.enabled }}
 - Vault: {{ .Values.vault.enabled }}
 

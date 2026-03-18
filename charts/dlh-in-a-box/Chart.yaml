@@ -66,6 +66,12 @@ dependencies:
     repository: https://helm.datahubproject.io
     condition: datahub.enabled
 
+  - name: datahub-prerequisites
+    alias: datahubPrerequisites
+    version: "0.2.3"
+    repository: https://helm.datahubproject.io
+    condition: datahub.enabled
+
   - name: vault
     version: "0.32.0"
     repository: https://helm.releases.hashicorp.com

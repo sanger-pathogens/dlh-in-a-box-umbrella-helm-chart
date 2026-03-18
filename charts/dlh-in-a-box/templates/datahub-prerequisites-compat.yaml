@@ -1,0 +1,45 @@
+{{- if .Values.datahub.enabled }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: prerequisites-kafka
+  labels:
+    {{- include "dlh-in-a-box.labels" . | nindent 4 }}
+spec:
+  type: ExternalName
+  externalName: {{ include "dlh-in-a-box.datahubPrerequisites.kafkaFQDN" . }}
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: prerequisites-zookeeper
+  labels:
+    {{- include "dlh-in-a-box.labels" . | nindent 4 }}
+spec:
+  type: ExternalName
+  externalName: {{ include "dlh-in-a-box.datahubPrerequisites.zookeeperFQDN" . }}
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: prerequisites-mysql
+  labels:
+    {{- include "dlh-in-a-box.labels" . | nindent 4 }}
+spec:
+  type: ExternalName
+  externalName: {{ include "dlh-in-a-box.datahubPrerequisites.mysqlFQDN" . }}
+
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: mysql-secrets
+  labels:
+    {{- include "dlh-in-a-box.labels" . | nindent 4 }}
+type: Opaque
+stringData:
+  mysql-root-password: {{ required "datahubPrerequisites.mysql.auth.rootPassword must be set when datahub.enabled=true." .Values.datahubPrerequisites.mysql.auth.rootPassword | quote }}
+{{- end }}

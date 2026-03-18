@@ -61,11 +61,23 @@ minio:
 
 datahub:
   enabled: false
+  # Upstream DataHub chart values should be set directly under this key.
+  # Example:
+  # datahub-frontend:
+  #   service:
+  #     type: ClusterIP
+  # datahubSystemUpdate:
+  #   annotations:
+  #     helm.sh/hook: post-install,post-upgrade
+  #     helm.sh/hook-delete-policy: before-hook-creation
 
-# Upstream DataHub chart values
-datahubUpstream:
+# Upstream DataHub prerequisites chart values. These are deployed alongside the
+# DataHub chart when DataHub is enabled so the umbrella release remains
+# self-contained.
+datahubPrerequisites:
   mysql:
-    enabled: true
+    auth:
+      rootPassword: ""
 
 hive:
   enabled: false

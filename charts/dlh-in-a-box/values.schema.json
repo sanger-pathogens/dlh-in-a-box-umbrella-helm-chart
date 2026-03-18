@@ -123,11 +123,12 @@
     },
     "datahub": {
       "type": "object",
+      "additionalProperties": true,
       "properties": {
         "enabled": { "type": "boolean" }
       }
     },
-    "datahubUpstream": {
+    "datahubPrerequisites": {
       "type": "object",
       "additionalProperties": true
     },
