@@ -52,8 +52,13 @@ shopt -s nullglob
 vault_archives=(charts/dlh-in-a-box/charts/vault-*.tgz)
 shopt -u nullglob
 if (( ${#vault_archives[@]} > 0 )); then
-  if ! tar -tzf "${vault_archives[0]}" | grep -Fqx "vault/LICENSE"; then
+  archive_index="$(mktemp)"
+  trap 'rm -f "${archive_index}"' EXIT
+  tar -tzf "${vault_archives[0]}" > "${archive_index}"
+  if ! grep -Fqx "vault/LICENSE" "${archive_index}"; then
     echo "Vault dependency archive no longer contains vault/LICENSE" >&2
     exit 1
   fi
+  rm -f "${archive_index}"
+  trap - EXIT
 fi

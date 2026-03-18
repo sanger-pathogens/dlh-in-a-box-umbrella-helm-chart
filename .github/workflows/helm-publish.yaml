@@ -3,8 +3,14 @@ name: helm-publish
 on:
   workflow_dispatch:
   push:
+    branches:
+      - main
     tags:
       - "v*"
+
+concurrency:
+  group: helm-publish-${{ github.ref }}
+  cancel-in-progress: true
 
 permissions:
   contents: read
@@ -22,6 +28,47 @@ jobs:
       - name: Setup Helm
         uses: azure/setup-helm@v4
 
+      - name: Resolve publish version
+        id: version
+        env:
+          GITHUB_REF: ${{ github.ref }}
+          GITHUB_REF_NAME: ${{ github.ref_name }}
+          GITHUB_RUN_ATTEMPT: ${{ github.run_attempt }}
+          GITHUB_RUN_NUMBER: ${{ github.run_number }}
+          GITHUB_SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+
+          BASE_VERSION="$(ruby -e 'require "yaml"; chart = YAML.load_file("charts/dlh-in-a-box/Chart.yaml"); puts chart.fetch("version")')"
+          BASE_APP_VERSION="$(ruby -e 'require "yaml"; chart = YAML.load_file("charts/dlh-in-a-box/Chart.yaml"); puts chart.fetch("appVersion")')"
+          SHORT_SHA="${GITHUB_SHA::7}"
+
+          if [[ "${GITHUB_REF}" == refs/tags/v* ]]; then
+            TAG_VERSION="${GITHUB_REF_NAME#v}"
+            if [[ "${TAG_VERSION}" != "${BASE_VERSION}" ]]; then
+              echo "Git tag ${TAG_VERSION} does not match Chart.yaml version ${BASE_VERSION}" >&2
+              exit 1
+            fi
+
+            CHART_VERSION="${BASE_VERSION}"
+            APP_VERSION="${BASE_APP_VERSION}"
+            CHANNEL="release"
+          else
+            CHART_VERSION="${BASE_VERSION}-main.${GITHUB_RUN_NUMBER}.${GITHUB_RUN_ATTEMPT}.${SHORT_SHA}"
+            APP_VERSION="${BASE_APP_VERSION}-main.${SHORT_SHA}"
+            CHANNEL="main"
+          fi
+
+          PACKAGE_REF="${GHCR_REPOSITORY}/dlh-in-a-box"
+
+          {
+            echo "base_version=${BASE_VERSION}"
+            echo "chart_version=${CHART_VERSION}"
+            echo "app_version=${APP_VERSION}"
+            echo "channel=${CHANNEL}"
+            echo "package_ref=${PACKAGE_REF}"
+          } >> "${GITHUB_OUTPUT}"
+
       - name: Update dependencies
         run: ./hack/helm-dependency-update.sh
 
@@ -29,7 +76,7 @@ jobs:
         run: ./hack/lint.sh
 
       - name: Package chart
-        run: ./hack/package.sh
+        run: ./hack/package.sh charts/dlh-in-a-box dist "${{ steps.version.outputs.chart_version }}" "${{ steps.version.outputs.app_version }}"
 
       - name: Log in to GHCR
         env:
@@ -52,4 +99,29 @@ jobs:
           printf '%s' "${TOKEN}" | helm registry login ghcr.io -u "${USERNAME}" --password-stdin
 
       - name: Push chart to GHCR
-        run: helm push dist/dlh-in-a-box-*.tgz "${GHCR_REPOSITORY}"
+        env:
+          CHART_VERSION: ${{ steps.version.outputs.chart_version }}
+          PACKAGE_REF: ${{ steps.version.outputs.package_ref }}
+        run: |
+          set -euo pipefail
+
+          if helm show chart "${PACKAGE_REF}" --version "${CHART_VERSION}" >/dev/null 2>&1; then
+            echo "Chart ${PACKAGE_REF}:${CHART_VERSION} already exists in GHCR, skipping push."
+            exit 0
+          fi
+
+          helm push "dist/dlh-in-a-box-${CHART_VERSION}.tgz" "${GHCR_REPOSITORY}"
+
+      - name: Publish summary
+        env:
+          CHART_VERSION: ${{ steps.version.outputs.chart_version }}
+          CHANNEL: ${{ steps.version.outputs.channel }}
+          PACKAGE_REF: ${{ steps.version.outputs.package_ref }}
+        run: |
+          {
+            echo "## Helm publish"
+            echo
+            echo "- Channel: ${CHANNEL}"
+            echo "- Package: \`${PACKAGE_REF}\`"
+            echo "- Version: \`${CHART_VERSION}\`"
+          } >> "${GITHUB_STEP_SUMMARY}"

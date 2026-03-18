@@ -47,6 +47,43 @@ helm upgrade --install dlh charts/dlh-in-a-box \
   -f examples/values-local.yaml
 ```
 
+Stable chart releases are published from repository tags like `v0.2.0`.
+Pushes to `main` also publish unique prerelease versions so downstream
+repositories can integration-test against the latest chart state.
+
+## Consuming from another repository
+
+For a repository in the same GitHub organization:
+
+1. make sure the package `ghcr.io/sanger-pathogens/charts/dlh-in-a-box` exists
+2. in GitHub package settings, add the consuming repository under `Manage Actions access`
+3. grant that repository at least `Read` access if package permissions are not inherited automatically
+
+In the consumer chart:
+
+```yaml
+dependencies:
+  - name: dlh-in-a-box
+    version: 0.2.0
+    repository: oci://ghcr.io/sanger-pathogens/charts
+```
+
+In the consumer workflow:
+
+```yaml
+permissions:
+  contents: read
+  packages: read
+
+steps:
+  - uses: actions/checkout@v4
+  - uses: azure/setup-helm@v4
+  - run: |
+      printf '%s' "${{ secrets.GITHUB_TOKEN }}" | \
+        helm registry login ghcr.io -u "${{ github.actor }}" --password-stdin
+  - run: helm dependency build
+```
+
 ## Architectural summary
 
 The chart is structured around a few clear responsibilities:

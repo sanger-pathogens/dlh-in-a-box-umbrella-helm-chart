@@ -199,6 +199,92 @@ Then run:
 helm dependency build
 ```
 
+For `main` branch integration builds, the publish workflow creates a unique
+prerelease version in the form:
+
+```text
+<base-version>-main.<run-number>.<run-attempt>.<short-sha>
+```
+
+That lets another repository consume the latest published `main` snapshot
+without waiting for a formal release tag. For production use, prefer the stable
+release versions published from `v*` tags.
+
+### Consuming from another repository in the same GitHub organization
+
+If the consumer repository lives in the same GitHub organization, there are two
+parts to make this work reliably:
+
+1. the chart package must exist in GHCR
+2. the consumer repository must have permission to read that package
+
+The publish workflow in this repository now handles the first part:
+
+- every push to `main` publishes a unique prerelease chart version
+- every `v*` tag publishes the matching stable chart version
+
+For the second part, configure the package once in GitHub:
+
+1. Open the package page for `ghcr.io/sanger-pathogens/charts/dlh-in-a-box`
+2. Go to `Package settings`
+3. Under `Manage Actions access`, add the consuming repository
+4. Grant that repository at least `Read` access
+
+If your organization allows package permission inheritance from the linked
+source repository, that may already be enough. If not, the explicit `Manage
+Actions access` entry is the safe setup for private cross-repo consumption.
+
+### Consumer repository example
+
+In the consuming repository `Chart.yaml`:
+
+```yaml
+dependencies:
+  - name: dlh-in-a-box
+    version: 0.2.0
+    repository: oci://ghcr.io/sanger-pathogens/charts
+```
+
+For an integration build that tracks `main`, use a published prerelease version
+instead:
+
+```yaml
+dependencies:
+  - name: dlh-in-a-box
+    version: 0.2.0-main.123.1.abcdef0
+    repository: oci://ghcr.io/sanger-pathogens/charts
+```
+
+Then in the consuming repository's workflow:
+
+```yaml
+permissions:
+  contents: read
+  packages: read
+
+steps:
+  - uses: actions/checkout@v4
+
+  - uses: azure/setup-helm@v4
+
+  - name: Log in to GHCR
+    run: |
+      printf '%s' "${{ secrets.GITHUB_TOKEN }}" | \
+        helm registry login ghcr.io -u "${{ github.actor }}" --password-stdin
+
+  - name: Build chart dependencies
+    run: helm dependency build
+```
+
+For local developer use outside GitHub Actions, authenticate with a personal
+access token classic that has `read:packages`:
+
+```bash
+export GHCR_TOKEN=YOUR_CLASSIC_PAT
+printf '%s' "$GHCR_TOKEN" | helm registry login ghcr.io -u YOUR_GITHUB_USERNAME --password-stdin
+helm dependency build
+```
+
 ## Production and operations guidance
 
 ### Secrets
@@ -224,7 +310,11 @@ helm dependency build
 - the chart package includes a dedicated chart README and license for registry consumers
 - OCI publication is handled by `.github/workflows/helm-publish.yaml`
 - the intended package target is `ghcr.io/sanger-pathogens/charts/dlh-in-a-box`
+- every push to `main` publishes a unique prerelease chart version to GHCR
+- tags in the form `vX.Y.Z` publish the stable `X.Y.Z` chart version from `Chart.yaml`
 - the workflow uses `GITHUB_TOKEN`, which is the GitHub-recommended approach for publishing packages from the workflow repository itself
+- because the package is published from the repository workflow, it should link to the repository and inherit repository permissions unless org policy disables that behavior
+- private consumer repositories may still need explicit package read access in GitHub package settings if your organization does not use automatic inheritance
 - a personal access token classic is still useful for local manual login and troubleshooting against GHCR
 
 For local manual GHCR access:
