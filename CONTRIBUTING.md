@@ -53,9 +53,17 @@ helm upgrade --install dlh charts/dlh-in-a-box \
 ## Ownership
 
 - Repository ownership is managed in `.github/CODEOWNERS`.
-- Default code owners are the
-  `@sanger-pathogens/data-engineering-and-integration-sanger` team together
-  with `@PsycheShaman` and `@y-popov`.
+- Default code owner is the
+  `@sanger-pathogens/data-engineering-and-integration-sanger` team.
+
+## Contribution model
+
+- This repository may be publicly visible, but pull requests are restricted to
+  repository collaborators.
+- External users should not assume that public visibility implies open
+  contribution rights.
+- Review routing and ongoing stewardship are handled through
+  `.github/CODEOWNERS`.
 
 ## Pull requests
 
