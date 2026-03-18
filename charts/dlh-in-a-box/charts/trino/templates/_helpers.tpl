@@ -1,3 +1,8 @@
+{{/*
+Modified for dlh-in-a-box from the upstream Trino chart.
+Local changes add catalog generation and access-control helpers for
+umbrella-chart-driven data catalog composition.
+*/}}
 {{/* vim: set filetype=mustache: */}}
 {{/*
 Expand the name of the chart.

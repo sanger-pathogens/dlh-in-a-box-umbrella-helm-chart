@@ -1,7 +1,6 @@
 global:
   storage:
     backend: minio
-    existingSecret: ""
 
 minio:
   enabled: true

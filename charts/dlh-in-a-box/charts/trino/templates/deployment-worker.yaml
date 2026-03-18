@@ -1,3 +1,8 @@
+{{/*
+Modified for dlh-in-a-box from the upstream Trino chart.
+Local changes watch globally generated catalog configuration so worker pods
+roll when umbrella-managed catalogs change.
+*/}}
 {{- $workerJmx := merge .Values.jmx.worker (omit .Values.jmx "coordinator" "worker") -}}
 {{- if gt (int .Values.server.workers) 0 }}
 apiVersion: apps/v1

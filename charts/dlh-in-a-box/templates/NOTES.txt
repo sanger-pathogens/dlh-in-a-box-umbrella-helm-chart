@@ -1,6 +1,6 @@
 Thank you for installing {{ .Chart.Name }}.
 
-This is a true umbrella chart that composes upstream components.
+This release deploys a composable lakehouse control plane into namespace {{ .Release.Namespace }}.
 
 Enabled components:
 - Trino: {{ .Values.trino.enabled }}
@@ -9,8 +9,26 @@ Enabled components:
 - Spark Operator: {{ .Values.sparkOperator.enabled }}
 - MinIO: {{ .Values.minio.enabled }}
 - DataHub: {{ .Values.datahub.enabled }}
-- Hive (placeholder): {{ .Values.hive.enabled }}
+- Hive Metastore: {{ .Values.hive.enabled }}
 - Vault: {{ .Values.vault.enabled }}
 
 Storage backend: {{ .Values.global.storage.backend }}
-Storage existing secret: {{ default "(none)" .Values.global.storage.existingSecret }}
+
+Inspect the deployment:
+- kubectl get pods -n {{ .Release.Namespace }}
+- kubectl get svc -n {{ .Release.Namespace }}
+- helm list -n {{ .Release.Namespace }}
+
+Common local access patterns:
+{{- if and .Values.prefect.enabled .Values.prefect.server.enabled }}
+- Prefect: kubectl port-forward -n {{ .Release.Namespace }} svc/prefect-server 4200:4200
+{{- end }}
+{{- if .Values.trino.enabled }}
+- Trino: kubectl port-forward -n {{ .Release.Namespace }} svc/{{ .Release.Name }}-trino 8080:8080
+{{- end }}
+{{- if .Values.minio.enabled }}
+- MinIO console: kubectl port-forward -n {{ .Release.Namespace }} svc/{{ .Release.Name }}-minio 9001:9001
+{{- end }}
+{{- if .Values.vault.enabled }}
+- Vault: kubectl port-forward -n {{ .Release.Namespace }} svc/{{ .Release.Name }}-vault 8200:8200
+{{- end }}

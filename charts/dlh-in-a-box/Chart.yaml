@@ -1,11 +1,19 @@
 apiVersion: v2
 name: dlh-in-a-box
-description: True umbrella Helm chart for modular data lakehouse platform infrastructure on Kubernetes.
+description: Production-oriented umbrella Helm chart for deploying a modular data lakehouse platform on Kubernetes.
 type: application
-version: 0.1.0
-appVersion: "0.1.0"
-home: https://github.com/example/dlh-in-a-box-umbrella-helm-chart
+version: 0.2.0
+appVersion: "0.2.0"
+home: https://github.com/sanger-pathogens/dlh-in-a-box-umbrella-helm-chart
+icon: https://raw.githubusercontent.com/sanger-pathogens/dlh-in-a-box-umbrella-helm-chart/main/docs/assets/dlh-in-a-box-icon.svg
+annotations:
+  org.opencontainers.image.title: dlh-in-a-box
+  org.opencontainers.image.description: Production-oriented umbrella Helm chart for deploying a modular data lakehouse platform on Kubernetes.
+  org.opencontainers.image.source: https://github.com/sanger-pathogens/dlh-in-a-box-umbrella-helm-chart
+  org.opencontainers.image.documentation: https://github.com/sanger-pathogens/dlh-in-a-box-umbrella-helm-chart#readme
+  org.opencontainers.image.licenses: Apache-2.0
 sources:
+  - https://github.com/sanger-pathogens/dlh-in-a-box-umbrella-helm-chart
   - https://github.com/trinodb/charts
   - https://github.com/PrefectHQ/prefect-helm
   - https://github.com/bitnami/charts
@@ -20,7 +28,8 @@ keywords:
   - datahub
   - vault
 maintainers:
-  - name: dlh-in-a-box maintainers
+  - name: Sanger Pathogens
+    url: https://github.com/sanger-pathogens
 
 # This chart intentionally prefers upstream dependencies with minimal local templates.
 dependencies:
@@ -31,34 +40,34 @@ dependencies:
 
   - name: prefect-server
     alias: prefectServer
-    version: ">=2024.0.0 <2026.0.0"
+    version: "2025.12.31221620"
     repository: https://prefecthq.github.io/prefect-helm
     condition: prefect.enabled,prefect.server.enabled
 
   - name: prefect-worker
     alias: prefectWorker
-    version: ">=2024.0.0 <2026.0.0"
+    version: "2025.12.31221620"
     repository: https://prefecthq.github.io/prefect-helm
     condition: prefect.enabled,prefect.workers.enabled
 
   - name: spark-operator
     alias: sparkOperator
-    version: ">=1.1.0 <3.0.0"
+    version: "2.4.0"
     repository: https://kubeflow.github.io/spark-operator
     condition: sparkOperator.enabled
 
   - name: minio
-    version: ">=14.0.0 <16.0.0"
+    version: "15.0.7"
     repository: https://charts.bitnami.com/bitnami
     condition: minio.enabled
 
   - name: datahub
-    version: ">=0.3.0 <1.0.0"
+    version: "0.8.21"
     repository: https://helm.datahubproject.io
     condition: datahub.enabled
 
   - name: vault
-    version: ">=0.27.0 <1.0.0"
+    version: "0.32.0"
     repository: https://helm.releases.hashicorp.com
     condition: vault.enabled
 
@@ -68,6 +77,6 @@ dependencies:
     condition: hive.enabled
 
   - name: postgresql
-    version: ">=12.0.0 <15.0.0"
+    version: "14.3.3"
     repository: https://charts.bitnami.com/bitnami
     condition: hive.enabled

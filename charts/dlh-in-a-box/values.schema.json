@@ -8,138 +8,39 @@
       "type": "object",
       "additionalProperties": true,
       "properties": {
-        "domain": {
-          "type": "string"
-        },
+        "nameOverride": { "type": "string" },
+        "fullnameOverride": { "type": "string" },
+        "domain": { "type": "string" },
         "environment": {
           "type": "string",
-          "minLength": 0,
-          "maxLength": 64,
           "pattern": "^[a-zA-Z0-9-]*$"
         },
-        "storage": {
-          "type": "object",
-          "additionalProperties": true,
-          "required": [
-            "backend",
-            "existingSecret",
-            "s3"
-          ],
-          "properties": {
-            "backend": {
-              "type": "string",
-              "enum": [
-                "externalS3",
-                "minio"
-              ]
-            },
-            "existingSecret": {
-              "type": "string"
-            },
-            "s3": {
-              "type": "object",
-              "additionalProperties": true,
-              "required": [
-                "endpoint",
-                "region",
-                "bucket",
-                "pathStyleAccess",
-                "accessKeyKey",
-                "secretKeyKey"
-              ],
-              "properties": {
-                "endpoint": {
-                  "type": "string"
-                },
-                "region": {
-                  "type": "string"
-                },
-                "bucket": {
-                  "type": "string"
-                },
-                "pathStyleAccess": {
-                  "type": "boolean"
-                },
-                "accessKey": {
-                  "type": "string"
-                },
-                "secretKey": {
-                  "type": "string"
-                },
-                "accessKeyKey": {
-                  "type": "string"
-                },
-                "secretKeyKey": {
-                  "type": "string"
-                }
-              }
-            }
+        "imagePullSecrets": {
+          "type": "array",
+          "items": {
+            "type": "object"
           }
-        }
-      }
-    },
-    "global": {
-      "type": "object",
-      "additionalProperties": true,
-      "properties": {
-        "domain": {
-          "type": "string"
-        },
-        "environment": {
-          "type": "string",
-          "minLength": 0,
-          "maxLength": 64,
-          "pattern": "^[a-zA-Z0-9-]*$"
         },
         "storage": {
           "type": "object",
           "additionalProperties": true,
-          "required": [
-            "backend",
-            "existingSecret",
-            "s3"
-          ],
           "properties": {
             "backend": {
               "type": "string",
-              "enum": [
-                "externalS3",
-                "minio"
-              ]
-            },
-            "existingSecret": {
-              "type": "string"
+              "enum": ["externalS3", "minio"]
             },
             "s3": {
               "type": "object",
               "additionalProperties": true,
-              "required": [
-                "endpoint",
-                "region",
-                "bucket",
-                "pathStyleAccess",
-                "accessKeyKey",
-                "secretKeyKey"
-              ],
               "properties": {
-                "endpoint": {
-                  "type": "string"
-                },
-                "region": {
-                  "type": "string"
-                },
-                "bucket": {
-                  "type": "string"
-                },
-                "pathStyleAccess": {
-                  "type": "boolean"
-                },
-                "accessKeyKey": {
-                  "type": "string"
-                },
-                "secretKeyKey": {
-                  "type": "string"
-                }
+                "endpoint": { "type": "string" },
+                "region": { "type": "string" },
+                "bucket": { "type": "string" },
+                "pathStyleAccess": { "type": "boolean" },
+                "accessKey": { "type": "string" },
+                "secretKey": { "type": "string" },
+                "accessKeyKey": { "type": "string" },
+                "secretKeyKey": { "type": "string" }
               }
             }
           }
@@ -149,6 +50,7 @@
           "patternProperties": {
             ".*": {
               "type": "object",
+              "additionalProperties": true,
               "properties": {
                 "type": {
                   "type": "string",
@@ -156,6 +58,7 @@
                 },
                 "authorizedUsers": {
                   "type": "object",
+                  "additionalProperties": true,
                   "properties": {
                     "read": {
                       "type": "array",
@@ -175,43 +78,24 @@
     },
     "trino": {
       "type": "object",
-      "required": ["enabled"],
       "properties": {
         "enabled": { "type": "boolean" }
       }
     },
     "prefect": {
       "type": "object",
-      "required": ["enabled", "server", "workers"],
       "properties": {
         "enabled": { "type": "boolean" },
         "server": {
           "type": "object",
-          "required": ["enabled"],
           "properties": {
             "enabled": { "type": "boolean" }
           }
         },
         "workers": {
           "type": "object",
-          "required": ["enabled", "replicaCount", "workPool", "workQueue"],
           "properties": {
-            "enabled": { "type": "boolean" },
-            "replicaCount": {
-              "type": "integer",
-              "minimum": 0
-            },
-            "workPool": {
-              "type": "string",
-              "minLength": 1
-            },
-            "workQueue": {
-              "type": "string",
-              "minLength": 1
-            },
-            "resources": {
-              "type": "object"
-            }
+            "enabled": { "type": "boolean" }
           }
         }
       }
@@ -226,21 +110,19 @@
     },
     "sparkOperator": {
       "type": "object",
-      "required": ["enabled"],
       "properties": {
-        "enabled": { "type": "boolean" }
+        "enabled": { "type": "boolean" },
+        "nameOverride": { "type": "string" }
       }
     },
     "minio": {
       "type": "object",
-      "required": ["enabled"],
       "properties": {
         "enabled": { "type": "boolean" }
       }
     },
     "datahub": {
       "type": "object",
-      "required": ["enabled"],
       "properties": {
         "enabled": { "type": "boolean" }
       }
@@ -251,14 +133,15 @@
     },
     "hive": {
       "type": "object",
-      "required": ["enabled"],
       "properties": {
         "enabled": { "type": "boolean" },
         "metastore": {
           "type": "object",
+          "additionalProperties": true,
           "properties": {
             "image": {
               "type": "object",
+              "additionalProperties": true,
               "properties": {
                 "registry": { "type": "string" },
                 "repository": { "type": "string" },
@@ -269,9 +152,11 @@
         },
         "schemainit": {
           "type": "object",
+          "additionalProperties": true,
           "properties": {
             "image": {
               "type": "object",
+              "additionalProperties": true,
               "properties": {
                 "registry": { "type": "string" },
                 "repository": { "type": "string" },
@@ -280,6 +165,7 @@
             },
             "job": {
               "type": "object",
+              "additionalProperties": true,
               "properties": {
                 "enabled": { "type": "boolean" }
               }
@@ -288,6 +174,7 @@
         },
         "postgres": {
           "type": "object",
+          "additionalProperties": true,
           "properties": {
             "host": { "type": "string" },
             "port": { "type": "string" },
@@ -298,6 +185,7 @@
         },
         "s3": {
           "type": "object",
+          "additionalProperties": true,
           "properties": {
             "endpoint": { "type": "string" },
             "accessKey": { "type": "string" },
@@ -309,46 +197,26 @@
         "warehouseDir": { "type": "string" },
         "ingress": {
           "type": "object",
+          "additionalProperties": true,
           "properties": {
             "enabled": { "type": "boolean" },
             "className": { "type": "string" },
             "tlsSecretName": { "type": "string" }
-          }
-        },
-        "dataCatalogs": {
-          "type": "object",
-          "patternProperties": {
-            ".*": {
-              "type": "object",
-              "properties": {
-                "type": {
-                  "type": "string",
-                  "enum": ["deltaLake", "hive"]
-                },
-                "authorizedUsers": {
-                  "type": "object",
-                  "properties": {
-                    "read": {
-                      "type": "array",
-                      "items": { "type": "string" }
-                    },
-                    "write": {
-                      "type": "array",
-                      "items": { "type": "string" }
-                    }
-                  }
-                }
-              }
-            }
           }
         }
       }
     },
     "vault": {
       "type": "object",
-      "required": ["enabled"],
       "properties": {
         "enabled": { "type": "boolean" }
+      }
+    },
+    "postgresql": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "nameOverride": { "type": "string" }
       }
     }
   },

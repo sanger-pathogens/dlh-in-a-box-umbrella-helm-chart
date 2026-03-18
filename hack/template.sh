@@ -15,6 +15,7 @@ if [[ $# -gt 0 ]]; then
   done
 else
   render examples/values-dev.yaml
+  render examples/values-local.yaml
   render examples/values-prod.yaml
   render examples/values-external-s3.yaml
   render examples/values-minio.yaml

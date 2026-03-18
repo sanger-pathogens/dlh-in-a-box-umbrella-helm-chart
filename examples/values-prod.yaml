@@ -3,18 +3,21 @@ global:
   domain: prod.example.com
   storage:
     backend: externalS3
-    existingSecret: prod-external-s3
     s3:
       endpoint: https://s3.example.com
       region: us-east-1
       bucket: dlh-prod
       pathStyleAccess: true
+      accessKey: ""
+      secretKey: ""
 
-prefect:
-  workers:
+prefectWorker:
+  worker:
     replicaCount: 3
-    workPool: kubernetes-prod
-    workQueue: critical
+    config:
+      workPool: kubernetes-prod
+      workQueues:
+        - critical
 
 vault:
   enabled: true

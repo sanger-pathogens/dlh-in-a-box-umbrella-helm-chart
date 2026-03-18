@@ -3,7 +3,6 @@ global:
   domain: local.test
   storage:
     backend: minio
-    existingSecret: ""
     s3:
       endpoint: http://dlh-minio:9000
       region: us-east-1

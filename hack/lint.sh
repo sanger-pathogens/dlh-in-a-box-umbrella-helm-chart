@@ -3,6 +3,8 @@ set -euo pipefail
 
 CHART_PATH="charts/dlh-in-a-box"
 
+./hack/license-check.sh
+
 helm lint "${CHART_PATH}"
 helm lint "${CHART_PATH}" -f examples/values-dev.yaml
 helm lint "${CHART_PATH}" -f examples/values-local.yaml

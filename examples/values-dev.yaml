@@ -3,12 +3,13 @@ global:
   domain: dev.local
   storage:
     backend: externalS3
-    existingSecret: dev-external-s3
     s3:
       endpoint: https://s3.example-dev.local
       region: us-east-1
       bucket: dlh-dev
       pathStyleAccess: true
+      accessKey: ""
+      secretKey: ""
   dataCatalogs:
     default:
       type: deltaLake
@@ -20,11 +21,13 @@ trino:
   accessControl:
     type: configmap
 
-prefect:
-  workers:
+prefectWorker:
+  worker:
     replicaCount: 1
-    workPool: kubernetes-dev
-    workQueue: default
+    config:
+      workPool: kubernetes-dev
+      workQueues:
+        - default
 
 datahub:
   enabled: false
@@ -48,8 +51,8 @@ hive:
     password: hivepassword
   s3:
     endpoint: https://s3.example-dev.local
-    accessKey: accesskey
-    secretKey: secretkey
+    accessKey: ""
+    secretKey: ""
   warehouseDir: s3a://dlh-dev/warehouse
 
 minio:

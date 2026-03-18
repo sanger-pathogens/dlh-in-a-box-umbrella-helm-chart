@@ -1,3 +1,8 @@
+{{/*
+Modified for dlh-in-a-box from the upstream Trino chart.
+Local changes render catalog definitions from global lakehouse catalog values
+and shared S3 settings.
+*/}}
 {{- $catalogs := (include "trino.dataCatalogs" . | fromYaml) | default (dict) -}}
 {{- $global := get .Values "global" | default (dict) -}}
 {{- $storage := get $global "storage" | default (dict) -}}

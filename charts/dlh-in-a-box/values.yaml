@@ -6,7 +6,6 @@ global:
   imagePullSecrets: []
   storage:
     backend: externalS3
-    existingSecret: ""
     s3:
       endpoint: ""
       region: ""
@@ -36,10 +35,6 @@ prefect:
     enabled: true
   workers:
     enabled: true
-    replicaCount: 1
-    workPool: kubernetes-pool
-    workQueue: default
-    resources: {}
 
 # Upstream Prefect chart values can be passed directly via these aliases.
 prefectServer:
@@ -49,8 +44,11 @@ prefectServer:
 prefectWorker:
   worker:
     apiConfig: selfHostedServer
+    replicaCount: 1
     config:
       workPool: kubernetes-pool
+      workQueues:
+        - default
     selfHostedServerApiConfig:
       apiUrl: http://prefect-server:4200/api
 
@@ -100,12 +98,6 @@ hive:
     enabled: false
     className: ""
     tlsSecretName: ""
-  dataCatalogs:
-    default:
-      type: deltaLake
-      authorizedUsers:
-        read: []
-        write: []
 
 vault:
   enabled: true
