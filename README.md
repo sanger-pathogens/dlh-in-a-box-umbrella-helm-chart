@@ -131,6 +131,7 @@ The umbrella chart keeps only the pieces that do not exist upstream or that need
 - `charts/dlh-in-a-box/charts/trino/`: locally patched Trino chart source used to build the vendored Trino dependency
 - `examples/`: environment and scenario overlays
 - `hack/`: repeatable lint, render, dependency, and packaging helpers
+- `CONTRIBUTING.md`: contributor workflow, release flow, and dependency hygiene guidance
 - `.github/workflows/helm-publish.yaml`: GitHub Actions workflow that packages and publishes the chart to GHCR
 
 ## Deployment modes
