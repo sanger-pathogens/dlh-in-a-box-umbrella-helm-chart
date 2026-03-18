@@ -89,11 +89,27 @@ spec:
                   -passWord "$POSTGRES_PASSWORD" \
                   -url "jdbc:postgresql://$POSTGRES_HOST:$POSTGRES_PORT/{{ $catalogName }}"
               fi
-          envFrom:
-            - secretRef:
-                name: {{ include "hive.fullname" $ }}-postgres-secret
-            - configMapRef:
-                name: {{ include "hive.fullname" $ }}-init-config
+          env:
+            - name: POSTGRES_USER
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "hive.fullname" $ }}-postgres-secret
+                  key: username
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "hive.fullname" $ }}-postgres-secret
+                  key: password
+            - name: POSTGRES_HOST
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ include "hive.fullname" $ }}-init-config
+                  key: POSTGRES_HOST
+            - name: POSTGRES_PORT
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ include "hive.fullname" $ }}-init-config
+                  key: POSTGRES_PORT
 
 {{- end }}
 {{- end }}
