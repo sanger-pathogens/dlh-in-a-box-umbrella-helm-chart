@@ -286,7 +286,7 @@ the one exception: those use `_README.txt` because source-based `helm lint` and
 
 | Path | Guide | Purpose |
 | --- | --- | --- |
-| `.github/` | [.github/README.md](.github/README.md) | Ownership model, repository automation, and CI/CD entry points |
+| `.github/` | [.github/OVERVIEW.md](.github/OVERVIEW.md) | Ownership model, repository automation, and CI/CD entry points |
 | `.github/ISSUE_TEMPLATE/` | [.github/ISSUE_TEMPLATE/README.md](.github/ISSUE_TEMPLATE/README.md) | Public issue intake, contact routing, and support forms |
 | `.github/workflows/` | [.github/workflows/README.md](.github/workflows/README.md) | Lint and publish workflow behavior |
 | `.vscode/` | [.vscode/README.md](.vscode/README.md) | Optional workspace settings for maintainers |

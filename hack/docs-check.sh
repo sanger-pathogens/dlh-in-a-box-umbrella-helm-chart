@@ -8,7 +8,7 @@ missing=()
 while IFS= read -r dir; do
   [[ "${dir}" == "${ROOT_DIR}" ]] && continue
 
-  if [[ -f "${dir}/README.md" ]] || [[ -f "${dir}/README.md.gotmpl" ]] || [[ -f "${dir}/_README.txt" ]]; then
+  if [[ -f "${dir}/README.md" ]] || [[ -f "${dir}/README.md.gotmpl" ]] || [[ -f "${dir}/OVERVIEW.md" ]] || [[ -f "${dir}/_README.txt" ]]; then
     continue
   fi
 
