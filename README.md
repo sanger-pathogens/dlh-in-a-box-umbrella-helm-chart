@@ -1,33 +1,50 @@
 # dlh-in-a-box-umbrella-helm-chart
 
-`dlh-in-a-box` is a production-oriented umbrella Helm chart for deploying a modular lakehouse control plane on Kubernetes.
+[![Helm Lint](https://github.com/sanger-pathogens/dlh-in-a-box-umbrella-helm-chart/actions/workflows/helm-lint.yaml/badge.svg)](https://github.com/sanger-pathogens/dlh-in-a-box-umbrella-helm-chart/actions/workflows/helm-lint.yaml)
+[![Helm Smoke Install](https://github.com/sanger-pathogens/dlh-in-a-box-umbrella-helm-chart/actions/workflows/helm-smoke-install.yaml/badge.svg)](https://github.com/sanger-pathogens/dlh-in-a-box-umbrella-helm-chart/actions/workflows/helm-smoke-install.yaml)
+[![Helm Publish](https://github.com/sanger-pathogens/dlh-in-a-box-umbrella-helm-chart/actions/workflows/helm-publish.yaml/badge.svg)](https://github.com/sanger-pathogens/dlh-in-a-box-umbrella-helm-chart/actions/workflows/helm-publish.yaml)
 
-It packages a working combination of Trino, Prefect, Spark Operator, Hive Metastore, Vault, and optional MinIO and DataHub into a single Helm release, while keeping local chart logic deliberately small and focused on cross-component composition.
+`dlh-in-a-box` packages a modular lakehouse control plane as a single OCI
+Helm chart. This repository is the source of truth for the chart itself, the
+small amount of local composition logic that sits around upstream components,
+the validation overlays used to prove it works, and the GitHub Actions flow
+that publishes it for downstream consumers.
 
-## What this repo is for
+## Quick links
 
-This repository exists to solve one specific problem well:
+- chart consumer guide: [charts/dlh-in-a-box/README.md](charts/dlh-in-a-box/README.md)
+- first five minutes: [docs/quickstart.md](docs/quickstart.md)
+- release playbook: [docs/release-playbook.md](docs/release-playbook.md)
+- example overlays: [examples/README.md](examples/README.md)
+- maintainer scripts: [hack/README.md](hack/README.md)
+- contribution workflow: [CONTRIBUTING.md](CONTRIBUTING.md)
+- support policy: [SUPPORT.md](SUPPORT.md)
+- security reporting: [SECURITY.md](SECURITY.md)
+- conduct expectations: [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md)
 
-- package a coherent lakehouse platform baseline as a single installable Helm chart
-- keep upstream services upstream wherever possible
-- provide working local and cluster overlays without burying the repo in environment-specific clutter
-- publish the chart as an OCI artifact so other repositories can consume it cleanly
+## Handover summary
 
-This repository is intentionally **not** where pipelines, Spark applications, or business logic live.
+This repository exists to do four things well:
 
-## Architecture
+- define a reusable Helm-packaged platform baseline
+- keep the dependency surface pinned and reviewable
+- validate the chart locally and in CI with realistic overlays
+- publish a consumable OCI artifact to GitHub Container Registry
 
-### Platform topology
+It is intentionally not the home for pipelines, Spark applications, or
+environment-specific business logic.
+
+## Platform architecture
 
 ```mermaid
 flowchart LR
-  subgraph Clients[Platform consumers]
+  subgraph Consumers[Platform consumers]
     Analysts[Analysts and SQL clients]
-    Operators[Platform engineers]
+    Operators[Platform operators]
     Flows[Scheduled and event-driven flows]
   end
 
-  subgraph ControlPlane[Kubernetes release]
+  subgraph Release[dlh-in-a-box Helm release]
     Trino[Trino]
     Prefect[Prefect Server]
     Worker[Prefect Workers]
@@ -38,7 +55,7 @@ flowchart LR
   end
 
   subgraph State[Stateful dependencies]
-    ObjectStore[(S3 or MinIO)]
+    ObjectStore[(External S3 or MinIO)]
     HivePg[(Hive PostgreSQL)]
     PrefectPg[(Prefect PostgreSQL)]
   end
@@ -48,113 +65,120 @@ flowchart LR
   Flows --> Worker
   Worker --> Prefect
   Worker --> Spark
+  Worker --> ObjectStore
   Trino --> Hive
   Trino --> ObjectStore
   Hive --> HivePg
   Hive --> ObjectStore
   Prefect --> PrefectPg
-  Worker --> ObjectStore
-  Vault -. secret delivery .-> Trino
-  Vault -. secret delivery .-> Worker
+  Vault -. optional secret delivery .-> Trino
+  Vault -. optional secret delivery .-> Worker
   DataHub -. optional metadata integration .-> Hive
   DataHub -. optional metadata integration .-> Trino
 ```
 
-### Control and data flow
+## Repository architecture
 
 ```mermaid
 flowchart TD
-  Values[Helm values and overlays] --> Umbrella[dlh-in-a-box umbrella chart]
-  Umbrella --> Upstream[Upstream dependency charts]
-  Umbrella --> LocalGlue[Minimal local templates]
-
-  LocalGlue --> Catalogs[Generated catalogs and access rules]
-  LocalGlue --> HiveInit[Hive schema and metastore wiring]
-
-  Upstream --> Runtime[Kubernetes workloads]
-  Catalogs --> Runtime
-  HiveInit --> Runtime
-
-  Runtime --> Query[Interactive SQL through Trino]
-  Runtime --> Orchestration[Flow orchestration through Prefect]
-  Runtime --> Compute[Spark job submission through Spark Operator]
-  Runtime --> Metadata[Table metadata through Hive]
+  Repo[Repository root]
+  Repo --> Github[.github]
+  Github --> Workflows[.github/workflows]
+  Repo --> VSCode[.vscode]
+  Repo --> Charts[charts]
+  Charts --> Umbrella[charts/dlh-in-a-box]
+  Umbrella --> UmbrellaTemplates[templates]
+  Umbrella --> Subcharts[charts]
+  Subcharts --> Hive[hive]
+  Subcharts --> Trino[trino]
+  Subcharts --> Archives[vendored upstream tgz archives]
+  Umbrella --> ThirdParty[third_party]
+  Repo --> Examples[examples]
+  Repo --> Hack[hack]
+  Repo --> Docs[docs]
+  Docs --> Assets[docs/assets]
 ```
 
-### Packaging and consumption
+## Delivery lifecycle
 
 ```mermaid
 flowchart LR
-  Repo[This repository] --> ChartDir[charts/dlh-in-a-box]
-  ChartDir --> Package[helm package]
-  Package --> OCI[OCI registry]
-  OCI --> Install[helm install or helm upgrade]
-  OCI --> ConsumerRepo[Another repository via Helm dependency]
+  Author[Maintain chart source<br/>and overlays] --> Validate[Run lint, render,<br/>license, and packaging checks]
+  Validate --> Smoke[Test install on kind<br/>with the validated local overlay]
+  Smoke --> Publish[GitHub Actions packages<br/>and pushes to GHCR]
+  Publish --> Stable[Tagged release versions]
+  Publish --> Prerelease[main branch prereleases]
+  Stable --> Consumers[Consumer repositories]
+  Prerelease --> Consumers
 ```
 
 ## Design principles
 
-- **Upstream first:** Trino, Prefect, Spark Operator, MinIO, Vault, DataHub, and PostgreSQL come from upstream charts.
-- **Minimal local ownership:** local templates only exist where cross-component composition is required.
-- **Pinned dependencies:** the published chart is built from pinned dependency versions, not floating ranges.
-- **OCI-native distribution:** consumers should install from a registry, not by copying chart directories around.
-- **Operational clarity:** local development, example overlays, package metadata, and registry-facing docs are all kept explicit.
+- Upstream first: Trino, Prefect, Spark Operator, MinIO, Vault, PostgreSQL, and
+  DataHub stay upstream wherever possible.
+- Minimal local ownership: local templates are only added for cross-component
+  composition, not to replace entire upstream charts.
+- OCI-native distribution: other repositories should consume the chart from a
+  registry, not by copying source directories around.
+- Pinned inputs: `Chart.yaml` and `Chart.lock` are treated as release inputs.
+- Operational clarity: the repo keeps examples, scripts, publication metadata,
+  licensing, and governance explicit.
 
-## What remains locally owned
+## Locally owned logic
 
-The umbrella chart keeps only the pieces that do not exist upstream or that need release-specific composition:
+These are the main behaviors that are authored here rather than delegated to an
+upstream dependency:
 
 - Trino catalog generation from `global.dataCatalogs`
 - Trino access-control generation from catalog ACLs
-- Hive metastore bootstrapping for per-catalog databases
-- local environment overlays for kind-based validation
-- umbrella-level packaging, release notes, and publication metadata
+- Hive metastore provisioning for one metastore per catalog
+- DataHub prerequisite service compatibility shims
+- local, layered, and production-shaped example overlays
+- packaging, publication, and licensing automation
 
-## Component model
+## Component inventory
 
 | Component | Role in the platform | Default state | Ownership model |
-|---|---|---|---|
-| Trino | Interactive SQL query engine over object storage and Hive metadata | Enabled | Upstream chart with local catalog wiring |
+| --- | --- | --- | --- |
+| Trino | Interactive SQL query engine over object storage and Hive metadata | Enabled | Vendored upstream chart with local patches |
 | Prefect Server | Flow API and UI | Enabled | Upstream chart |
 | Prefect Workers | Flow execution workers | Enabled | Upstream chart |
 | Spark Operator | Spark workload controller | Enabled | Upstream chart |
-| Hive Metastore | Table metadata service for Trino and Spark-compatible engines | Disabled by default | Local subchart |
-| Vault | Secrets platform for cluster-native secret workflows | Enabled | Upstream chart |
-| MinIO | In-cluster S3-compatible object store for development and demos | Disabled by default | Upstream chart |
+| Hive Metastore | Per-catalog metadata service for Trino and Spark-compatible engines | Disabled by default | Local subchart |
+| Vault | Secrets platform for cluster-native workflows | Enabled | Upstream chart |
+| MinIO | Self-contained S3-compatible storage for local or demo deployments | Disabled by default | Upstream chart |
 | DataHub | Optional metadata governance and discovery layer | Disabled by default | Upstream chart |
 | PostgreSQL | Stateful dependency for Hive metastore | Enabled when Hive is enabled | Upstream chart |
 
-## Repository layout
+## Deployment and consumption
 
-- `charts/dlh-in-a-box/`: the installable umbrella chart
-- `charts/dlh-in-a-box/charts/hive/`: local Hive subchart used to create metastore instances per catalog
-- `charts/dlh-in-a-box/charts/trino/`: locally patched Trino chart source used to build the vendored Trino dependency
-- `examples/`: environment and scenario overlays
-- `hack/`: repeatable lint, render, dependency, and packaging helpers
-- `CONTRIBUTING.md`: contributor workflow, release flow, and dependency hygiene guidance
-- `.github/workflows/helm-publish.yaml`: GitHub Actions workflow that packages and publishes the chart to GHCR
+### First five minutes
 
-## Contribution model
+If you are new to the repository, start with
+[docs/quickstart.md](docs/quickstart.md). It covers:
 
-This repository can be made publicly visible for consumption and reuse without
-being open to unrestricted pull requests. Pull requests are limited to
-repository collaborators, and repository ownership is managed through
-`.github/CODEOWNERS`.
+- inspecting the published chart
+- deploying the validated local overlay
+- consuming the package from another repository
+- the fastest route into the deeper docs
 
-## Deployment modes
+### Security posture
+
+- locally generated Trino catalog files and Hive metastore config are mounted
+  from Kubernetes `Secret` resources rather than `ConfigMap`
+- tracked non-local example overlays are kept free of inline credentials
+- the disposable local overlays still use demo credentials for laptop testing
+  and should never be reused outside throwaway environments
+- shared or production environments should enable upstream network policies
+  where the target cluster supports them
+- real secrets should be injected at deploy time, not committed to tracked
+  values files
 
 ### Local validation
 
-The local overlay is the canonical proof that the chart works end-to-end on kind:
-
-- kind cluster
-- in-cluster MinIO
-- Hive enabled
-- Prefect enabled
-- Vault in dev mode
-- reduced Trino footprint for laptop use
-
-Use:
+The canonical local proof point is `examples/values-local.yaml`, which enables
+MinIO, Hive, Prefect, Spark Operator, and Vault with laptop-sized Trino
+settings.
 
 ```bash
 ./hack/helm-dependency-update.sh
@@ -165,23 +189,29 @@ helm upgrade --install dlh charts/dlh-in-a-box \
   -f examples/values-local.yaml
 ```
 
-### External object storage
+If you prefer task aliases, use:
 
-Use `examples/values-external-s3.yaml` as a starting point when object storage is external and MinIO is disabled.
+```bash
+make lint
+make template
+make package
+make local-install
+```
 
-### Production baseline
+### Example overlays
 
-Use `examples/values-prod.yaml` as a skeletal production overlay, then layer in:
+The full overlay catalog is documented in [examples/README.md](examples/README.md).
+In brief:
 
-- real ingress and DNS
-- secret delivery strategy
-- resource requests and limits
-- storage and PostgreSQL durability requirements
-- organization-specific network policies and security controls
+- `values-local.yaml` is the validated kind deployment path
+- `values-local-layers.yaml` shows a richer multi-catalog local topology
+- `values-dev.yaml` is a lightweight shared-development baseline
+- `values-prod.yaml` is a minimal production-shaped baseline
+- `values-prod-layers.yaml` shows layered production catalog patterns
+- `values-external-s3.yaml` is the simplest external object-storage starting point
+- `values-minio.yaml` isolates the in-cluster MinIO scenario
 
-## Consuming the chart from another repository
-
-Install directly from OCI:
+### Install from GHCR
 
 ```bash
 helm install dlh \
@@ -192,7 +222,9 @@ helm install dlh \
   -f my-values.yaml
 ```
 
-Or declare it as a dependency:
+### Consume from another repository
+
+Use the chart as a dependency:
 
 ```yaml
 dependencies:
@@ -201,69 +233,25 @@ dependencies:
     repository: oci://ghcr.io/sanger-pathogens/charts
 ```
 
-Then run:
-
-```bash
-helm dependency build
-```
-
-For `main` branch integration builds, the publish workflow creates a unique
-prerelease version in the form:
+`main` publishes prerelease versions in this form:
 
 ```text
 <base-version>-main.<run-number>.<run-attempt>.<short-sha>
 ```
 
-That lets another repository consume the latest published `main` snapshot
-without waiting for a formal release tag. For production use, prefer the stable
-release versions published from `v*` tags.
+Tagged releases publish stable `X.Y.Z` versions that must match
+`charts/dlh-in-a-box/Chart.yaml`.
 
-### Consuming from another repository in the same GitHub organization
+### Same-organization consumer repositories
 
-If the consumer repository lives in the same GitHub organization, there are two
-parts to make this work reliably:
+For a consumer repository inside the same GitHub organization:
 
-1. the chart package must exist in GHCR
-2. the consumer repository must have permission to read that package
+1. ensure the package exists at `ghcr.io/sanger-pathogens/charts/dlh-in-a-box`
+2. if package permissions are not inherited automatically, add the consumer
+   repository under `Manage Actions access`
+3. grant that repository at least `Read` access
 
-The publish workflow in this repository now handles the first part:
-
-- every push to `main` publishes a unique prerelease chart version
-- every `v*` tag publishes the matching stable chart version
-
-For the second part, configure the package once in GitHub:
-
-1. Open the package page for `ghcr.io/sanger-pathogens/charts/dlh-in-a-box`
-2. Go to `Package settings`
-3. Under `Manage Actions access`, add the consuming repository
-4. Grant that repository at least `Read` access
-
-If your organization allows package permission inheritance from the linked
-source repository, that may already be enough. If not, the explicit `Manage
-Actions access` entry is the safe setup for private cross-repo consumption.
-
-### Consumer repository example
-
-In the consuming repository `Chart.yaml`:
-
-```yaml
-dependencies:
-  - name: dlh-in-a-box
-    version: 0.2.0
-    repository: oci://ghcr.io/sanger-pathogens/charts
-```
-
-For an integration build that tracks `main`, use a published prerelease version
-instead:
-
-```yaml
-dependencies:
-  - name: dlh-in-a-box
-    version: 0.2.0-main.123.1.abcdef0
-    repository: oci://ghcr.io/sanger-pathogens/charts
-```
-
-Then in the consuming repository's workflow:
+In the consumer workflow:
 
 ```yaml
 permissions:
@@ -272,91 +260,79 @@ permissions:
 
 steps:
   - uses: actions/checkout@v4
-
   - uses: azure/setup-helm@v4
-
   - name: Log in to GHCR
     run: |
       printf '%s' "${{ secrets.GITHUB_TOKEN }}" | \
         helm registry login ghcr.io -u "${{ github.actor }}" --password-stdin
-
   - name: Build chart dependencies
     run: helm dependency build
 ```
 
-For local developer use outside GitHub Actions, authenticate with a personal
-access token classic that has `read:packages`:
-
-```bash
-export GHCR_TOKEN=YOUR_CLASSIC_PAT
-printf '%s' "$GHCR_TOKEN" | helm registry login ghcr.io -u YOUR_GITHUB_USERNAME --password-stdin
-helm dependency build
-```
-
-## Production and operations guidance
-
-### Secrets
-
-- Do not commit real secrets to tracked values files.
-- Use environment-specific secret delivery outside Git wherever possible.
-- Treat the example values as scaffolding, not as production secret management.
-
-### Stateful services
-
-- Hive metadata depends on PostgreSQL durability.
-- Query data durability depends on the external object store or MinIO persistence configuration.
-- Local overlays intentionally trade durability for reproducibility and speed.
-
-### Dependency management
-
-- `Chart.yaml` uses pinned dependency versions.
-- `Chart.lock` is committed and should be treated as release input.
-- `./hack/helm-dependency-update.sh` is the explicit place where dependency upgrades happen.
-
-### Publication
-
-- the chart package includes a dedicated chart README and license for registry consumers
-- OCI publication is handled by `.github/workflows/helm-publish.yaml`
-- the intended package target is `ghcr.io/sanger-pathogens/charts/dlh-in-a-box`
-- every push to `main` publishes a unique prerelease chart version to GHCR
-- tags in the form `vX.Y.Z` publish the stable `X.Y.Z` chart version from `Chart.yaml`
-- the workflow uses `GITHUB_TOKEN`, which is the GitHub-recommended approach for publishing packages from the workflow repository itself
-- because the package is published from the repository workflow, it should link to the repository and inherit repository permissions unless org policy disables that behavior
-- private consumer repositories may still need explicit package read access in GitHub package settings if your organization does not use automatic inheritance
-- a personal access token classic is still useful for local manual login and troubleshooting against GHCR
-
-For local manual GHCR access:
+For manual local access outside GitHub Actions, use a personal access token
+classic with `read:packages`:
 
 ```bash
 export GHCR_TOKEN=YOUR_CLASSIC_PAT
 printf '%s' "$GHCR_TOKEN" | helm registry login ghcr.io -u YOUR_GITHUB_USERNAME --password-stdin
 ```
 
-## Examples
+## Directory guides
 
-- `examples/values-local.yaml`: validated local kind deployment
-- `examples/values-dev.yaml`: lightweight shared development baseline
-- `examples/values-prod.yaml`: production-shaped baseline overlay
-- `examples/values-external-s3.yaml`: external object storage baseline
-- `examples/values-minio.yaml`: in-cluster MinIO scenario
+Every maintained directory in the repository now carries its own guide so a
+new maintainer can navigate the tree top-down. Helm template directories are
+the one exception: those use `_README.txt` because source-based `helm lint` and
+`helm template` cannot tolerate Markdown files inside `templates/`.
 
-## Third-party licensing
+| Path | Guide | Purpose |
+| --- | --- | --- |
+| `.github/` | [.github/README.md](.github/README.md) | Ownership model, repository automation, and CI/CD entry points |
+| `.github/ISSUE_TEMPLATE/` | [.github/ISSUE_TEMPLATE/README.md](.github/ISSUE_TEMPLATE/README.md) | Public issue intake, contact routing, and support forms |
+| `.github/workflows/` | [.github/workflows/README.md](.github/workflows/README.md) | Lint and publish workflow behavior |
+| `.vscode/` | [.vscode/README.md](.vscode/README.md) | Optional workspace settings for maintainers |
+| `charts/` | [charts/README.md](charts/README.md) | Chart source tree and packaging map |
+| `charts/dlh-in-a-box/` | [charts/dlh-in-a-box/README.md](charts/dlh-in-a-box/README.md) | Umbrella chart API, values surface, and runtime composition |
+| `charts/dlh-in-a-box/charts/` | [charts/dlh-in-a-box/charts/README.md](charts/dlh-in-a-box/charts/README.md) | Local subcharts, vendored chart source, and dependency archives |
+| `charts/dlh-in-a-box/charts/hive/` | [charts/dlh-in-a-box/charts/hive/README.md](charts/dlh-in-a-box/charts/hive/README.md) | Local Hive subchart ownership and design |
+| `charts/dlh-in-a-box/charts/hive/templates/` | [charts/dlh-in-a-box/charts/hive/templates/_README.txt](charts/dlh-in-a-box/charts/hive/templates/_README.txt) | Hive template-by-template implementation guide |
+| `charts/dlh-in-a-box/charts/trino/` | [charts/dlh-in-a-box/charts/trino/README.md](charts/dlh-in-a-box/charts/trino/README.md) | Vendored upstream Trino chart documentation |
+| `charts/dlh-in-a-box/charts/trino/templates/` | [charts/dlh-in-a-box/charts/trino/templates/_README.txt](charts/dlh-in-a-box/charts/trino/templates/_README.txt) | Local Trino patch points and generated resources |
+| `charts/dlh-in-a-box/charts/trino/templates/tests/` | [charts/dlh-in-a-box/charts/trino/templates/tests/_README.txt](charts/dlh-in-a-box/charts/trino/templates/tests/_README.txt) | Helm test coverage bundled with the vendored Trino chart |
+| `charts/dlh-in-a-box/templates/` | [charts/dlh-in-a-box/templates/_README.txt](charts/dlh-in-a-box/templates/_README.txt) | Umbrella-only glue templates |
+| `charts/dlh-in-a-box/third_party/` | [charts/dlh-in-a-box/third_party/README.md](charts/dlh-in-a-box/third_party/README.md) | Bundled notice material and provenance |
+| `charts/dlh-in-a-box/third_party/datahub/` | [charts/dlh-in-a-box/third_party/datahub/README.md](charts/dlh-in-a-box/third_party/datahub/README.md) | DataHub `NOTICE` provenance |
+| `charts/dlh-in-a-box/third_party/gcloud-sqlproxy/` | [charts/dlh-in-a-box/third_party/gcloud-sqlproxy/README.md](charts/dlh-in-a-box/third_party/gcloud-sqlproxy/README.md) | MIT license provenance for bundled `gcloud-sqlproxy` material |
+| `docs/` | [docs/README.md](docs/README.md) | Static documentation assets and documentation strategy |
+| `docs/assets/` | [docs/assets/README.md](docs/assets/README.md) | Brand and package assets used by the chart |
+| `docs/quickstart.md` | [docs/quickstart.md](docs/quickstart.md) | First-run onboarding for new consumers |
+| `docs/release-playbook.md` | [docs/release-playbook.md](docs/release-playbook.md) | Stable and prerelease publication runbook |
+| `examples/` | [examples/README.md](examples/README.md) | Overlay selection and configuration patterns |
+| `hack/` | [hack/README.md](hack/README.md) | Maintainer scripts for validation and release tasks |
 
-This repository redistributes upstream Helm charts as packaged dependencies and
-vendors a locally modified copy of the Trino chart source.
+## Governance and operating expectations
 
-See `THIRD_PARTY_NOTICES.md` for the dependency inventory, upstream license
-sources reviewed, and the extra notice material carried in this repository for
-public release hygiene.
+- Pull requests are restricted to repository collaborators even if the
+  repository is publicly visible.
+- Repository ownership is managed through `.github/CODEOWNERS`.
+- Contributor workflow and release expectations are documented in
+  [CONTRIBUTING.md](CONTRIBUTING.md).
+- Operational and user-facing support guidance is documented in
+  [SUPPORT.md](SUPPORT.md).
+- Security reporting guidance is documented in [SECURITY.md](SECURITY.md).
+- Community interaction expectations are documented in
+  [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md).
+- Third-party redistribution obligations are tracked in
+  [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
 
 ## Out of scope
 
 - pipeline code and application logic
 - Spark application definitions
 - business-specific schemas and datasets
-- one-off environment customization that belongs in a consumer repo
+- one-off environment customization that belongs in a consumer repository
 
 ## License
 
-This project is licensed under Apache-2.0. See `LICENSE`.
-Third-party dependency notices are documented in `THIRD_PARTY_NOTICES.md`.
+This repository is licensed under Apache-2.0. See `LICENSE`.
+Third-party dependency notices and bundled notice material are documented in
+[THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).

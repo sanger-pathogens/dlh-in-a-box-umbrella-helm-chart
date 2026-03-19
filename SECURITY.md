@@ -55,3 +55,16 @@ they relate to:
 
 Issues that are purely upstream product vulnerabilities may still be helpful to
 report, but they may need to be addressed in the upstream project as well.
+
+## Security posture notes
+
+- The repository keeps non-local example overlays free of inline credentials.
+- The disposable local overlays use demo credentials and permissive settings for
+  throwaway kind-based validation only; they are not production examples.
+- Locally generated Trino catalog files and Hive metastore config are mounted
+  from Kubernetes `Secret` resources because they can contain sensitive values.
+- GitHub Actions workflow dependencies are pinned to immutable SHAs and covered
+  by Dependabot for reviewable updates.
+- Real credentials should be injected at deploy time or delivered through
+  environment-specific secret-management tooling rather than committed to
+  tracked values files.

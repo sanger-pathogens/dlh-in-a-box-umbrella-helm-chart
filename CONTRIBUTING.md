@@ -18,6 +18,20 @@ Before opening a pull request, run the standard local checks:
 ./hack/package.sh
 ```
 
+If you prefer a shorter entry point, the repository root `Makefile` exposes the
+same common tasks:
+
+```bash
+make deps
+make lint
+make template
+make package
+```
+
+`./hack/lint.sh` and `./hack/template.sh` exercise every tracked example values
+file under `examples/` by default, so the examples directory should be treated
+as part of the supported surface rather than a dumping ground for stale notes.
+
 If you are validating the full local deployment path, use:
 
 ```bash
@@ -43,12 +57,19 @@ helm upgrade --install dlh charts/dlh-in-a-box \
 
 ## Documentation
 
-- Keep the root `README.md` focused on architecture, operations, and
-  consumption from other repositories.
-- Keep `charts/dlh-in-a-box/README.md` focused on chart consumers.
+- Keep the root `README.md` focused on architecture, repository navigation, and
+  handover for new maintainers.
+- Keep `charts/dlh-in-a-box/README.md` focused on chart consumers and the chart
+  values surface.
+- Every maintained directory should carry a local guide file. Use `README.md`
+  by default. In Helm `templates/` directories, use `_README.txt` so source
+  validation does not try to parse the documentation as manifests. Link new
+  guides from the nearest parent README.
 - If you add or vendor third-party material, update
   `THIRD_PARTY_NOTICES.md`, `charts/dlh-in-a-box/THIRD_PARTY_NOTICES.md`, and
   any required bundled license files.
+- `./hack/docs-check.sh` enforces the directory-guide convention and should stay
+  green.
 
 ## Ownership
 
@@ -64,6 +85,7 @@ helm upgrade --install dlh charts/dlh-in-a-box \
   contribution rights.
 - Review routing and ongoing stewardship are handled through
   `.github/CODEOWNERS`.
+- Public issue intake is handled through `.github/ISSUE_TEMPLATE/`.
 
 ## Pull requests
 
@@ -72,3 +94,4 @@ Good pull requests for this repository usually include:
 - a short explanation of the user-facing or operator-facing change
 - updates to examples or documentation when the values surface changes
 - note of any dependency or license impact
+- updates to directory README files when repository structure changes

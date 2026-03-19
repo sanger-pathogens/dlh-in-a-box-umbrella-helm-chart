@@ -66,8 +66,8 @@ spec:
             name: {{ template "trino.worker" . }}
         {{- if or .Values.global.dataCatalogs .Values.catalogs .Values.additionalCatalogs }}
         - name: catalog-volume
-          configMap:
-            name: {{ template "trino.catalog" . }}
+          secret:
+            secretName: {{ template "trino.catalog" . }}
         {{- end }}
         - name: schemas-volume
           configMap:

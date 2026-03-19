@@ -1,0 +1,21 @@
+changelog:
+  categories:
+    - title: Platform Features
+      labels:
+        - enhancement
+        - feature
+    - title: Bug Fixes
+      labels:
+        - bug
+        - fix
+    - title: Dependency and Packaging
+      labels:
+        - dependencies
+        - packaging
+    - title: Documentation and Handover
+      labels:
+        - documentation
+    - title: Maintenance
+      labels:
+        - chore
+        - maintenance

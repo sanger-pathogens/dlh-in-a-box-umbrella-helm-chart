@@ -9,14 +9,15 @@ and shared S3 settings.
 {{- $s3 := get $storage "s3" | default (dict) -}}
 {{- if $catalogs }}
 apiVersion: v1
-kind: ConfigMap
+kind: Secret
 metadata:
   name: {{ template "trino.catalog" . }}
   namespace: {{ .Release.Namespace }}
   labels:
     {{- include "trino.labels" . | nindent 4 }}
     app.kubernetes.io/component: catalogs
-data:
+type: Opaque
+stringData:
 {{- range $catalogName, $catalog := $catalogs }}
   {{ $catalogName }}.properties: |
 {{ include "trino.catalogProperties" (dict "root" $ "catalogName" $catalogName "catalog" $catalog "s3" $s3) | indent 4 }}

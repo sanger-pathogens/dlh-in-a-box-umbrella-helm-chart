@@ -10,13 +10,11 @@ render() {
 }
 
 if [[ $# -gt 0 ]]; then
-  for vf in "$@"; do
-    render "$vf"
-  done
+  example_files=("$@")
 else
-  render examples/values-dev.yaml
-  render examples/values-local.yaml
-  render examples/values-prod.yaml
-  render examples/values-external-s3.yaml
-  render examples/values-minio.yaml
+  example_files=(examples/*.yaml)
 fi
+
+for vf in "${example_files[@]}"; do
+  render "$vf"
+done

@@ -11,6 +11,8 @@ global:
       region: ""
       bucket: ""
       pathStyleAccess: true
+      # Do not commit real credentials in tracked values files. Prefer CI-injected
+      # values, environment-specific secrets, or external secret delivery.
       accessKey: ""
       secretKey: ""
       accessKeyKey: accessKey
@@ -97,10 +99,12 @@ hive:
     host: ""
     port: "5432"
     username: ""
+    # Do not commit real database passwords in tracked values files.
     password: ""
     existingSecret: ""
   s3:
     endpoint: ""
+    # Do not commit real object-store credentials in tracked values files.
     accessKey: ""
     secretKey: ""
     pathStyleAccess: true

@@ -1,3 +1,5 @@
+# Shared development baseline.
+# Keep this file free of inline credentials so it can be reused safely.
 global:
   environment: dev
   domain: dev.local
@@ -34,26 +36,6 @@ datahub:
 
 hive:
   enabled: false
-  metastore:
-    image:
-      registry: docker.io
-      repository: apache/hive
-      tag: 3.1.3
-  schemainit:
-    image:
-      registry: docker.io
-      repository: apache/hive
-      tag: 3.1.3
-  postgres:
-    host: dlh-postgresql
-    port: "5432"
-    username: hive
-    password: hivepassword
-  s3:
-    endpoint: https://s3.example-dev.local
-    accessKey: ""
-    secretKey: ""
-  warehouseDir: s3a://dlh-dev/warehouse
 
 minio:
   enabled: false

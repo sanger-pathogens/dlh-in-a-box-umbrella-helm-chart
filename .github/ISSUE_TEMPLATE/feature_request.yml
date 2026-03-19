@@ -1,0 +1,35 @@
+name: Feature request
+description: Suggest an improvement to the chart, overlays, or publication flow.
+title: "[Feature]: "
+labels:
+  - enhancement
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Pull requests are limited to repository collaborators, but feature requests are welcome when they are clearly tied to the chart's scope.
+  - type: textarea
+    id: problem
+    attributes:
+      label: What problem are you trying to solve?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: What would you like to see?
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+    validations:
+      required: false
+  - type: textarea
+    id: impact
+    attributes:
+      label: Expected impact
+      description: Explain who benefits and whether this changes values, dependencies, or deployment patterns.
+    validations:
+      required: false

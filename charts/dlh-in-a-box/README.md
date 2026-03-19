@@ -1,31 +1,49 @@
 # dlh-in-a-box Helm Chart
 
-`dlh-in-a-box` is an umbrella Helm chart for deploying a modular lakehouse control plane on Kubernetes.
+`dlh-in-a-box` is an umbrella Helm chart for deploying a modular lakehouse
+control plane on Kubernetes. It packages upstream services where possible and
+keeps local templates deliberately narrow: catalog generation, access-control
+generation, Hive metastore wiring, and release-level compatibility glue.
 
-The chart packages upstream services where possible and keeps local templates limited to the composition logic that ties those services together: catalog generation, metastore wiring, and release-level integration.
+## Chart architecture
 
-## Included platform components
+```mermaid
+flowchart LR
+  Values[Helm values] --> Umbrella[dlh-in-a-box umbrella chart]
+  Umbrella --> LocalGlue[Local templates and helpers]
+  Umbrella --> Dependencies[Dependency charts]
 
-- Trino for interactive SQL
-- Prefect Server and Prefect Workers for orchestration
-- Spark Operator for Spark workload control
-- Hive Metastore for table metadata
-- Vault for secrets workflows
-- MinIO for local or self-contained S3-compatible storage
-- DataHub as an optional metadata/governance extension
+  LocalGlue --> Catalogs[Trino catalogs and ACLs]
+  LocalGlue --> HiveBootstrap[Hive metastore bootstrap]
+  LocalGlue --> DataHubCompat[DataHub compatibility services]
 
-## What this chart is designed for
+  Dependencies --> Runtime[Kubernetes workloads]
+  Catalogs --> Runtime
+  HiveBootstrap --> Runtime
+  DataHubCompat --> Runtime
+```
 
-Use this chart when you want:
+## What this chart includes
 
-- one Helm release to stand up a coherent lakehouse control plane
-- a reusable OCI-packaged platform dependency for other repositories
-- upstream-managed subcomponents with minimal local maintenance burden
-- a validated local kind deployment path for development and testing
+| Component | Purpose | Source |
+| --- | --- | --- |
+| Trino | Query engine for lakehouse data access | Vendored upstream chart with local patches |
+| Prefect Server | API and UI for orchestration | Upstream chart |
+| Prefect Workers | Flow execution workers | Upstream chart |
+| Spark Operator | Spark workload controller | Upstream chart |
+| Hive Metastore | Per-catalog metadata service | Local subchart |
+| Vault | Secret-management platform integration point | Upstream chart |
+| MinIO | Optional self-contained S3-compatible object store | Upstream chart |
+| DataHub | Optional metadata governance layer | Upstream chart |
+| PostgreSQL | Hive metastore backing database | Upstream chart |
 
 ## Quick start
 
-Install directly from OCI:
+If you are evaluating the chart for the first time, pair this guide with
+[../../docs/quickstart.md](../../docs/quickstart.md) for a shorter path from
+inspection to installation.
+
+Install directly from GHCR:
 
 ```bash
 helm install dlh \
@@ -47,17 +65,87 @@ helm upgrade --install dlh charts/dlh-in-a-box \
   -f examples/values-local.yaml
 ```
 
-Stable chart releases are published from repository tags like `v0.2.0`.
-Pushes to `main` also publish unique prerelease versions so downstream
-repositories can integration-test against the latest chart state.
+Stable releases are published from tags like `v0.2.0`. Pushes to `main`
+publish uniquely versioned prereleases so downstream repositories can test the
+latest chart state without waiting for a formal release.
+
+## First-run checklist
+
+```mermaid
+flowchart TD
+  Start[New consumer]
+  Start --> Inspect[helm show chart or helm show readme]
+  Inspect --> Pick[Choose an example overlay or consumer values]
+  Pick --> Install[helm install or dependency build]
+  Install --> Verify[Inspect workloads and service endpoints]
+```
+
+Recommended first steps:
+
+1. Inspect the published package with `helm show chart` and `helm show readme`.
+2. Decide whether you are validating locally or consuming from another repo.
+3. Start from one of the example overlays instead of building values from scratch.
+4. Verify package permissions in GHCR before troubleshooting Helm.
+
+## Security notes
+
+- Trino catalog properties and Hive metastore runtime configuration are mounted
+  from Kubernetes `Secret` resources because they can contain object-store and
+  database credentials.
+- Non-local example overlays are intentionally kept free of inline credentials.
+- Shared environments should enable available upstream network-policy controls
+  where the cluster networking plugin supports them.
+- The local kind overlays contain disposable demo credentials for laptop
+  validation only and should never be promoted into shared environments.
+- Prefer deploy-time secret injection or external secret delivery over tracked
+  values files for real credentials.
+
+## Key values surface
+
+| Top-level values key | Responsibility | Notes |
+| --- | --- | --- |
+| `global.storage` | Object-store endpoint, bucket, and path-style settings | Used by local composition logic and downstream services |
+| `global.dataCatalogs` | Catalog definitions and authorized users | Drives generated Trino and Hive resources |
+| `trino` | Upstream Trino settings | Includes locally generated catalog and access-control resources |
+| `prefect` | Feature toggles for Prefect server and workers | Simple umbrella enablement surface |
+| `prefectServer` | Direct pass-through to upstream Prefect Server chart | Includes PostgreSQL settings |
+| `prefectWorker` | Direct pass-through to upstream Prefect Worker chart | Includes worker config and API connection |
+| `sparkOperator` | Upstream Spark Operator settings | Feature toggle plus pass-through |
+| `minio` | Upstream MinIO settings | Usually enabled for local deployments only |
+| `datahub` | Upstream DataHub settings | Optional metadata layer |
+| `datahubPrerequisites` | Upstream prerequisites chart values | Used only when DataHub is enabled |
+| `hive` | Local metastore image, database, S3, and ingress settings | Powers one metastore per catalog |
+| `vault` | Upstream Vault settings | Enabled by default |
+| `postgresql` | Upstream PostgreSQL settings for Hive | Used when Hive is enabled |
+
+## Deployment patterns
+
+```mermaid
+flowchart TD
+  Start[Choose deployment mode]
+  Start --> Local[Local validation]
+  Start --> Shared[Shared cluster]
+  Start --> Prod[Production baseline]
+
+  Local --> LocalValues[examples/values-local.yaml]
+  Local --> LocalLayers[examples/values-local-layers.yaml]
+  Shared --> DevValues[examples/values-dev.yaml]
+  Shared --> ExternalS3[examples/values-external-s3.yaml]
+  Prod --> ProdValues[examples/values-prod.yaml]
+  Prod --> ProdLayers[examples/values-prod-layers.yaml]
+```
+
+See [../../examples/README.md](../../examples/README.md) for the overlay
+catalog and selection guidance.
 
 ## Consuming from another repository
 
-For a repository in the same GitHub organization:
+For repositories in the same GitHub organization:
 
 1. make sure the package `ghcr.io/sanger-pathogens/charts/dlh-in-a-box` exists
-2. in GitHub package settings, add the consuming repository under `Manage Actions access`
-3. grant that repository at least `Read` access if package permissions are not inherited automatically
+2. if package access is not inherited automatically, add the consumer
+   repository under `Manage Actions access`
+3. grant that repository `Read` access
 
 In the consumer chart:
 
@@ -78,56 +166,43 @@ permissions:
 steps:
   - uses: actions/checkout@v4
   - uses: azure/setup-helm@v4
-  - run: |
+  - name: Log in to GHCR
+    run: |
       printf '%s' "${{ secrets.GITHUB_TOKEN }}" | \
         helm registry login ghcr.io -u "${{ github.actor }}" --password-stdin
-  - run: helm dependency build
+  - name: Build chart dependencies
+    run: helm dependency build
 ```
 
-## Architectural summary
+For prerelease integration builds, use the published
+`-main.<run>.<attempt>.<sha>` version instead of a stable tag.
 
-The chart is structured around a few clear responsibilities:
+## Directory guides
 
-- Trino is the query front door.
-- Hive Metastore supplies table metadata for Trino and Spark-compatible engines.
-- Object storage is the durable data layer, using external S3-compatible storage by default or MinIO for self-contained deployments.
-- Prefect coordinates flow execution and operational automation.
-- Spark Operator manages Spark jobs submitted into the cluster.
-- Vault provides an optional but first-class secrets platform.
-
-## Key values surface
-
-The chart keeps its public API focused around a small number of top-level sections:
-
-- `global.storage`: object storage endpoint and bucket configuration
-- `global.dataCatalogs`: catalog definitions and access rules
-- `prefect`: component enablement flags
-- `prefectServer` and `prefectWorker`: direct pass-throughs to upstream Prefect charts
-- `trino`, `minio`, `sparkOperator`, `vault`, `datahub`: upstream component values
-- `hive`: metastore, schema initialization, database, and S3 wiring
-- `postgresql`: PostgreSQL settings used when Hive is enabled
+| Path | Guide | Purpose |
+| --- | --- | --- |
+| `charts/` | [charts/README.md](../README.md) | Chart source tree overview |
+| `charts/dlh-in-a-box/charts/` | [charts/dlh-in-a-box/charts/README.md](charts/README.md) | Local and vendored subchart inventory |
+| `charts/dlh-in-a-box/charts/hive/` | [charts/dlh-in-a-box/charts/hive/README.md](charts/hive/README.md) | Hive subchart handover guide |
+| `charts/dlh-in-a-box/charts/trino/` | [charts/dlh-in-a-box/charts/trino/README.md](charts/trino/README.md) | Vendored upstream Trino chart documentation |
+| `charts/dlh-in-a-box/templates/` | [charts/dlh-in-a-box/templates/_README.txt](templates/_README.txt) | Umbrella-only glue templates |
+| `charts/dlh-in-a-box/third_party/` | [charts/dlh-in-a-box/third_party/README.md](third_party/README.md) | Bundled notice material and provenance |
 
 ## Operational expectations
 
 - do not commit real secrets to tracked values files
-- treat example values as scaffolding, not final production configuration
+- treat example values as scaffolding rather than production-ready secret handling
 - pin and review dependency changes deliberately
-- use `Chart.lock` as part of release review
-- publish the packaged chart as an OCI artifact for downstream consumption
-
-## Support material
-
-- root architecture and repo guide: repository `README.md`
-- example overlays: `examples/`
-- helper scripts: `hack/`
+- treat `Chart.lock` as a release input, not generated noise
+- use the maintainer scripts under `hack/` for repeatable validation
 
 ## Third-party licensing
 
 This chart package redistributes upstream Helm charts under their own licenses.
-See `THIRD_PARTY_NOTICES.md` for the dependency inventory and bundled notice
-material carried with the package.
+See [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) for the dependency
+inventory and bundled notice material that ships with the package.
 
 ## License
 
-Apache-2.0 for the umbrella chart itself. Third-party dependency notices are in
-`THIRD_PARTY_NOTICES.md`.
+Apache-2.0 applies to the umbrella chart itself. Third-party dependency notices
+are documented in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).

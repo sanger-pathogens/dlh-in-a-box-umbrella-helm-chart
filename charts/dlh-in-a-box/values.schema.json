@@ -5,47 +5,87 @@
   "additionalProperties": true,
   "properties": {
     "global": {
+      "description": "Cross-cutting settings shared across the umbrella chart, including storage and catalog definitions.",
       "type": "object",
       "additionalProperties": true,
       "properties": {
-        "nameOverride": { "type": "string" },
-        "fullnameOverride": { "type": "string" },
-        "domain": { "type": "string" },
+        "nameOverride": {
+          "type": "string",
+          "description": "Override the chart name used in generated Kubernetes resource names."
+        },
+        "fullnameOverride": {
+          "type": "string",
+          "description": "Override the fully qualified release name used in generated Kubernetes resource names."
+        },
+        "domain": {
+          "type": "string",
+          "description": "Base domain used by components that generate hostnames, such as optional Hive ingress resources."
+        },
         "environment": {
           "type": "string",
+          "description": "Short environment label used to distinguish local, development, or production-style deployments.",
           "pattern": "^[a-zA-Z0-9-]*$"
         },
         "imagePullSecrets": {
           "type": "array",
+          "description": "Image pull secret references shared across components that honor the global value.",
           "items": {
             "type": "object"
           }
         },
         "storage": {
+          "description": "Object-store configuration shared by locally owned composition logic and downstream components.",
           "type": "object",
           "additionalProperties": true,
           "properties": {
             "backend": {
               "type": "string",
+              "description": "Select whether the deployment uses an external S3-compatible object store or the in-cluster MinIO dependency.",
               "enum": ["externalS3", "minio"]
             },
             "s3": {
+              "description": "Connection and credential settings for the S3-compatible object-store endpoint.",
               "type": "object",
               "additionalProperties": true,
               "properties": {
-                "endpoint": { "type": "string" },
-                "region": { "type": "string" },
-                "bucket": { "type": "string" },
-                "pathStyleAccess": { "type": "boolean" },
-                "accessKey": { "type": "string" },
-                "secretKey": { "type": "string" },
-                "accessKeyKey": { "type": "string" },
-                "secretKeyKey": { "type": "string" }
+                "endpoint": {
+                  "type": "string",
+                  "description": "S3-compatible endpoint URL, for example the MinIO service or an external object-store endpoint."
+                },
+                "region": {
+                  "type": "string",
+                  "description": "Logical region for the configured object store."
+                },
+                "bucket": {
+                  "type": "string",
+                  "description": "Primary bucket used by local examples and generated catalog wiring."
+                },
+                "pathStyleAccess": {
+                  "type": "boolean",
+                  "description": "Enable path-style S3 access, which is commonly required for MinIO and some S3-compatible endpoints."
+                },
+                "accessKey": {
+                  "type": "string",
+                  "description": "Inline access key used by example overlays or simple local deployments."
+                },
+                "secretKey": {
+                  "type": "string",
+                  "description": "Inline secret key used by example overlays or simple local deployments."
+                },
+                "accessKeyKey": {
+                  "type": "string",
+                  "description": "Secret key name to read the access key from when external secret delivery is used."
+                },
+                "secretKeyKey": {
+                  "type": "string",
+                  "description": "Secret key name to read the secret key from when external secret delivery is used."
+                }
               }
             }
           }
         },
         "dataCatalogs": {
+          "description": "Catalog definitions that drive generated Trino catalogs, ACLs, and per-catalog Hive metastore resources.",
           "type": "object",
           "patternProperties": {
             ".*": {
@@ -54,18 +94,22 @@
               "properties": {
                 "type": {
                   "type": "string",
+                  "description": "Logical catalog type used by the local Trino and Hive composition logic.",
                   "enum": ["deltaLake", "hive"]
                 },
                 "authorizedUsers": {
+                  "description": "Simple catalog-level access-control lists used by generated Trino access rules.",
                   "type": "object",
                   "additionalProperties": true,
                   "properties": {
                     "read": {
                       "type": "array",
+                      "description": "User or group identifiers granted read access to the catalog.",
                       "items": { "type": "string" }
                     },
                     "write": {
                       "type": "array",
+                      "description": "User or group identifiers granted write access to the catalog.",
                       "items": { "type": "string" }
                     }
                   }
@@ -77,12 +121,14 @@
       }
     },
     "trino": {
+      "description": "Pass-through values for the vendored Trino chart plus the top-level enablement flag.",
       "type": "object",
       "properties": {
         "enabled": { "type": "boolean" }
       }
     },
     "prefect": {
+      "description": "Feature toggles for the Prefect server and worker subcomponents.",
       "type": "object",
       "properties": {
         "enabled": { "type": "boolean" },
@@ -101,14 +147,17 @@
       }
     },
     "prefectServer": {
+      "description": "Direct pass-through values for the upstream Prefect Server chart.",
       "type": "object",
       "additionalProperties": true
     },
     "prefectWorker": {
+      "description": "Direct pass-through values for the upstream Prefect Worker chart.",
       "type": "object",
       "additionalProperties": true
     },
     "sparkOperator": {
+      "description": "Pass-through values for the Spark Operator dependency.",
       "type": "object",
       "properties": {
         "enabled": { "type": "boolean" },
@@ -116,12 +165,14 @@
       }
     },
     "minio": {
+      "description": "Pass-through values for the MinIO dependency used in local and self-contained deployments.",
       "type": "object",
       "properties": {
         "enabled": { "type": "boolean" }
       }
     },
     "datahub": {
+      "description": "Pass-through values for the optional DataHub dependency.",
       "type": "object",
       "additionalProperties": true,
       "properties": {
@@ -129,14 +180,17 @@
       }
     },
     "datahubPrerequisites": {
+      "description": "Pass-through values for the DataHub prerequisites chart deployed alongside DataHub.",
       "type": "object",
       "additionalProperties": true
     },
     "hive": {
+      "description": "Settings for the locally owned Hive metastore subchart.",
       "type": "object",
       "properties": {
         "enabled": { "type": "boolean" },
         "metastore": {
+          "description": "Container image settings for the Hive metastore runtime.",
           "type": "object",
           "additionalProperties": true,
           "properties": {
@@ -152,6 +206,7 @@
           }
         },
         "schemainit": {
+          "description": "Container image and optional hook-job settings for Hive schema initialization.",
           "type": "object",
           "additionalProperties": true,
           "properties": {
@@ -174,6 +229,7 @@
           }
         },
         "postgres": {
+          "description": "PostgreSQL connectivity for Hive metadata databases.",
           "type": "object",
           "additionalProperties": true,
           "properties": {
@@ -185,6 +241,7 @@
           }
         },
         "s3": {
+          "description": "S3 connectivity used by Hive metastore instances when reading and writing warehouse data.",
           "type": "object",
           "additionalProperties": true,
           "properties": {
@@ -195,8 +252,12 @@
             "existingSecret": { "type": "string" }
           }
         },
-        "warehouseDir": { "type": "string" },
+        "warehouseDir": {
+          "type": "string",
+          "description": "Base warehouse directory under which per-catalog locations are created."
+        },
         "ingress": {
+          "description": "Optional ingress settings for exposing Hive metastore services.",
           "type": "object",
           "additionalProperties": true,
           "properties": {
@@ -208,12 +269,14 @@
       }
     },
     "vault": {
+      "description": "Pass-through values for the Vault dependency.",
       "type": "object",
       "properties": {
         "enabled": { "type": "boolean" }
       }
     },
     "postgresql": {
+      "description": "Pass-through values for the PostgreSQL dependency used by the Hive subchart.",
       "type": "object",
       "additionalProperties": true,
       "properties": {

@@ -14,11 +14,26 @@ global:
       accessKey: minioadmin
       secretKey: minioadmin123
   dataCatalogs:
-    default:
+    bronze:
       type: deltaLake
       authorizedUsers:
-        read: ["local-reader"]
-        write: ["local-admin"]
+        read: ["dlh_team", "surveillance_dashboard", "datahub"]
+        write: ["admin"]
+    silver:
+      type: deltaLake
+      authorizedUsers:
+        read: ["dlh_team", "surveillance_dashboard"]
+        write: ["admin"]
+    gold:
+      type: deltaLake
+      authorizedUsers:
+        read: ["dlh_team", "surveillance_dashboard"]
+        write: ["admin"]
+    geospatial:
+      type: hive
+      authorizedUsers:
+        read: ["dlh_team", "surveillance_dashboard"]
+        write: ["admin"]
 
 trino:
   server:

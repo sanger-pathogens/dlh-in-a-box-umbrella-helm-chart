@@ -1,0 +1,54 @@
+name: Bug report
+description: Report a problem with the chart, examples, packaging flow, or deployment behavior.
+title: "[Bug]: "
+labels:
+  - bug
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for helping improve `dlh-in-a-box`. Please include enough detail for a maintainer to reproduce the issue.
+  - type: input
+    id: chart_version
+    attributes:
+      label: Chart version
+      description: Include the published chart version or the commit SHA you tested.
+      placeholder: 0.2.0
+    validations:
+      required: true
+  - type: input
+    id: kubernetes
+    attributes:
+      label: Kubernetes environment
+      description: Which cluster or local environment are you using?
+      placeholder: kind v0.23.0 on Kubernetes v1.31
+    validations:
+      required: true
+  - type: input
+    id: values_file
+    attributes:
+      label: Values file or overlay
+      description: Which values file, overlay, or relevant configuration fragment were you using?
+      placeholder: examples/values-local.yaml
+    validations:
+      required: true
+  - type: textarea
+    id: behavior
+    attributes:
+      label: What happened?
+      description: Describe the failure, including relevant logs, Helm output, or Kubernetes symptoms.
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: How can it be reproduced?
+      description: Share the commands or steps a maintainer can follow.
+    validations:
+      required: true
+  - type: textarea
+    id: expectations
+    attributes:
+      label: What did you expect to happen?
+    validations:
+      required: true
