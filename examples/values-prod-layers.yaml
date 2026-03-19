@@ -1,0 +1,54 @@
+global:
+  environment: prod
+  domain: prod.example.com
+  storage:
+    backend: externalS3
+    s3:
+      endpoint: https://s3.example.com
+      region: us-east-1
+      bucket: dlh-prod
+      pathStyleAccess: true
+      accessKey: ""
+      secretKey: ""
+  dataCatalogs:
+    bronze:
+      type: deltaLake
+      authorizedUsers:
+        read: ["dlh_team", "surveillance_dashboard", "datahub"]
+        write: ["admin"]
+    silver:
+      type: deltaLake
+      authorizedUsers:
+        read: ["dlh_team", "surveillance_dashboard"]
+        write: ["admin"]
+    gold:
+      type: deltaLake
+      authorizedUsers:
+        read: ["dlh_team", "surveillance_dashboard"]
+        write: ["admin"]
+    geospatial:
+      type: hive
+      authorizedUsers:
+        read: ["dlh_team", "surveillance_dashboard"]
+        write: ["admin"]
+
+prefectWorker:
+  worker:
+    replicaCount: 3
+    config:
+      workPool: kubernetes-prod
+      workQueues:
+        - critical
+
+vault:
+  enabled: true
+
+minio:
+  enabled: false
+
+datahub:
+  enabled: false
+
+hive:
+  enabled: true
+

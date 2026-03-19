@@ -1,0 +1,183 @@
+global:
+  environment: local
+  domain: local.test
+  storage:
+    backend: minio
+    s3:
+      endpoint: http://dlh-minio:9000
+      region: us-east-1
+      bucket: dlh-local
+      pathStyleAccess: true
+      accessKey: minioadmin
+      secretKey: minioadmin123
+  dataCatalogs:
+    bronze:
+      type: deltaLake
+      authorizedUsers:
+        read: ["dlh_team", "surveillance_dashboard", "datahub"]
+        write: ["admin"]
+    silver:
+      type: deltaLake
+      authorizedUsers:
+        read: ["dlh_team", "surveillance_dashboard"]
+        write: ["admin"]
+    gold:
+      type: deltaLake
+      authorizedUsers:
+        read: ["dlh_team", "surveillance_dashboard"]
+        write: ["admin"]
+    geospatial:
+      type: hive
+      authorizedUsers:
+        read: ["dlh_team", "surveillance_dashboard"]
+        write: ["admin"]
+
+trino:
+  server:
+    workers: 1
+    node:
+      environment: local
+    config:
+      query:
+        maxMemory: 512MB
+  coordinator:
+    jvm:
+      maxHeapSize: 1G
+    config:
+      query:
+        maxMemoryPerNode: 256MB
+  worker:
+    jvm:
+      maxHeapSize: 1G
+    config:
+      query:
+        maxMemoryPerNode: 256MB
+
+prefectServer:
+  postgresql:
+    enabled: true
+  server:
+    resources:
+      requests:
+        cpu: 100m
+        memory: 256Mi
+      limits:
+        cpu: 500m
+        memory: 512Mi
+
+prefectWorker:
+  worker:
+    apiConfig: selfHostedServer
+    replicaCount: 1
+    initContainer:
+      extraContainers:
+        - name: wait-for-prefect-server
+          image: "{{ .Values.worker.image.repository }}:{{ .Values.worker.image.prefectTag }}"
+          imagePullPolicy: "{{ .Values.worker.image.pullPolicy }}"
+          command:
+            - /bin/sh
+            - -c
+          args:
+            - |
+              python - <<'PY'
+              import sys
+              import time
+              import urllib.request
+
+              url = "http://prefect-server:4200/api/health"
+              for _ in range(90):
+                  try:
+                      with urllib.request.urlopen(url, timeout=5) as response:
+                          if response.status < 500:
+                              sys.exit(0)
+                  except Exception:
+                      pass
+                  time.sleep(2)
+
+              sys.exit("Prefect server did not become reachable in time")
+              PY
+    config:
+      workPool: kubernetes-local
+      workQueues:
+        - default
+      jobNamespace: data-lakehouse-local
+    selfHostedServerApiConfig:
+      apiUrl: http://prefect-server:4200/api
+
+sparkOperator:
+  enabled: true
+  nameOverride: spark-operator
+
+minio:
+  enabled: true
+  global:
+    security:
+      allowInsecureImages: true
+  image:
+    registry: docker.io
+    repository: bitnamilegacy/minio
+    tag: 2025.7.23-debian-12-r5
+  auth:
+    rootUser: minioadmin
+    rootPassword: minioadmin123
+  defaultBuckets: dlh-local
+  persistence:
+    enabled: false
+
+hive:
+  enabled: true
+  metastore:
+    image:
+      registry: docker.io
+      repository: apache/hive
+      tag: 3.1.3
+  schemainit:
+    image:
+      registry: docker.io
+      repository: apache/hive
+      tag: 3.1.3
+  postgres:
+    host: dlh-hive-postgresql
+    port: "5432"
+    username: postgres
+    password: localpostgres
+  s3:
+    endpoint: http://dlh-minio:9000
+    accessKey: minioadmin
+    secretKey: minioadmin123
+    pathStyleAccess: true
+  warehouseDir: s3a://dlh-local/warehouse
+  ingress:
+    enabled: false
+
+postgresql:
+  image:
+    registry: docker.io
+    repository: bitnamilegacy/postgresql
+    tag: 16.2.0-debian-12-r8
+  nameOverride: hive-postgresql
+  auth:
+    enablePostgresUser: true
+    postgresPassword: localpostgres
+  primary:
+    pgHbaConfiguration: |-
+      local   all             all                                     trust
+      host    all             all             127.0.0.1/32            trust
+      host    all             all             ::1/128                 trust
+      host    all             all             0.0.0.0/0               md5
+      host    all             all             ::/0                    md5
+    initdb:
+      scripts:
+        00-set-postgres-md5.sql: |
+          SET password_encryption = 'md5';
+          ALTER ROLE postgres WITH PASSWORD 'localpostgres';
+
+datahub:
+  enabled: false
+
+vault:
+  enabled: true
+  server:
+    dev:
+      enabled: true
+

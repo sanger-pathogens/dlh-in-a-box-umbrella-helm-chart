@@ -10,3 +10,6 @@ charts/dlh-in-a-box/charts/*.tgz
 *.tmp
 *.log
 dist/
+
+# Local reference repositories (not part of the packaged chart)
+reference/
