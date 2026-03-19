@@ -29,6 +29,11 @@ spec:
     type: Recreate
   template:
     metadata:
+      annotations:
+        checksum/init-config: {{ include (print $.Template.BasePath "/init-config.yaml") $ | sha256sum }}
+        checksum/metastore-config: {{ include (print $.Template.BasePath "/configmap.yaml") $ | sha256sum }}
+        checksum/postgres-secret: {{ ($.Values.postgres.existingSecret | default (include (print $.Template.BasePath "/postgres-secret.yaml") $)) | sha256sum }}
+        checksum/s3-secret: {{ ($.Values.s3.existingSecret | default (include (print $.Template.BasePath "/s3-secret.yaml") $)) | sha256sum }}
       labels:
         app: {{ include "hive.fullname" $ }}-{{ $safeCatalog }}-metastore
     spec:
@@ -162,8 +167,8 @@ spec:
               mountPath: /hive_custom_conf
       volumes:
         - name: metastore-cfg-vol
-          configMap:
-            name: {{ include "hive.fullname" $ }}-metastore-cfg-{{ $safeCatalog }}
+          secret:
+            secretName: {{ include "hive.fullname" $ }}-metastore-cfg-{{ $safeCatalog }}
 
 {{- if $.Values.ingress.enabled }}
 ---

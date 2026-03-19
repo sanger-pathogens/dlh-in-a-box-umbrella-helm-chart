@@ -8,6 +8,7 @@ points.
 | File or directory | Purpose |
 | --- | --- |
 | `CODEOWNERS` | Default review ownership and stewardship routing |
+| `dependabot.yml` | Automated GitHub Actions dependency update policy |
 | `ISSUE_TEMPLATE/` | Structured public issue forms and contact routing |
 | `pull_request_template.md` | Pull-request checklist for collaborators |
 | `release.yml` | GitHub-generated release-note categories |
@@ -42,3 +43,5 @@ flowchart LR
   support, documentation, and security channels.
 - Workflow behavior is documented separately so the root README can stay focused
   on handover and platform architecture.
+- Dependabot keeps pinned GitHub Actions references reviewable over time instead
+  of letting workflow dependencies drift silently.

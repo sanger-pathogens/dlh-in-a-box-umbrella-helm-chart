@@ -41,6 +41,14 @@ flowchart TD
   directory.
 - `values-local.yaml` remains the canonical end-to-end deployment proof point.
 
+## Security note
+
+- `values-local.yaml` and `values-local-layers.yaml` are disposable local
+  overlays and intentionally contain demo credentials for self-contained kind
+  validation.
+- Non-local overlays in this directory should remain free of inline
+  credentials.
+
 ## Maintainer note
 
 Keep example overlays readable. They are part of the handover and consumer

@@ -19,12 +19,14 @@ postgres:
   host: ""
   port: "5432"
   username: ""
+  # Do not commit real database passwords in tracked values files.
   password: ""
   existingSecret: ""
 
 # S3 configuration
 s3:
   endpoint: ""
+  # Do not commit real object-store credentials in tracked values files.
   accessKey: ""
   secretKey: ""
   pathStyleAccess: true

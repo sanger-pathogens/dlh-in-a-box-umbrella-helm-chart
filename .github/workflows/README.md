@@ -7,6 +7,7 @@ This directory contains the automation that validates and publishes the chart.
 | Workflow | Trigger | Purpose |
 | --- | --- | --- |
 | `helm-lint.yaml` | `push`, `pull_request` | Dependency refresh, docs checks, schema validation, lint, render, and package verification |
+| `helm-smoke-install.yaml` | `push`, `pull_request`, `workflow_dispatch` | kind-based install smoke test of the validated local overlay, with diagnostics artifact upload on failure |
 | `helm-publish.yaml` | `push` to `main`, `push` tags `v*`, `workflow_dispatch` | Version resolution, packaging, GHCR login, and OCI publication |
 
 ## Workflow lifecycle
@@ -14,11 +15,15 @@ This directory contains the automation that validates and publishes the chart.
 ```mermaid
 flowchart TD
   Push[Push or pull request] --> Lint[helm-lint workflow]
+  Push --> Smoke[helm-smoke-install workflow]
   Lint --> DependencyUpdate[helm dependency update]
   DependencyUpdate --> DocsChecks[directory guide and script checks]
   DocsChecks --> LicenseChecks[license and notice checks]
   LicenseChecks --> Render[helm template]
   Render --> Package[helm package]
+  Smoke --> Kind[create disposable kind cluster]
+  Kind --> Install[helm install validated local overlay]
+  Install --> Diagnostics[collect diagnostics artifact on failure]
 
   MainPush[Push to main] --> Publish[helm-publish workflow]
   TagPush[Push tag vX.Y.Z] --> Publish
@@ -36,6 +41,8 @@ flowchart TD
   not match `charts/dlh-in-a-box/Chart.yaml`
 - GHCR authentication uses `GITHUB_TOKEN` by default, with optional `GHCR_TOKEN`
   and `GHCR_USERNAME` overrides if organization policy requires them
+- smoke-install failures upload `kubectl` and `helm` diagnostics as a workflow
+  artifact for triage
 
 ## Operational expectations
 

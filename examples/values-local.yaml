@@ -1,3 +1,6 @@
+# Disposable local kind overlay only.
+# These credentials are intentionally non-secret demo values and must never be
+# reused in a shared or production environment.
 global:
   environment: local
   domain: local.test

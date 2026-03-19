@@ -1,6 +1,7 @@
 # dlh-in-a-box-umbrella-helm-chart
 
 [![Helm Lint](https://github.com/sanger-pathogens/dlh-in-a-box-umbrella-helm-chart/actions/workflows/helm-lint.yaml/badge.svg)](https://github.com/sanger-pathogens/dlh-in-a-box-umbrella-helm-chart/actions/workflows/helm-lint.yaml)
+[![Helm Smoke Install](https://github.com/sanger-pathogens/dlh-in-a-box-umbrella-helm-chart/actions/workflows/helm-smoke-install.yaml/badge.svg)](https://github.com/sanger-pathogens/dlh-in-a-box-umbrella-helm-chart/actions/workflows/helm-smoke-install.yaml)
 [![Helm Publish](https://github.com/sanger-pathogens/dlh-in-a-box-umbrella-helm-chart/actions/workflows/helm-publish.yaml/badge.svg)](https://github.com/sanger-pathogens/dlh-in-a-box-umbrella-helm-chart/actions/workflows/helm-publish.yaml)
 
 `dlh-in-a-box` packages a modular lakehouse control plane as a single OCI
@@ -103,7 +104,8 @@ flowchart TD
 ```mermaid
 flowchart LR
   Author[Maintain chart source<br/>and overlays] --> Validate[Run lint, render,<br/>license, and packaging checks]
-  Validate --> Publish[GitHub Actions packages<br/>and pushes to GHCR]
+  Validate --> Smoke[Test install on kind<br/>with the validated local overlay]
+  Smoke --> Publish[GitHub Actions packages<br/>and pushes to GHCR]
   Publish --> Stable[Tagged release versions]
   Publish --> Prerelease[main branch prereleases]
   Stable --> Consumers[Consumer repositories]
@@ -159,6 +161,18 @@ If you are new to the repository, start with
 - deploying the validated local overlay
 - consuming the package from another repository
 - the fastest route into the deeper docs
+
+### Security posture
+
+- locally generated Trino catalog files and Hive metastore config are mounted
+  from Kubernetes `Secret` resources rather than `ConfigMap`
+- tracked non-local example overlays are kept free of inline credentials
+- the disposable local overlays still use demo credentials for laptop testing
+  and should never be reused outside throwaway environments
+- shared or production environments should enable upstream network policies
+  where the target cluster supports them
+- real secrets should be injected at deploy time, not committed to tracked
+  values files
 
 ### Local validation
 

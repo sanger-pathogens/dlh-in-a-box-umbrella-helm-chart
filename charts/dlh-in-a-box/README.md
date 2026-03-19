@@ -87,6 +87,19 @@ Recommended first steps:
 3. Start from one of the example overlays instead of building values from scratch.
 4. Verify package permissions in GHCR before troubleshooting Helm.
 
+## Security notes
+
+- Trino catalog properties and Hive metastore runtime configuration are mounted
+  from Kubernetes `Secret` resources because they can contain object-store and
+  database credentials.
+- Non-local example overlays are intentionally kept free of inline credentials.
+- Shared environments should enable available upstream network-policy controls
+  where the cluster networking plugin supports them.
+- The local kind overlays contain disposable demo credentials for laptop
+  validation only and should never be promoted into shared environments.
+- Prefer deploy-time secret injection or external secret delivery over tracked
+  values files for real credentials.
+
 ## Key values surface
 
 | Top-level values key | Responsibility | Notes |
