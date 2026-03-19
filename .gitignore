@@ -13,3 +13,4 @@ dist/
 
 # Local reference repositories (not part of the packaged chart)
 reference/
+references/

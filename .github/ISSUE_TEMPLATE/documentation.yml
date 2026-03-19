@@ -1,0 +1,27 @@
+name: Documentation improvement
+description: Report unclear, outdated, or missing documentation.
+title: "[Docs]: "
+labels:
+  - documentation
+body:
+  - type: input
+    id: location
+    attributes:
+      label: Documentation location
+      description: Which file or guide needs attention?
+      placeholder: README.md or charts/dlh-in-a-box/README.md
+    validations:
+      required: true
+  - type: textarea
+    id: problem
+    attributes:
+      label: What is confusing or missing?
+    validations:
+      required: true
+  - type: textarea
+    id: improvement
+    attributes:
+      label: Suggested improvement
+      description: Share the wording, example, or structure you expected to see.
+    validations:
+      required: false

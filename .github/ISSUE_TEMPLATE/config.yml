@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Support Guide
+    url: https://github.com/sanger-pathogens/dlh-in-a-box-umbrella-helm-chart/blob/main/SUPPORT.md
+    about: Start here for chart support, operational questions, and maintainer expectations.
+  - name: Security Policy
+    url: https://github.com/sanger-pathogens/dlh-in-a-box-umbrella-helm-chart/security/policy
+    about: Report suspected vulnerabilities privately according to the repository security policy.

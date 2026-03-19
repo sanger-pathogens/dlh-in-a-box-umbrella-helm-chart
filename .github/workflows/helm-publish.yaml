@@ -124,4 +124,19 @@ jobs:
             echo "- Channel: ${CHANNEL}"
             echo "- Package: \`${PACKAGE_REF}\`"
             echo "- Version: \`${CHART_VERSION}\`"
+            echo
+            echo "### Install"
+            echo
+            echo '```bash'
+            echo "helm install dlh ${PACKAGE_REF} --version ${CHART_VERSION} -n data-lakehouse --create-namespace -f my-values.yaml"
+            echo '```'
+            echo
+            echo "### Consume as dependency"
+            echo
+            echo '```yaml'
+            echo 'dependencies:'
+            echo '  - name: dlh-in-a-box'
+            echo "    version: ${CHART_VERSION}"
+            echo '    repository: oci://ghcr.io/${{ github.repository_owner }}/charts'
+            echo '```'
           } >> "${GITHUB_STEP_SUMMARY}"
