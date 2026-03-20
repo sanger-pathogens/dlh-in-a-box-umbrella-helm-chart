@@ -115,6 +115,13 @@ superset:
     nameOverride: superset-redis
     image:
       repository: bitnamilegacy/redis
+  supersetNode:
+    connections:
+      # Point Superset at its own bundled metadata database and Redis service
+      # rather than the umbrella release's other PostgreSQL and Redis
+      # dependencies.
+      db_host: "{{ .Release.Name }}-superset-postgresql"
+      redis_host: "{{ .Release.Name }}-superset-redis-master"
   # Set a real SUPERSET_SECRET_KEY via extraSecretEnv or external secret
   # delivery before enabling Superset outside disposable local overlays.
 
