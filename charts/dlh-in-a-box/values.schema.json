@@ -184,6 +184,14 @@
       "type": "object",
       "additionalProperties": true
     },
+    "superset": {
+      "description": "Pass-through values for the optional Apache Superset dependency plus the top-level enablement flag.",
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "enabled": { "type": "boolean" }
+      }
+    },
     "hive": {
       "description": "Settings for the locally owned Hive metastore subchart.",
       "type": "object",

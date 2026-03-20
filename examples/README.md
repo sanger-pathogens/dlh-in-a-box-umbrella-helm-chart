@@ -13,6 +13,7 @@ flowchart TD
   Start --> Prod[Need a production-shaped starting point]
 
   Local --> LocalBase[values-local.yaml]
+  Local --> LocalSuperset[values-local-superset.yaml]
   Local --> LocalLayers[values-local-layers.yaml]
   Shared --> Dev[values-dev.yaml]
   Shared --> ExternalS3[values-external-s3.yaml]
@@ -26,6 +27,7 @@ flowchart TD
 | File | Primary use | Characteristics |
 | --- | --- | --- |
 | `values-local.yaml` | Canonical kind validation path | MinIO, Hive, Prefect, Spark Operator, Vault dev mode, reduced Trino footprint |
+| `values-local-superset.yaml` | Focused local BI validation path | MinIO, Trino, and Superset with demo credentials, seeded local Trino datasource, bundled Superset PostgreSQL and Redis |
 | `values-local-layers.yaml` | Richer local topology example | Multiple catalogs, layered access patterns, self-contained object storage |
 | `values-dev.yaml` | Shared development baseline | External S3, lighter worker setup, no Hive by default |
 | `values-prod.yaml` | Minimal production-shaped baseline | External S3, scaled workers, MinIO disabled |
@@ -40,12 +42,14 @@ flowchart TD
 - `./hack/template.sh` renders the umbrella chart against every file in this
   directory.
 - `values-local.yaml` remains the canonical end-to-end deployment proof point.
+- `values-local-superset.yaml` is the focused local proof point for the
+  optional Superset integration.
 
 ## Security note
 
-- `values-local.yaml` and `values-local-layers.yaml` are disposable local
-  overlays and intentionally contain demo credentials for self-contained kind
-  validation.
+- `values-local.yaml`, `values-local-superset.yaml`, and
+  `values-local-layers.yaml` are disposable local overlays and intentionally
+  contain demo credentials for self-contained kind validation.
 - Non-local overlays in this directory should remain free of inline
   credentials.
 

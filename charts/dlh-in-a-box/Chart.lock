@@ -2,6 +2,9 @@ dependencies:
 - name: trino
   repository: file://charts/trino
   version: 0.34.0
+- name: superset
+  repository: https://apache.github.io/superset
+  version: 0.15.2
 - name: prefect-server
   repository: https://prefecthq.github.io/prefect-helm
   version: 2025.12.31221620
@@ -29,5 +32,5 @@ dependencies:
 - name: postgresql
   repository: https://charts.bitnami.com/bitnami
   version: 14.3.3
-digest: sha256:c875b5372d95ac7cfbc69c0be02cb21c02413f0cd881d1a37046d58f1b1b7709
-generated: "2026-03-18T13:12:38.248655Z"
+digest: sha256:284d7c79a8f0db537ec7012a072a4aef31dced1bc6eb90b052d2ead2d023978d
+generated: "2026-03-20T11:06:14.93159Z"

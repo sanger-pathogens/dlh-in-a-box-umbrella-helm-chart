@@ -45,7 +45,12 @@ paths = {
   "hive.s3.accessKey" => %w[hive s3 accessKey],
   "hive.s3.secretKey" => %w[hive s3 secretKey],
   "minio.auth.rootPassword" => %w[minio auth rootPassword],
-  "postgresql.auth.postgresPassword" => %w[postgresql auth postgresPassword]
+  "postgresql.auth.postgresPassword" => %w[postgresql auth postgresPassword],
+  "superset.extraSecretEnv.SUPERSET_SECRET_KEY" => %w[superset extraSecretEnv SUPERSET_SECRET_KEY],
+  "superset.init.adminUser.password" => %w[superset init adminUser password],
+  "superset.postgresql.auth.password" => %w[superset postgresql auth password],
+  "superset.redis.auth.password" => %w[superset redis auth password],
+  "superset.supersetNode.connections.db_pass" => %w[superset supersetNode connections db_pass]
 }
 
 ARGV.each do |path|

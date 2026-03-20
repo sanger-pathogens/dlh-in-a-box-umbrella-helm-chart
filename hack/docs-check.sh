@@ -15,7 +15,7 @@ while IFS= read -r dir; do
   missing+=("${dir#${ROOT_DIR}/}")
 done < <(
   find "${ROOT_DIR}" \
-    \( -path "${ROOT_DIR}/.git" -o -path "${ROOT_DIR}/artifacts" -o -path "${ROOT_DIR}/dist" \) -prune -o \
+    \( -path "${ROOT_DIR}/.git" -o -path "${ROOT_DIR}/artifacts" -o -path "${ROOT_DIR}/dist" -o -path "${ROOT_DIR}/references" \) -prune -o \
     -type d -print | sort
 )
 

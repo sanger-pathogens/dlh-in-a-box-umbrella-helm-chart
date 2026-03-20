@@ -40,12 +40,14 @@ environment-specific business logic.
 flowchart LR
   subgraph Consumers[Platform consumers]
     Analysts[Analysts and SQL clients]
+    BIUsers[Dashboard authors and BI users]
     Operators[Platform operators]
     Flows[Scheduled and event-driven flows]
   end
 
   subgraph Release[dlh-in-a-box Helm release]
     Trino[Trino]
+    Superset[Superset<br/>optional]
     Prefect[Prefect Server]
     Worker[Prefect Workers]
     Spark[Spark Operator]
@@ -58,9 +60,12 @@ flowchart LR
     ObjectStore[(External S3 or MinIO)]
     HivePg[(Hive PostgreSQL)]
     PrefectPg[(Prefect PostgreSQL)]
+    SupersetPg[(Superset PostgreSQL)]
+    Redis[(Superset Redis)]
   end
 
   Analysts --> Trino
+  BIUsers --> Superset
   Operators --> Prefect
   Flows --> Worker
   Worker --> Prefect
@@ -68,6 +73,9 @@ flowchart LR
   Worker --> ObjectStore
   Trino --> Hive
   Trino --> ObjectStore
+  Superset --> Trino
+  Superset --> SupersetPg
+  Superset --> Redis
   Hive --> HivePg
   Hive --> ObjectStore
   Prefect --> PrefectPg
@@ -114,8 +122,8 @@ flowchart LR
 
 ## Design principles
 
-- Upstream first: Trino, Prefect, Spark Operator, MinIO, Vault, PostgreSQL, and
-  DataHub stay upstream wherever possible.
+- Upstream first: Trino, Superset, Prefect, Spark Operator, MinIO, Vault,
+  PostgreSQL, and DataHub stay upstream wherever possible.
 - Minimal local ownership: local templates are only added for cross-component
   composition, not to replace entire upstream charts.
 - OCI-native distribution: other repositories should consume the chart from a
@@ -133,6 +141,8 @@ upstream dependency:
 - Trino access-control generation from catalog ACLs
 - Hive metastore provisioning for one metastore per catalog
 - DataHub prerequisite service compatibility shims
+- Superset compatibility defaults for chart-managed PostgreSQL and Redis images
+  plus the missing runtime PostgreSQL driver
 - local, layered, and production-shaped example overlays
 - packaging, publication, and licensing automation
 
@@ -141,6 +151,7 @@ upstream dependency:
 | Component | Role in the platform | Default state | Ownership model |
 | --- | --- | --- | --- |
 | Trino | Interactive SQL query engine over object storage and Hive metadata | Enabled | Vendored upstream chart with local patches |
+| Superset | Optional business-intelligence and dashboarding layer over Trino | Disabled by default | Upstream chart |
 | Prefect Server | Flow API and UI | Enabled | Upstream chart |
 | Prefect Workers | Flow execution workers | Enabled | Upstream chart |
 | Spark Operator | Spark workload controller | Enabled | Upstream chart |
@@ -169,6 +180,8 @@ If you are new to the repository, start with
 - tracked non-local example overlays are kept free of inline credentials
 - the disposable local overlays still use demo credentials for laptop testing
   and should never be reused outside throwaway environments
+- if Superset is enabled, set a real `SUPERSET_SECRET_KEY` and avoid tracked
+  inline admin or metadata-database passwords outside local overlays
 - shared or production environments should enable upstream network policies
   where the target cluster supports them
 - real secrets should be injected at deploy time, not committed to tracked
@@ -204,6 +217,7 @@ The full overlay catalog is documented in [examples/README.md](examples/README.m
 In brief:
 
 - `values-local.yaml` is the validated kind deployment path
+- `values-local-superset.yaml` is a focused local BI overlay for Superset + Trino
 - `values-local-layers.yaml` shows a richer multi-catalog local topology
 - `values-dev.yaml` is a lightweight shared-development baseline
 - `values-prod.yaml` is a minimal production-shaped baseline
