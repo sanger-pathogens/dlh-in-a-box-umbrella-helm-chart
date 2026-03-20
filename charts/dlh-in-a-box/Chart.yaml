@@ -17,6 +17,7 @@ annotations:
 sources:
   - https://github.com/sanger-pathogens/dlh-in-a-box-umbrella-helm-chart
   - https://github.com/trinodb/charts
+  - https://github.com/apache/superset
   - https://github.com/PrefectHQ/prefect-helm
   - https://github.com/bitnami/charts
   - https://github.com/kubeflow/spark-operator
@@ -28,6 +29,7 @@ keywords:
   - helm
   - trino
   - hive
+  - superset
   - prefect
   - spark
   - datahub
@@ -42,6 +44,11 @@ dependencies:
     version: "0.34.0"
     repository: file://charts/trino
     condition: trino.enabled
+
+  - name: superset
+    version: "0.15.2"
+    repository: https://apache.github.io/superset
+    condition: superset.enabled
 
   - name: prefect-server
     alias: prefectServer

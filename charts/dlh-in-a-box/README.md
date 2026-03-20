@@ -18,6 +18,7 @@ flowchart LR
   LocalGlue --> DataHubCompat[DataHub compatibility services]
 
   Dependencies --> Runtime[Kubernetes workloads]
+  Dependencies --> SupersetBI[Optional Superset BI layer]
   Catalogs --> Runtime
   HiveBootstrap --> Runtime
   DataHubCompat --> Runtime
@@ -28,6 +29,7 @@ flowchart LR
 | Component | Purpose | Source |
 | --- | --- | --- |
 | Trino | Query engine for lakehouse data access | Vendored upstream chart with local patches |
+| Superset | Optional business-intelligence and dashboard layer over Trino | Upstream chart |
 | Prefect Server | API and UI for orchestration | Upstream chart |
 | Prefect Workers | Flow execution workers | Upstream chart |
 | Spark Operator | Spark workload controller | Upstream chart |
@@ -92,6 +94,9 @@ Recommended first steps:
 - Trino catalog properties and Hive metastore runtime configuration are mounted
   from Kubernetes `Secret` resources because they can contain object-store and
   database credentials.
+- If Superset is enabled, set a real `extraSecretEnv.SUPERSET_SECRET_KEY` and
+  deliver admin and metadata-database credentials outside tracked non-local
+  overlays.
 - Non-local example overlays are intentionally kept free of inline credentials.
 - Shared environments should enable available upstream network-policy controls
   where the cluster networking plugin supports them.
@@ -107,6 +112,7 @@ Recommended first steps:
 | `global.storage` | Object-store endpoint, bucket, and path-style settings | Used by local composition logic and downstream services |
 | `global.dataCatalogs` | Catalog definitions and authorized users | Drives generated Trino and Hive resources |
 | `trino` | Upstream Trino settings | Includes locally generated catalog and access-control resources |
+| `superset` | Upstream Apache Superset settings | Optional dashboarding layer, including built-in PostgreSQL and Redis dependencies |
 | `prefect` | Feature toggles for Prefect server and workers | Simple umbrella enablement surface |
 | `prefectServer` | Direct pass-through to upstream Prefect Server chart | Includes PostgreSQL settings |
 | `prefectWorker` | Direct pass-through to upstream Prefect Worker chart | Includes worker config and API connection |
@@ -128,6 +134,7 @@ flowchart TD
   Start --> Prod[Production baseline]
 
   Local --> LocalValues[examples/values-local.yaml]
+  Local --> LocalSuperset[examples/values-local-superset.yaml]
   Local --> LocalLayers[examples/values-local-layers.yaml]
   Shared --> DevValues[examples/values-dev.yaml]
   Shared --> ExternalS3[examples/values-external-s3.yaml]
@@ -137,6 +144,11 @@ flowchart TD
 
 See [../../examples/README.md](../../examples/README.md) for the overlay
 catalog and selection guidance.
+
+The umbrella chart also applies small compatibility defaults for Superset by
+pointing its bundled PostgreSQL and Redis dependencies at the legacy Bitnami
+image repositories used by the published chart tags and by installing the
+missing PostgreSQL runtime driver during bootstrap.
 
 ## Consuming from another repository
 

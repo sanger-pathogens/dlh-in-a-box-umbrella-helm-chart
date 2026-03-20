@@ -72,11 +72,20 @@ helm upgrade --install "${RELEASE_NAME}" "${CHART_PATH}" \
   --timeout "${TIMEOUT}"
 
 mapfile -t workloads < <(kubectl get deployment -n "${NAMESPACE}" -o name)
+mapfile -t jobs < <(kubectl get job -n "${NAMESPACE}" -o name)
 
 for workload in "${workloads[@]}"; do
   kubectl rollout status "${workload}" -n "${NAMESPACE}" --timeout="${TIMEOUT}"
 done
 
-kubectl wait --for=condition=Ready pod --all -n "${NAMESPACE}" --timeout="${TIMEOUT}"
+for job in "${jobs[@]}"; do
+  kubectl wait --for=condition=complete "${job}" -n "${NAMESPACE}" --timeout="${TIMEOUT}"
+done
+
+mapfile -t pods < <(kubectl get pod -n "${NAMESPACE}" --field-selector=status.phase!=Succeeded,status.phase!=Failed -o name)
+
+for pod in "${pods[@]}"; do
+  kubectl wait --for=condition=Ready "${pod}" -n "${NAMESPACE}" --timeout="${TIMEOUT}"
+done
 
 kubectl get pods,svc -n "${NAMESPACE}"

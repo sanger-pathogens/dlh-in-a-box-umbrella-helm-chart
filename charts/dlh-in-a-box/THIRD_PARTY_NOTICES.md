@@ -11,6 +11,7 @@ embedded dependency charts keep their own upstream licenses.
 | Material | Version or scope | License | Notes |
 | --- | --- | --- | --- |
 | Trino Helm chart | `0.34.0` | Apache-2.0 | Vendored locally and packaged as a dependency. Upstream Apache-2.0 text is included at `charts/trino/LICENSE`. Files modified for `dlh-in-a-box` contain prominent change notices. |
+| Apache Superset Helm chart | `0.15.2` | Apache-2.0 | Packaged upstream chart archive. The chart bundles Bitnami PostgreSQL and Redis subcharts that stay covered by the Bitnami Apache-2.0 notices already documented here. |
 | Prefect Helm charts | `prefect-server` and `prefect-worker` `2025.12.31221620` | Apache-2.0 | Packaged upstream chart archives. These archives bundle Bitnami `common`, `postgresql`, and `redis` subcharts. |
 | Spark Operator Helm chart | `2.4.0` | Apache-2.0 | Packaged upstream chart archive. |
 | Bitnami Helm charts | `minio 15.0.7`, `postgresql 14.3.3`, and bundled `common` and `redis` subcharts | Apache-2.0 | Packaged upstream chart archives. The umbrella chart includes the Apache-2.0 text in `LICENSE`. |
@@ -22,6 +23,7 @@ embedded dependency charts keep their own upstream licenses.
 ## Upstream sources
 
 - Trino: `https://github.com/trinodb/charts`
+- Apache Superset: `https://github.com/apache/superset/tree/master/helm/superset`
 - Prefect: `https://github.com/PrefectHQ/prefect-helm`
 - Spark Operator: `https://github.com/kubeflow/spark-operator`
 - Bitnami charts: `https://github.com/bitnami/charts`
