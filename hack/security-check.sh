@@ -38,6 +38,16 @@ non_local_examples=(
 ruby - "${non_local_examples[@]}" <<'RUBY'
 require "yaml"
 
+def load_yaml(path)
+  content = File.read(path)
+
+  begin
+    YAML.safe_load(content, aliases: true) || {}
+  rescue ArgumentError
+    YAML.load(content) || {}
+  end
+end
+
 paths = {
   "global.storage.s3.accessKey" => %w[global storage s3 accessKey],
   "global.storage.s3.secretKey" => %w[global storage s3 secretKey],
@@ -55,7 +65,7 @@ paths = {
 }
 
 ARGV.each do |path|
-  data = YAML.load_file(path) || {}
+  data = load_yaml(path)
   hits = []
 
   paths.each do |label, segments|
