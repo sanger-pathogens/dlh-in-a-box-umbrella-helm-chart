@@ -66,8 +66,11 @@ data:
     memory.heap-headroom-per-node={{ .Values.worker.config.memory.heapHeadroomPerNode }}
     {{- end }}
     discovery.uri=http://{{ template "trino.fullname" . }}:{{ .Values.service.port }}
+    {{- $internalSharedSecret := include "trino.internalCommunicationSharedSecret" . }}
     {{- if $identityEnabled }}
     internal-communication.shared-secret=${ENV:TRINO_INTERNAL_SHARED_SECRET}
+    {{- else if $internalSharedSecret }}
+    internal-communication.shared-secret={{ $internalSharedSecret }}
     {{- end }}
     {{- range $configValue := .Values.additionalConfigProperties }}
     {{ $configValue }}

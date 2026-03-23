@@ -173,6 +173,64 @@ Create the secret name for the group-provider file
 {{- toYaml (get $global "dataCatalogs" | default (dict)) -}}
 {{- end -}}
 
+{{- define "trino.lookupSecretValue" -}}
+{{- $secret := lookup "v1" "Secret" .namespace .secretName -}}
+{{- if and $secret (hasKey $secret.data .secretKey) -}}
+{{- index $secret.data .secretKey | b64dec -}}
+{{- end -}}
+{{- end -}}
+
+{{- define "trino.globalS3AccessKey" -}}
+{{- $global := get .Values "global" | default (dict) -}}
+{{- $storage := get $global "storage" | default (dict) -}}
+{{- $s3 := get $storage "s3" | default (dict) -}}
+{{- $resolved := "" -}}
+{{- if $s3.existingSecret -}}
+  {{- $resolved = include "trino.lookupSecretValue" (dict "namespace" .Release.Namespace "secretName" $s3.existingSecret "secretKey" ($s3.accessKeyKey | default "accessKey")) -}}
+{{- end -}}
+{{- if $resolved -}}
+{{- $resolved -}}
+{{- else if $s3.accessKey -}}
+{{- $s3.accessKey -}}
+{{- else if $s3.existingSecret -}}
+{{- "" -}}
+{{- else -}}
+{{- fail "global.storage.s3.accessKey or global.storage.s3.existingSecret must be configured for generated Trino catalogs." -}}
+{{- end -}}
+{{- end -}}
+
+{{- define "trino.globalS3SecretKey" -}}
+{{- $global := get .Values "global" | default (dict) -}}
+{{- $storage := get $global "storage" | default (dict) -}}
+{{- $s3 := get $storage "s3" | default (dict) -}}
+{{- $resolved := "" -}}
+{{- if $s3.existingSecret -}}
+  {{- $resolved = include "trino.lookupSecretValue" (dict "namespace" .Release.Namespace "secretName" $s3.existingSecret "secretKey" ($s3.secretKeyKey | default "secretKey")) -}}
+{{- end -}}
+{{- if $resolved -}}
+{{- $resolved -}}
+{{- else if $s3.secretKey -}}
+{{- $s3.secretKey -}}
+{{- else if $s3.existingSecret -}}
+{{- "" -}}
+{{- else -}}
+{{- fail "global.storage.s3.secretKey or global.storage.s3.existingSecret must be configured for generated Trino catalogs." -}}
+{{- end -}}
+{{- end -}}
+
+{{- define "trino.internalCommunicationSharedSecret" -}}
+{{- $auth := .Values.auth | default dict -}}
+{{- $resolved := "" -}}
+{{- if $auth.internalCommunicationSharedSecretSecret -}}
+  {{- $resolved = include "trino.lookupSecretValue" (dict "namespace" .Release.Namespace "secretName" $auth.internalCommunicationSharedSecretSecret "secretKey" ($auth.internalCommunicationSharedSecretKey | default "sharedSecret")) -}}
+{{- end -}}
+{{- if $resolved -}}
+{{- $resolved -}}
+{{- else -}}
+{{- $auth.internalCommunicationSharedSecret | default "" -}}
+{{- end -}}
+{{- end -}}
+
 {{- define "trino.catalogProperties" -}}
 {{- $root := .root -}}
 {{- $catalogName := .catalogName -}}
@@ -185,8 +243,8 @@ Create the secret name for the group-provider file
 connector.name=delta_lake
 hive.metastore.uri=thrift://{{ $hiveFullname }}-{{ $safeCatalog }}-metastore:9083
 fs.native-s3.enabled=true
-s3.aws-access-key={{ $s3.accessKey }}
-s3.aws-secret-key={{ $s3.secretKey }}
+s3.aws-access-key={{ include "trino.globalS3AccessKey" $root }}
+s3.aws-secret-key={{ include "trino.globalS3SecretKey" $root }}
 s3.endpoint={{ $s3.endpoint }}
 s3.region={{ $s3.region }}
 s3.path-style-access={{ $s3.pathStyleAccess }}
@@ -197,8 +255,8 @@ delta.metadata.cache-ttl=30s
 connector.name=hive
 hive.metastore.uri=thrift://{{ $hiveFullname }}-{{ $safeCatalog }}-metastore:9083
 fs.native-s3.enabled=true
-s3.aws-access-key={{ $s3.accessKey }}
-s3.aws-secret-key={{ $s3.secretKey }}
+s3.aws-access-key={{ include "trino.globalS3AccessKey" $root }}
+s3.aws-secret-key={{ include "trino.globalS3SecretKey" $root }}
 s3.endpoint={{ $s3.endpoint }}
 s3.region={{ $s3.region }}
 s3.path-style-access={{ $s3.pathStyleAccess }}

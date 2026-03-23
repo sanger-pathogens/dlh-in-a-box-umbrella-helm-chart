@@ -338,6 +338,10 @@
                   "type": "string",
                   "description": "Inline secret key used by example overlays or simple local deployments."
                 },
+                "existingSecret": {
+                  "type": "string",
+                  "description": "Existing Kubernetes Secret name containing object-store credentials for chart renders that read secrets from the cluster."
+                },
                 "accessKeyKey": {
                   "type": "string",
                   "description": "Secret key name to read the access key from when external secret delivery is used."

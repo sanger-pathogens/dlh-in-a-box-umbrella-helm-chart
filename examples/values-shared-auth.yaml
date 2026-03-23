@@ -82,6 +82,8 @@ global:
       endpoint: https://s3.example.org
       region: eu-west-2
       bucket: dlh-shared
+      accessKey: EXAMPLE_ACCESS_KEY
+      secretKey: EXAMPLE_SECRET_KEY
       pathStyleAccess: false
   dataCatalogs:
     default:

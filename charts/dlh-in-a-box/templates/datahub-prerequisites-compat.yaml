@@ -1,4 +1,12 @@
 {{- if .Values.datahub.enabled }}
+{{- $mysqlAuth := .Values.datahubPrerequisites.mysql.auth | default dict }}
+{{- $mysqlExistingSecret := $mysqlAuth.existingSecret | default "" }}
+{{- $mysqlExistingSecretObject := dict }}
+{{- $mysqlExistingSecretData := dict }}
+{{- if $mysqlExistingSecret }}
+  {{- $mysqlExistingSecretObject = lookup "v1" "Secret" .Release.Namespace $mysqlExistingSecret | default dict }}
+  {{- $mysqlExistingSecretData = get $mysqlExistingSecretObject "data" | default dict }}
+{{- end }}
 ---
 apiVersion: v1
 kind: Service
@@ -32,19 +40,33 @@ spec:
   type: ExternalName
   externalName: {{ include "dlh-in-a-box.datahubPrerequisites.mysqlFQDN" . }}
 
-{{- $mysqlAuth := .Values.datahubPrerequisites.mysql.auth | default (dict) -}}
-{{- if $mysqlAuth.rootPassword }}
+{{- if and $mysqlExistingSecret (ne $mysqlExistingSecret "mysql-secrets") (not (empty $mysqlExistingSecretData)) }}
 ---
 apiVersion: v1
 kind: Secret
 metadata:
-  name: {{ default "mysql-secrets" $mysqlAuth.existingSecret }}
+  name: mysql-secrets
   labels:
     {{- include "dlh-in-a-box.labels" . | nindent 4 }}
 type: Opaque
 stringData:
-  mysql-root-password: {{ $mysqlAuth.rootPassword | quote }}
-{{- else if not $mysqlAuth.existingSecret }}
-{{- fail "Set datahubPrerequisites.mysql.auth.rootPassword or datahubPrerequisites.mysql.auth.existingSecret when datahub.enabled=true." }}
+  mysql-root-password: {{ required "datahubPrerequisites.mysql.auth.existingSecret must contain mysql-root-password when datahub.enabled=true." (index $mysqlExistingSecretData "mysql-root-password" | b64dec) | quote }}
+  {{- if index $mysqlExistingSecretData "mysql-password" }}
+  mysql-password: {{ index $mysqlExistingSecretData "mysql-password" | b64dec | quote }}
+  {{- end }}
+  {{- if index $mysqlExistingSecretData "mysql-replication-password" }}
+  mysql-replication-password: {{ index $mysqlExistingSecretData "mysql-replication-password" | b64dec | quote }}
+  {{- end }}
+{{- else if not $mysqlExistingSecret }}
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: mysql-secrets
+  labels:
+    {{- include "dlh-in-a-box.labels" . | nindent 4 }}
+type: Opaque
+stringData:
+  mysql-root-password: {{ required "datahubPrerequisites.mysql.auth.rootPassword must be set when datahub.enabled=true when mysql.auth.existingSecret is not configured." .Values.datahubPrerequisites.mysql.auth.rootPassword | quote }}
 {{- end }}
 {{- end }}

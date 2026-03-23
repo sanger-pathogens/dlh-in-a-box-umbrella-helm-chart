@@ -79,6 +79,7 @@ data:
     memory.heap-headroom-per-node={{ .Values.coordinator.config.memory.heapHeadroomPerNode }}
     {{- end }}
     discovery.uri=http://localhost:{{ .Values.service.port }}
+    {{- $internalSharedSecret := include "trino.internalCommunicationSharedSecret" . }}
     {{- if $identityEnabled }}
     http-server.process-forwarded={{ default true $oidc.processForwardedHeaders }}
     internal-communication.shared-secret=${ENV:TRINO_INTERNAL_SHARED_SECRET}
@@ -92,6 +93,9 @@ data:
     {{- end }}
     {{- else if .Values.server.config.authenticationType }}
     http-server.authentication.type={{ .Values.server.config.authenticationType }}
+    {{- end }}
+    {{- if and (not $identityEnabled) $internalSharedSecret }}
+    internal-communication.shared-secret={{ $internalSharedSecret }}
     {{- end }}
     {{- range $configValue := .Values.additionalConfigProperties }}
     {{ $configValue }}
