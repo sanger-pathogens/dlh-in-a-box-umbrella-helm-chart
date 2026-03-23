@@ -235,9 +235,17 @@ superset:
   # Default to the legacy repository names so the optional bundled PostgreSQL
   # and Redis subcharts remain installable.
   postgresql:
+    # Give the bundled Superset metadata database its own chart name so the
+    # generated Service selectors do not collide with other PostgreSQL
+    # dependencies in the same umbrella release.
+    nameOverride: superset-postgresql
     image:
       repository: bitnamilegacy/postgresql
   redis:
+    # Give the bundled Superset Redis dependency its own chart name so the
+    # generated Service selectors do not collide with other Redis
+    # dependencies in the same umbrella release.
+    nameOverride: superset-redis
     image:
       repository: bitnamilegacy/redis
   configOverrides:
