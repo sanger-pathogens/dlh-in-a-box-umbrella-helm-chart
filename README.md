@@ -14,6 +14,7 @@ that publishes it for downstream consumers.
 
 - chart consumer guide: [charts/dlh-in-a-box/README.md](charts/dlh-in-a-box/README.md)
 - first five minutes: [docs/quickstart.md](docs/quickstart.md)
+- identity and access architecture: [docs/auth-architecture.md](docs/auth-architecture.md)
 - release playbook: [docs/release-playbook.md](docs/release-playbook.md)
 - example overlays: [examples/README.md](examples/README.md)
 - maintainer scripts: [hack/README.md](hack/README.md)
@@ -49,6 +50,7 @@ flowchart LR
     Trino[Trino]
     Superset[Superset<br/>optional]
     Prefect[Prefect Server]
+    PrefectProxy[Prefect Auth Proxy<br/>optional]
     Worker[Prefect Workers]
     Spark[Spark Operator]
     Hive[Hive Metastore]
@@ -66,7 +68,8 @@ flowchart LR
 
   Analysts --> Trino
   BIUsers --> Superset
-  Operators --> Prefect
+  Operators --> PrefectProxy
+  PrefectProxy --> Prefect
   Flows --> Worker
   Worker --> Prefect
   Worker --> Spark
@@ -107,6 +110,42 @@ flowchart TD
   Docs --> Assets[docs/assets]
 ```
 
+## Shared identity architecture
+
+```mermaid
+flowchart LR
+  IdP[External OIDC IdP] --> Trino[Trino]
+  IdP --> Superset[Superset]
+  IdP --> DataHub[DataHub]
+  IdP --> Proxy[oauth2-proxy]
+  Proxy --> Prefect[Prefect]
+  LDAP[LDAP / Active Directory] --> Trino
+  Groups[Shared group contract] --> Trino
+  Groups --> Superset
+  Groups --> DataHub
+  Groups --> Proxy
+```
+
+The chart now includes a shared identity contract for external OIDC and
+LDAP-backed group resolution. In phase 1:
+
+- Trino uses OIDC authentication plus LDAP group lookups and generated
+  file-based ACLs.
+- Superset uses OIDC and group-to-role mappings.
+- DataHub uses upstream OIDC settings and the same group contract for policy
+  design.
+- Prefect is protected with `oauth2-proxy` rather than pretending the
+  self-hosted product has native role parity with the other components.
+
+For maintainability, shared-environment overlays should usually define the
+human-facing `identity` block once and mirror it into `global.identity`. The
+reference overlay uses a YAML anchor for that pattern so the values contract
+stays readable while subcharts still receive the runtime copy they need.
+
+See [docs/auth-architecture.md](docs/auth-architecture.md) for the full design,
+group taxonomy, and the phase-2 path if you later want to add Apache Ranger
+for Trino-only policy administration.
+
 ## Delivery lifecycle
 
 ```mermaid
@@ -138,11 +177,14 @@ These are the main behaviors that are authored here rather than delegated to an
 upstream dependency:
 
 - Trino catalog generation from `global.dataCatalogs`
-- Trino access-control generation from catalog ACLs
+- Trino access-control generation from catalog ACLs, now including preferred
+  group-based rules via `authorizedGroups`
 - Hive metastore provisioning for one metastore per catalog
 - DataHub prerequisite service compatibility shims
 - Superset compatibility defaults for chart-managed PostgreSQL and Redis images
   plus the missing runtime PostgreSQL driver
+- shared external identity scaffolding for Trino, Superset, DataHub, and
+  Prefect proxy protection
 - local, layered, and production-shaped example overlays
 - packaging, publication, and licensing automation
 
@@ -177,6 +219,8 @@ If you are new to the repository, start with
 
 - locally generated Trino catalog files and Hive metastore config are mounted
   from Kubernetes `Secret` resources rather than `ConfigMap`
+- Trino OIDC and LDAP bind secrets are referenced from existing Kubernetes
+  secrets rather than tracked values files
 - tracked non-local example overlays are kept free of inline credentials
 - the disposable local overlays still use demo credentials for laptop testing
   and should never be reused outside throwaway environments
@@ -208,6 +252,7 @@ If you prefer task aliases, use:
 make lint
 make template
 make package
+make smoke-install
 make local-install
 ```
 
@@ -220,6 +265,7 @@ In brief:
 - `values-local-superset.yaml` is a focused local BI overlay for Superset + Trino
 - `values-local-layers.yaml` shows a richer multi-catalog local topology
 - `values-dev.yaml` is a lightweight shared-development baseline
+- `values-shared-auth.yaml` is the shared-cluster external identity reference
 - `values-prod.yaml` is a minimal production-shaped baseline
 - `values-prod-layers.yaml` shows layered production catalog patterns
 - `values-external-s3.yaml` is the simplest external object-storage starting point

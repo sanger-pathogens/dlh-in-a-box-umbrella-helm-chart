@@ -3,7 +3,269 @@
   "title": "dlh-in-a-box umbrella values schema",
   "type": "object",
   "additionalProperties": true,
+  "definitions": {
+    "catalogAcl": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "read": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "write": {
+          "type": "array",
+          "items": { "type": "string" }
+        }
+      }
+    },
+    "identityContract": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "description": "Enable the shared external identity contract used by Trino and the optional UI integrations."
+        },
+        "external": {
+          "type": "object",
+          "additionalProperties": true,
+          "properties": {
+            "oidc": {
+              "type": "object",
+              "additionalProperties": true,
+              "properties": {
+                "issuer": { "type": "string" },
+                "usernameClaim": { "type": "string" },
+                "groupsClaim": { "type": "string" },
+                "userMappingPattern": { "type": "string" },
+                "processForwardedHeaders": { "type": "boolean" },
+                "scopes": {
+                  "type": "array",
+                  "items": { "type": "string" }
+                }
+              }
+            },
+            "clients": {
+              "type": "object",
+              "additionalProperties": true,
+              "properties": {
+                "trino": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "properties": {
+                    "enabled": { "type": "boolean" },
+                    "clientId": { "type": "string" },
+                    "existingSecret": { "type": "string" },
+                    "clientSecretKey": { "type": "string" },
+                    "sharedSecretExistingSecret": { "type": "string" },
+                    "sharedSecretKey": { "type": "string" }
+                  },
+                  "allOf": [
+                    {
+                      "if": {
+                        "properties": { "enabled": { "const": true } },
+                        "required": ["enabled"]
+                      },
+                      "then": {
+                        "required": [
+                          "clientId",
+                          "existingSecret",
+                          "sharedSecretExistingSecret"
+                        ]
+                      }
+                    }
+                  ]
+                },
+                "superset": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "properties": {
+                    "enabled": { "type": "boolean" },
+                    "clientId": { "type": "string" },
+                    "existingSecret": { "type": "string" },
+                    "clientSecretKey": { "type": "string" },
+                    "authorizeUrl": { "type": "string" },
+                    "accessTokenUrl": { "type": "string" },
+                    "apiBaseUrl": { "type": "string" },
+                    "jwksUri": { "type": "string" },
+                    "userInfoUrl": { "type": "string" },
+                    "providerName": { "type": "string" },
+                    "roleKeysPath": { "type": "string" }
+                  },
+                  "allOf": [
+                    {
+                      "if": {
+                        "properties": { "enabled": { "const": true } },
+                        "required": ["enabled"]
+                      },
+                      "then": {
+                        "required": [
+                          "clientId",
+                          "existingSecret",
+                          "authorizeUrl",
+                          "accessTokenUrl",
+                          "apiBaseUrl",
+                          "jwksUri",
+                          "userInfoUrl"
+                        ]
+                      }
+                    }
+                  ]
+                },
+                "datahub": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "properties": {
+                    "enabled": { "type": "boolean" },
+                    "provider": { "type": "string" },
+                    "clientId": { "type": "string" },
+                    "existingSecret": { "type": "string" },
+                    "clientSecretKey": { "type": "string" },
+                    "discoveryUri": { "type": "string" },
+                    "scope": { "type": "string" },
+                    "userNameClaim": { "type": "string" },
+                    "userNameClaimRegex": { "type": "string" }
+                  },
+                  "allOf": [
+                    {
+                      "if": {
+                        "properties": { "enabled": { "const": true } },
+                        "required": ["enabled"]
+                      },
+                      "then": {
+                        "required": [
+                          "clientId",
+                          "existingSecret",
+                          "discoveryUri"
+                        ]
+                      }
+                    }
+                  ]
+                },
+                "prefectProxy": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "properties": {
+                    "enabled": { "type": "boolean" },
+                    "clientId": { "type": "string" },
+                    "existingSecret": { "type": "string" },
+                    "clientSecretKey": { "type": "string" },
+                    "cookieExistingSecret": { "type": "string" },
+                    "cookieSecretKey": { "type": "string" },
+                    "redirectUrl": { "type": "string" },
+                    "allowedGroups": {
+                      "type": "array",
+                      "items": { "type": "string" }
+                    },
+                    "emailDomains": {
+                      "type": "array",
+                      "items": { "type": "string" }
+                    },
+                    "ingress": {
+                      "type": "object",
+                      "additionalProperties": true,
+                      "properties": {
+                        "enabled": { "type": "boolean" },
+                        "className": { "type": "string" },
+                        "host": { "type": "string" },
+                        "tlsSecretName": { "type": "string" },
+                        "annotations": {
+                          "type": "object",
+                          "additionalProperties": true
+                        }
+                      }
+                    }
+                  },
+                  "allOf": [
+                    {
+                      "if": {
+                        "properties": { "enabled": { "const": true } },
+                        "required": ["enabled"]
+                      },
+                      "then": {
+                        "required": [
+                          "clientId",
+                          "existingSecret",
+                          "redirectUrl"
+                        ]
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "directory": {
+          "type": "object",
+          "additionalProperties": true,
+          "properties": {
+            "ldap": {
+              "type": "object",
+              "additionalProperties": true,
+              "properties": {
+                "enabled": { "type": "boolean" },
+                "url": { "type": "string" },
+                "userBaseDn": { "type": "string" },
+                "userSearchFilter": { "type": "string" },
+                "groupNameAttribute": { "type": "string" },
+                "useGroupFilter": { "type": "boolean" },
+                "groupBaseDn": { "type": "string" },
+                "groupSearchFilter": { "type": "string" },
+                "groupSearchMemberAttribute": { "type": "string" },
+                "userMemberOfAttribute": { "type": "string" },
+                "bindDistinguishedName": { "type": "string" },
+                "bindExistingSecret": { "type": "string" },
+                "bindPasswordKey": { "type": "string" },
+                "allowInsecure": { "type": "boolean" }
+              },
+              "allOf": [
+                {
+                  "if": {
+                    "properties": { "enabled": { "const": true } },
+                    "required": ["enabled"]
+                  },
+                  "then": {
+                    "required": [
+                      "url",
+                      "userBaseDn",
+                      "bindDistinguishedName",
+                      "bindExistingSecret"
+                    ]
+                  }
+                }
+              ]
+            }
+          }
+        },
+        "groupConventions": {
+          "type": "object",
+          "additionalProperties": true,
+          "properties": {
+            "appAccessPrefix": { "type": "string" },
+            "rolePrefix": { "type": "string" },
+            "dataPrefix": { "type": "string" }
+          }
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": { "enabled": { "const": true } },
+            "required": ["enabled"]
+          },
+          "then": {
+            "required": ["external", "directory"]
+          }
+        }
+      ]
+    }
+  },
   "properties": {
+    "identity": {
+      "$ref": "#/definitions/identityContract",
+      "description": "Human-facing shared identity contract. Mirror this into global.identity in consumer values so subcharts can read it."
+    },
     "global": {
       "description": "Cross-cutting settings shared across the umbrella chart, including storage and catalog definitions.",
       "type": "object",
@@ -32,6 +294,10 @@
           "items": {
             "type": "object"
           }
+        },
+        "identity": {
+          "$ref": "#/definitions/identityContract",
+          "description": "Runtime copy of the shared identity contract consumed by subcharts."
         },
         "storage": {
           "description": "Object-store configuration shared by locally owned composition logic and downstream components.",
@@ -97,22 +363,13 @@
                   "description": "Logical catalog type used by the local Trino and Hive composition logic.",
                   "enum": ["deltaLake", "hive"]
                 },
+                "authorizedGroups": {
+                  "description": "Preferred catalog-level group access lists used by generated Trino access rules.",
+                  "$ref": "#/definitions/catalogAcl"
+                },
                 "authorizedUsers": {
                   "description": "Simple catalog-level access-control lists used by generated Trino access rules.",
-                  "type": "object",
-                  "additionalProperties": true,
-                  "properties": {
-                    "read": {
-                      "type": "array",
-                      "description": "User or group identifiers granted read access to the catalog.",
-                      "items": { "type": "string" }
-                    },
-                    "write": {
-                      "type": "array",
-                      "description": "User or group identifiers granted write access to the catalog.",
-                      "items": { "type": "string" }
-                    }
-                  }
+                  "$ref": "#/definitions/catalogAcl"
                 }
               }
             }
@@ -130,6 +387,7 @@
     "prefect": {
       "description": "Feature toggles for the Prefect server and worker subcomponents.",
       "type": "object",
+      "additionalProperties": true,
       "properties": {
         "enabled": { "type": "boolean" },
         "server": {
@@ -143,6 +401,13 @@
           "properties": {
             "enabled": { "type": "boolean" }
           }
+        },
+        "authProxy": {
+          "type": "object",
+          "additionalProperties": true,
+          "properties": {
+            "enabled": { "type": "boolean" }
+          }
         }
       }
     },
@@ -153,6 +418,11 @@
     },
     "prefectWorker": {
       "description": "Direct pass-through values for the upstream Prefect Worker chart.",
+      "type": "object",
+      "additionalProperties": true
+    },
+    "prefect-auth-proxy": {
+      "description": "Pass-through values for the oauth2-proxy dependency that can protect Prefect in shared environments.",
       "type": "object",
       "additionalProperties": true
     },
@@ -176,7 +446,29 @@
       "type": "object",
       "additionalProperties": true,
       "properties": {
-        "enabled": { "type": "boolean" }
+        "enabled": { "type": "boolean" },
+        "auth": {
+          "type": "object",
+          "additionalProperties": true,
+          "properties": {
+            "groupProvisioning": {
+              "type": "object",
+              "additionalProperties": true,
+              "properties": {
+                "enabled": { "type": "boolean" },
+                "groupsClaim": { "type": "string" },
+                "viewers": {
+                  "type": "array",
+                  "items": { "type": "string" }
+                },
+                "editors": {
+                  "type": "array",
+                  "items": { "type": "string" }
+                }
+              }
+            }
+          }
+        }
       }
     },
     "datahubPrerequisites": {
@@ -189,7 +481,20 @@
       "type": "object",
       "additionalProperties": true,
       "properties": {
-        "enabled": { "type": "boolean" }
+        "enabled": { "type": "boolean" },
+        "auth": {
+          "type": "object",
+          "additionalProperties": true,
+          "properties": {
+            "roleMappings": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "array",
+                "items": { "type": "string" }
+              }
+            }
+          }
+        }
       }
     },
     "hive": {

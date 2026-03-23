@@ -1,9 +1,20 @@
 {{/*
 Modified for dlh-in-a-box from the upstream Trino chart.
 Local changes watch globally generated catalog configuration so coordinator
-pods roll when umbrella-managed catalogs change.
+pods roll when umbrella-managed catalogs change and inject identity secrets
+through environment variables.
 */}}
 {{- $coordinatorJmx := merge .Values.jmx.coordinator (omit .Values.jmx "coordinator" "worker") -}}
+{{- $identity := get .Values.global "identity" | default (dict) -}}
+{{- $externalIdentity := get $identity "external" | default (dict) -}}
+{{- $identityClients := get $externalIdentity "clients" | default (dict) -}}
+{{- $trinoIdentity := get $identityClients "trino" | default (dict) -}}
+{{- $directory := get $identity "directory" | default (dict) -}}
+{{- $ldap := get $directory "ldap" | default (dict) -}}
+{{- $identityEnabled := and (default false $identity.enabled) (default false $trinoIdentity.enabled) -}}
+{{- $ldapEnabled := and $identityEnabled (default false $ldap.enabled) -}}
+{{- $env := .Values.env | default (list) -}}
+{{- $envFrom := .Values.envFrom | default (list) -}}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -138,10 +149,35 @@ spec:
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           securityContext:
             {{- toYaml .Values.containerSecurityContext | nindent 12 }}
+          {{- if or (gt (len $env) 0) $identityEnabled $ldapEnabled }}
           env:
-            {{- toYaml .Values.env | nindent 12 }}
+            {{- if gt (len $env) 0 }}
+            {{- toYaml $env | nindent 12 }}
+            {{- end }}
+            {{- if $identityEnabled }}
+            - name: TRINO_OIDC_CLIENT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $trinoIdentity.existingSecret }}
+                  key: {{ default "clientSecret" $trinoIdentity.clientSecretKey }}
+            - name: TRINO_INTERNAL_SHARED_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $trinoIdentity.sharedSecretExistingSecret }}
+                  key: {{ default "sharedSecret" $trinoIdentity.sharedSecretKey }}
+            {{- end }}
+            {{- if $ldapEnabled }}
+            - name: TRINO_LDAP_BIND_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $ldap.bindExistingSecret }}
+                  key: {{ default "bindPassword" $ldap.bindPasswordKey }}
+            {{- end }}
+          {{- end }}
+          {{- if gt (len $envFrom) 0 }}
           envFrom:
-            {{- toYaml .Values.envFrom | nindent 12 }}
+            {{- toYaml $envFrom | nindent 12 }}
+          {{- end }}
           volumeMounts:
             - mountPath: {{ .Values.server.config.path }}
               name: config-volume

@@ -1,7 +1,7 @@
 {{/*
 Modified for dlh-in-a-box from the upstream Trino chart.
 Local changes add catalog generation and access-control helpers for
-umbrella-chart-driven data catalog composition.
+umbrella-chart-driven data catalog composition, including group-based ACLs.
 */}}
 {{/* vim: set filetype=mustache: */}}
 {{/*
@@ -213,15 +213,31 @@ s3.path-style-access={{ $s3.pathStyleAccess }}
   "catalogs": [
 {{- $first := true }}
 {{- range $catalogName, $catalog := $catalogs }}
-  {{- $write := $catalog.authorizedUsers.write | default (list) }}
-  {{- $read := $catalog.authorizedUsers.read | default (list) }}
-  {{- range $user := $write }}
+  {{- $authorizedGroups := get $catalog "authorizedGroups" | default (dict) }}
+  {{- $authorizedUsers := get $catalog "authorizedUsers" | default (dict) }}
+  {{- $groupWrite := get $authorizedGroups "write" | default (list) }}
+  {{- $groupRead := get $authorizedGroups "read" | default (list) }}
+  {{- $userWrite := get $authorizedUsers "write" | default (list) }}
+  {{- $userRead := get $authorizedUsers "read" | default (list) }}
+  {{- range $group := $groupWrite }}
+    {{- if not $first }},{{ end }}
+    {"group":"{{ $group }}","catalog":"{{ $catalogName }}","allow":"all"}
+    {{- $first = false }}
+  {{- end }}
+  {{- range $group := $groupRead }}
+    {{- if not (has $group $groupWrite) }}
+      {{- if not $first }},{{ end }}
+      {"group":"{{ $group }}","catalog":"{{ $catalogName }}","allow":"read-only"}
+      {{- $first = false }}
+    {{- end }}
+  {{- end }}
+  {{- range $user := $userWrite }}
     {{- if not $first }},{{ end }}
     {"user":"{{ $user }}","catalog":"{{ $catalogName }}","allow":"all"}
     {{- $first = false }}
   {{- end }}
-  {{- range $user := $read }}
-    {{- if not (has $user $write) }}
+  {{- range $user := $userRead }}
+    {{- if not (has $user $userWrite) }}
       {{- if not $first }},{{ end }}
       {"user":"{{ $user }}","catalog":"{{ $catalogName }}","allow":"read-only"}
       {{- $first = false }}

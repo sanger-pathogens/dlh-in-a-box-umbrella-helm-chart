@@ -1,0 +1,203 @@
+# Shared-environment reference overlay for external OIDC + LDAP/AD.
+# This file is designed to render and document the integration pattern rather
+# than act as a disposable local demo.
+identity: &identity
+  enabled: true
+  external:
+    oidc:
+      issuer: https://login.example.org/realms/dlh
+      usernameClaim: email
+      groupsClaim: groups
+      userMappingPattern: "([^@]+)"
+      scopes:
+        - openid
+        - profile
+        - email
+        - groups
+      processForwardedHeaders: true
+    clients:
+      trino:
+        enabled: true
+        clientId: dlh-trino
+        existingSecret: trino-oidc-client
+        clientSecretKey: clientSecret
+        sharedSecretExistingSecret: trino-internal-shared-secret
+        sharedSecretKey: sharedSecret
+      superset:
+        enabled: true
+        clientId: dlh-superset
+        existingSecret: superset-oidc-client
+        clientSecretKey: clientSecret
+        authorizeUrl: https://login.example.org/realms/dlh/protocol/openid-connect/auth
+        accessTokenUrl: https://login.example.org/realms/dlh/protocol/openid-connect/token
+        apiBaseUrl: https://login.example.org/realms/dlh/protocol/openid-connect
+        jwksUri: https://login.example.org/realms/dlh/protocol/openid-connect/certs
+        userInfoUrl: https://login.example.org/realms/dlh/protocol/openid-connect/userinfo
+      datahub:
+        enabled: true
+        provider: other
+        clientId: dlh-datahub
+        existingSecret: datahub-oidc-client
+        clientSecretKey: clientSecret
+        discoveryUri: https://login.example.org/realms/dlh/.well-known/openid-configuration
+        scope: openid profile email groups
+        userNameClaim: email
+        userNameClaimRegex: "([^@]+)"
+      prefectProxy:
+        enabled: true
+        clientId: dlh-prefect
+        existingSecret: prefect-auth-proxy-secrets
+        clientSecretKey: client-secret
+        redirectUrl: https://prefect.shared.example.org/oauth2/callback
+        allowedGroups:
+          - dlh-app-prefect
+          - dlh-role-data-engineer
+        emailDomains:
+          - sanger.ac.uk
+  directory:
+    ldap:
+      enabled: true
+      url: ldaps://ldap.example.org:636
+      userBaseDn: ou=People,dc=example,dc=org
+      userSearchFilter: "(uid={0})"
+      groupNameAttribute: cn
+      useGroupFilter: false
+      userMemberOfAttribute: memberOf
+      bindDistinguishedName: cn=svc-dlh-trino,ou=Service Accounts,dc=example,dc=org
+      bindExistingSecret: trino-ldap-bind
+      bindPasswordKey: bindPassword
+      allowInsecure: false
+  groupConventions:
+    appAccessPrefix: dlh-app-
+    rolePrefix: dlh-role-
+    dataPrefix: dlh-data-
+
+global:
+  environment: shared
+  domain: shared.example.org
+  identity: *identity
+  storage:
+    backend: externalS3
+    s3:
+      endpoint: https://s3.example.org
+      region: eu-west-2
+      bucket: dlh-shared
+      pathStyleAccess: false
+  dataCatalogs:
+    default:
+      type: deltaLake
+      authorizedGroups:
+        read:
+          - dlh-data-default-ro
+          - dlh-data-default-rw
+        write:
+          - dlh-data-default-rw
+
+trino:
+  ingress:
+    enabled: true
+    className: nginx
+    hosts:
+      - host: trino.shared.example.org
+        paths:
+          - path: /
+            pathType: ImplementationSpecific
+    tls:
+      - secretName: trino-shared-tls
+        hosts:
+          - trino.shared.example.org
+
+prefect:
+  enabled: true
+  server:
+    enabled: true
+  workers:
+    enabled: true
+  authProxy:
+    enabled: true
+
+prefectServer:
+  ingress:
+    enabled: false
+  server:
+    uiConfig:
+      prefectUiApiUrl: https://prefect.shared.example.org/api
+
+prefect-auth-proxy:
+  config:
+    existingSecret: prefect-auth-proxy-secrets
+  ingress:
+    enabled: true
+    className: nginx
+    hosts:
+      - prefect.shared.example.org
+    tls:
+      - secretName: prefect-shared-tls
+        hosts:
+          - prefect.shared.example.org
+
+sparkOperator:
+  enabled: true
+
+minio:
+  enabled: false
+
+datahub:
+  enabled: true
+  auth:
+    groupProvisioning:
+      enabled: true
+      groupsClaim: groups
+      viewers:
+        - dlh-data-default-ro
+      editors:
+        - dlh-data-default-rw
+  datahub-frontend:
+    ingress:
+      enabled: true
+      hosts:
+        - host: datahub.shared.example.org
+          paths: []
+      tls:
+        - secretName: datahub-shared-tls
+          hosts:
+            - datahub.shared.example.org
+    oidcAuthentication:
+      enabled: true
+      provider: other
+      clientId: dlh-datahub
+      clientSecretRef:
+        secretRef: datahub-oidc-client
+        secretKey: clientSecret
+      discoveryUri: https://login.example.org/realms/dlh/.well-known/openid-configuration
+      scope: openid profile email groups
+      user_name_claim: email
+      user_name_claim_regex: "([^@]+)"
+
+superset:
+  enabled: true
+  secretEnv:
+    create: false
+  envFromSecret: superset-runtime-secrets
+  extraEnvRaw:
+    - name: OAUTH_CLIENT_ID
+      value: dlh-superset
+    - name: OAUTH_CLIENT_SECRET
+      valueFrom:
+        secretKeyRef:
+          name: superset-oidc-client
+          key: clientSecret
+  ingress:
+    enabled: true
+    hosts:
+      - superset.shared.example.org
+    tls:
+      - secretName: superset-shared-tls
+        hosts:
+          - superset.shared.example.org
+
+hive:
+  enabled: false
+
+vault:
+  enabled: true

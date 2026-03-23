@@ -16,6 +16,7 @@ flowchart TD
   Local --> LocalSuperset[values-local-superset.yaml]
   Local --> LocalLayers[values-local-layers.yaml]
   Shared --> Dev[values-dev.yaml]
+  Shared --> SharedAuth[values-shared-auth.yaml]
   Shared --> ExternalS3[values-external-s3.yaml]
   Shared --> MinioOnly[values-minio.yaml]
   Prod --> ProdBase[values-prod.yaml]
@@ -30,6 +31,7 @@ flowchart TD
 | `values-local-superset.yaml` | Focused local BI validation path | MinIO, Trino, and Superset with demo credentials, seeded local Trino datasource, bundled Superset PostgreSQL and Redis |
 | `values-local-layers.yaml` | Richer local topology example | Multiple catalogs, layered access patterns, self-contained object storage |
 | `values-dev.yaml` | Shared development baseline | External S3, lighter worker setup, no Hive by default |
+| `values-shared-auth.yaml` | Shared external-identity reference | OIDC + LDAP/AD scaffold for Trino, Superset, DataHub, and Prefect proxy protection |
 | `values-prod.yaml` | Minimal production-shaped baseline | External S3, scaled workers, MinIO disabled |
 | `values-prod-layers.yaml` | Layered production example | Multiple catalogs and production-style access patterns |
 | `values-external-s3.yaml` | Simplest external object-storage baseline | External S3 enabled and MinIO disabled |
@@ -44,6 +46,18 @@ flowchart TD
 - `values-local.yaml` remains the canonical end-to-end deployment proof point.
 - `values-local-superset.yaml` is the focused local proof point for the
   optional Superset integration.
+- `values-shared-auth.yaml` is a render-validated shared-environment reference,
+  not a disposable local demo.
+
+## Shared-auth overlay expectations
+
+- `values-shared-auth.yaml` assumes real ingress hosts, DNS, and externally
+  created Kubernetes Secrets for OIDC clients, proxy credentials, and LDAP
+  bind credentials.
+- It uses a YAML anchor to define `identity` once and mirror it into
+  `global.identity`, which is the runtime contract consumed by subcharts.
+- Treat it as a pattern for shared environments, then copy and tailor it in a
+  consumer repository or environment-specific values file.
 
 ## Security note
 

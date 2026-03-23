@@ -32,6 +32,7 @@ non_local_examples=(
   "examples/values-minio.yaml"
   "examples/values-prod.yaml"
   "examples/values-prod-layers.yaml"
+  "examples/values-shared-auth.yaml"
 )
 
 ruby - "${non_local_examples[@]}" <<'RUBY'

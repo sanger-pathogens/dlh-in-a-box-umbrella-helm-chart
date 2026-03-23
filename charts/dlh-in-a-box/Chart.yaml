@@ -2,8 +2,8 @@ apiVersion: v2
 name: dlh-in-a-box
 description: Production-oriented umbrella Helm chart for deploying a modular data lakehouse platform on Kubernetes.
 type: application
-version: 0.2.0
-appVersion: "0.2.0"
+version: 0.3.0
+appVersion: "0.3.0"
 home: https://github.com/sanger-pathogens/dlh-in-a-box-umbrella-helm-chart
 icon: https://raw.githubusercontent.com/sanger-pathogens/dlh-in-a-box-umbrella-helm-chart/main/docs/assets/dlh-in-a-box-icon.jpg
 annotations:
@@ -19,6 +19,7 @@ sources:
   - https://github.com/trinodb/charts
   - https://github.com/apache/superset
   - https://github.com/PrefectHQ/prefect-helm
+  - https://github.com/oauth2-proxy/manifests
   - https://github.com/bitnami/charts
   - https://github.com/kubeflow/spark-operator
   - https://github.com/acryldata/datahub-helm
@@ -61,6 +62,12 @@ dependencies:
     version: "2025.12.31221620"
     repository: https://prefecthq.github.io/prefect-helm
     condition: prefect.enabled,prefect.workers.enabled
+
+  - name: oauth2-proxy
+    alias: prefect-auth-proxy
+    version: "10.1.4"
+    repository: https://oauth2-proxy.github.io/manifests
+    condition: prefect.authProxy.enabled
 
   - name: spark-operator
     alias: sparkOperator

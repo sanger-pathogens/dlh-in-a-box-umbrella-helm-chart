@@ -11,6 +11,7 @@ required_files=(
   "charts/dlh-in-a-box/charts/trino/LICENSE"
   "charts/dlh-in-a-box/third_party/datahub/NOTICE"
   "charts/dlh-in-a-box/third_party/gcloud-sqlproxy/LICENSE"
+  "charts/dlh-in-a-box/third_party/oauth2-proxy/LICENSE"
 )
 
 for file in "${required_files[@]}"; do

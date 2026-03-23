@@ -1,0 +1,71 @@
+{{- $identity := .Values.global.identity | default (dict) -}}
+{{- $external := get $identity "external" | default (dict) -}}
+{{- $clients := get $external "clients" | default (dict) -}}
+{{- $supersetIdentity := get $clients "superset" | default (dict) -}}
+{{- $datahubIdentity := get $clients "datahub" | default (dict) -}}
+{{- $prefectIdentity := get $clients "prefectProxy" | default (dict) -}}
+{{- $datahubValues := .Values.datahub | default (dict) -}}
+{{- $datahubFrontend := get $datahubValues "datahub-frontend" | default (dict) -}}
+{{- $datahubFrontendIngress := get $datahubFrontend "ingress" | default (dict) -}}
+{{- $datahubOidc := get $datahubFrontend "oidcAuthentication" | default (dict) -}}
+{{- $prefectProxyValues := index .Values "prefect-auth-proxy" | default (dict) -}}
+{{- $prefectProxyConfig := get $prefectProxyValues "config" | default (dict) -}}
+{{- $supersetValues := .Values.superset | default (dict) -}}
+{{- $supersetExtraEnvRaw := get $supersetValues "extraEnvRaw" | default (list) -}}
+{{- $hasSupersetOauthClientId := false -}}
+{{- $hasSupersetOauthClientSecret := false -}}
+
+{{- range $env := $supersetExtraEnvRaw -}}
+  {{- if eq (get $env "name") "OAUTH_CLIENT_ID" -}}
+    {{- $hasSupersetOauthClientId = true -}}
+    {{- if and (get $supersetIdentity "clientId") (get $env "value") (ne (get $env "value") (get $supersetIdentity "clientId")) -}}
+      {{- fail "superset.extraEnvRaw OAUTH_CLIENT_ID must match global.identity.external.clients.superset.clientId." -}}
+    {{- end -}}
+  {{- end -}}
+  {{- if eq (get $env "name") "OAUTH_CLIENT_SECRET" -}}
+    {{- $hasSupersetOauthClientSecret = true -}}
+  {{- end -}}
+{{- end -}}
+
+{{- if and .Values.prefect.authProxy.enabled (not .Values.prefect.enabled) -}}
+{{- fail "prefect.authProxy.enabled requires prefect.enabled=true." -}}
+{{- end -}}
+{{- if and .Values.prefect.authProxy.enabled (not .Values.prefect.server.enabled) -}}
+{{- fail "prefect.authProxy.enabled requires prefect.server.enabled=true." -}}
+{{- end -}}
+{{- if and (get $supersetIdentity "enabled") (not .Values.superset.enabled) -}}
+{{- fail "global.identity.external.clients.superset.enabled requires superset.enabled=true." -}}
+{{- end -}}
+{{- if and (get $supersetIdentity "enabled") (not $hasSupersetOauthClientId) -}}
+{{- fail "superset.extraEnvRaw must project OAUTH_CLIENT_ID when global.identity.external.clients.superset.enabled=true." -}}
+{{- end -}}
+{{- if and (get $supersetIdentity "enabled") (not $hasSupersetOauthClientSecret) -}}
+{{- fail "superset.extraEnvRaw must project OAUTH_CLIENT_SECRET when global.identity.external.clients.superset.enabled=true." -}}
+{{- end -}}
+{{- if and (get $datahubIdentity "enabled") (not .Values.datahub.enabled) -}}
+{{- fail "global.identity.external.clients.datahub.enabled requires datahub.enabled=true." -}}
+{{- end -}}
+{{- if and (get $datahubIdentity "enabled") (not (get $datahubFrontendIngress "enabled")) -}}
+{{- fail "datahub.datahub-frontend.ingress.enabled must be true when DataHub OIDC is enabled through the shared identity contract." -}}
+{{- end -}}
+{{- if and (get $datahubIdentity "enabled") (eq (len (get $datahubFrontendIngress "hosts" | default (list))) 0) -}}
+{{- fail "datahub.datahub-frontend.ingress.hosts must contain at least one host when DataHub OIDC is enabled." -}}
+{{- end -}}
+{{- if and (get $datahubIdentity "enabled") (not (get $datahubOidc "enabled")) -}}
+{{- fail "datahub.datahub-frontend.oidcAuthentication.enabled must be true when global.identity.external.clients.datahub.enabled=true." -}}
+{{- end -}}
+{{- if and (get $datahubIdentity "enabled") (get $datahubIdentity "clientId") (ne (get $datahubOidc "clientId") (get $datahubIdentity "clientId")) -}}
+{{- fail "datahub.datahub-frontend.oidcAuthentication.clientId must match global.identity.external.clients.datahub.clientId." -}}
+{{- end -}}
+{{- if and (get $datahubIdentity "enabled") (get $datahubIdentity "existingSecret") (ne (dig "clientSecretRef" "secretRef" "" $datahubOidc) (get $datahubIdentity "existingSecret")) -}}
+{{- fail "datahub.datahub-frontend.oidcAuthentication.clientSecretRef.secretRef must match global.identity.external.clients.datahub.existingSecret." -}}
+{{- end -}}
+{{- if and (get $prefectIdentity "enabled") (not .Values.prefect.authProxy.enabled) -}}
+{{- fail "global.identity.external.clients.prefectProxy.enabled requires prefect.authProxy.enabled=true." -}}
+{{- end -}}
+{{- if and (get $prefectIdentity "enabled") (not (get $prefectProxyConfig "existingSecret")) -}}
+{{- fail "prefect-auth-proxy.config.existingSecret must be set when global.identity.external.clients.prefectProxy.enabled=true." -}}
+{{- end -}}
+{{- if and (get $prefectIdentity "enabled") (get $prefectIdentity "existingSecret") (ne (get $prefectProxyConfig "existingSecret") (get $prefectIdentity "existingSecret")) -}}
+{{- fail "prefect-auth-proxy.config.existingSecret must match global.identity.external.clients.prefectProxy.existingSecret." -}}
+{{- end -}}

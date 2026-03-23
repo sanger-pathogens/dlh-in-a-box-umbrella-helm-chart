@@ -1,9 +1,99 @@
+identity: &identity_defaults
+  enabled: false
+  external:
+    oidc:
+      issuer: ""
+      usernameClaim: email
+      groupsClaim: groups
+      userMappingPattern: "([^@]+)"
+      scopes:
+        - openid
+        - profile
+        - email
+        - groups
+      processForwardedHeaders: true
+    clients:
+      trino:
+        enabled: false
+        clientId: ""
+        existingSecret: ""
+        clientSecretKey: clientSecret
+        sharedSecretExistingSecret: ""
+        sharedSecretKey: sharedSecret
+        discovery:
+          enabled: true
+        challengeTimeout: ""
+      superset:
+        enabled: false
+        providerName: oidc
+        clientId: ""
+        existingSecret: ""
+        clientSecretKey: clientSecret
+        authorizeUrl: ""
+        accessTokenUrl: ""
+        apiBaseUrl: ""
+        jwksUri: ""
+        userInfoUrl: ""
+        icon: fa-openid
+        roleKeysPath: role_keys
+      datahub:
+        enabled: false
+        provider: other
+        clientId: ""
+        existingSecret: ""
+        clientSecretKey: clientSecret
+        discoveryUri: ""
+        scope: ""
+        userNameClaim: email
+        userNameClaimRegex: "([^@]+)"
+      prefectProxy:
+        enabled: false
+        clientId: ""
+        existingSecret: ""
+        clientSecretKey: clientSecret
+        cookieExistingSecret: ""
+        cookieSecretKey: cookieSecret
+        redirectUrl: ""
+        allowedGroups: []
+        emailDomains:
+          - "*"
+        ingress:
+          enabled: false
+          className: ""
+          host: ""
+          tlsSecretName: ""
+          annotations: {}
+  directory:
+    ldap:
+      enabled: false
+      url: ""
+      userBaseDn: ""
+      userSearchFilter: "(uid={0})"
+      groupNameAttribute: cn
+      useGroupFilter: false
+      groupBaseDn: ""
+      groupSearchFilter: "(cn=trino_*)"
+      groupSearchMemberAttribute: member
+      userMemberOfAttribute: memberOf
+      bindDistinguishedName: ""
+      bindExistingSecret: ""
+      bindPasswordKey: bindPassword
+      allowInsecure: false
+  groupConventions:
+    appAccessPrefix: dlh-app-
+    rolePrefix: dlh-role-
+    dataPrefix: dlh-data-
+
 global:
   nameOverride: ""
   fullnameOverride: ""
   domain: ""
   environment: ""
   imagePullSecrets: []
+  # Subcharts consume the runtime identity contract from global.identity.
+  # Keep this in sync with the top-level identity block in consumer values files,
+  # preferably by using YAML anchors in environment overlays.
+  identity: *identity_defaults
   storage:
     backend: externalS3
     s3:
@@ -22,6 +112,9 @@ global:
   dataCatalogs:
     default:
       type: deltaLake  # deltaLake or hive
+      authorizedGroups:
+        read: []
+        write: []
       authorizedUsers:
         read: []
         write: []
@@ -37,6 +130,8 @@ prefect:
     enabled: true
   workers:
     enabled: true
+  authProxy:
+    enabled: false
 
 # Upstream Prefect chart values can be passed directly via these aliases.
 prefectServer:
@@ -54,6 +149,30 @@ prefectWorker:
     selfHostedServerApiConfig:
       apiUrl: http://prefect-server:4200/api
 
+prefect-auth-proxy:
+  config:
+    clientID: '{{ .Values.global.identity.external.clients.prefectProxy.clientId }}'
+    # When using an externally managed Secret, it must contain the oauth2-proxy
+    # keys `client-id`, `client-secret`, and `cookie-secret`.
+    existingSecret: ""
+    configFile: |-
+      provider = "oidc"
+      oidc_issuer_url = "{{ .Values.global.identity.external.oidc.issuer }}"
+      scope = "{{ join " " .Values.global.identity.external.oidc.scopes }}"
+      email_domains = [{{- range $index, $domain := .Values.global.identity.external.clients.prefectProxy.emailDomains }}{{ if $index }}, {{ end }}{{ $domain | quote }}{{- end }}]
+      allowed_groups = [{{- range $index, $group := .Values.global.identity.external.clients.prefectProxy.allowedGroups }}{{ if $index }}, {{ end }}{{ $group | quote }}{{- end }}]
+      oidc_groups_claim = "{{ .Values.global.identity.external.oidc.groupsClaim }}"
+      redirect_url = "{{ .Values.global.identity.external.clients.prefectProxy.redirectUrl }}"
+      upstreams = [ "http://prefect-server:4200" ]
+      pass_access_token = true
+      pass_authorization_header = true
+      set_xauthrequest = true
+      reverse_proxy = true
+  service:
+    type: ClusterIP
+  ingress:
+    enabled: false
+
 sparkOperator:
   enabled: true
   nameOverride: spark-operator
@@ -63,6 +182,12 @@ minio:
 
 datahub:
   enabled: false
+  auth:
+    groupProvisioning:
+      enabled: false
+      groupsClaim: ""
+      viewers: []
+      editors: []
   # Upstream DataHub chart values should be set directly under this key.
   # Example:
   # datahub-frontend:
@@ -80,9 +205,17 @@ datahubPrerequisites:
   mysql:
     auth:
       rootPassword: ""
+      existingSecret: mysql-secrets
 
 superset:
   enabled: false
+  auth:
+    roleMappings:
+      Gamma:
+        - dlh-app-superset
+      Alpha: []
+      Admin:
+        - dlh-role-data-engineer
   image:
     repository: apache/superset
   bootstrapScript: |
@@ -107,6 +240,48 @@ superset:
   redis:
     image:
       repository: bitnamilegacy/redis
+  configOverrides:
+    enable_oauth: |
+      {{- if .Values.global.identity.external.clients.superset.enabled }}
+      import os
+      from flask_appbuilder.security.manager import AUTH_OAUTH
+
+      AUTH_TYPE = AUTH_OAUTH
+      AUTH_ROLES_SYNC_AT_LOGIN = True
+      AUTH_USER_REGISTRATION = True
+      AUTH_USER_REGISTRATION_ROLE = "Gamma"
+      AUTH_ROLES_MAPPING = {
+      {{- range $role, $groups := .Values.auth.roleMappings }}
+        {{- range $group := $groups }}
+        {{ $group | quote }}: ["{{ $role }}"],
+        {{- end }}
+      {{- end }}
+      }
+
+      OAUTH_PROVIDERS = [
+          {
+              "name": {{ .Values.global.identity.external.clients.superset.providerName | quote }},
+              "icon": {{ .Values.global.identity.external.clients.superset.icon | quote }},
+              "token_key": "access_token",
+              "remote_app": {
+                  "client_id": os.environ.get("OAUTH_CLIENT_ID"),
+                  "client_secret": os.environ.get("OAUTH_CLIENT_SECRET"),
+                  "api_base_url": {{ .Values.global.identity.external.clients.superset.apiBaseUrl | quote }},
+                  "client_kwargs": {
+                      "scope": {{ join " " .Values.global.identity.external.oidc.scopes | quote }},
+                      "verify_signature": False,
+                  },
+                  "access_token_url": {{ .Values.global.identity.external.clients.superset.accessTokenUrl | quote }},
+                  "authorize_url": {{ .Values.global.identity.external.clients.superset.authorizeUrl | quote }},
+                  "jwks_uri": {{ .Values.global.identity.external.clients.superset.jwksUri | quote }},
+                  "userinfo_endpoint": {{ .Values.global.identity.external.clients.superset.userInfoUrl | quote }},
+              },
+          }
+      ]
+      {{- end }}
+  extraSecretEnv:
+    SUPERSET_SECRET_KEY: ""
+  extraEnvRaw: []
   # Set a real SUPERSET_SECRET_KEY via extraSecretEnv or external secret
   # delivery before enabling Superset outside disposable local overlays.
 
@@ -146,6 +321,12 @@ hive:
 
 vault:
   enabled: true
+  server:
+    readinessProbe:
+      # The upstream exec probe can take slightly more than 3 seconds on local
+      # kind clusters, which leads to readiness flapping even when Vault is
+      # healthy. Use a less brittle timeout as the umbrella default.
+      timeoutSeconds: 5
 
 postgresql:
   nameOverride: hive-postgresql

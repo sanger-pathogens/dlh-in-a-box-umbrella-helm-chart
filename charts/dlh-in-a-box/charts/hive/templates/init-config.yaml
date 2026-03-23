@@ -4,5 +4,5 @@ metadata:
   name: {{ include "hive.fullname" . }}-init-config
   namespace: {{ .Release.Namespace }}
 data:
-  POSTGRES_HOST: {{ .Values.postgres.host | quote }}
+  POSTGRES_HOST: {{ include "hive.postgresHost" . | quote }}
   POSTGRES_PORT: {{ .Values.postgres.port | quote }}

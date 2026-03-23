@@ -9,10 +9,12 @@ get from zero to a working deployment path quickly.
 flowchart TD
   Start[Start here]
   Start --> Local[Validate locally]
+  Start --> SharedIdentity[Plan shared identity]
   Start --> Consume[Consume from another repo]
   Start --> Inspect[Inspect the published chart]
 
   Local --> Kind[kind plus examples/values-local.yaml]
+  SharedIdentity --> AuthGuide[docs/auth-architecture.md<br/>plus examples/values-shared-auth.yaml]
   Consume --> Dependency[Add as a Helm dependency]
   Inspect --> Show[helm show chart or helm show readme]
 ```
@@ -29,7 +31,7 @@ consumer-facing README before you install anything.
 
 ## 2. Deploy the validated local example
 
-From this repository:
+From the repository root:
 
 ```bash
 ./hack/helm-dependency-update.sh
@@ -53,6 +55,13 @@ kubectl port-forward -n data-lakehouse-local svc/prefect-server 4200:4200
 kubectl port-forward -n data-lakehouse-local svc/dlh-minio 9001:9001
 kubectl port-forward -n data-lakehouse-local svc/dlh-trino 8080:8080
 kubectl port-forward -n data-lakehouse-local svc/dlh-vault 8200:8200
+```
+
+If you are maintaining the chart itself rather than just evaluating it, the
+closest local mirror of CI is:
+
+```bash
+make smoke-install
 ```
 
 ## 3. Consume the chart from another repository
@@ -91,6 +100,8 @@ package settings `Manage Actions access`.
 
 - chart API and values surface:
   [../charts/dlh-in-a-box/README.md](../charts/dlh-in-a-box/README.md)
+- shared identity and access model:
+  [auth-architecture.md](auth-architecture.md)
 - overlay selection:
   [../examples/README.md](../examples/README.md)
 - support expectations:

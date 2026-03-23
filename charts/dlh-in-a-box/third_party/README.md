@@ -19,6 +19,7 @@ flowchart LR
 | --- | --- |
 | `datahub/` | Carries the reproduced upstream DataHub `NOTICE` file |
 | `gcloud-sqlproxy/` | Carries the reproduced MIT license text for bundled `gcloud-sqlproxy` material |
+| `oauth2-proxy/` | Carries the reproduced MIT license text for the bundled `oauth2-proxy` dependency |
 
 ## Child guides
 
@@ -26,6 +27,7 @@ flowchart LR
 | --- | --- | --- |
 | `datahub/` | [datahub/README.md](datahub/README.md) | Provenance of the bundled DataHub `NOTICE` |
 | `gcloud-sqlproxy/` | [gcloud-sqlproxy/README.md](gcloud-sqlproxy/README.md) | Provenance of the bundled MIT license text |
+| `oauth2-proxy/` | [oauth2-proxy/README.md](oauth2-proxy/README.md) | Provenance of the bundled MIT license text |
 
 ## Maintainer note
 

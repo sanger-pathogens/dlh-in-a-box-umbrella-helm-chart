@@ -1,4 +1,5 @@
 {{- $catalogs := default dict .Values.global.dataCatalogs }}
+{{- $postgresHost := include "hive.postgresHost" . }}
 {{- range $catalogName, $catalog := $catalogs }}
 {{- $safeCatalog := include "hive.sanitize" $catalogName }}
 
@@ -57,7 +58,7 @@ stringData:
       </property>
       <property>
         <name>javax.jdo.option.ConnectionURL</name>
-        <value>jdbc:postgresql://{{ $.Values.postgres.host }}:{{ $.Values.postgres.port }}/{{ $catalogName }}</value>
+        <value>jdbc:postgresql://{{ $postgresHost }}:{{ $.Values.postgres.port }}/{{ $catalogName }}</value>
       </property>
       <property>
         <name>javax.jdo.option.ConnectionUserName</name>

@@ -1,9 +1,17 @@
 {{/*
 Modified for dlh-in-a-box from the upstream Trino chart.
 Local changes watch globally generated catalog configuration so worker pods
-roll when umbrella-managed catalogs change.
+roll when umbrella-managed catalogs change and inject identity secrets
+through environment variables.
 */}}
 {{- $workerJmx := merge .Values.jmx.worker (omit .Values.jmx "coordinator" "worker") -}}
+{{- $identity := get .Values.global "identity" | default (dict) -}}
+{{- $externalIdentity := get $identity "external" | default (dict) -}}
+{{- $identityClients := get $externalIdentity "clients" | default (dict) -}}
+{{- $trinoIdentity := get $identityClients "trino" | default (dict) -}}
+{{- $identityEnabled := and (default false $identity.enabled) (default false $trinoIdentity.enabled) -}}
+{{- $env := .Values.env | default (list) -}}
+{{- $envFrom := .Values.envFrom | default (list) -}}
 {{- if gt (int .Values.server.workers) 0 }}
 apiVersion: apps/v1
 kind: Deployment
@@ -124,10 +132,23 @@ spec:
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           securityContext:
             {{- toYaml .Values.containerSecurityContext | nindent 12 }}
+          {{- if or (gt (len $env) 0) $identityEnabled }}
           env:
-            {{- toYaml .Values.env | nindent 12 }}
+            {{- if gt (len $env) 0 }}
+            {{- toYaml $env | nindent 12 }}
+            {{- end }}
+            {{- if $identityEnabled }}
+            - name: TRINO_INTERNAL_SHARED_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $trinoIdentity.sharedSecretExistingSecret }}
+                  key: {{ default "sharedSecret" $trinoIdentity.sharedSecretKey }}
+            {{- end }}
+          {{- end }}
+          {{- if gt (len $envFrom) 0 }}
           envFrom:
-            {{- toYaml .Values.envFrom | nindent 12 }}
+            {{- toYaml $envFrom | nindent 12 }}
+          {{- end }}
           volumeMounts:
             - mountPath: {{ .Values.server.config.path }}
               name: config-volume

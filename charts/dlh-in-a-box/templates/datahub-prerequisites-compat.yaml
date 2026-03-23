@@ -32,14 +32,19 @@ spec:
   type: ExternalName
   externalName: {{ include "dlh-in-a-box.datahubPrerequisites.mysqlFQDN" . }}
 
+{{- $mysqlAuth := .Values.datahubPrerequisites.mysql.auth | default (dict) -}}
+{{- if $mysqlAuth.rootPassword }}
 ---
 apiVersion: v1
 kind: Secret
 metadata:
-  name: mysql-secrets
+  name: {{ default "mysql-secrets" $mysqlAuth.existingSecret }}
   labels:
     {{- include "dlh-in-a-box.labels" . | nindent 4 }}
 type: Opaque
 stringData:
-  mysql-root-password: {{ required "datahubPrerequisites.mysql.auth.rootPassword must be set when datahub.enabled=true." .Values.datahubPrerequisites.mysql.auth.rootPassword | quote }}
+  mysql-root-password: {{ $mysqlAuth.rootPassword | quote }}
+{{- else if not $mysqlAuth.existingSecret }}
+{{- fail "Set datahubPrerequisites.mysql.auth.rootPassword or datahubPrerequisites.mysql.auth.existingSecret when datahub.enabled=true." }}
+{{- end }}
 {{- end }}
