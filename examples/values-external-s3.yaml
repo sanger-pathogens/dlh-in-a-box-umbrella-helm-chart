@@ -6,8 +6,7 @@ global:
       region: us-east-1
       bucket: lakehouse-shared
       pathStyleAccess: true
-      accessKey: ""
-      secretKey: ""
+      existingSecret: lakehouse-object-store-credentials
 
 minio:
   enabled: false

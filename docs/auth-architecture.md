@@ -186,5 +186,5 @@ Acceptance check:
 [../examples/values-shared-auth.yaml](../examples/values-shared-auth.yaml) is
 the shared-environment starting point for this model. It is intentionally
 render-validated documentation rather than a disposable local demo, so it
-expects real ingress hosts, externally created Secrets, and a live OIDC plus
-LDAP or AD integration path.
+expects real ingress hosts, externally created Secrets for OIDC and object
+storage credentials, and a live OIDC plus LDAP or AD integration path.

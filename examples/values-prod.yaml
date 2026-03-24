@@ -8,8 +8,7 @@ global:
       region: us-east-1
       bucket: dlh-prod
       pathStyleAccess: true
-      accessKey: ""
-      secretKey: ""
+      existingSecret: dlh-prod-object-store-credentials
 
 prefectWorker:
   worker:

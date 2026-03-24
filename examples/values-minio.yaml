@@ -1,11 +1,20 @@
 global:
   storage:
     backend: minio
+    s3:
+      endpoint: http://dlh-minio:9000
+      region: us-east-1
+      bucket: dlh-minio
+      pathStyleAccess: true
+      existingSecret: minio-root-user
+      accessKeyKey: root-user
+      secretKeyKey: root-password
 
 minio:
   enabled: true
   auth:
     existingSecret: minio-root-user
+  defaultBuckets: dlh-minio
 
 datahub:
   enabled: false

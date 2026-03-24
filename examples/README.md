@@ -52,8 +52,8 @@ flowchart TD
 ## Shared-auth overlay expectations
 
 - `values-shared-auth.yaml` assumes real ingress hosts, DNS, and externally
-  created Kubernetes Secrets for OIDC clients, proxy credentials, and LDAP
-  bind credentials.
+  created Kubernetes Secrets for OIDC clients, object-store credentials,
+  proxy credentials, and LDAP bind credentials.
 - It uses a YAML anchor to define `identity` once and mirror it into
   `global.identity`, which is the runtime contract consumed by subcharts.
 - Treat it as a pattern for shared environments, then copy and tailor it in a
@@ -66,6 +66,9 @@ flowchart TD
   contain demo credentials for self-contained kind validation.
 - Non-local overlays in this directory should remain free of inline
   credentials.
+- External S3 overlays should point at an existing Kubernetes Secret for
+  object-store credentials rather than carrying placeholder access keys in
+  versioned values files.
 
 ## Maintainer note
 

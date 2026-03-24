@@ -10,8 +10,7 @@ global:
       region: us-east-1
       bucket: dlh-dev
       pathStyleAccess: true
-      accessKey: ""
-      secretKey: ""
+      existingSecret: dlh-dev-object-store-credentials
   dataCatalogs:
     default:
       type: deltaLake
