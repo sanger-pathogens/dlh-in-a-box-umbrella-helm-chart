@@ -16,6 +16,9 @@ minio:
     existingSecret: minio-root-user
   defaultBuckets: dlh-minio
 
+hivePostgresql:
+  nameOverride: hive-postgresql
+
 datahub:
   enabled: false
 

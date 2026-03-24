@@ -145,7 +145,7 @@ Recommended first steps:
 | `datahubPrerequisites` | Upstream prerequisites chart values | Used only when DataHub is enabled |
 | `hive` | Local metastore image, database, S3, and ingress settings | Powers one metastore per catalog |
 | `vault` | Upstream Vault settings | Enabled by default |
-| `postgresql` | Upstream PostgreSQL settings for Hive | Used when Hive is enabled |
+| `hivePostgresql` | Upstream PostgreSQL settings for Hive | Uses a dedicated alias so its values do not collide with PostgreSQL dependencies bundled inside other charts |
 
 ## Deployment patterns
 

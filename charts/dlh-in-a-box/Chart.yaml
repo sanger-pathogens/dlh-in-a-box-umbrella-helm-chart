@@ -102,6 +102,7 @@ dependencies:
     condition: hive.enabled
 
   - name: postgresql
+    alias: hivePostgresql
     version: "14.3.3"
     repository: https://charts.bitnami.com/bitnami
     condition: hive.enabled

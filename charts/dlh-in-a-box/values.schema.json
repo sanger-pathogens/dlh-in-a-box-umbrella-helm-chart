@@ -592,7 +592,7 @@
         "enabled": { "type": "boolean" }
       }
     },
-    "postgresql": {
+    "hivePostgresql": {
       "description": "Pass-through values for the PostgreSQL dependency used by the Hive subchart.",
       "type": "object",
       "additionalProperties": true,

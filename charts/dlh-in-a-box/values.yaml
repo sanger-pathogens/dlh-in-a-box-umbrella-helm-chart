@@ -337,5 +337,5 @@ vault:
       # healthy. Use a less brittle timeout as the umbrella default.
       timeoutSeconds: 5
 
-postgresql:
+hivePostgresql:
   nameOverride: hive-postgresql
