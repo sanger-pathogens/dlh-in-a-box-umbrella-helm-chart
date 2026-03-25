@@ -1,0 +1,9 @@
+global:
+  authorization:
+    platformRoleExceptions:
+      - platformRole: redcap-readonly-analyst
+        username: am83
+        approvalRef: ""
+        reason: Temporary additive access for validation.
+        grantedBy: reviewer@example.org
+        expiresAt: "2026-12-31"

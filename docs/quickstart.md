@@ -13,7 +13,7 @@ flowchart TD
   Start --> Consume[Consume from another repo]
   Start --> Inspect[Inspect the published chart]
 
-  Local --> Kind[kind plus examples/values-local.yaml]
+  Local --> Kind[kind plus examples/values-local-auth.yaml]
   SharedIdentity --> AuthGuide[docs/auth-architecture.md<br/>plus examples/values-shared-auth.yaml]
   Consume --> Dependency[Add as a Helm dependency]
   Inspect --> Show[helm show chart or helm show readme]
@@ -39,7 +39,7 @@ From the repository root:
 helm upgrade --install dlh charts/dlh-in-a-box \
   -n data-lakehouse-local \
   --create-namespace \
-  -f examples/values-local.yaml
+  -f examples/values-local-auth.yaml
 ```
 
 Then inspect the result:
@@ -51,9 +51,13 @@ kubectl get all -n data-lakehouse-local
 Useful port-forwards:
 
 ```bash
-kubectl port-forward -n data-lakehouse-local svc/prefect-server 4200:4200
+kubectl port-forward -n data-lakehouse-local svc/dlh-platform-home 8110:80
+kubectl port-forward -n data-lakehouse-local svc/dlh-prefect-auth-proxy 4200:80
+kubectl port-forward -n data-lakehouse-local svc/dlh-cloudbeaver-auth-proxy 8978:80
+kubectl port-forward -n data-lakehouse-local svc/dlh-keycloak 8081:80
 kubectl port-forward -n data-lakehouse-local svc/dlh-minio 9001:9001
-kubectl port-forward -n data-lakehouse-local svc/dlh-trino 8080:8080
+kubectl port-forward -n data-lakehouse-local svc/dlh-ranger-admin 6080:6080
+kubectl port-forward -n data-lakehouse-local svc/dlh-trino 8443:8443
 kubectl port-forward -n data-lakehouse-local svc/dlh-vault 8200:8200
 ```
 

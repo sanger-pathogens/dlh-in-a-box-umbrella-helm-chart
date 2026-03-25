@@ -1,81 +1,236 @@
-# Shared-environment reference overlay for external OIDC + LDAP/AD.
-# This file is designed to render and document the integration pattern rather
-# than act as a disposable local demo.
-identity: &identity
-  enabled: true
-  external:
-    oidc:
-      issuer: https://login.example.org/realms/dlh
-      usernameClaim: email
-      groupsClaim: groups
-      userMappingPattern: "([^@]+)"
-      scopes:
-        - openid
-        - profile
-        - email
-        - groups
-      processForwardedHeaders: true
-    clients:
-      trino:
-        enabled: true
-        clientId: dlh-trino
-        existingSecret: trino-oidc-client
-        clientSecretKey: clientSecret
-        sharedSecretExistingSecret: trino-internal-shared-secret
-        sharedSecretKey: sharedSecret
-      superset:
-        enabled: true
-        clientId: dlh-superset
-        existingSecret: superset-oidc-client
-        clientSecretKey: clientSecret
-        authorizeUrl: https://login.example.org/realms/dlh/protocol/openid-connect/auth
-        accessTokenUrl: https://login.example.org/realms/dlh/protocol/openid-connect/token
-        apiBaseUrl: https://login.example.org/realms/dlh/protocol/openid-connect
-        jwksUri: https://login.example.org/realms/dlh/protocol/openid-connect/certs
-        userInfoUrl: https://login.example.org/realms/dlh/protocol/openid-connect/userinfo
-      datahub:
-        enabled: true
-        provider: other
-        clientId: dlh-datahub
-        existingSecret: datahub-oidc-client
-        clientSecretKey: clientSecret
-        discoveryUri: https://login.example.org/realms/dlh/.well-known/openid-configuration
-        scope: openid profile email groups
-        userNameClaim: email
-        userNameClaimRegex: "([^@]+)"
-      prefectProxy:
-        enabled: true
-        clientId: dlh-prefect
-        existingSecret: prefect-auth-proxy-secrets
-        clientSecretKey: client-secret
-        redirectUrl: https://prefect.shared.example.org/oauth2/callback
-        allowedGroups:
-          - dlh-app-prefect
-          - dlh-role-data-engineer
-        emailDomains:
-          - sanger.ac.uk
-  directory:
-    ldap:
-      enabled: true
-      url: ldaps://ldap.example.org:636
-      userBaseDn: ou=People,dc=example,dc=org
-      userSearchFilter: "(uid={0})"
-      groupNameAttribute: cn
-      useGroupFilter: false
-      userMemberOfAttribute: memberOf
-      bindDistinguishedName: cn=svc-dlh-trino,ou=Service Accounts,dc=example,dc=org
-      bindExistingSecret: trino-ldap-bind
-      bindPasswordKey: bindPassword
-      allowInsecure: false
-  groupConventions:
-    appAccessPrefix: dlh-app-
-    rolePrefix: dlh-role-
-    dataPrefix: dlh-data-
-
+# Shared-environment reference overlay for an externally managed OIDC provider
+# plus LDAP/AD. This is the escape hatch pattern. The default documented model
+# is bundled Keycloak plus LDAP/AD federation.
 global:
-  environment: shared
+  environment: dev
   domain: shared.example.org
-  identity: *identity
+  identity:
+    enabled: true
+    provider:
+      mode: externalOidc
+    external:
+      oidc:
+        issuer: https://login.example.org/realms/dlh
+        usernameClaim: email
+        groupsClaim: groups
+        userMappingPattern: "([^@]+)"
+        scopes:
+          - openid
+          - profile
+          - email
+          - groups
+        processForwardedHeaders: true
+      clients:
+        trino:
+          enabled: true
+          clientId: dlh-trino
+          existingSecret: trino-oidc-client
+          clientSecretKey: clientSecret
+          redirectUris:
+            - https://trino.shared.example.org/oauth2/callback
+          webOrigins:
+            - https://trino.shared.example.org
+          sharedSecretExistingSecret: trino-internal-shared-secret
+          sharedSecretKey: sharedSecret
+          passwordAuthEnabled: true
+        superset:
+          enabled: true
+          clientId: dlh-superset
+          existingSecret: superset-oidc-client
+          clientSecretKey: clientSecret
+          redirectUris:
+            - https://superset.shared.example.org/oauth-authorized/oidc
+          webOrigins:
+            - https://superset.shared.example.org
+          authorizeUrl: https://login.example.org/realms/dlh/protocol/openid-connect/auth
+          accessTokenUrl: https://login.example.org/realms/dlh/protocol/openid-connect/token
+          apiBaseUrl: https://login.example.org/realms/dlh/protocol/openid-connect
+          jwksUri: https://login.example.org/realms/dlh/protocol/openid-connect/certs
+          userInfoUrl: https://login.example.org/realms/dlh/protocol/openid-connect/userinfo
+        datahub:
+          enabled: true
+          provider: other
+          clientId: dlh-datahub
+          existingSecret: datahub-oidc-client
+          clientSecretKey: clientSecret
+          redirectUris:
+            - https://datahub.shared.example.org/callback/oidc
+          webOrigins:
+            - https://datahub.shared.example.org
+          discoveryUri: https://login.example.org/realms/dlh/.well-known/openid-configuration
+          scope: openid profile email groups
+          userNameClaim: email
+          userNameClaimRegex: "([^@]+)"
+        cloudbeaverProxy:
+          enabled: true
+          clientId: dlh-cloudbeaver
+          existingSecret: cloudbeaver-auth-proxy-secrets
+          clientSecretKey: client-secret
+          cookieExistingSecret: cloudbeaver-auth-proxy-secrets
+          cookieSecretKey: cookie-secret
+          redirectUrl: https://cloudbeaver.shared.example.org/oauth2/callback
+          redirectUris:
+            - https://cloudbeaver.shared.example.org/oauth2/callback
+          webOrigins:
+            - https://cloudbeaver.shared.example.org
+          allowedGroups:
+            - dlh-app-cloudbeaver
+            - dlh-role-data-engineer
+          emailDomains:
+            - sanger.ac.uk
+          ingress:
+            enabled: true
+            className: nginx
+            host: cloudbeaver.shared.example.org
+            tlsSecretName: cloudbeaver-shared-tls
+        prefectProxy:
+          enabled: true
+          clientId: dlh-prefect
+          existingSecret: prefect-auth-proxy-secrets
+          clientSecretKey: client-secret
+          cookieExistingSecret: prefect-auth-proxy-secrets
+          cookieSecretKey: cookie-secret
+          redirectUrl: https://prefect.shared.example.org/oauth2/callback
+          redirectUris:
+            - https://prefect.shared.example.org/oauth2/callback
+          webOrigins:
+            - https://prefect.shared.example.org
+          allowedGroups:
+            - dlh-app-prefect
+            - dlh-role-data-engineer
+          emailDomains:
+            - sanger.ac.uk
+    directory:
+      mode: externalLdap
+      ldap:
+        enabled: true
+        url: ldaps://ldap.example.org:636
+        userBaseDn: ou=People,dc=example,dc=org
+        userBindPattern: "uid=${USER},ou=People,dc=example,dc=org"
+        userSearchFilter: "(uid={0})"
+        groupNameAttribute: cn
+        useGroupFilter: false
+        userMemberOfAttribute: memberOf
+        bindDistinguishedName: cn=svc-dlh-trino,ou=Service Accounts,dc=example,dc=org
+        bindExistingSecret: trino-ldap-bind
+        bindPasswordKey: bindPassword
+        trustedCaExistingSecret: shared-ldap-ca
+        trustedCaCertKey: ca.crt
+        allowInsecure: false
+    groupConventions:
+      appAccessPrefix: dlh-app-
+      rolePrefix: dlh-role-
+      dataPrefix: dlh-data-
+  authorization:
+    platformRoles:
+      platform-admin:
+        description: Platform administrators with full browser access and broad Trino administration rights.
+        members:
+          directoryGroups:
+            - dlh-role-platform-admin
+        apps:
+          superset: true
+          datahub: true
+          trinoUi: true
+          cloudbeaver: true
+          prefect: true
+      default-readonly-analyst:
+        description: Shared-environment read-only users for the default catalog.
+        members:
+          directoryGroups:
+            - dlh-data-default-ro
+        apps:
+          superset: true
+          datahub: true
+          trinoUi: true
+          cloudbeaver: true
+          prefect: false
+      default-readwrite-engineer:
+        description: Shared-environment read-write operators for the default catalog.
+        members:
+          directoryGroups:
+            - dlh-data-default-rw
+        apps:
+          superset: true
+          datahub: true
+          trinoUi: true
+          cloudbeaver: true
+          prefect: true
+    platformRoleExceptions: []
+    ranger:
+      enabled: true
+      serviceName: trino
+      serviceUsername: trino
+      serviceAdminGroups:
+        - dlh-role-platform-admin
+      superGroups:
+        - dlh-role-platform-admin
+      useRangerGroups: false
+      admin:
+        browserUrl: https://ranger.shared.example.org
+      importCatalogAcls: false
+      bootstrapPolicies:
+        - name: trino-default-read
+          description: Shared-environment read access for the default catalog.
+          resources:
+            catalog: default
+            schema: "*"
+            table: "*"
+            column: "*"
+          policyItems:
+            - groups: []
+              users: []
+              roles:
+                - default-readonly-analyst
+                - default-readwrite-engineer
+              accesses:
+                - type: select
+                  isAllowed: true
+                - type: show
+                  isAllowed: true
+                - type: use
+                  isAllowed: true
+                - type: execute
+                  isAllowed: true
+              conditions: []
+              delegateAdmin: false
+        - name: trino-default-write
+          description: Shared-environment write access for the default catalog.
+          resources:
+            catalog: default
+            schema: "*"
+            table: "*"
+            column: "*"
+          policyItems:
+            - groups: []
+              users: []
+              roles:
+                - default-readwrite-engineer
+              accesses:
+                - type: select
+                  isAllowed: true
+                - type: show
+                  isAllowed: true
+                - type: use
+                  isAllowed: true
+                - type: execute
+                  isAllowed: true
+                - type: insert
+                  isAllowed: true
+                - type: create
+                  isAllowed: true
+                - type: delete
+                  isAllowed: true
+                - type: drop
+                  isAllowed: true
+                - type: alter
+                  isAllowed: true
+                - type: grant
+                  isAllowed: true
+                - type: revoke
+                  isAllowed: true
+              conditions: []
+              delegateAdmin: false
   storage:
     backend: externalS3
     s3:
@@ -89,12 +244,19 @@ global:
   dataCatalogs:
     default:
       type: deltaLake
-      authorizedGroups:
-        read:
-          - dlh-data-default-ro
-          - dlh-data-default-rw
-        write:
-          - dlh-data-default-rw
+      governance:
+        dataType: derived
+        classification: internal-deidentified
+        containsDirectIdentifiers: false
+        containsQuasiIdentifiers: false
+        consentBasis: approved-internal-analytics
+        irbStatus: not-required
+        sharingStatus: internal-only
+        ownerPi: platform-owner
+        dataSteward: data-platform-team
+        sourceSystem: curated-lakehouse
+        approvalReference: INT-DEFAULT-001
+        retentionNotes: Retain according to the shared environment retention standard.
 
 trino:
   ingress:
@@ -138,6 +300,26 @@ prefect-auth-proxy:
       - secretName: prefect-shared-tls
         hosts:
           - prefect.shared.example.org
+
+cloudbeaver:
+  enabled: true
+  bootstrap:
+    existingSecret: cloudbeaver-bootstrap
+  authProxy:
+    enabled: true
+
+cloudbeaver-auth-proxy:
+  config:
+    existingSecret: cloudbeaver-auth-proxy-secrets
+  ingress:
+    enabled: true
+    className: nginx
+    hosts:
+      - cloudbeaver.shared.example.org
+    tls:
+      - secretName: cloudbeaver-shared-tls
+        hosts:
+          - cloudbeaver.shared.example.org
 
 sparkOperator:
   enabled: true

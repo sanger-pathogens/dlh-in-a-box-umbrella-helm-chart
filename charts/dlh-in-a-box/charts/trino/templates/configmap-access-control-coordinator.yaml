@@ -3,7 +3,9 @@ Modified for dlh-in-a-box from the upstream Trino chart.
 Local changes allow generated access-control rules when no explicit rules.json
 is provided in values.
 */}}
-{{- if eq .Values.accessControl.type "configmap" }}
+{{- $authorization := get .Values.global "authorization" | default (dict) -}}
+{{- $ranger := get $authorization "ranger" | default (dict) -}}
+{{- if and (not (default false $ranger.enabled)) (eq .Values.accessControl.type "configmap") }}
 apiVersion: v1
 kind: ConfigMap
 metadata:

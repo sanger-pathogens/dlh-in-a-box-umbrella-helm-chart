@@ -24,6 +24,7 @@ sources:
   - https://github.com/kubeflow/spark-operator
   - https://github.com/acryldata/datahub-helm
   - https://github.com/hashicorp/vault-helm
+  - https://github.com/dbeaver/cloudbeaver
 keywords:
   - lakehouse
   - kubernetes
@@ -69,6 +70,17 @@ dependencies:
     repository: https://oauth2-proxy.github.io/manifests
     condition: prefect.authProxy.enabled
 
+  - name: oauth2-proxy
+    alias: cloudbeaver-auth-proxy
+    version: "10.1.4"
+    repository: https://oauth2-proxy.github.io/manifests
+    condition: cloudbeaver.enabled,cloudbeaver.authProxy.enabled
+
+  - name: keycloak
+    version: "25.2.0"
+    repository: oci://registry-1.docker.io/bitnamicharts
+    condition: keycloak.enabled
+
   - name: spark-operator
     alias: sparkOperator
     version: "2.4.0"
@@ -100,6 +112,12 @@ dependencies:
     version: "0.1.0"
     repository: file://charts/hive
     condition: hive.enabled
+
+  - name: postgresql
+    alias: rangerPostgresql
+    version: "14.3.3"
+    repository: https://charts.bitnami.com/bitnami
+    condition: authorization.ranger.enabled,authorization.ranger.postgresql.enabled
 
   - name: postgresql
     alias: hivePostgresql

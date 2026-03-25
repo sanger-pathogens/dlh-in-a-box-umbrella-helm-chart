@@ -73,7 +73,10 @@ data:
     internal-communication.shared-secret={{ $internalSharedSecret }}
     {{- end }}
     {{- range $configValue := .Values.additionalConfigProperties }}
+    {{- if and $identityEnabled (hasPrefix "internal-communication.shared-secret=" $configValue) }}
+    {{- else }}
     {{ $configValue }}
+    {{- end }}
     {{- end }}
     {{- if $workerJmx.enabled }}
     jmx.rmiregistry.port={{- $workerJmx.registryPort }}

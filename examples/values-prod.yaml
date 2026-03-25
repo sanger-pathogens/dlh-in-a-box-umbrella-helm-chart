@@ -1,30 +1,358 @@
+# Production-shaped baseline using bundled Keycloak with external LDAP/Active
+# Directory federation over LDAPS, Ranger for Trino authorization, and a
+# Keycloak-backed proxy in front of Prefect.
 global:
   environment: prod
-  domain: prod.example.com
+  domain: data-platform.example.org
+  identity:
+    enabled: true
+    provider:
+      mode: bundledKeycloak
+      keycloak:
+        realm: dlh
+        browserHost: https://keycloak.data-platform.example.org
+        internalScheme: http
+        loginTheme: ""
+        configCliEnvExistingSecret: &keycloak_config_cli_env_secret dlh-keycloak-config-cli-env
+    external:
+      oidc:
+        issuer: https://keycloak.data-platform.example.org/realms/dlh
+        usernameClaim: email
+        groupsClaim: groups
+        userMappingPattern: "([^@]+)"
+        scopes:
+          - openid
+          - profile
+          - email
+          - groups
+        processForwardedHeaders: true
+      clients:
+        trino:
+          enabled: true
+          clientId: trino
+          existingSecret: dlh-oidc-clients
+          clientSecretKey: trinoClientSecret
+          redirectUris:
+            - https://trino.data-platform.example.org/oauth2/callback
+          webOrigins:
+            - https://trino.data-platform.example.org
+          sharedSecretExistingSecret: dlh-trino-internal-communication
+          sharedSecretKey: sharedSecret
+          passwordAuthEnabled: true
+        superset:
+          enabled: false
+        datahub:
+          enabled: false
+        platformHome:
+          enabled: true
+          clientId: platform-home
+          redirectUris:
+            - https://portal.data-platform.example.org/
+          webOrigins:
+            - https://portal.data-platform.example.org
+        cloudbeaverProxy:
+          enabled: true
+          clientId: cloudbeaver
+          existingSecret: dlh-cloudbeaver-oauth2-proxy
+          clientSecretKey: client-secret
+          cookieExistingSecret: dlh-cloudbeaver-oauth2-proxy
+          cookieSecretKey: cookie-secret
+          redirectUrl: https://cloudbeaver.data-platform.example.org/oauth2/callback
+          redirectUris:
+            - https://cloudbeaver.data-platform.example.org/oauth2/callback
+          webOrigins:
+            - https://cloudbeaver.data-platform.example.org
+          allowedGroups:
+            - dlh-app-cloudbeaver
+            - dlh-role-platform-admin
+          emailDomains:
+            - example.org
+          ingress:
+            enabled: true
+            className: nginx
+            host: cloudbeaver.data-platform.example.org
+            tlsSecretName: prod-example-wildcard
+        prefectProxy:
+          enabled: true
+          clientId: prefect
+          existingSecret: dlh-prefect-oauth2-proxy
+          clientSecretKey: client-secret
+          cookieExistingSecret: dlh-prefect-oauth2-proxy
+          cookieSecretKey: cookie-secret
+          redirectUrl: https://prefect.data-platform.example.org/oauth2/callback
+          redirectUris:
+            - https://prefect.data-platform.example.org/oauth2/callback
+          webOrigins:
+            - https://prefect.data-platform.example.org
+          allowedGroups:
+            - dlh-app-prefect
+            - dlh-role-platform-admin
+          emailDomains:
+            - "*"
+    directory:
+      mode: externalLdap
+      ldap:
+        enabled: true
+        url: ldaps://ad.example.org:636
+        userBaseDn: OU=Users,DC=example,DC=org
+        usernameAttribute: sAMAccountName
+        firstNameAttribute: givenName
+        lastNameAttribute: sn
+        emailAttribute: mail
+        uuidAttribute: objectGUID
+        userObjectClasses: person,organizationalPerson,user
+        userSearchFilter: "(sAMAccountName={0})"
+        userBindPattern: "${USER}@example.org"
+        groupNameAttribute: cn
+        membershipUserAttribute: sAMAccountName
+        groupObjectClasses: group
+        useGroupFilter: true
+        groupBaseDn: OU=Groups,DC=example,DC=org
+        groupSearchFilter: "(cn=dlh-*)"
+        groupSearchMemberAttribute: member
+        userMemberOfAttribute: memberOf
+        bindDistinguishedName: CN=svc-dlh-keycloak,OU=Service Accounts,DC=example,DC=org
+        bindExistingSecret: dlh-ad-bind
+        bindPasswordKey: bindPassword
+        trustedCaExistingSecret: dlh-ad-ca
+        trustedCaCertKey: ca.crt
+        allowInsecure: false
+    groupConventions:
+      appAccessPrefix: dlh-app-
+      rolePrefix: dlh-role-
+      dataPrefix: dlh-data-
+  authorization:
+    platformRoles:
+      platform-admin:
+        description: Platform administrators with full browser access and broad Trino administration rights.
+        members:
+          directoryGroups:
+            - dlh-role-platform-admin
+        apps:
+          superset: true
+          datahub: true
+          trinoUi: true
+          cloudbeaver: true
+          prefect: true
+      redcap-readonly-analyst:
+        description: Read-only analysts for approved REDCap data.
+        members:
+          directoryGroups:
+            - dlh-data-redcap-ro
+        apps:
+          superset: true
+          datahub: true
+          trinoUi: true
+          cloudbeaver: true
+          prefect: false
+    platformRoleExceptions: []
+    ranger:
+      enabled: true
+      serviceName: trino
+      serviceUsername: trino
+      serviceAdminGroups:
+        - dlh-role-platform-admin
+      superGroups:
+        - dlh-role-platform-admin
+      useRangerGroups: false
+      postgresql:
+        enabled: true
+        existingSecret: dlh-ranger-postgresql
+        passwordKey: password
+        adminPasswordKey: postgres-password
+      admin:
+        browserUrl: https://ranger.data-platform.example.org
+        existingSecret: dlh-ranger-admin
+        adminPasswordKey: rangerAdminPassword
+        usersyncPasswordKey: rangerUsersyncPassword
+      usersync:
+        enabled: true
+        schedule: "*/15 * * * *"
+        syncSource: LDAP
+      importCatalogAcls: false
+      bootstrapPolicies:
+        - name: trino-redcap-read
+          description: Allow approved analyst roles to query the redcap catalog.
+          resources:
+            catalog: redcap
+            schema: "*"
+            table: "*"
+            column: "*"
+          policyItems:
+            - groups: []
+              users: []
+              roles:
+                - redcap-readonly-analyst
+              accesses:
+                - type: select
+                  isAllowed: true
+                - type: show
+                  isAllowed: true
+                - type: use
+                  isAllowed: true
+                - type: execute
+                  isAllowed: true
+              conditions: []
+              delegateAdmin: false
+        - name: trino-redcap-write
+          description: Allow the platform administrator role to manage the redcap catalog.
+          resources:
+            catalog: redcap
+            schema: "*"
+            table: "*"
+            column: "*"
+          policyItems:
+            - groups: []
+              users: []
+              roles:
+                - platform-admin
+              accesses:
+                - type: select
+                  isAllowed: true
+                - type: show
+                  isAllowed: true
+                - type: use
+                  isAllowed: true
+                - type: execute
+                  isAllowed: true
+                - type: insert
+                  isAllowed: true
+                - type: create
+                  isAllowed: true
+                - type: delete
+                  isAllowed: true
+                - type: drop
+                  isAllowed: true
+                - type: alter
+                  isAllowed: true
+                - type: grant
+                  isAllowed: true
+                - type: revoke
+                  isAllowed: true
+              conditions: []
+              delegateAdmin: false
+        - name: trino-redcap-mask-identifiers
+          description: Mask direct identifier columns for approved analyst roles.
+          policyType: 1
+          resources:
+            catalog: redcap
+            schema: patient_data
+            table: participants
+            column:
+              - national_id
+              - phone_number
+          dataMaskPolicyItems:
+            - groups: []
+              users: []
+              roles:
+                - redcap-readonly-analyst
+              accesses:
+                - type: select
+                  isAllowed: true
+              dataMaskInfo:
+                dataMaskType: MASK_SHOW_LAST_4
+              conditions: []
+              delegateAdmin: false
   storage:
     backend: externalS3
     s3:
-      endpoint: https://s3.example.com
+      endpoint: https://s3.example.org
       region: us-east-1
-      bucket: dlh-prod
+      bucket: redcap-prod
       pathStyleAccess: true
       existingSecret: dlh-prod-object-store-credentials
+  dataCatalogs:
+    redcap:
+      type: deltaLake
+      governance:
+        dataType: research
+        classification: restricted-identifiable
+        containsDirectIdentifiers: true
+        containsQuasiIdentifiers: true
+        consentBasis: consent-and-dcc-approval
+        irbStatus: required-approved
+        sharingStatus: approved-secondary-use
+        ownerPi: redcap-pi
+        dataSteward: data-platform-team
+        sourceSystem: redcap
+        approvalReference: DCC-PROD-001
+        retentionNotes: Retain according to the approved study retention schedule.
 
-prefectWorker:
-  worker:
-    replicaCount: 3
-    config:
-      workPool: kubernetes-prod
-      workQueues:
-        - critical
+trino:
+  accessControl:
+    type: configmap
+  auth:
+    internalCommunicationSharedSecretSecret: dlh-trino-internal-communication
+
+prefect:
+  enabled: true
+  server:
+    enabled: true
+  workers:
+    enabled: true
+  authProxy:
+    enabled: true
+
+prefect-auth-proxy:
+  config:
+    existingSecret: dlh-prefect-oauth2-proxy
+  ingress:
+    enabled: true
+    className: nginx
+    hosts:
+      - prefect.data-platform.example.org
+    tls:
+      - secretName: prod-example-wildcard
+        hosts:
+          - prefect.data-platform.example.org
+
+platformHome:
+  enabled: true
+  ingress:
+    enabled: true
+    className: nginx
+    host: portal.data-platform.example.org
+    tlsSecretName: prod-example-wildcard
+
+cloudbeaver:
+  enabled: true
+  bootstrap:
+    existingSecret: dlh-cloudbeaver-bootstrap
+  authProxy:
+    enabled: true
+
+cloudbeaver-auth-proxy:
+  config:
+    existingSecret: dlh-cloudbeaver-oauth2-proxy
+  ingress:
+    enabled: true
+    className: nginx
+    hosts:
+      - cloudbeaver.data-platform.example.org
+    tls:
+      - secretName: prod-example-wildcard
+        hosts:
+          - cloudbeaver.data-platform.example.org
+
+keycloak:
+  enabled: true
+  auth:
+    existingSecret: dlh-keycloak-admin
+    passwordSecretKey: adminPassword
+  trustedCertsExistingSecret: dlh-ad-ca
+  keycloakConfigCli:
+    extraEnvVarsSecret: *keycloak_config_cli_env_secret
+
+datahub:
+  enabled: false
+
+superset:
+  enabled: false
 
 vault:
   enabled: true
 
 minio:
-  enabled: false
-
-datahub:
   enabled: false
 
 hive:

@@ -1,22 +1,22 @@
-# Shared development baseline using bundled Keycloak, embedded OpenLDAP, and
-# Apache Ranger. Keep this file free of inline credentials so it can be reused
-# safely across clusters.
+# Disposable local auth overlay for kind smoke testing.
+# These credentials are intentionally non-secret demo values and must never be
+# reused in a shared or production environment.
 global:
-  environment: dev
-  domain: dev.example.org
-  identity: &identity
+  environment: local
+  domain: local.test
+  identity:
     enabled: true
     provider:
       mode: bundledKeycloak
       keycloak:
         realm: dlh
-        browserHost: https://keycloak.dev.example.org
+        browserHost: http://dlh-keycloak.data-lakehouse-local.svc.cluster.local
         internalScheme: http
         loginTheme: ""
         configCliEnvExistingSecret: &keycloak_config_cli_env_secret dlh-keycloak-config-cli-env
     external:
       oidc:
-        issuer: https://keycloak.dev.example.org/realms/dlh
+        issuer: http://dlh-keycloak.data-lakehouse-local.svc.cluster.local/realms/dlh
         usernameClaim: email
         groupsClaim: groups
         userMappingPattern: "([^@]+)"
@@ -33,9 +33,9 @@ global:
           existingSecret: dlh-oidc-clients
           clientSecretKey: trinoClientSecret
           redirectUris:
-            - https://127.0.0.1:28443/oauth2/callback
+            - http://dlh-trino.data-lakehouse-local.svc.cluster.local/oauth2/callback
           webOrigins:
-            - https://127.0.0.1:28443
+            - http://dlh-trino.data-lakehouse-local.svc.cluster.local
           sharedSecretExistingSecret: dlh-trino-internal-communication
           sharedSecretKey: sharedSecret
           passwordAuthEnabled: true
@@ -47,9 +47,9 @@ global:
           enabled: true
           clientId: platform-home
           redirectUris:
-            - https://portal.dev.example.org/
+            - http://dlh-platform-home.data-lakehouse-local.svc.cluster.local/
           webOrigins:
-            - https://portal.dev.example.org
+            - http://dlh-platform-home.data-lakehouse-local.svc.cluster.local
         cloudbeaverProxy:
           enabled: true
           clientId: cloudbeaver
@@ -57,21 +57,16 @@ global:
           clientSecretKey: client-secret
           cookieExistingSecret: dlh-cloudbeaver-oauth2-proxy
           cookieSecretKey: cookie-secret
-          redirectUrl: https://cloudbeaver.dev.example.org/oauth2/callback
+          redirectUrl: http://dlh-cloudbeaver-auth-proxy.data-lakehouse-local.svc.cluster.local/oauth2/callback
           redirectUris:
-            - https://cloudbeaver.dev.example.org/oauth2/callback
+            - http://dlh-cloudbeaver-auth-proxy.data-lakehouse-local.svc.cluster.local/oauth2/callback
           webOrigins:
-            - https://cloudbeaver.dev.example.org
+            - http://dlh-cloudbeaver-auth-proxy.data-lakehouse-local.svc.cluster.local
           allowedGroups:
             - dlh-app-cloudbeaver
             - dlh-role-platform-admin
           emailDomains:
             - "*"
-          ingress:
-            enabled: true
-            className: nginx
-            host: cloudbeaver.dev.example.org
-            tlsSecretName: dev-example-tls
         prefectProxy:
           enabled: true
           clientId: prefect
@@ -79,11 +74,11 @@ global:
           clientSecretKey: client-secret
           cookieExistingSecret: dlh-prefect-oauth2-proxy
           cookieSecretKey: cookie-secret
-          redirectUrl: https://prefect.dev.example.org/oauth2/callback
+          redirectUrl: http://dlh-prefect-auth-proxy.data-lakehouse-local.svc.cluster.local/oauth2/callback
           redirectUris:
-            - https://prefect.dev.example.org/oauth2/callback
+            - http://dlh-prefect-auth-proxy.data-lakehouse-local.svc.cluster.local/oauth2/callback
           webOrigins:
-            - https://prefect.dev.example.org
+            - http://dlh-prefect-auth-proxy.data-lakehouse-local.svc.cluster.local
           allowedGroups:
             - dlh-app-prefect
             - dlh-role-platform-admin
@@ -93,7 +88,7 @@ global:
       mode: embeddedLdap
       ldap:
         enabled: true
-        url: ldap://dlh-openldap.data-lakehouse-dev.svc.cluster.local:389
+        url: ldap://dlh-openldap.data-lakehouse-local.svc.cluster.local:389
         userBaseDn: ou=people,dc=example,dc=org
         usernameAttribute: uid
         firstNameAttribute: givenName
@@ -119,10 +114,10 @@ global:
       appAccessPrefix: dlh-app-
       rolePrefix: dlh-role-
       dataPrefix: dlh-data-
-  authorization: &authorization
+  authorization:
     platformRoles:
       platform-admin:
-        description: Platform administrators with full browser access and broad Trino administration rights.
+        description: Local administrators with full browser access and broad Trino administration rights.
         members:
           directoryGroups:
             - dlh-role-platform-admin
@@ -132,22 +127,11 @@ global:
           trinoUi: true
           cloudbeaver: true
           prefect: true
-      redcap-readonly-analyst:
-        description: Read-only analysts for approved REDCap data.
+      default-readonly-analyst:
+        description: Demo read-only users for the default catalog.
         members:
           directoryGroups:
-            - dlh-data-redcap-ro
-        apps:
-          superset: true
-          datahub: true
-          trinoUi: true
-          cloudbeaver: true
-          prefect: false
-      redcap-site-analyst:
-        description: Site-scoped analysts limited to the approved site subset.
-        members:
-          directoryGroups:
-            - dlh-data-redcap-site-ro
+            - dlh-data-default-ro
         apps:
           superset: true
           datahub: true
@@ -170,7 +154,7 @@ global:
         passwordKey: password
         adminPasswordKey: postgres-password
       admin:
-        browserUrl: https://ranger.dev.example.org
+        browserUrl: http://dlh-ranger-admin.data-lakehouse-local.svc.cluster.local:6080
         existingSecret: dlh-ranger-admin
         adminPasswordKey: rangerAdminPassword
         usersyncPasswordKey: rangerUsersyncPassword
@@ -180,10 +164,10 @@ global:
         syncSource: LDAP
       importCatalogAcls: false
       bootstrapPolicies:
-        - name: trino-redcap-read
-          description: Allow approved analyst roles to query the redcap catalog.
+        - name: trino-default-read
+          description: Local read-only access for the default catalog.
           resources:
-            catalog: redcap
+            catalog: default
             schema: "*"
             table: "*"
             column: "*"
@@ -191,8 +175,7 @@ global:
             - groups: []
               users: []
               roles:
-                - redcap-readonly-analyst
-                - redcap-site-analyst
+                - default-readonly-analyst
               accesses:
                 - type: select
                   isAllowed: true
@@ -204,10 +187,10 @@ global:
                   isAllowed: true
               conditions: []
               delegateAdmin: false
-        - name: trino-redcap-write
-          description: Allow the platform administrator role to manage the redcap catalog.
+        - name: trino-default-write
+          description: Local write access for the default catalog through the administrator role.
           resources:
-            catalog: redcap
+            catalog: default
             schema: "*"
             table: "*"
             column: "*"
@@ -235,28 +218,22 @@ global:
                   isAllowed: true
                 - type: alter
                   isAllowed: true
-                - type: grant
-                  isAllowed: true
-                - type: revoke
-                  isAllowed: true
               conditions: []
               delegateAdmin: false
-        - name: trino-redcap-mask-identifiers
-          description: Mask direct identifier columns for approved analyst roles.
+        - name: trino-default-mask-demo
+          description: Demo masking policy so local smoke installs exercise Ranger fine-grained policy rendering.
           policyType: 1
           resources:
-            catalog: redcap
-            schema: patient_data
-            table: participants
+            catalog: default
+            schema: demo
+            table: people
             column:
               - national_id
-              - phone_number
           dataMaskPolicyItems:
             - groups: []
               users: []
               roles:
-                - redcap-readonly-analyst
-                - redcap-site-analyst
+                - default-readonly-analyst
               accesses:
                 - type: select
                   isAllowed: true
@@ -264,55 +241,43 @@ global:
                 dataMaskType: MASK_SHOW_LAST_4
               conditions: []
               delegateAdmin: false
-        - name: trino-redcap-site-filter
-          description: Limit site-scoped readers to one site.
-          policyType: 2
-          resources:
-            catalog: redcap
-            schema: patient_data
-            table: encounters
-          rowFilterPolicyItems:
-            - groups: []
-              users: []
-              roles:
-                - redcap-site-analyst
-              accesses:
-                - type: select
-                  isAllowed: true
-              rowFilterInfo:
-                filterExpr: "site_code = 'DHAKA'"
-              conditions: []
-              delegateAdmin: false
   storage:
-    backend: externalS3
+    backend: minio
     s3:
-      endpoint: https://s3.example-dev.local
+      endpoint: http://dlh-minio:9000
       region: us-east-1
-      bucket: redcap-dev
+      bucket: dlh-local
       pathStyleAccess: true
-      existingSecret: dlh-dev-object-store-credentials
+      accessKey: minioadmin
+      secretKey: minioadmin123
   dataCatalogs:
-    redcap:
+    default:
       type: deltaLake
-      governance:
-        dataType: research
-        classification: restricted-identifiable
-        containsDirectIdentifiers: true
-        containsQuasiIdentifiers: true
-        consentBasis: consent-and-dcc-approval
-        irbStatus: required-approved
-        sharingStatus: internal-only
-        ownerPi: redcap-pi
-        dataSteward: data-platform-team
-        sourceSystem: redcap
-        approvalReference: DCC-DEV-001
-        retentionNotes: Retain according to approved study retention schedule.
 
 trino:
   accessControl:
     type: configmap
   auth:
     internalCommunicationSharedSecretSecret: dlh-trino-internal-communication
+  server:
+    workers: 1
+    node:
+      environment: local
+    config:
+      query:
+        maxMemory: 512MB
+  coordinator:
+    jvm:
+      maxHeapSize: 1G
+    config:
+      query:
+        maxMemoryPerNode: 256MB
+  worker:
+    jvm:
+      maxHeapSize: 1G
+    config:
+      query:
+        maxMemoryPerNode: 256MB
 
 prefect:
   enabled: true
@@ -323,26 +288,63 @@ prefect:
   authProxy:
     enabled: true
 
+prefectServer:
+  postgresql:
+    enabled: true
+  server:
+    resources:
+      requests:
+        cpu: 100m
+        memory: 256Mi
+      limits:
+        cpu: 500m
+        memory: 512Mi
+
+prefectWorker:
+  worker:
+    apiConfig: selfHostedServer
+    replicaCount: 1
+    initContainer:
+      extraContainers:
+        - name: wait-for-prefect-server
+          image: "{{ .Values.worker.image.repository }}:{{ .Values.worker.image.prefectTag }}"
+          imagePullPolicy: "{{ .Values.worker.image.pullPolicy }}"
+          command:
+            - /bin/sh
+            - -c
+          args:
+            - |
+              python - <<'PY'
+              import sys
+              import time
+              import urllib.request
+
+              url = "http://prefect-server:4200/api/health"
+              for _ in range(90):
+                  try:
+                      with urllib.request.urlopen(url, timeout=5) as response:
+                          if response.status < 500:
+                              sys.exit(0)
+                  except Exception:
+                      pass
+                  time.sleep(2)
+
+              sys.exit("Prefect server did not become reachable in time")
+              PY
+    config:
+      workPool: kubernetes-local
+      workQueues:
+        - default
+      jobNamespace: data-lakehouse-local
+    selfHostedServerApiConfig:
+      apiUrl: http://prefect-server:4200/api
+
 prefect-auth-proxy:
   config:
     existingSecret: dlh-prefect-oauth2-proxy
-  ingress:
-    enabled: true
-    className: nginx
-    hosts:
-      - prefect.dev.example.org
-    tls:
-      - secretName: dev-example-tls
-        hosts:
-          - prefect.dev.example.org
 
 platformHome:
   enabled: true
-  ingress:
-    enabled: true
-    className: nginx
-    host: portal.dev.example.org
-    tlsSecretName: dev-example-tls
 
 cloudbeaver:
   enabled: true
@@ -354,19 +356,14 @@ cloudbeaver:
 cloudbeaver-auth-proxy:
   config:
     existingSecret: dlh-cloudbeaver-oauth2-proxy
-  ingress:
-    enabled: true
-    className: nginx
-    hosts:
-      - cloudbeaver.dev.example.org
-    tls:
-      - secretName: dev-example-tls
-        hosts:
-          - cloudbeaver.dev.example.org
 
 keycloak:
   enabled: true
+  production: false
+  httpEnabled: true
+  proxyHeaders: xforwarded
   auth:
+    adminUser: admin
     existingSecret: dlh-keycloak-admin
     passwordSecretKey: adminPassword
   keycloakConfigCli:
@@ -377,6 +374,111 @@ openldap:
   auth:
     existingSecret: dlh-openldap-admin
     adminPasswordKey: adminPassword
+  seed:
+    organization: Example
+    domain: example.org
+    baseDn: dc=example,dc=org
+    users:
+      - username: local-admin
+        givenName: Local
+        sn: Admin
+        mail: local-admin@example.org
+        password: local-admin-password
+        groups:
+          - dlh-role-platform-admin
+          - dlh-data-default-rw
+          - dlh-app-cloudbeaver
+          - dlh-app-prefect
+      - username: local-reader
+        givenName: Local
+        sn: Reader
+        mail: local-reader@example.org
+        password: local-reader-password
+        groups:
+          - dlh-app-cloudbeaver
+          - dlh-data-default-ro
+    groups:
+      - name: dlh-role-platform-admin
+      - name: dlh-data-default-ro
+      - name: dlh-data-default-rw
+      - name: dlh-app-cloudbeaver
+      - name: dlh-app-prefect
+
+sparkOperator:
+  enabled: true
+  nameOverride: spark-operator
+
+minio:
+  enabled: true
+  global:
+    security:
+      allowInsecureImages: true
+  image:
+    registry: docker.io
+    repository: bitnamilegacy/minio
+    tag: 2025.7.23-debian-12-r5
+  auth:
+    rootUser: minioadmin
+    rootPassword: minioadmin123
+  defaultBuckets: dlh-local
+  persistence:
+    enabled: false
+
+hive:
+  enabled: true
+  metastore:
+    image:
+      registry: docker.io
+      repository: apache/hive
+      tag: 3.1.3
+  schemainit:
+    image:
+      registry: docker.io
+      repository: apache/hive
+      tag: 3.1.3
+  postgres:
+    port: "5432"
+    username: postgres
+    password: localpostgres
+  s3:
+    endpoint: http://dlh-minio:9000
+    accessKey: minioadmin
+    secretKey: minioadmin123
+    pathStyleAccess: true
+  warehouseDir: s3a://dlh-local/warehouse
+  ingress:
+    enabled: false
+
+hivePostgresql:
+  image:
+    registry: docker.io
+    repository: bitnamilegacy/postgresql
+    tag: 16.2.0-debian-12-r8
+  nameOverride: hive-postgresql
+  auth:
+    enablePostgresUser: true
+    postgresPassword: localpostgres
+  primary:
+    pgHbaConfiguration: |-
+      local   all             all                                     trust
+      host    all             all             127.0.0.1/32            trust
+      host    all             all             ::1/128                 trust
+      host    all             all             0.0.0.0/0               md5
+      host    all             all             ::/0                    md5
+    initdb:
+      scripts:
+        00-set-postgres-md5.sql: |
+          SET password_encryption = 'md5';
+          ALTER ROLE postgres WITH PASSWORD 'localpostgres';
 
 datahub:
   enabled: false
+
+superset:
+  enabled: false
+
+vault:
+  enabled: true
+  server:
+    dev:
+      enabled: true

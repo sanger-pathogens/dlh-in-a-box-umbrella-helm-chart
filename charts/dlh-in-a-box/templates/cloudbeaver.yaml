@@ -1,0 +1,183 @@
+{{- if .Values.cloudbeaver.enabled }}
+{{- $serviceName := include "dlh-in-a-box.cloudbeaver.serviceName" . -}}
+{{- $port := default 8978 .Values.cloudbeaver.service.port -}}
+{{- $bootstrap := .Values.cloudbeaver.bootstrap | default dict -}}
+{{- $authProxy := .Values.cloudbeaver.authProxy | default dict -}}
+{{- $appConfig := .Values.cloudbeaver.app | default dict -}}
+{{- $workspace := .Values.cloudbeaver.workspace | default dict -}}
+{{- $workspacePersistence := get $workspace "persistence" | default dict -}}
+{{- $defaultUserTeam := include "dlh-in-a-box.group.app" (dict "root" . "name" "cloudbeaver") -}}
+{{- $adminTeam := include "dlh-in-a-box.group.role" (dict "root" . "name" "platform-admin") -}}
+{{- $global := .Values.global | default dict -}}
+{{- $identity := get $global "identity" | default dict -}}
+{{- $external := get $identity "external" | default dict -}}
+{{- $clients := get $external "clients" | default dict -}}
+{{- $cloudbeaverIdentity := get $clients "cloudbeaverProxy" | default dict -}}
+{{- $cloudbeaverOrigin := first (default (list) (get $cloudbeaverIdentity "webOrigins")) -}}
+{{- $logoutUrl := default (printf "%s/oauth2/sign_out" $cloudbeaverOrigin) $authProxy.logoutUrl -}}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ $serviceName }}-config
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "dlh-in-a-box.labels" . | nindent 4 }}
+    app.kubernetes.io/component: cloudbeaver
+data:
+  cloudbeaver.conf: |
+    {
+      server: {
+        serverPort: {{ $port }},
+        forceHttps: false,
+        contentRoot: "web",
+        driversLocation: "drivers",
+        sslConfigurationPath: "${CLOUDBEAVER_SSL_CONF_PATH:workspace/.data/ssl-config.xml}",
+        rootURI: "/",
+        serviceURI: "/api/",
+        supportedHosts: []
+      },
+      app: {
+        anonymousAccessEnabled: false,
+        defaultUserTeam: {{ $defaultUserTeam | quote }},
+        supportsCustomConnections: {{ ternary "true" "false" (default true $appConfig.supportsCustomConnections) }},
+        showReadOnlyConnectionInfo: {{ ternary "true" "false" (default true $appConfig.showReadOnlyConnectionInfo) }},
+        publicCredentialsSaveEnabled: {{ ternary "true" "false" (default false $appConfig.publicCredentialsSaveEnabled) }},
+        adminCredentialsSaveEnabled: {{ ternary "true" "false" (default false $appConfig.adminCredentialsSaveEnabled) }},
+        enabledAuthProviders: [
+          "reverseProxy"
+        ],
+        authConfigurations: [
+          {
+            id: "keycloak-proxy",
+            provider: "reverseProxy",
+            displayName: "Keycloak",
+            disabled: false,
+            iconURL: "",
+            description: "CloudBeaver browser login is delegated to the Keycloak-backed reverse proxy.",
+            parameters: {
+              "logout-url": {{ $logoutUrl | quote }},
+              "user-header": {{ default "X-Forwarded-Preferred-Username" $authProxy.userHeader | quote }},
+              "team-header": {{ default "X-Forwarded-Groups" $authProxy.groupHeader | quote }},
+              "team-delimiter": {{ default "," $authProxy.groupDelimiter | quote }},
+              "first-name-header": {{ default "" $authProxy.firstNameHeader | quote }},
+              "last-name-header": {{ default "" $authProxy.lastNameHeader | quote }}
+            }
+          }
+        ]
+      }
+    }
+---
+{{- if and (default false $workspacePersistence.enabled) (not (get $workspacePersistence "existingClaim")) }}
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ $serviceName }}-workspace
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "dlh-in-a-box.labels" . | nindent 4 }}
+    app.kubernetes.io/component: cloudbeaver
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: {{ default "10Gi" $workspacePersistence.size }}
+  {{- if $workspacePersistence.storageClass }}
+  storageClassName: {{ $workspacePersistence.storageClass }}
+  {{- end }}
+---
+{{- end }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ $serviceName }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "dlh-in-a-box.labels" . | nindent 4 }}
+    app.kubernetes.io/component: cloudbeaver
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/name: {{ include "dlh-in-a-box.name" . }}
+    app.kubernetes.io/component: cloudbeaver
+  ports:
+    - name: http
+      port: {{ $port }}
+      targetPort: http
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ $serviceName }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "dlh-in-a-box.labels" . | nindent 4 }}
+    app.kubernetes.io/component: cloudbeaver
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/instance: {{ .Release.Name }}
+      app.kubernetes.io/name: {{ include "dlh-in-a-box.name" . }}
+      app.kubernetes.io/component: cloudbeaver
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/instance: {{ .Release.Name }}
+        app.kubernetes.io/name: {{ include "dlh-in-a-box.name" . }}
+        app.kubernetes.io/component: cloudbeaver
+    spec:
+      {{- with .Values.global.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: cloudbeaver
+          image: "{{ .Values.cloudbeaver.image.repository }}:{{ .Values.cloudbeaver.image.tag }}"
+          imagePullPolicy: {{ .Values.cloudbeaver.image.pullPolicy }}
+          env:
+            - name: CLOUDBEAVER_WEB_SERVER_PORT
+              value: {{ printf "%v" $port | quote }}
+          ports:
+            - name: http
+              containerPort: {{ $port }}
+              protocol: TCP
+          readinessProbe:
+            httpGet:
+              path: /status
+              port: http
+            initialDelaySeconds: 20
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /status
+              port: http
+            initialDelaySeconds: 45
+            periodSeconds: 20
+          volumeMounts:
+            - name: cloudbeaver-config
+              mountPath: /opt/cloudbeaver/conf/cloudbeaver.conf
+              subPath: cloudbeaver.conf
+              readOnly: true
+            - name: cloudbeaver-bootstrap
+              mountPath: /opt/cloudbeaver/conf/initial-data.conf
+              subPath: {{ default "initial-data.conf" $bootstrap.initialDataKey }}
+              readOnly: true
+            - name: workspace
+              mountPath: /opt/cloudbeaver/workspace
+      volumes:
+        - name: cloudbeaver-config
+          configMap:
+            name: {{ $serviceName }}-config
+        - name: cloudbeaver-bootstrap
+          secret:
+            secretName: {{ $bootstrap.existingSecret }}
+        - name: workspace
+          {{- if default false $workspacePersistence.enabled }}
+          persistentVolumeClaim:
+            claimName: {{ default (printf "%s-workspace" $serviceName) $workspacePersistence.existingClaim }}
+          {{- else }}
+          emptyDir: {}
+          {{- end }}
+{{- end }}

@@ -1,0 +1,7 @@
+global:
+  identity:
+    external:
+      clients:
+        trino:
+          redirectUris:
+            - https://*.data-platform.example.org/oauth2/callback

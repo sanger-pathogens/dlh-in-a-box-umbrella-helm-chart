@@ -7,6 +7,7 @@ EXAMPLE_FILES=(examples/*.yaml)
 ./hack/license-check.sh
 ./hack/docs-check.sh
 ./hack/security-check.sh
+./hack/render-contract.sh
 
 bash -n hack/*.sh
 ruby -e 'require "json"; JSON.parse(File.read("charts/dlh-in-a-box/values.schema.json"))'

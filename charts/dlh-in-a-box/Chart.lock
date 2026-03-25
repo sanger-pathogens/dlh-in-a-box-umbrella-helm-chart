@@ -14,6 +14,12 @@ dependencies:
 - name: oauth2-proxy
   repository: https://oauth2-proxy.github.io/manifests
   version: 10.1.4
+- name: oauth2-proxy
+  repository: https://oauth2-proxy.github.io/manifests
+  version: 10.1.4
+- name: keycloak
+  repository: oci://registry-1.docker.io/bitnamicharts
+  version: 25.2.0
 - name: spark-operator
   repository: https://kubeflow.github.io/spark-operator
   version: 2.4.0
@@ -35,5 +41,8 @@ dependencies:
 - name: postgresql
   repository: https://charts.bitnami.com/bitnami
   version: 14.3.3
-digest: sha256:5d81b7102acbe3a7bd799f0a6fcab23b7448a775b82365b3d7bfcad4976f1883
-generated: "2026-03-20T13:16:02.299574Z"
+- name: postgresql
+  repository: https://charts.bitnami.com/bitnami
+  version: 14.3.3
+digest: sha256:ca5d96b65a8a945aa411c4ab75f9cf955ec2d2906fe4c6d675a863de33276755
+generated: "2026-03-25T15:38:13.593789Z"

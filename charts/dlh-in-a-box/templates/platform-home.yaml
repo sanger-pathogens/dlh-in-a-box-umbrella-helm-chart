@@ -1,0 +1,845 @@
+{{- if .Values.platformHome.enabled }}
+{{- $serviceName := include "dlh-in-a-box.platformHome.serviceName" . -}}
+{{- $port := default 8080 .Values.platformHome.service.port -}}
+{{- $branding := .Values.platformHome.branding | default dict -}}
+{{- $global := .Values.global | default dict -}}
+{{- $identity := get $global "identity" | default dict -}}
+{{- $authorization := get $global "authorization" | default dict -}}
+{{- $platformRoles := get $authorization "platformRoles" | default dict -}}
+{{- $platformRoleExceptions := get $authorization "platformRoleExceptions" | default (list) -}}
+{{- $ranger := get $authorization "ranger" | default dict -}}
+{{- $rangerAdmin := get $ranger "admin" | default dict -}}
+{{- $external := get $identity "external" | default dict -}}
+{{- $clients := get $external "clients" | default dict -}}
+{{- $oidc := get $external "oidc" | default dict -}}
+{{- $adminRequiredGroup := include "dlh-in-a-box.group.role" (dict "root" . "name" "platform-admin") -}}
+{{- $platformRoleViews := list -}}
+{{- range $roleKey := keys $platformRoles | sortAlpha -}}
+  {{- $role := get $platformRoles $roleKey | default dict -}}
+  {{- $members := get $role "members" | default dict -}}
+  {{- $roleApps := get $role "apps" | default dict -}}
+  {{- $declaredExceptions := list -}}
+  {{- range $exception := $platformRoleExceptions -}}
+    {{- if eq (default "" (get $exception "platformRole")) $roleKey -}}
+      {{- $declaredExceptions = append $declaredExceptions (dict
+        "username" (default "" (get $exception "username"))
+        "approvalRef" (default "" (get $exception "approvalRef"))
+        "reason" (default "" (get $exception "reason"))
+        "grantedBy" (default "" (get $exception "grantedBy"))
+        "expiresAt" (default "" (get $exception "expiresAt"))
+      ) -}}
+    {{- end -}}
+  {{- end -}}
+  {{- $platformRoleViews = append $platformRoleViews (dict
+    "key" $roleKey
+    "name" (default $roleKey (dig "ranger" "roleName" "" $role))
+    "description" (default "" (get $role "description"))
+    "directoryGroups" (get $members "directoryGroups" | default (list))
+    "users" (get $members "users" | default (list))
+    "nestedRoles" (get $members "nestedRoles" | default (list))
+    "apps" (dict
+      "superset" (default false (get $roleApps "superset"))
+      "datahub" (default false (get $roleApps "datahub"))
+      "trinoUi" (default false (get $roleApps "trinoUi"))
+      "cloudbeaver" (default false (get $roleApps "cloudbeaver"))
+      "prefect" (default false (get $roleApps "prefect"))
+    )
+    "declaredExceptions" $declaredExceptions
+  ) -}}
+{{- end -}}
+{{- $apps := list -}}
+{{- if and .Values.superset.enabled (default false (dig "superset" "enabled" false $clients)) -}}
+  {{- $apps = append $apps (dict
+    "id" "superset"
+    "name" "Superset"
+    "description" "Dashboards and ad hoc SQL for approved users."
+    "url" (first (default (list) (dig "superset" "webOrigins" list $clients)))
+    "requiredGroups" (list (include "dlh-in-a-box.group.app" (dict "root" . "name" "superset")))
+    "badges" (list "OIDC SSO" "Dashboards")
+  ) -}}
+{{- end -}}
+{{- if and .Values.datahub.enabled (default false (dig "datahub" "enabled" false $clients)) -}}
+  {{- $apps = append $apps (dict
+    "id" "datahub"
+    "name" "DataHub"
+    "description" "Browse datasets, ownership, and governance metadata."
+    "url" (first (default (list) (dig "datahub" "webOrigins" list $clients)))
+    "requiredGroups" (list (include "dlh-in-a-box.group.app" (dict "root" . "name" "datahub")))
+    "badges" (list "OIDC SSO" "Metadata")
+  ) -}}
+{{- end -}}
+{{- if default false (dig "trino" "enabled" false $clients) -}}
+  {{- $apps = append $apps (dict
+    "id" "trino"
+    "name" "Trino UI"
+    "description" "Inspect queries and coordinator activity in the Trino web UI."
+    "url" (first (default (list) (dig "trino" "webOrigins" list $clients)))
+    "requiredGroups" (list (include "dlh-in-a-box.group.app" (dict "root" . "name" "trino")))
+    "badges" (list "OIDC SSO" "Query UI")
+  ) -}}
+{{- end -}}
+{{- if default false (dig "prefectProxy" "enabled" false $clients) -}}
+  {{- $apps = append $apps (dict
+    "id" "prefect"
+    "name" "Prefect"
+    "description" "View flow runs through the Keycloak-backed proxy."
+    "url" (first (default (list) (dig "prefectProxy" "webOrigins" list $clients)))
+    "requiredGroups" (list (include "dlh-in-a-box.group.app" (dict "root" . "name" "prefect")))
+    "badges" (list "Proxy SSO" "Orchestration")
+  ) -}}
+{{- end -}}
+{{- if and .Values.cloudbeaver.enabled (default false (dig "cloudbeaverProxy" "enabled" false $clients)) -}}
+  {{- $apps = append $apps (dict
+    "id" "cloudbeaver"
+    "name" "CloudBeaver"
+    "description" "Launch a browser SQL client, then authenticate to Trino with your LDAP password."
+    "url" (first (default (list) (dig "cloudbeaverProxy" "webOrigins" list $clients)))
+    "requiredGroups" (list (include "dlh-in-a-box.group.app" (dict "root" . "name" "cloudbeaver")))
+    "badges" (list "Proxy SSO" "LDAP password in Trino")
+  ) -}}
+{{- end -}}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ $serviceName }}-assets
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "dlh-in-a-box.labels" . | nindent 4 }}
+    app.kubernetes.io/component: platform-home
+data:
+  index.html: |
+    <!doctype html>
+    <html lang="en">
+    <head>
+      <meta charset="utf-8" />
+      <meta name="viewport" content="width=device-width, initial-scale=1" />
+      <title>{{ default "Data Platform Home" $branding.title }}</title>
+      <link rel="stylesheet" href="/styles.css" />
+    </head>
+    <body>
+      <div class="shell">
+        <header class="masthead">
+          <div class="brand-block">
+            <p class="eyebrow">Unified Entry</p>
+            <h1 id="portal-title">{{ default "Data Platform Home" $branding.title }}</h1>
+            <p id="portal-subtitle">{{ default "One sign-in. Launch the tools your directory groups allow." $branding.subtitle }}</p>
+          </div>
+          <div class="session-card">
+            <p class="session-label">Signed in as</p>
+            <p id="session-name" class="session-name">Loading session...</p>
+            <p id="session-groups" class="session-groups"></p>
+            <button id="logout-button" class="session-button" type="button">Sign out</button>
+          </div>
+        </header>
+        <main class="content">
+          <section class="panel">
+            <div class="panel-header">
+              <div>
+                <p class="eyebrow">Browser Tools</p>
+                <h2>Your launchpad</h2>
+              </div>
+              <p class="panel-copy">
+                Cards are filtered from your Keycloak group claims. The real security boundary still lives in each app and in Trino plus Ranger.
+              </p>
+            </div>
+            <div id="launch-grid" class="launch-grid"></div>
+          </section>
+          <section class="panel panel-secondary">
+            <div class="panel-header">
+              <div>
+                <p class="eyebrow">How access works</p>
+                <h2>One browser session, two auth paths</h2>
+              </div>
+            </div>
+            <div class="fact-grid">
+              <article class="fact-card">
+                <h3>Browser SSO</h3>
+                <p>Superset, DataHub, Trino UI, Prefect, and CloudBeaver reuse your Keycloak browser session.</p>
+              </article>
+              <article class="fact-card">
+                <h3>Query authentication</h3>
+                <p>CloudBeaver and direct Python, R, JDBC, or DBeaver clients still authenticate to Trino with LDAP username and password.</p>
+              </article>
+              <article class="fact-card">
+                <h3>Authorization</h3>
+                <p>Ranger remains the Trino enforcement layer, so the same masks and row filters apply whether you query through the UI or a code client.</p>
+              </article>
+            </div>
+          </section>
+          <section id="access-admin-panel" class="panel panel-secondary is-hidden">
+            <div class="panel-header">
+              <div>
+                <p class="eyebrow">Access Admin</p>
+                <h2>Directory app access and Ranger data roles</h2>
+              </div>
+              <p class="panel-copy">
+                App front-door access stays directory-controlled. Ranger governs data access inside Trino. Use the matrix below to understand the Git-managed baseline before making a change in Ranger Admin.
+              </p>
+            </div>
+            <div class="admin-callout">
+              <div>
+                <h3>Ranger Admin</h3>
+                <p id="ranger-admin-copy">Use Ranger Admin for additive, time-bound data-access exceptions. Keep long-lived roles and policies in Git.</p>
+              </div>
+              <div id="ranger-admin-link-wrap"></div>
+            </div>
+            <div id="access-admin-grid" class="admin-grid"></div>
+          </section>
+        </main>
+      </div>
+      <script src="/app.js"></script>
+    </body>
+    </html>
+  app.js: |
+    const appRoot = document.getElementById("launch-grid");
+    const sessionName = document.getElementById("session-name");
+    const sessionGroups = document.getElementById("session-groups");
+    const logoutButton = document.getElementById("logout-button");
+    const accessAdminPanel = document.getElementById("access-admin-panel");
+    const accessAdminGrid = document.getElementById("access-admin-grid");
+    const rangerAdminLinkWrap = document.getElementById("ranger-admin-link-wrap");
+
+    function escapeHtml(value) {
+      return String(value)
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll('"', "&quot;")
+        .replaceAll("'", "&#39;");
+    }
+
+    function badgeList(badges) {
+      return (badges || [])
+        .map((badge) => `<span class="badge">${escapeHtml(badge)}</span>`)
+        .join("");
+    }
+
+    function boolBadge(label, enabled) {
+      return `<span class="badge ${enabled ? "" : "badge-muted"}">${escapeHtml(label)}</span>`;
+    }
+
+    function textList(items, fallback) {
+      if (!items || items.length === 0) {
+        return `<span class="detail-empty">${escapeHtml(fallback)}</span>`;
+      }
+      return items.map((item) => `<span class="detail-chip">${escapeHtml(item)}</span>`).join("");
+    }
+
+    function renderApps(config, groups) {
+      const visibleApps = (config.apps || []).filter((app) => {
+        const requiredGroups = app.requiredGroups || [];
+        return requiredGroups.length === 0 || requiredGroups.some((group) => groups.includes(group));
+      });
+
+      if (visibleApps.length === 0) {
+        appRoot.innerHTML = `
+          <article class="empty-state">
+            <h3>No launchable applications</h3>
+            <p>Your account authenticated successfully, but no browser applications are assigned to your current directory groups.</p>
+          </article>
+        `;
+        return;
+      }
+
+      appRoot.innerHTML = visibleApps
+        .map((app) => `
+          <article class="launch-card">
+            <div class="launch-card-header">
+              <div>
+                <p class="launch-kicker">${escapeHtml(app.name)}</p>
+                <h3>${escapeHtml(app.description)}</h3>
+              </div>
+              <a class="launch-link" href="${escapeHtml(app.url)}">Open</a>
+            </div>
+            <div class="badge-row">${badgeList(app.badges)}</div>
+          </article>
+        `)
+        .join("");
+    }
+
+    function renderAdmin(config, groups) {
+      const adminConfig = config.admin || {};
+      const requiredGroups = adminConfig.requiredGroups || [];
+      const isAdmin = requiredGroups.length > 0 && requiredGroups.some((group) => groups.includes(group));
+
+      if (!isAdmin) {
+        accessAdminPanel.classList.add("is-hidden");
+        return;
+      }
+
+      accessAdminPanel.classList.remove("is-hidden");
+
+      if (adminConfig.rangerAdminUrl) {
+        rangerAdminLinkWrap.innerHTML = `<a class="launch-link" href="${escapeHtml(adminConfig.rangerAdminUrl)}">Open Ranger Admin</a>`;
+      } else {
+        rangerAdminLinkWrap.innerHTML = `<p class="detail-note">Ranger Admin URL is not configured for this environment yet.</p>`;
+      }
+
+      const roles = adminConfig.platformRoles || [];
+      accessAdminGrid.innerHTML = roles
+        .map((role) => `
+          <article class="admin-card">
+            <div class="launch-card-header">
+              <div>
+                <p class="launch-kicker">${escapeHtml(role.key)}</p>
+                <h3>${escapeHtml(role.description || role.name)}</h3>
+              </div>
+              <span class="badge">${escapeHtml(role.name)}</span>
+            </div>
+            <p class="detail-note">Browser app access still comes from directory groups. Ranger role membership below governs data access inside Trino.</p>
+            <div class="admin-section">
+              <h4>Directory groups</h4>
+              <div class="detail-row">${textList(role.directoryGroups, "No directory groups mapped")}</div>
+            </div>
+            <div class="admin-section">
+              <h4>Direct users</h4>
+              <div class="detail-row">${textList(role.users, "No direct users in the Git baseline")}</div>
+            </div>
+            <div class="admin-section">
+              <h4>Nested roles</h4>
+              <div class="detail-row">${textList(role.nestedRoles, "No nested roles")}</div>
+            </div>
+            <div class="admin-section">
+              <h4>App entitlements</h4>
+              <div class="badge-row">
+                ${boolBadge("Superset", role.apps && role.apps.superset)}
+                ${boolBadge("DataHub", role.apps && role.apps.datahub)}
+                ${boolBadge("Trino UI", role.apps && role.apps.trinoUi)}
+                ${boolBadge("CloudBeaver", role.apps && role.apps.cloudbeaver)}
+                ${boolBadge("Prefect", role.apps && role.apps.prefect)}
+              </div>
+            </div>
+            <div class="admin-section">
+              <h4>Declared exception grants</h4>
+              ${
+                role.declaredExceptions && role.declaredExceptions.length > 0
+                  ? role.declaredExceptions
+                      .map((exception) => `
+                        <div class="exception-card">
+                          <strong>${escapeHtml(exception.username)}</strong>
+                          <span>${escapeHtml(exception.approvalRef)} until ${escapeHtml(exception.expiresAt)}</span>
+                          <span>${escapeHtml(exception.reason)}</span>
+                        </div>
+                      `)
+                      .join("")
+                  : `<p class="detail-note">No Git-declared direct-user exceptions. Ranger Admin may still hold short-lived UI-created exceptions when they follow the metadata and expiry convention.</p>`
+              }
+            </div>
+          </article>
+        `)
+        .join("");
+    }
+
+    function loadScript(src) {
+      return new Promise((resolve, reject) => {
+        const script = document.createElement("script");
+        script.src = src;
+        script.onload = resolve;
+        script.onerror = reject;
+        document.head.appendChild(script);
+      });
+    }
+
+    async function bootstrap() {
+      const response = await fetch("/config/config.json", { credentials: "same-origin" });
+      if (!response.ok) {
+        throw new Error(`Unable to load config.json: ${response.status}`);
+      }
+
+      const config = await response.json();
+      await loadScript(`${config.identity.keycloak.baseUrl}/js/keycloak.js`);
+
+      const keycloak = new window.Keycloak({
+        url: config.identity.keycloak.baseUrl,
+        realm: config.identity.keycloak.realm,
+        clientId: config.identity.keycloak.clientId,
+      });
+
+      const authenticated = await keycloak.init({
+        onLoad: "login-required",
+        pkceMethod: "S256",
+        checkLoginIframe: false,
+      });
+
+      if (!authenticated) {
+        throw new Error("Keycloak login did not complete.");
+      }
+
+      const claimName = config.identity.groupsClaim || "groups";
+      const rawGroups = keycloak.tokenParsed?.[claimName];
+      const groups = Array.isArray(rawGroups) ? rawGroups : [];
+      const displayName =
+        keycloak.tokenParsed?.name ||
+        keycloak.tokenParsed?.preferred_username ||
+        keycloak.tokenParsed?.email ||
+        "Authenticated user";
+
+      sessionName.textContent = displayName;
+      sessionGroups.textContent = groups.length > 0 ? groups.join(", ") : "No directory groups in token";
+      logoutButton.addEventListener("click", () => {
+        keycloak.logout({ redirectUri: window.location.origin + "/" });
+      });
+
+      window.setInterval(() => {
+        keycloak.updateToken(60).catch(() => {
+          keycloak.login();
+        });
+      }, 30000);
+
+      renderApps(config, groups);
+      renderAdmin(config, groups);
+    }
+
+    bootstrap().catch((error) => {
+      appRoot.innerHTML = `
+        <article class="empty-state">
+          <h3>Portal startup failed</h3>
+          <p>${escapeHtml(error.message)}</p>
+        </article>
+      `;
+      sessionName.textContent = "Unable to start session";
+      sessionGroups.textContent = "";
+      console.error(error);
+    });
+  styles.css: |
+    :root {
+      --bg-top: #f7f1e5;
+      --bg-bottom: #dce7f4;
+      --surface: rgba(255, 255, 255, 0.84);
+      --surface-strong: rgba(255, 255, 255, 0.94);
+      --ink: #17324d;
+      --muted: #54697f;
+      --accent: #0f6b7f;
+      --accent-soft: #d8eff4;
+      --line: rgba(23, 50, 77, 0.12);
+      --shadow: 0 18px 48px rgba(23, 50, 77, 0.12);
+      --radius: 24px;
+      --font-heading: "Avenir Next", "Trebuchet MS", sans-serif;
+      --font-body: "IBM Plex Sans", "Segoe UI", sans-serif;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: var(--font-body);
+      color: var(--ink);
+      background:
+        radial-gradient(circle at top left, rgba(15, 107, 127, 0.12), transparent 28rem),
+        radial-gradient(circle at right center, rgba(214, 129, 74, 0.16), transparent 24rem),
+        linear-gradient(180deg, var(--bg-top), var(--bg-bottom));
+    }
+
+    .shell {
+      width: min(1180px, calc(100% - 2rem));
+      margin: 0 auto;
+      padding: 2rem 0 3rem;
+    }
+
+    .masthead {
+      display: grid;
+      gap: 1.5rem;
+      grid-template-columns: minmax(0, 1.8fr) minmax(18rem, 0.9fr);
+      align-items: stretch;
+      margin-bottom: 1.5rem;
+    }
+
+    .brand-block,
+    .session-card,
+    .panel {
+      background: var(--surface);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      backdrop-filter: blur(16px);
+    }
+
+    .brand-block {
+      padding: 2rem;
+    }
+
+    .session-card {
+      padding: 1.5rem;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      gap: 0.75rem;
+      background: linear-gradient(160deg, var(--surface-strong), rgba(216, 239, 244, 0.92));
+    }
+
+    .session-label,
+    .eyebrow,
+    .launch-kicker {
+      margin: 0 0 0.4rem;
+      text-transform: uppercase;
+      letter-spacing: 0.18em;
+      font-size: 0.74rem;
+      color: var(--muted);
+    }
+
+    #portal-title,
+    h2,
+    .launch-card h3,
+    .fact-card h3 {
+      margin: 0;
+      font-family: var(--font-heading);
+    }
+
+    #portal-title {
+      font-size: clamp(2.2rem, 6vw, 4rem);
+      line-height: 0.98;
+      margin-bottom: 0.8rem;
+    }
+
+    #portal-subtitle,
+    .panel-copy,
+    .fact-card p,
+    .launch-card p,
+    .empty-state p,
+    .session-groups {
+      margin: 0;
+      color: var(--muted);
+      line-height: 1.55;
+    }
+
+    .session-name {
+      margin: 0;
+      font-size: 1.25rem;
+      font-weight: 700;
+    }
+
+    .session-button,
+    .launch-link {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 0.75rem 1rem;
+      border-radius: 999px;
+      border: none;
+      background: var(--ink);
+      color: white;
+      text-decoration: none;
+      font-weight: 700;
+      cursor: pointer;
+      transition: transform 160ms ease, background 160ms ease;
+    }
+
+    .session-button:hover,
+    .launch-link:hover {
+      transform: translateY(-1px);
+      background: #0d2237;
+    }
+
+    .content {
+      display: grid;
+      gap: 1.5rem;
+    }
+
+    .panel {
+      padding: 1.5rem;
+    }
+
+    .panel-secondary {
+      background: rgba(255, 255, 255, 0.72);
+    }
+
+    .panel-header {
+      display: flex;
+      gap: 1rem;
+      justify-content: space-between;
+      align-items: end;
+      margin-bottom: 1rem;
+    }
+
+    .panel-copy {
+      max-width: 34rem;
+    }
+
+    .launch-grid,
+    .fact-grid {
+      display: grid;
+      gap: 1rem;
+      grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr));
+    }
+
+    .launch-card,
+    .fact-card,
+    .empty-state,
+    .admin-card {
+      padding: 1.25rem;
+      border-radius: 20px;
+      border: 1px solid var(--line);
+      background: var(--surface-strong);
+    }
+
+    .launch-card-header {
+      display: flex;
+      gap: 1rem;
+      justify-content: space-between;
+      align-items: start;
+      margin-bottom: 1rem;
+    }
+
+    .badge-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+    }
+
+    .badge {
+      display: inline-flex;
+      padding: 0.4rem 0.7rem;
+      border-radius: 999px;
+      background: var(--accent-soft);
+      color: var(--accent);
+      font-size: 0.82rem;
+      font-weight: 700;
+    }
+
+    .badge-muted {
+      background: rgba(84, 105, 127, 0.12);
+      color: var(--muted);
+    }
+
+    .is-hidden {
+      display: none;
+    }
+
+    .admin-callout {
+      display: flex;
+      gap: 1rem;
+      align-items: center;
+      justify-content: space-between;
+      padding: 1rem 1.25rem;
+      margin-bottom: 1rem;
+      border-radius: 20px;
+      border: 1px solid var(--line);
+      background: linear-gradient(135deg, rgba(15, 107, 127, 0.1), rgba(255, 255, 255, 0.92));
+    }
+
+    .admin-callout h3,
+    .admin-section h4 {
+      margin: 0 0 0.45rem;
+      font-family: var(--font-heading);
+    }
+
+    .admin-grid {
+      display: grid;
+      gap: 1rem;
+      grid-template-columns: repeat(auto-fit, minmax(19rem, 1fr));
+    }
+
+    .admin-section + .admin-section {
+      margin-top: 1rem;
+    }
+
+    .detail-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+    }
+
+    .detail-chip {
+      display: inline-flex;
+      padding: 0.35rem 0.65rem;
+      border-radius: 999px;
+      border: 1px solid var(--line);
+      background: rgba(255, 255, 255, 0.94);
+      color: var(--ink);
+      font-size: 0.84rem;
+    }
+
+    .detail-empty,
+    .detail-note,
+    .exception-card span {
+      color: var(--muted);
+      line-height: 1.45;
+    }
+
+    .exception-card {
+      display: grid;
+      gap: 0.2rem;
+      padding: 0.75rem;
+      border-radius: 16px;
+      border: 1px dashed var(--line);
+      background: rgba(216, 239, 244, 0.3);
+    }
+
+    @media (max-width: 900px) {
+      .masthead,
+      .panel-header,
+      .admin-callout {
+        grid-template-columns: 1fr;
+        display: grid;
+      }
+    }
+  config/config.json: |
+    {{- $config := dict
+      "branding" (dict
+        "title" (default "Data Platform Home" $branding.title)
+        "subtitle" (default "One sign-in. Launch the tools your directory groups allow." $branding.subtitle)
+      )
+      "identity" (dict
+        "groupsClaim" (default "groups" $oidc.groupsClaim)
+        "keycloak" (dict
+          "baseUrl" (include "dlh-in-a-box.keycloak.browserBaseUrl" .)
+          "realm" (include "dlh-in-a-box.keycloak.realm" .)
+          "clientId" (default "" (get (get $clients "platformHome" | default dict) "clientId"))
+        )
+      )
+      "apps" $apps
+      "admin" (dict
+        "requiredGroups" (list $adminRequiredGroup)
+        "rangerAdminUrl" (default "" (get $rangerAdmin "browserUrl"))
+        "platformRoles" $platformRoleViews
+      )
+    -}}
+{{ toPrettyJson $config | nindent 4 }}
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ $serviceName }}-nginx
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "dlh-in-a-box.labels" . | nindent 4 }}
+    app.kubernetes.io/component: platform-home
+data:
+  default.conf: |
+    server {
+      listen {{ $port }};
+      server_name _;
+      root /usr/share/nginx/html;
+      index index.html;
+
+      location = /healthz {
+        access_log off;
+        add_header Content-Type text/plain;
+        return 200 'ok';
+      }
+
+      location / {
+        try_files $uri $uri/ /index.html;
+      }
+    }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ $serviceName }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "dlh-in-a-box.labels" . | nindent 4 }}
+    app.kubernetes.io/component: platform-home
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/name: {{ include "dlh-in-a-box.name" . }}
+    app.kubernetes.io/component: platform-home
+  ports:
+    - name: http
+      port: 80
+      targetPort: http
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ $serviceName }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "dlh-in-a-box.labels" . | nindent 4 }}
+    app.kubernetes.io/component: platform-home
+spec:
+  replicas: {{ default 1 .Values.platformHome.replicaCount }}
+  selector:
+    matchLabels:
+      app.kubernetes.io/instance: {{ .Release.Name }}
+      app.kubernetes.io/name: {{ include "dlh-in-a-box.name" . }}
+      app.kubernetes.io/component: platform-home
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/instance: {{ .Release.Name }}
+        app.kubernetes.io/name: {{ include "dlh-in-a-box.name" . }}
+        app.kubernetes.io/component: platform-home
+    spec:
+      {{- with .Values.global.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: platform-home
+          image: "{{ .Values.platformHome.image.repository }}:{{ .Values.platformHome.image.tag }}"
+          imagePullPolicy: {{ .Values.platformHome.image.pullPolicy }}
+          ports:
+            - name: http
+              containerPort: {{ $port }}
+              protocol: TCP
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            initialDelaySeconds: 15
+            periodSeconds: 20
+          volumeMounts:
+            - name: assets
+              mountPath: /usr/share/nginx/html
+              readOnly: true
+            - name: nginx-config
+              mountPath: /etc/nginx/conf.d/default.conf
+              subPath: default.conf
+              readOnly: true
+      volumes:
+        - name: assets
+          configMap:
+            name: {{ $serviceName }}-assets
+        - name: nginx-config
+          configMap:
+            name: {{ $serviceName }}-nginx
+---
+{{- if .Values.platformHome.ingress.enabled }}
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ $serviceName }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "dlh-in-a-box.labels" . | nindent 4 }}
+    app.kubernetes.io/component: platform-home
+  {{- with .Values.platformHome.ingress.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  {{- if .Values.platformHome.ingress.className }}
+  ingressClassName: {{ .Values.platformHome.ingress.className }}
+  {{- end }}
+  rules:
+    - host: {{ .Values.platformHome.ingress.host | quote }}
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ $serviceName }}
+                port:
+                  number: 80
+  {{- if .Values.platformHome.ingress.tlsSecretName }}
+  tls:
+    - hosts:
+        - {{ .Values.platformHome.ingress.host | quote }}
+      secretName: {{ .Values.platformHome.ingress.tlsSecretName }}
+  {{- end }}
+{{- end }}
+{{- end }}

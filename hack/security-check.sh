@@ -83,3 +83,28 @@ ARGV.each do |path|
   exit 1
 end
 RUBY
+
+allowed_bitnamilegacy_paths=(
+  "charts/dlh-in-a-box/values.yaml"
+  "examples/values-local-auth.yaml"
+  "examples/values-local.yaml"
+  "examples/values-local-layers.yaml"
+  "examples/values-local-superset.yaml"
+)
+
+while IFS=: read -r path _; do
+  [[ -z "${path}" ]] && continue
+
+  allowed=false
+  for expected in "${allowed_bitnamilegacy_paths[@]}"; do
+    if [[ "${path}" == "${expected}" ]]; then
+      allowed=true
+      break
+    fi
+  done
+
+  if [[ "${allowed}" != "true" ]]; then
+    echo "Unexpected bitnamilegacy image reference found in ${path}. Keep new references out of the chart until the temporary supply-chain debt is removed." >&2
+    exit 1
+  fi
+done < <(rg -n 'bitnamilegacy/' charts/dlh-in-a-box/values.yaml examples/*.yaml || true)

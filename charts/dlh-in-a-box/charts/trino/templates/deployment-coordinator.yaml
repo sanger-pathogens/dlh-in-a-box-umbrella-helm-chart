@@ -11,8 +11,19 @@ through environment variables.
 {{- $trinoIdentity := get $identityClients "trino" | default (dict) -}}
 {{- $directory := get $identity "directory" | default (dict) -}}
 {{- $ldap := get $directory "ldap" | default (dict) -}}
+{{- $authorization := get .Values.global "authorization" | default (dict) -}}
+{{- $ranger := get $authorization "ranger" | default (dict) -}}
 {{- $identityEnabled := and (default false $identity.enabled) (default false $trinoIdentity.enabled) -}}
-{{- $ldapEnabled := and $identityEnabled (default false $ldap.enabled) -}}
+{{- $ldapEnabled := and $identityEnabled (or (default false $ldap.enabled) (eq (default "externalLdap" $directory.mode) "embeddedLdap")) -}}
+{{- $ldapAllowInsecure := or (eq (default "externalLdap" $directory.mode) "embeddedLdap") (default false $ldap.allowInsecure) -}}
+{{- $ldapTrustedCaSecretName := include "dlh-in-a-box.identity.directory.trustedCaSecretName" . -}}
+{{- $ldapTrustedCaCertKey := include "dlh-in-a-box.identity.directory.trustedCaCertKey" . -}}
+{{- $mountTrustedLdapCa := and $ldapEnabled (not $ldapAllowInsecure) $ldapTrustedCaSecretName -}}
+{{- $rangerEnabled := default false $ranger.enabled -}}
+{{- $legacyPasswordAuthRequested := contains "PASSWORD" (default "" .Values.server.config.authenticationType) -}}
+{{- $passwordAuthRequested := or (default false $trinoIdentity.passwordAuthEnabled) $legacyPasswordAuthRequested -}}
+{{- $filePasswordAuthConfigured := or .Values.auth.passwordAuth .Values.auth.passwordAuthSecret -}}
+{{- $renderFilePasswordAuth := and $filePasswordAuthConfigured (not (and $identityEnabled $passwordAuthRequested)) -}}
 {{- $env := .Values.env | default (list) -}}
 {{- $envFrom := .Values.envFrom | default (list) -}}
 apiVersion: apps/v1
@@ -41,7 +52,7 @@ spec:
   template:
     metadata:
       annotations:
-        {{- if and (eq .Values.accessControl.type "configmap") (not .Values.accessControl.refreshPeriod) }}
+        {{- if and (not $rangerEnabled) (eq .Values.accessControl.type "configmap") (not .Values.accessControl.refreshPeriod) }}
         checksum/access-control-config: {{ include (print $.Template.BasePath "/configmap-access-control-coordinator.yaml") . | sha256sum }}
         {{- end }}
         {{- if or .Values.global.dataCatalogs .Values.catalogs .Values.additionalCatalogs }}
@@ -80,7 +91,7 @@ spec:
         - name: schemas-volume
           configMap:
             name: {{ template "trino.fullname" . }}-schemas-volume-coordinator
-        {{- if eq .Values.accessControl.type "configmap" }}
+        {{- if and (not $rangerEnabled) (eq .Values.accessControl.type "configmap") }}
         - name: access-control-volume
           configMap:
             name: {{ template "trino.fullname" . }}-access-control-volume-coordinator
@@ -90,7 +101,7 @@ spec:
           configMap:
             name: {{ template "trino.fullname" . }}-resource-groups-volume-coordinator
         {{- end }}
-        {{- if or .Values.auth.passwordAuth .Values.auth.passwordAuthSecret }}
+        {{- if $renderFilePasswordAuth }}
         - name: file-password-authentication-volume
           secret:
             secretName: {{ template "trino.passwordSecretName" . }}
@@ -105,6 +116,14 @@ spec:
             items:
               - key: group.db
                 path: group.db
+        {{- end }}
+        {{- if $mountTrustedLdapCa }}
+        - name: ldap-trusted-ca
+          secret:
+            secretName: {{ $ldapTrustedCaSecretName }}
+            items:
+              - key: {{ $ldapTrustedCaCertKey }}
+                path: {{ $ldapTrustedCaCertKey }}
         {{- end }}
         {{- if $coordinatorJmx.exporter.enabled }}
         - name: jmx-exporter-config-volume
@@ -187,7 +206,7 @@ spec:
             {{- end }}
             - mountPath: {{ .Values.kafka.mountPath }}
               name: schemas-volume
-            {{- if eq .Values.accessControl.type "configmap" }}
+            {{- if and (not $rangerEnabled) (eq .Values.accessControl.type "configmap") }}
             - mountPath: {{ .Values.server.config.path }}/access-control
               name: access-control-volume
             {{- end }}
@@ -211,13 +230,18 @@ spec:
             - name: {{ .name }}
               mountPath: {{ .path }}
             {{- end }}
-            {{- if or .Values.auth.passwordAuth .Values.auth.passwordAuthSecret }}
+            {{- if $renderFilePasswordAuth }}
             - mountPath: {{ .Values.server.config.path }}/auth/password
               name: file-password-authentication-volume
             {{- end }}
             {{- if or .Values.auth.groups .Values.auth.groupsAuthSecret }}
             - mountPath: {{ .Values.server.config.path }}/auth/group
               name: file-groups-authentication-volume
+            {{- end }}
+            {{- if $mountTrustedLdapCa }}
+            - mountPath: {{ .Values.server.config.path }}/auth/ldap/ca
+              name: ldap-trusted-ca
+              readOnly: true
             {{- end }}
             {{- with .Values.coordinator.additionalVolumeMounts }}
             {{- . | toYaml | nindent 12 }}

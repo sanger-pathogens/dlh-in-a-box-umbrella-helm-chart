@@ -1,99 +1,204 @@
-identity: &identity_defaults
-  enabled: false
-  external:
-    oidc:
-      issuer: ""
-      usernameClaim: email
-      groupsClaim: groups
-      userMappingPattern: "([^@]+)"
-      scopes:
-        - openid
-        - profile
-        - email
-        - groups
-      processForwardedHeaders: true
-    clients:
-      trino:
-        enabled: false
-        clientId: ""
-        existingSecret: ""
-        clientSecretKey: clientSecret
-        sharedSecretExistingSecret: ""
-        sharedSecretKey: sharedSecret
-        discovery:
-          enabled: true
-        challengeTimeout: ""
-      superset:
-        enabled: false
-        providerName: oidc
-        clientId: ""
-        existingSecret: ""
-        clientSecretKey: clientSecret
-        authorizeUrl: ""
-        accessTokenUrl: ""
-        apiBaseUrl: ""
-        jwksUri: ""
-        userInfoUrl: ""
-        icon: fa-openid
-        roleKeysPath: role_keys
-      datahub:
-        enabled: false
-        provider: other
-        clientId: ""
-        existingSecret: ""
-        clientSecretKey: clientSecret
-        discoveryUri: ""
-        scope: ""
-        userNameClaim: email
-        userNameClaimRegex: "([^@]+)"
-      prefectProxy:
-        enabled: false
-        clientId: ""
-        existingSecret: ""
-        clientSecretKey: clientSecret
-        cookieExistingSecret: ""
-        cookieSecretKey: cookieSecret
-        redirectUrl: ""
-        allowedGroups: []
-        emailDomains:
-          - "*"
-        ingress:
-          enabled: false
-          className: ""
-          host: ""
-          tlsSecretName: ""
-          annotations: {}
-  directory:
-    ldap:
-      enabled: false
-      url: ""
-      userBaseDn: ""
-      userSearchFilter: "(uid={0})"
-      groupNameAttribute: cn
-      useGroupFilter: false
-      groupBaseDn: ""
-      groupSearchFilter: "(cn=trino_*)"
-      groupSearchMemberAttribute: member
-      userMemberOfAttribute: memberOf
-      bindDistinguishedName: ""
-      bindExistingSecret: ""
-      bindPasswordKey: bindPassword
-      allowInsecure: false
-  groupConventions:
-    appAccessPrefix: dlh-app-
-    rolePrefix: dlh-role-
-    dataPrefix: dlh-data-
-
 global:
   nameOverride: ""
   fullnameOverride: ""
   domain: ""
-  environment: ""
   imagePullSecrets: []
-  # Subcharts consume the runtime identity contract from global.identity.
-  # Keep this in sync with the top-level identity block in consumer values files,
-  # preferably by using YAML anchors in environment overlays.
-  identity: *identity_defaults
+  identity: &identity_defaults
+    enabled: false
+    provider:
+      mode: externalOidc
+      keycloak:
+        realm: dlh
+        browserHost: ""
+        internalScheme: http
+        loginTheme: ""
+        configCliEnvExistingSecret: dlh-keycloak-config-cli-env
+    external:
+      oidc:
+        issuer: ""
+        usernameClaim: email
+        groupsClaim: groups
+        userMappingPattern: "([^@]+)"
+        scopes:
+          - openid
+          - profile
+          - email
+          - groups
+        processForwardedHeaders: true
+      clients:
+        trino:
+          enabled: false
+          clientId: ""
+          existingSecret: dlh-oidc-clients
+          clientSecretKey: trinoClientSecret
+          redirectUris: []
+          webOrigins: []
+          passwordAuthEnabled: false
+          sharedSecretExistingSecret: ""
+          sharedSecretKey: sharedSecret
+          discovery:
+            enabled: true
+          challengeTimeout: ""
+        superset:
+          enabled: false
+          providerName: oidc
+          clientId: ""
+          existingSecret: dlh-oidc-clients
+          clientSecretKey: supersetClientSecret
+          redirectUris: []
+          webOrigins: []
+          authorizeUrl: ""
+          accessTokenUrl: ""
+          apiBaseUrl: ""
+          jwksUri: ""
+          userInfoUrl: ""
+          icon: fa-openid
+          roleKeysPath: role_keys
+        datahub:
+          enabled: false
+          provider: other
+          clientId: ""
+          existingSecret: dlh-oidc-clients
+          clientSecretKey: datahubClientSecret
+          redirectUris: []
+          webOrigins: []
+          discoveryUri: ""
+          scope: ""
+          userNameClaim: email
+          userNameClaimRegex: "([^@]+)"
+        platformHome:
+          enabled: false
+          clientId: ""
+          redirectUris: []
+          webOrigins: []
+        cloudbeaverProxy:
+          enabled: false
+          clientId: ""
+          existingSecret: dlh-cloudbeaver-oauth2-proxy
+          clientSecretKey: client-secret
+          cookieExistingSecret: ""
+          cookieSecretKey: cookie-secret
+          redirectUrl: ""
+          redirectUris: []
+          webOrigins: []
+          allowedGroups: []
+          emailDomains:
+            - "*"
+          ingress:
+            enabled: false
+            className: ""
+            host: ""
+            tlsSecretName: ""
+            annotations: {}
+        prefectProxy:
+          enabled: false
+          clientId: ""
+          existingSecret: dlh-oidc-clients
+          clientSecretKey: prefectClientSecret
+          cookieExistingSecret: ""
+          cookieSecretKey: cookieSecret
+          redirectUrl: ""
+          redirectUris: []
+          webOrigins: []
+          allowedGroups: []
+          emailDomains:
+            - "*"
+          ingress:
+            enabled: false
+            className: ""
+            host: ""
+            tlsSecretName: ""
+            annotations: {}
+    directory:
+      mode: externalLdap
+      ldap:
+        enabled: false
+        url: ""
+        userBaseDn: ""
+        usernameAttribute: uid
+        firstNameAttribute: givenName
+        lastNameAttribute: sn
+        emailAttribute: mail
+        uuidAttribute: entryUUID
+        userObjectClasses: inetOrgPerson,organizationalPerson,person
+        userSearchFilter: "(uid={0})"
+        userBindPattern: ""
+        groupNameAttribute: cn
+        membershipUserAttribute: uid
+        groupObjectClasses: groupOfNames
+        useGroupFilter: false
+        groupBaseDn: ""
+        groupSearchFilter: "(cn=trino_*)"
+        groupSearchMemberAttribute: member
+        userMemberOfAttribute: memberOf
+        bindDistinguishedName: ""
+        bindExistingSecret: ""
+        bindPasswordKey: bindPassword
+        trustedCaExistingSecret: ""
+        trustedCaCertKey: ca.crt
+        allowInsecure: false
+    groupConventions:
+      appAccessPrefix: dlh-app-
+      rolePrefix: dlh-role-
+      dataPrefix: dlh-data-
+  authorization: &authorization_defaults
+    platformRoles: {}
+    platformRoleExceptions: []
+    ranger:
+      enabled: false
+      serviceName: trino
+      serviceUsername: trino
+      serviceAdminUsers:
+        - trino-admin
+      serviceAdminGroups: []
+      superUsers:
+        - trino-admin
+      superGroups: []
+      useRangerGroups: false
+      postgresql:
+        enabled: true
+        host: ""
+        database: ranger
+        username: rangeradmin
+        existingSecret: dlh-ranger-postgresql
+        passwordKey: password
+        adminPasswordKey: postgres-password
+      admin:
+        browserUrl: ""
+        image:
+          repository: apache/ranger
+          tag: 2.8.0
+          pullPolicy: IfNotPresent
+        existingSecret: dlh-ranger-admin
+        adminPasswordKey: rangerAdminPassword
+        usersyncPasswordKey: rangerUsersyncPassword
+      usersync:
+        enabled: true
+        image:
+          repository: python
+          tag: 3.12-slim
+          pullPolicy: IfNotPresent
+        schedule: "*/15 * * * *"
+        syncSource: LDAP
+      importCatalogAcls: false
+      exceptionRoleAudit:
+        enabled: true
+        prefix: exception-
+        schedule: "23 * * * *"
+        gracePeriodDays: 7
+        deleteExpired: true
+        logUndocumented: true
+      bootstrapPolicies: []
+      bootstrap:
+        enabled: true
+        importCatalogAcls: false
+        image:
+          repository: python
+          tag: 3.12-slim
+          pullPolicy: IfNotPresent
+        policies: []
+      trino:
+        auditMode: log4j
   storage:
     backend: externalS3
     s3:
@@ -110,20 +215,437 @@ global:
       secretKeyKey: secretKey
 
   # Data catalogs configuration (used to generate Hive metastores and Trino catalogs)
-  dataCatalogs:
-    default:
-      type: deltaLake  # deltaLake or hive
-      authorizedGroups:
-        read: []
-        write: []
-      authorizedUsers:
-        read: []
-        write: []
+  dataCatalogs: {}
 
 trino:
   enabled: true
   accessControl:
     type: configmap
+
+keycloak:
+  enabled: false
+  production: false
+  httpEnabled: true
+  proxyHeaders: xforwarded
+  auth:
+    adminUser: admin
+    existingSecret: dlh-keycloak-admin
+    passwordSecretKey: adminPassword
+  keycloakConfigCli:
+    enabled: true
+    extraEnvVarsSecret: dlh-keycloak-config-cli-env
+    extraEnvVars:
+      - name: IMPORT_VARSUBSTITUTION_ENABLED
+        value: "true"
+      - name: IMPORT_VARSUBSTITUTION_UNDEFINEDISERROR
+        value: "false"
+    configuration:
+      dlh-realm.yaml: |
+        realm: {{ include "dlh-in-a-box.keycloak.realm" $ }}
+        enabled: true
+        registrationAllowed: false
+        loginWithEmailAllowed: true
+        duplicateEmailsAllowed: false
+        resetPasswordAllowed: true
+        rememberMe: true
+        {{- $keycloakLoginTheme := default "" .Values.global.identity.provider.keycloak.loginTheme }}
+        {{- if $keycloakLoginTheme }}
+        loginTheme: {{ $keycloakLoginTheme | quote }}
+        {{- end }}
+        defaultDefaultClientScopes:
+          - profile
+          - email
+          - roles
+          - groups
+        clientScopes:
+          - name: groups
+            protocol: openid-connect
+            attributes:
+              include.in.token.scope: "true"
+              display.on.consent.screen: "false"
+            protocolMappers:
+              - name: groups
+                protocol: openid-connect
+                protocolMapper: oidc-group-membership-mapper
+                consentRequired: false
+                config:
+                  full.path: "false"
+                  id.token.claim: "true"
+                  access.token.claim: "true"
+                  userinfo.token.claim: "true"
+                  introspection.token.claim: "true"
+                  claim.name: {{ .Values.global.identity.external.oidc.groupsClaim | quote }}
+                  jsonType.label: String
+        clients:
+        {{- if .Values.global.identity.external.clients.trino.enabled }}
+          - clientId: {{ .Values.global.identity.external.clients.trino.clientId | quote }}
+            name: Trino
+            description: OIDC client for Trino browser login
+            enabled: true
+            protocol: openid-connect
+            publicClient: false
+            standardFlowEnabled: true
+            directAccessGrantsEnabled: false
+            serviceAccountsEnabled: false
+            secret: "$(env:KC_TRINO_CLIENT_SECRET:change-me)"
+            redirectUris:
+            {{- range .Values.global.identity.external.clients.trino.redirectUris }}
+              - {{ . | quote }}
+            {{- end }}
+            webOrigins:
+            {{- range .Values.global.identity.external.clients.trino.webOrigins }}
+              - {{ . | quote }}
+            {{- end }}
+            defaultClientScopes:
+              - profile
+              - email
+              - roles
+              - groups
+        {{- end }}
+        {{- if .Values.global.identity.external.clients.superset.enabled }}
+          - clientId: {{ .Values.global.identity.external.clients.superset.clientId | quote }}
+            name: Superset
+            description: OIDC client for Apache Superset
+            enabled: true
+            protocol: openid-connect
+            publicClient: false
+            standardFlowEnabled: true
+            directAccessGrantsEnabled: false
+            serviceAccountsEnabled: false
+            secret: "$(env:KC_SUPERSET_CLIENT_SECRET:change-me)"
+            redirectUris:
+            {{- range .Values.global.identity.external.clients.superset.redirectUris }}
+              - {{ . | quote }}
+            {{- end }}
+            webOrigins:
+            {{- range .Values.global.identity.external.clients.superset.webOrigins }}
+              - {{ . | quote }}
+            {{- end }}
+            defaultClientScopes:
+              - profile
+              - email
+              - roles
+              - groups
+        {{- end }}
+        {{- if .Values.global.identity.external.clients.datahub.enabled }}
+          - clientId: {{ .Values.global.identity.external.clients.datahub.clientId | quote }}
+            name: DataHub
+            description: OIDC client for DataHub frontend
+            enabled: true
+            protocol: openid-connect
+            publicClient: false
+            standardFlowEnabled: true
+            directAccessGrantsEnabled: false
+            serviceAccountsEnabled: false
+            secret: "$(env:KC_DATAHUB_CLIENT_SECRET:change-me)"
+            redirectUris:
+            {{- range .Values.global.identity.external.clients.datahub.redirectUris }}
+              - {{ . | quote }}
+            {{- end }}
+            webOrigins:
+            {{- range .Values.global.identity.external.clients.datahub.webOrigins }}
+              - {{ . | quote }}
+            {{- end }}
+            defaultClientScopes:
+              - profile
+              - email
+              - roles
+              - groups
+        {{- end }}
+        {{- if .Values.global.identity.external.clients.platformHome.enabled }}
+          - clientId: {{ .Values.global.identity.external.clients.platformHome.clientId | quote }}
+            name: Platform Home
+            description: Public browser client for the data-platform launchpad
+            enabled: true
+            protocol: openid-connect
+            publicClient: true
+            standardFlowEnabled: true
+            directAccessGrantsEnabled: false
+            serviceAccountsEnabled: false
+            redirectUris:
+            {{- range .Values.global.identity.external.clients.platformHome.redirectUris }}
+              - {{ . | quote }}
+            {{- end }}
+            webOrigins:
+            {{- range .Values.global.identity.external.clients.platformHome.webOrigins }}
+              - {{ . | quote }}
+            {{- end }}
+            defaultClientScopes:
+              - profile
+              - email
+              - roles
+              - groups
+        {{- end }}
+        {{- if .Values.global.identity.external.clients.cloudbeaverProxy.enabled }}
+          - clientId: {{ .Values.global.identity.external.clients.cloudbeaverProxy.clientId | quote }}
+            name: CloudBeaver Proxy
+            description: OIDC client for oauth2-proxy in front of CloudBeaver
+            enabled: true
+            protocol: openid-connect
+            publicClient: false
+            standardFlowEnabled: true
+            directAccessGrantsEnabled: false
+            serviceAccountsEnabled: false
+            secret: "$(env:KC_CLOUDBEAVER_CLIENT_SECRET:change-me)"
+            redirectUris:
+            {{- range .Values.global.identity.external.clients.cloudbeaverProxy.redirectUris }}
+              - {{ . | quote }}
+            {{- end }}
+            webOrigins:
+            {{- range .Values.global.identity.external.clients.cloudbeaverProxy.webOrigins }}
+              - {{ . | quote }}
+            {{- end }}
+            defaultClientScopes:
+              - profile
+              - email
+              - roles
+              - groups
+        {{- end }}
+        {{- if .Values.global.identity.external.clients.prefectProxy.enabled }}
+          - clientId: {{ .Values.global.identity.external.clients.prefectProxy.clientId | quote }}
+            name: Prefect Proxy
+            description: OIDC client for oauth2-proxy in front of Prefect
+            enabled: true
+            protocol: openid-connect
+            publicClient: false
+            standardFlowEnabled: true
+            directAccessGrantsEnabled: false
+            serviceAccountsEnabled: false
+            secret: "$(env:KC_PREFECT_CLIENT_SECRET:change-me)"
+            redirectUris:
+            {{- range .Values.global.identity.external.clients.prefectProxy.redirectUris }}
+              - {{ . | quote }}
+            {{- end }}
+            webOrigins:
+            {{- range .Values.global.identity.external.clients.prefectProxy.webOrigins }}
+              - {{ . | quote }}
+            {{- end }}
+            defaultClientScopes:
+              - profile
+              - email
+              - roles
+              - groups
+        {{- end }}
+        {{- if or (eq .Values.global.identity.directory.mode "embeddedLdap") .Values.global.identity.directory.ldap.enabled }}
+        components:
+          org.keycloak.storage.UserStorageProvider:
+            - name: ldap-directory
+              providerId: ldap
+              config:
+                enabled:
+                  - "true"
+                priority:
+                  - "0"
+                fullSyncPeriod:
+                  - "-1"
+                changedSyncPeriod:
+                  - "-1"
+                cachePolicy:
+                  - DEFAULT
+                importEnabled:
+                  - "true"
+                editMode:
+                  - READ_ONLY
+                syncRegistrations:
+                  - "false"
+                usersDn:
+                  - {{ include "dlh-in-a-box.identity.directory.userBaseDn" $ | quote }}
+                usernameLDAPAttribute:
+                  - {{ .Values.global.identity.directory.ldap.usernameAttribute | quote }}
+                rdnLDAPAttribute:
+                  - {{ .Values.global.identity.directory.ldap.usernameAttribute | quote }}
+                uuidLDAPAttribute:
+                  - {{ .Values.global.identity.directory.ldap.uuidAttribute | quote }}
+                userObjectClasses:
+                  - {{ .Values.global.identity.directory.ldap.userObjectClasses | quote }}
+                connectionUrl:
+                  - {{ include "dlh-in-a-box.identity.directory.url" $ | quote }}
+                searchScope:
+                  - "1"
+                vendor:
+                  - other
+                bindDn:
+                  - {{ include "dlh-in-a-box.identity.directory.bindDn" $ | quote }}
+                bindCredential:
+                  - "$(env:LDAP_BIND_PASSWORD:change-me)"
+                authType:
+                  - simple
+                useTruststoreSpi:
+                  - {{ ternary "never" "ldapsOnly" (or .Values.global.identity.directory.ldap.allowInsecure (eq .Values.global.identity.directory.mode "embeddedLdap")) | quote }}
+                trustEmail:
+                  - "true"
+              subComponents:
+                org.keycloak.storage.ldap.mappers.LDAPStorageMapper:
+                  - name: username
+                    providerId: user-attribute-ldap-mapper
+                    config:
+                      ldap.attribute:
+                        - {{ .Values.global.identity.directory.ldap.usernameAttribute | quote }}
+                      user.model.attribute:
+                        - username
+                      is.mandatory.in.ldap:
+                        - "true"
+                      read.only:
+                        - "true"
+                      always.read.value.from.ldap:
+                        - "true"
+                  - name: first name
+                    providerId: user-attribute-ldap-mapper
+                    config:
+                      ldap.attribute:
+                        - {{ .Values.global.identity.directory.ldap.firstNameAttribute | quote }}
+                      user.model.attribute:
+                        - firstName
+                      is.mandatory.in.ldap:
+                        - "false"
+                      read.only:
+                        - "true"
+                      always.read.value.from.ldap:
+                        - "true"
+                  - name: last name
+                    providerId: user-attribute-ldap-mapper
+                    config:
+                      ldap.attribute:
+                        - {{ .Values.global.identity.directory.ldap.lastNameAttribute | quote }}
+                      user.model.attribute:
+                        - lastName
+                      is.mandatory.in.ldap:
+                        - "false"
+                      read.only:
+                        - "true"
+                      always.read.value.from.ldap:
+                        - "true"
+                  - name: email
+                    providerId: user-attribute-ldap-mapper
+                    config:
+                      ldap.attribute:
+                        - {{ .Values.global.identity.directory.ldap.emailAttribute | quote }}
+                      user.model.attribute:
+                        - email
+                      is.mandatory.in.ldap:
+                        - "false"
+                      read.only:
+                        - "true"
+                      always.read.value.from.ldap:
+                        - "true"
+                  - name: groups
+                    providerId: group-ldap-mapper
+                    config:
+                      membership.attribute.type:
+                        - DN
+                      group.name.ldap.attribute:
+                        - {{ .Values.global.identity.directory.ldap.groupNameAttribute | quote }}
+                      membership.user.ldap.attribute:
+                        - {{ .Values.global.identity.directory.ldap.membershipUserAttribute | quote }}
+                      preserve.group.inheritance:
+                        - "true"
+                      groups.dn:
+                        - {{ include "dlh-in-a-box.identity.directory.groupBaseDn" $ | quote }}
+                      mode:
+                        - READ_ONLY
+                      user.roles.retrieve.strategy:
+                        - LOAD_GROUPS_BY_MEMBER_ATTRIBUTE
+                      membership.ldap.attribute:
+                        - {{ .Values.global.identity.directory.ldap.groupSearchMemberAttribute | quote }}
+                      ignore.missing.groups:
+                        - "false"
+                      group.object.classes:
+                        - {{ .Values.global.identity.directory.ldap.groupObjectClasses | quote }}
+                      memberof.ldap.attribute:
+                        - {{ .Values.global.identity.directory.ldap.userMemberOfAttribute | quote }}
+                      groups.path:
+                        - /
+                      drop.non.existing.groups.during.sync:
+                        - "false"
+        {{- end }}
+  postgresql:
+    enabled: true
+    auth:
+      username: bn_keycloak
+      database: bitnami_keycloak
+      existingSecret: dlh-keycloak-postgresql
+  ingress:
+    enabled: false
+
+openldap:
+  enabled: false
+  image:
+    repository: osixia/openldap
+    tag: 1.5.0
+    pullPolicy: IfNotPresent
+  service:
+    port: 389
+  auth:
+    existingSecret: dlh-openldap-admin
+    adminPasswordKey: adminPassword
+  seed:
+    existingSecret: ""
+    ldifKey: bootstrap.ldif
+    organization: Example
+    domain: example.org
+    baseDn: dc=example,dc=org
+    users: []
+    groups: []
+
+platformHome:
+  enabled: false
+  replicaCount: 1
+  image:
+    repository: nginxinc/nginx-unprivileged
+    tag: 1.27-alpine
+    pullPolicy: IfNotPresent
+  service:
+    port: 8080
+  ingress:
+    enabled: false
+    className: ""
+    host: ""
+    tlsSecretName: ""
+    annotations: {}
+  branding:
+    title: Data Platform Home
+    subtitle: One sign-in. Launch the tools your directory groups allow.
+
+cloudbeaver:
+  enabled: false
+  image:
+    repository: dbeaver/cloudbeaver
+    tag: 25.2.0
+    pullPolicy: IfNotPresent
+  service:
+    port: 8978
+  workspace:
+    persistence:
+      enabled: false
+      size: 10Gi
+      storageClass: ""
+  bootstrap:
+    existingSecret: dlh-cloudbeaver-bootstrap
+    initialDataKey: initial-data.conf
+  authProxy:
+    enabled: false
+    userHeader: X-Forwarded-Preferred-Username
+    groupHeader: X-Forwarded-Groups
+    groupDelimiter: ","
+    firstNameHeader: ""
+    lastNameHeader: ""
+    logoutUrl: ""
+  app:
+    supportsCustomConnections: true
+    showReadOnlyConnectionInfo: true
+    publicCredentialsSaveEnabled: false
+    adminCredentialsSaveEnabled: false
+
+rangerPostgresql:
+  nameOverride: ranger-postgresql
+  auth:
+    username: rangeradmin
+    database: ranger
+    existingSecret: dlh-ranger-postgresql
+  primary:
+    persistence:
+      enabled: true
+      size: 8Gi
 
 prefect:
   enabled: true
@@ -158,7 +680,7 @@ prefect-auth-proxy:
     existingSecret: ""
     configFile: |-
       provider = "oidc"
-      oidc_issuer_url = "{{ .Values.global.identity.external.oidc.issuer }}"
+      oidc_issuer_url = "{{ include "dlh-in-a-box.identity.issuer" $ }}"
       scope = "{{ join " " .Values.global.identity.external.oidc.scopes }}"
       email_domains = [{{- range $index, $domain := .Values.global.identity.external.clients.prefectProxy.emailDomains }}{{ if $index }}, {{ end }}{{ $domain | quote }}{{- end }}]
       allowed_groups = [{{- range $index, $group := .Values.global.identity.external.clients.prefectProxy.allowedGroups }}{{ if $index }}, {{ end }}{{ $group | quote }}{{- end }}]
@@ -167,6 +689,31 @@ prefect-auth-proxy:
       upstreams = [ "http://prefect-server:4200" ]
       pass_access_token = true
       pass_authorization_header = true
+      set_xauthrequest = true
+      reverse_proxy = true
+  service:
+    type: ClusterIP
+  ingress:
+    enabled: false
+
+cloudbeaver-auth-proxy:
+  config:
+    clientID: '{{ .Values.global.identity.external.clients.cloudbeaverProxy.clientId }}'
+    # When using an externally managed Secret, it must contain the oauth2-proxy
+    # keys `client-id`, `client-secret`, and `cookie-secret`.
+    existingSecret: ""
+    configFile: |-
+      provider = "oidc"
+      oidc_issuer_url = "{{ include "dlh-in-a-box.identity.issuer" $ }}"
+      scope = "{{ join " " .Values.global.identity.external.oidc.scopes }}"
+      email_domains = [{{- range $index, $domain := .Values.global.identity.external.clients.cloudbeaverProxy.emailDomains }}{{ if $index }}, {{ end }}{{ $domain | quote }}{{- end }}]
+      allowed_groups = [{{- range $index, $group := .Values.global.identity.external.clients.cloudbeaverProxy.allowedGroups }}{{ if $index }}, {{ end }}{{ $group | quote }}{{- end }}]
+      oidc_groups_claim = "{{ .Values.global.identity.external.oidc.groupsClaim }}"
+      redirect_url = "{{ .Values.global.identity.external.clients.cloudbeaverProxy.redirectUrl }}"
+      upstreams = [ "http://{{ include "dlh-in-a-box.cloudbeaver.serviceName" $ }}:8978" ]
+      pass_access_token = true
+      pass_authorization_header = true
+      pass_user_headers = true
       set_xauthrequest = true
       reverse_proxy = true
   service:
@@ -275,15 +822,15 @@ superset:
               "remote_app": {
                   "client_id": os.environ.get("OAUTH_CLIENT_ID"),
                   "client_secret": os.environ.get("OAUTH_CLIENT_SECRET"),
-                  "api_base_url": {{ .Values.global.identity.external.clients.superset.apiBaseUrl | quote }},
+                  "api_base_url": {{ include "dlh-in-a-box.identity.apiBaseUrl" $ | quote }},
                   "client_kwargs": {
                       "scope": {{ join " " .Values.global.identity.external.oidc.scopes | quote }},
                       "verify_signature": False,
                   },
-                  "access_token_url": {{ .Values.global.identity.external.clients.superset.accessTokenUrl | quote }},
-                  "authorize_url": {{ .Values.global.identity.external.clients.superset.authorizeUrl | quote }},
-                  "jwks_uri": {{ .Values.global.identity.external.clients.superset.jwksUri | quote }},
-                  "userinfo_endpoint": {{ .Values.global.identity.external.clients.superset.userInfoUrl | quote }},
+                  "access_token_url": {{ include "dlh-in-a-box.identity.accessTokenUrl" $ | quote }},
+                  "authorize_url": {{ include "dlh-in-a-box.identity.authorizeUrl" $ | quote }},
+                  "jwks_uri": {{ include "dlh-in-a-box.identity.jwksUri" $ | quote }},
+                  "userinfo_endpoint": {{ include "dlh-in-a-box.identity.userInfoUrl" $ | quote }},
               },
           }
       ]

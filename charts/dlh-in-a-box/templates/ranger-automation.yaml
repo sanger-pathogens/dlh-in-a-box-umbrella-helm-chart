@@ -1,0 +1,1056 @@
+{{- $authorization := .Values.global.authorization | default dict -}}
+{{- $platformRoles := get $authorization "platformRoles" | default dict -}}
+{{- $platformRoleExceptions := get $authorization "platformRoleExceptions" | default (list) -}}
+{{- $ranger := get $authorization "ranger" | default dict -}}
+{{- $exceptionRoleAudit := get $ranger "exceptionRoleAudit" | default dict -}}
+{{- $identity := .Values.global.identity | default dict -}}
+{{- $directory := get $identity "directory" | default dict -}}
+{{- $ldap := get $directory "ldap" | default dict -}}
+{{- $ldapTrustedCaSecretName := include "dlh-in-a-box.identity.directory.trustedCaSecretName" . -}}
+{{- $ldapTrustedCaCertKey := include "dlh-in-a-box.identity.directory.trustedCaCertKey" . -}}
+{{- $ldapTrustedCaPath := printf "/opt/ranger-automation/ldap-ca/%s" $ldapTrustedCaCertKey -}}
+{{- $rangerBootstrap := get $ranger "bootstrap" | default dict -}}
+{{- $importCatalogAcls := false -}}
+{{- if hasKey $ranger "importCatalogAcls" -}}
+  {{- $importCatalogAcls = $ranger.importCatalogAcls -}}
+{{- else if hasKey $rangerBootstrap "importCatalogAcls" -}}
+  {{- $importCatalogAcls = $rangerBootstrap.importCatalogAcls -}}
+{{- end -}}
+{{- $bootstrapPolicies := get $ranger "bootstrapPolicies" | default (get $rangerBootstrap "policies" | default (list)) -}}
+{{- if $ranger.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "dlh-in-a-box.ranger.admin.serviceName" . }}-automation
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "dlh-in-a-box.labels" . | nindent 4 }}
+    app.kubernetes.io/component: ranger-automation
+data:
+  bootstrap-config.json: |
+    {{- dict
+      "ranger" (dict
+        "serviceName" (include "dlh-in-a-box.ranger.serviceName" .)
+        "serviceUsername" (default "trino" $ranger.serviceUsername)
+        "serviceAdminUsers" ($ranger.serviceAdminUsers | default (list))
+        "serviceAdminGroups" ($ranger.serviceAdminGroups | default (list))
+        "superUsers" ($ranger.superUsers | default (list))
+        "superGroups" ($ranger.superGroups | default (list))
+        "importCatalogAcls" $importCatalogAcls
+        "bootstrapPolicies" $bootstrapPolicies
+        "exceptionRoleAudit" (dict
+          "enabled" (default true $exceptionRoleAudit.enabled)
+          "prefix" (default "exception-" $exceptionRoleAudit.prefix)
+          "schedule" (default "23 * * * *" $exceptionRoleAudit.schedule)
+          "gracePeriodDays" (default 7 $exceptionRoleAudit.gracePeriodDays)
+          "deleteExpired" (default true $exceptionRoleAudit.deleteExpired)
+          "logUndocumented" (default true $exceptionRoleAudit.logUndocumented)
+        )
+      )
+      "platformRoles" $platformRoles
+      "platformRoleExceptions" $platformRoleExceptions
+      "catalogs" (.Values.global.dataCatalogs | default (dict))
+      "trinoJdbcUrl" (include "dlh-in-a-box.ranger.trinoJdbcUrl" .)
+      "ldap" (dict
+        "url" (include "dlh-in-a-box.identity.directory.url" .)
+        "allowInsecure" (default false $ldap.allowInsecure)
+        "bindDn" (include "dlh-in-a-box.identity.directory.bindDn" .)
+        "trustedCaPath" (ternary $ldapTrustedCaPath "" (and (ne $ldapTrustedCaSecretName "") (not (default false $ldap.allowInsecure))))
+        "userBaseDn" (include "dlh-in-a-box.identity.directory.userBaseDn" .)
+        "groupBaseDn" (include "dlh-in-a-box.identity.directory.groupBaseDn" .)
+        "usernameAttribute" (default "uid" $ldap.usernameAttribute)
+        "firstNameAttribute" (default "givenName" $ldap.firstNameAttribute)
+        "lastNameAttribute" (default "sn" $ldap.lastNameAttribute)
+        "emailAttribute" (default "mail" $ldap.emailAttribute)
+        "groupNameAttribute" (default "cn" $ldap.groupNameAttribute)
+        "groupSearchFilter" (default "(cn=trino_*)" $ldap.groupSearchFilter)
+        "groupSearchMemberAttribute" (default "member" $ldap.groupSearchMemberAttribute)
+      )
+    | toPrettyJson | nindent 4 }}
+  bootstrap.py: |
+    import base64
+    import datetime
+    import json
+    import os
+    import time
+    import urllib.error
+    import urllib.parse
+    import urllib.request
+
+    CONFIG_PATH = "/opt/ranger-automation/bootstrap-config.json"
+    RANGER_URL = os.environ["RANGER_URL"].rstrip("/")
+    RANGER_PASSWORD = os.environ["RANGER_ADMIN_PASSWORD"]
+
+
+    def load_config():
+        with open(CONFIG_PATH, "r", encoding="utf-8") as handle:
+            return json.load(handle)
+
+
+    def request(method, path, payload=None, ok=(200, 201)):
+        url = f"{RANGER_URL}{path}"
+        headers = {
+            "Authorization": "Basic "
+            + base64.b64encode(f"admin:{RANGER_PASSWORD}".encode("utf-8")).decode("ascii"),
+            "Accept": "application/json",
+        }
+        body = None
+        if payload is not None:
+            body = json.dumps(payload).encode("utf-8")
+            headers["Content-Type"] = "application/json"
+        req = urllib.request.Request(url, data=body, headers=headers, method=method)
+        try:
+            with urllib.request.urlopen(req, timeout=30) as response:
+                data = response.read().decode("utf-8")
+                return json.loads(data) if data else None
+        except urllib.error.HTTPError as exc:
+            if exc.code in ok:
+                data = exc.read().decode("utf-8")
+                return json.loads(data) if data else None
+            raise
+
+
+    def wait_for_ranger():
+        deadline = time.time() + 600
+        while time.time() < deadline:
+            try:
+                request("GET", "/login.jsp", ok=(200,))
+                return
+            except Exception:
+                time.sleep(5)
+        raise RuntimeError("Timed out waiting for Ranger Admin")
+
+
+    def as_resource(value):
+        if isinstance(value, dict):
+            result = dict(value)
+            result.setdefault("isExcludes", False)
+            result.setdefault("isRecursive", False)
+            if "values" in result and not isinstance(result["values"], list):
+                result["values"] = [str(result["values"])]
+            return result
+        if value is None:
+            values = ["*"]
+        elif isinstance(value, list):
+            values = [str(item) for item in value] or ["*"]
+        else:
+            values = [str(value)]
+        return {"values": values, "isExcludes": False, "isRecursive": False}
+
+
+    def normalize_names(items):
+        return sorted({str(item) for item in items if str(item).strip()})
+
+
+    def role_member(name, is_admin=False):
+        return {"name": str(name), "isAdmin": bool(is_admin)}
+
+
+    def normalize_role_members(items):
+        return [role_member(name) for name in normalize_names(items)]
+
+
+    def access_item(users, groups, roles, accesses):
+        if not users and not groups and not roles:
+            return None
+        return {
+            "users": normalize_names(users),
+            "groups": normalize_names(groups),
+            "roles": normalize_names(roles),
+            "accesses": [{"type": access, "isAllowed": True} for access in accesses],
+            "conditions": [],
+            "delegateAdmin": False,
+        }
+
+
+    def upsert_service(config):
+        ranger_cfg = config["ranger"]
+        service_name = ranger_cfg["serviceName"]
+        payload = {
+            "name": service_name,
+            "type": "trino",
+            "configs": {
+                "username": ranger_cfg["serviceUsername"],
+                "password": "",
+                "jdbc.driverClassName": "io.trino.jdbc.TrinoDriver",
+                "jdbc.url": config["trinoJdbcUrl"],
+                "policy.download.auth.users": ranger_cfg["serviceUsername"],
+                "tag.download.auth.users": ranger_cfg["serviceUsername"],
+                "userstore.download.auth.users": ranger_cfg["serviceUsername"],
+                "service.admin.users": ",".join(ranger_cfg.get("serviceAdminUsers", [])),
+                "service.admin.groups": ",".join(ranger_cfg.get("serviceAdminGroups", [])),
+                "ranger.plugin.super.users": ",".join(ranger_cfg.get("superUsers", [])),
+                "ranger.plugin.super.groups": ",".join(ranger_cfg.get("superGroups", [])),
+                "ranger.plugin.trino.policy.refresh.synchronous": "true",
+            },
+        }
+
+        path = "/service/public/v2/api/service/name/" + urllib.parse.quote(service_name, safe="")
+        try:
+            existing = request("GET", path, ok=(200,))
+        except urllib.error.HTTPError as exc:
+            if exc.code != 404:
+                raise
+            existing = None
+
+        if existing:
+            payload["id"] = existing["id"]
+            payload["guid"] = existing.get("guid")
+            request("PUT", path, payload, ok=(200,))
+        else:
+            request("POST", "/service/public/v2/api/service/", payload, ok=(200, 201))
+
+
+    def normalize_policy(policy, service_name):
+        normalized = dict(policy)
+        normalized["service"] = service_name
+        normalized["serviceType"] = "trino"
+        normalized.setdefault("isEnabled", True)
+        normalized.setdefault("isAuditEnabled", True)
+        normalized.setdefault("policyType", 0)
+        normalized["resources"] = {
+            key: as_resource(value) for key, value in normalized.get("resources", {}).items()
+        }
+        normalized.setdefault("policyItems", [])
+        normalized.setdefault("denyPolicyItems", [])
+        normalized.setdefault("allowExceptions", [])
+        normalized.setdefault("denyExceptions", [])
+        normalized.setdefault("dataMaskPolicyItems", [])
+        normalized.setdefault("rowFilterPolicyItems", [])
+        return normalized
+
+
+    def role_lookup_path(service_name, role_name):
+        return (
+            "/service/public/v2/api/roles/roles/name/"
+            + urllib.parse.quote(role_name, safe="")
+            + "?serviceName="
+            + urllib.parse.quote(service_name, safe="")
+        )
+
+
+    def role_create_path(service_name):
+        return (
+            "/service/public/v2/api/roles/roles?serviceName="
+            + urllib.parse.quote(service_name, safe="")
+            + "&createNonExistUserGroup=true"
+        )
+
+
+    def role_update_path(role_id):
+        return f"/service/public/v2/api/roles/roles/{role_id}?createNonExistUserGroup=true"
+
+
+    def exception_role_name(base_role_name, username, expires_at):
+        return f"exception-{base_role_name}-{username}-{expires_at.replace('-', '')}"
+
+
+    def exception_role_description(base_role_name, exception):
+        metadata = {
+            "approvalRef": exception["approvalRef"],
+            "reason": exception["reason"],
+            "grantedBy": exception["grantedBy"],
+            "expiresAt": exception["expiresAt"],
+            "platformRole": exception["platformRole"],
+            "username": exception["username"],
+        }
+        return (
+            f"Temporary additive exception role nested into {base_role_name}. "
+            f"EXCEPTION_METADATA={json.dumps(metadata, sort_keys=True, separators=(',', ':'))}"
+        )
+
+
+    def get_role(service_name, role_name):
+        try:
+            return request("GET", role_lookup_path(service_name, role_name), ok=(200,))
+        except urllib.error.HTTPError as exc:
+            if exc.code != 404:
+                raise
+            return None
+
+
+    def upsert_role(service_name, role):
+        payload = {
+            "name": role["name"],
+            "description": role.get("description", ""),
+            "isEnabled": True,
+            "users": normalize_role_members(role.get("users", [])),
+            "groups": normalize_role_members(role.get("groups", [])),
+            "roles": normalize_role_members(role.get("roles", [])),
+        }
+        existing = get_role(service_name, role["name"])
+        if existing:
+            payload["id"] = existing["id"]
+            payload["guid"] = existing.get("guid")
+            payload["version"] = existing.get("version")
+            payload["createdByUser"] = existing.get("createdByUser")
+            request("PUT", role_update_path(existing["id"]), payload, ok=(200,))
+        else:
+            request("POST", role_create_path(service_name), payload, ok=(200, 201))
+
+
+    def build_platform_roles(config):
+        result = []
+        for role_key in sorted(config.get("platformRoles", {})):
+            raw_role = config["platformRoles"][role_key] or {}
+            members = raw_role.get("members", {}) or {}
+            ranger_cfg = raw_role.get("ranger", {}) or {}
+            result.append(
+                {
+                    "key": role_key,
+                    "name": ranger_cfg.get("roleName") or role_key,
+                    "description": raw_role.get("description", "").strip(),
+                    "users": normalize_names(members.get("users", [])),
+                    "groups": normalize_names(members.get("directoryGroups", [])),
+                    "nestedRoleKeys": normalize_names(members.get("nestedRoles", [])),
+                }
+            )
+        return result
+
+
+    def build_exception_roles(config, base_roles):
+        base_roles_by_key = {role["key"]: role for role in base_roles}
+        exception_roles = []
+        for raw_exception in config.get("platformRoleExceptions", []):
+            exception = raw_exception or {}
+            base_role = base_roles_by_key.get(exception.get("platformRole"))
+            if not base_role:
+                continue
+            role_name = exception_role_name(
+                base_role["name"],
+                exception["username"],
+                exception["expiresAt"],
+            )
+            exception_roles.append(
+                {
+                    "name": role_name,
+                    "description": exception_role_description(base_role["name"], exception),
+                    "users": [exception["username"]],
+                    "groups": [],
+                    "roles": [],
+                    "targetRoleKey": base_role["key"],
+                }
+            )
+        return exception_roles
+
+
+    def build_catalog_acl_policies(config):
+        service_name = config["ranger"]["serviceName"]
+        read_accesses = ["select", "show", "use", "execute"]
+        write_accesses = read_accesses + ["insert", "create", "delete", "drop", "alter", "grant", "revoke"]
+        policies = []
+
+        super_users = config["ranger"].get("superUsers", [])
+        super_groups = config["ranger"].get("superGroups", [])
+        admin_item = access_item(
+            super_users,
+            super_groups,
+            [],
+            [
+                "select",
+                "insert",
+                "create",
+                "delete",
+                "drop",
+                "use",
+                "alter",
+                "grant",
+                "revoke",
+                "show",
+                "impersonate",
+                "execute",
+                "read_sysinfo",
+                "write_sysinfo",
+            ],
+        )
+        if admin_item:
+            policies.append(
+                normalize_policy(
+                    {
+                        "name": f"{service_name}-platform-admins",
+                        "description": "Platform administrators get full Trino access through Ranger.",
+                        "resources": {
+                            "catalog": "*",
+                            "schema": "*",
+                            "table": "*",
+                            "column": "*",
+                            "queryid": "*",
+                            "trinouser": "*",
+                        },
+                        "policyItems": [admin_item],
+                    },
+                    service_name,
+                )
+            )
+
+        if not config["ranger"].get("importCatalogAcls", False):
+            return policies
+
+        for catalog_name, catalog in config.get("catalogs", {}).items():
+            groups_acl = catalog.get("authorizedGroups", {}) or {}
+            users_acl = catalog.get("authorizedUsers", {}) or {}
+            read_item = access_item(users_acl.get("read", []), groups_acl.get("read", []), [], read_accesses)
+            write_item = access_item(users_acl.get("write", []), groups_acl.get("write", []), [], write_accesses)
+
+            if read_item:
+                policies.append(
+                    normalize_policy(
+                        {
+                            "name": f"{service_name}-{catalog_name}-read",
+                            "description": f"Imported read-only catalog policy for {catalog_name}.",
+                            "resources": {
+                                "catalog": catalog_name,
+                                "schema": "*",
+                                "table": "*",
+                                "column": "*",
+                            },
+                            "policyItems": [read_item],
+                        },
+                        service_name,
+                    )
+                )
+            if write_item:
+                policies.append(
+                    normalize_policy(
+                        {
+                            "name": f"{service_name}-{catalog_name}-write",
+                            "description": f"Imported read-write catalog policy for {catalog_name}.",
+                            "resources": {
+                                "catalog": catalog_name,
+                                "schema": "*",
+                                "table": "*",
+                                "column": "*",
+                            },
+                            "policyItems": [write_item],
+                        },
+                        service_name,
+                    )
+                )
+
+        return policies
+
+
+    def reconcile_roles(config):
+        service_name = config["ranger"]["serviceName"]
+        base_roles = build_platform_roles(config)
+        base_roles_by_key = {role["key"]: role for role in base_roles}
+
+        for role in base_roles:
+            upsert_role(
+                service_name,
+                {
+                    "name": role["name"],
+                    "description": role["description"],
+                    "users": role["users"],
+                    "groups": role["groups"],
+                    "roles": [],
+                },
+            )
+            print(f"Reconciled Ranger role: {role['name']}")
+
+        exception_roles = build_exception_roles(config, base_roles)
+        exception_names_by_target = {}
+        for role in exception_roles:
+            upsert_role(service_name, role)
+            exception_names_by_target.setdefault(role["targetRoleKey"], []).append(role["name"])
+            print(f"Reconciled Ranger exception role: {role['name']}")
+
+        for role in base_roles:
+            nested_role_names = [
+                base_roles_by_key[nested_role_key]["name"]
+                for nested_role_key in role.get("nestedRoleKeys", [])
+                if nested_role_key in base_roles_by_key
+            ]
+            nested_role_names.extend(exception_names_by_target.get(role["key"], []))
+            upsert_role(
+                service_name,
+                {
+                    "name": role["name"],
+                    "description": role["description"],
+                    "users": role["users"],
+                    "groups": role["groups"],
+                    "roles": nested_role_names,
+                },
+            )
+
+
+    def upsert_policy(service_name, policy):
+        name = policy["name"]
+        path = (
+            "/service/public/v2/api/service/"
+            + urllib.parse.quote(service_name, safe="")
+            + "/policy/"
+            + urllib.parse.quote(name, safe="")
+        )
+        try:
+            existing = request("GET", path, ok=(200,))
+        except urllib.error.HTTPError as exc:
+            if exc.code != 404:
+                raise
+            existing = None
+
+        if existing:
+            policy["id"] = existing["id"]
+            policy["guid"] = existing.get("guid")
+            request("PUT", path, policy, ok=(200,))
+        else:
+            request("POST", "/service/public/v2/api/policy/", policy, ok=(200, 201))
+
+
+    def main():
+        wait_for_ranger()
+        config = load_config()
+        service_name = config["ranger"]["serviceName"]
+        upsert_service(config)
+        reconcile_roles(config)
+
+        policies = []
+        policies.extend(build_catalog_acl_policies(config))
+        for raw_policy in config["ranger"].get("bootstrapPolicies", []):
+            policies.append(normalize_policy(raw_policy, service_name))
+
+        for policy in policies:
+            upsert_policy(service_name, policy)
+            print(f"Reconciled Ranger policy: {policy['name']}")
+
+
+    if __name__ == "__main__":
+        main()
+  exception_audit.py: |
+    import base64
+    import datetime
+    import json
+    import os
+    import time
+    import urllib.error
+    import urllib.parse
+    import urllib.request
+
+    CONFIG_PATH = "/opt/ranger-automation/bootstrap-config.json"
+    RANGER_URL = os.environ["RANGER_URL"].rstrip("/")
+    RANGER_PASSWORD = os.environ["RANGER_ADMIN_PASSWORD"]
+    METADATA_MARKER = "EXCEPTION_METADATA="
+
+
+    def load_config():
+        with open(CONFIG_PATH, "r", encoding="utf-8") as handle:
+            return json.load(handle)
+
+
+    def request(method, path, payload=None, ok=(200, 201)):
+        url = f"{RANGER_URL}{path}"
+        headers = {
+            "Authorization": "Basic "
+            + base64.b64encode(f"admin:{RANGER_PASSWORD}".encode("utf-8")).decode("ascii"),
+            "Accept": "application/json",
+        }
+        body = None
+        if payload is not None:
+            body = json.dumps(payload).encode("utf-8")
+            headers["Content-Type"] = "application/json"
+        req = urllib.request.Request(url, data=body, headers=headers, method=method)
+        try:
+            with urllib.request.urlopen(req, timeout=30) as response:
+                data = response.read().decode("utf-8")
+                return json.loads(data) if data else None
+        except urllib.error.HTTPError as exc:
+            if exc.code in ok:
+                data = exc.read().decode("utf-8")
+                return json.loads(data) if data else None
+            raise
+
+
+    def wait_for_ranger():
+        deadline = time.time() + 600
+        while time.time() < deadline:
+            try:
+                request("GET", "/login.jsp", ok=(200,))
+                return
+            except Exception:
+                time.sleep(5)
+        raise RuntimeError("Timed out waiting for Ranger Admin")
+
+
+    def role_lookup_path(service_name, role_name):
+        return (
+            "/service/public/v2/api/roles/roles/name/"
+            + urllib.parse.quote(role_name, safe="")
+            + "?serviceName="
+            + urllib.parse.quote(service_name, safe="")
+        )
+
+
+    def list_role_names(service_name):
+        path = (
+            "/service/public/v2/api/roles/roles/names?serviceName="
+            + urllib.parse.quote(service_name, safe="")
+        )
+        return request("GET", path, ok=(200,)) or []
+
+
+    def get_role(service_name, role_name):
+        try:
+            return request("GET", role_lookup_path(service_name, role_name), ok=(200,))
+        except urllib.error.HTTPError as exc:
+            if exc.code != 404:
+                raise
+            return None
+
+
+    def delete_role(service_name, role_name):
+        path = (
+            "/service/public/v2/api/roles/roles/name/"
+            + urllib.parse.quote(role_name, safe="")
+            + "?serviceName="
+            + urllib.parse.quote(service_name, safe="")
+        )
+        request("DELETE", path, ok=(204, 404))
+
+
+    def parse_metadata(description):
+        if not description or METADATA_MARKER not in description:
+            return None
+        raw = description.split(METADATA_MARKER, 1)[1].strip()
+        try:
+            return json.loads(raw)
+        except json.JSONDecodeError:
+            return None
+
+
+    def main():
+        wait_for_ranger()
+        config = load_config()
+        audit_cfg = config["ranger"].get("exceptionRoleAudit", {}) or {}
+        if not audit_cfg.get("enabled", True):
+            print("Exception role audit disabled; exiting.")
+            return
+
+        service_name = config["ranger"]["serviceName"]
+        prefix = audit_cfg.get("prefix", "exception-")
+        grace_days = int(audit_cfg.get("gracePeriodDays", 7))
+        delete_expired = bool(audit_cfg.get("deleteExpired", True))
+        log_undocumented = bool(audit_cfg.get("logUndocumented", True))
+        today = datetime.date.today()
+
+        for role_name in sorted(name for name in list_role_names(service_name) if str(name).startswith(prefix)):
+            role = get_role(service_name, role_name) or {}
+            metadata = parse_metadata(role.get("description", ""))
+            if not metadata:
+                if log_undocumented:
+                    print(f"WARNING: {role_name} is missing structured exception metadata.")
+                continue
+
+            expires_at_raw = metadata.get("expiresAt", "")
+            try:
+                expires_at = datetime.date.fromisoformat(expires_at_raw)
+            except ValueError:
+                print(f"WARNING: {role_name} has invalid expiresAt metadata: {expires_at_raw!r}")
+                continue
+
+            if today <= expires_at:
+                continue
+
+            grace_deadline = expires_at + datetime.timedelta(days=grace_days)
+            if today <= grace_deadline:
+                print(
+                    f"WARNING: {role_name} expired on {expires_at.isoformat()} but is still within "
+                    f"the {grace_days}-day grace period."
+                )
+                continue
+
+            if delete_expired:
+                delete_role(service_name, role_name)
+                print(f"Deleted expired exception role: {role_name}")
+            else:
+                print(
+                    f"WARNING: {role_name} expired on {expires_at.isoformat()} and exceeded the "
+                    f"{grace_days}-day grace period."
+                )
+
+
+    if __name__ == "__main__":
+        main()
+  usersync.py: |
+    import base64
+    import json
+    import os
+    import ssl
+    import time
+    import urllib.error
+    import urllib.request
+    import urllib.parse
+
+    from ldap3 import BASE, SUBTREE, Connection, Server, Tls
+
+    CONFIG_PATH = "/opt/ranger-automation/bootstrap-config.json"
+    RANGER_URL = os.environ["RANGER_URL"].rstrip("/")
+    RANGER_PASSWORD = os.environ["RANGER_ADMIN_PASSWORD"]
+    LDAP_BIND_PASSWORD = os.environ["LDAP_BIND_PASSWORD"]
+
+
+    def load_config():
+        with open(CONFIG_PATH, "r", encoding="utf-8") as handle:
+            return json.load(handle)
+
+
+    def ranger_request(method, path, payload=None, ok=(200, 201)):
+        url = f"{RANGER_URL}{path}"
+        headers = {
+            "Authorization": "Basic "
+            + base64.b64encode(f"admin:{RANGER_PASSWORD}".encode("utf-8")).decode("ascii"),
+            "Accept": "application/json",
+        }
+        body = None
+        if payload is not None:
+            body = json.dumps(payload).encode("utf-8")
+            headers["Content-Type"] = "application/json"
+        req = urllib.request.Request(url, data=body, headers=headers, method=method)
+        try:
+            with urllib.request.urlopen(req, timeout=30) as response:
+                data = response.read().decode("utf-8")
+                return json.loads(data) if data else None
+        except urllib.error.HTTPError as exc:
+            if exc.code in ok:
+                data = exc.read().decode("utf-8")
+                return json.loads(data) if data else None
+            raise
+
+
+    def wait_for_ranger():
+        deadline = time.time() + 600
+        while time.time() < deadline:
+            try:
+                ranger_request("GET", "/login.jsp", ok=(200,))
+                return
+            except Exception:
+                time.sleep(5)
+        raise RuntimeError("Timed out waiting for Ranger Admin")
+
+
+    def attr_value(entry, name):
+        try:
+            return str(entry[name].value or "")
+        except Exception:
+            return ""
+
+
+    def sync(config):
+        ldap_cfg = config["ldap"]
+        parsed = urllib.parse.urlparse(ldap_cfg["url"])
+        use_ssl = parsed.scheme == "ldaps"
+        host = parsed.hostname or ldap_cfg["url"]
+        port = parsed.port or (636 if use_ssl else 389)
+        tls = None
+        if use_ssl:
+            trusted_ca_path = ldap_cfg.get("trustedCaPath")
+            if ldap_cfg.get("allowInsecure", False):
+                tls = Tls(validate=ssl.CERT_NONE)
+            elif trusted_ca_path and os.path.exists(trusted_ca_path):
+                tls = Tls(validate=ssl.CERT_REQUIRED, ca_certs_file=trusted_ca_path)
+            else:
+                tls = Tls(validate=ssl.CERT_REQUIRED)
+        server = Server(host, port=port, use_ssl=use_ssl, tls=tls, get_info=None)
+        conn = Connection(server, user=ldap_cfg["bindDn"], password=LDAP_BIND_PASSWORD, auto_bind=True)
+        conn.search(
+            ldap_cfg["groupBaseDn"],
+            ldap_cfg["groupSearchFilter"],
+            search_scope=SUBTREE,
+            attributes=[
+                ldap_cfg["groupNameAttribute"],
+                ldap_cfg["groupSearchMemberAttribute"],
+            ],
+        )
+
+        groups = {}
+        users = {}
+
+        for group_entry in conn.entries:
+            group_name = attr_value(group_entry, ldap_cfg["groupNameAttribute"])
+            if not group_name:
+                continue
+            raw_members = []
+            try:
+                raw_members = list(group_entry[ldap_cfg["groupSearchMemberAttribute"]].values)
+            except Exception:
+                raw_members = []
+
+            member_names = set()
+            for member_dn in raw_members:
+                member_dn = str(member_dn)
+                if not member_dn:
+                    continue
+                if "=" in member_dn and "," in member_dn:
+                    conn.search(
+                        member_dn,
+                        "(objectClass=*)",
+                        search_scope=BASE,
+                        attributes=[
+                            ldap_cfg["usernameAttribute"],
+                            ldap_cfg["firstNameAttribute"],
+                            ldap_cfg["lastNameAttribute"],
+                            ldap_cfg["emailAttribute"],
+                        ],
+                    )
+                    if not conn.entries:
+                        continue
+                    user_entry = conn.entries[0]
+                    username = attr_value(user_entry, ldap_cfg["usernameAttribute"])
+                    if not username:
+                        continue
+                    member_names.add(username)
+                    users[username] = {
+                        "name": username,
+                        "firstName": attr_value(user_entry, ldap_cfg["firstNameAttribute"]) or username,
+                        "lastName": attr_value(user_entry, ldap_cfg["lastNameAttribute"]) or "User",
+                        "emailAddress": attr_value(user_entry, ldap_cfg["emailAttribute"]) or f"{username}@example.org",
+                        "status": 1,
+                        "isVisible": 1,
+                        "userSource": 1,
+                        "userRoleList": ["ROLE_USER"],
+                        "syncSource": "LDAP",
+                    }
+                else:
+                    member_names.add(member_dn)
+                    users.setdefault(
+                        member_dn,
+                        {
+                            "name": member_dn,
+                            "firstName": member_dn,
+                            "lastName": "User",
+                            "emailAddress": f"{member_dn}@example.org",
+                            "status": 1,
+                            "isVisible": 1,
+                            "userSource": 1,
+                            "userRoleList": ["ROLE_USER"],
+                            "syncSource": "LDAP",
+                        },
+                    )
+
+            groups[group_name] = sorted(member_names)
+
+        if users:
+            ranger_request(
+                "POST",
+                "/service/xusers/ugsync/users",
+                {"vXUsers": list(users.values())},
+                ok=(200, 201),
+            )
+
+        if groups:
+            ranger_request(
+                "POST",
+                "/service/xusers/ugsync/groups",
+                {
+                    "vXGroups": [
+                        {
+                            "name": group_name,
+                            "description": "Synced from LDAP/AD",
+                            "isVisible": 1,
+                            "groupSource": 1,
+                            "syncSource": "LDAP",
+                        }
+                        for group_name in sorted(groups)
+                    ]
+                },
+                ok=(200, 201),
+            )
+
+        current = ranger_request("GET", "/service/xusers/ugsync/groupusers", ok=(200,)) or {}
+        deltas = []
+        for group_name, desired_members in groups.items():
+            current_members = set(current.get(group_name, []))
+            desired_members = set(desired_members)
+            add_users = sorted(desired_members - current_members)
+            del_users = sorted(current_members - desired_members)
+            if add_users or del_users:
+                deltas.append(
+                    {
+                        "groupName": group_name,
+                        "addUsers": add_users,
+                        "delUsers": del_users,
+                    }
+                )
+
+        if deltas:
+            ranger_request("POST", "/service/xusers/ugsync/groupusers", deltas, ok=(200, 201))
+
+
+    def main():
+        wait_for_ranger()
+        sync(load_config())
+
+
+    if __name__ == "__main__":
+        main()
+---
+{{- if (dig "bootstrap" "enabled" true $ranger) }}
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ include "dlh-in-a-box.ranger.admin.serviceName" . }}-bootstrap
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "dlh-in-a-box.labels" . | nindent 4 }}
+    app.kubernetes.io/component: ranger-bootstrap
+  annotations:
+    helm.sh/hook: post-install,post-upgrade
+    helm.sh/hook-delete-policy: before-hook-creation,hook-succeeded
+spec:
+  backoffLimit: 3
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/instance: {{ .Release.Name }}
+        app.kubernetes.io/name: {{ include "dlh-in-a-box.name" . }}
+        app.kubernetes.io/component: ranger-bootstrap
+    spec:
+      restartPolicy: OnFailure
+      containers:
+        - name: ranger-bootstrap
+          image: "{{ $ranger.bootstrap.image.repository }}:{{ $ranger.bootstrap.image.tag }}"
+          imagePullPolicy: {{ $ranger.bootstrap.image.pullPolicy }}
+          command:
+            - python
+            - /opt/ranger-automation/bootstrap.py
+          env:
+            - name: RANGER_URL
+              value: {{ include "dlh-in-a-box.ranger.admin.url" . | quote }}
+            - name: RANGER_ADMIN_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $ranger.admin.existingSecret }}
+                  key: {{ default "rangerAdminPassword" $ranger.admin.adminPasswordKey }}
+          volumeMounts:
+            - name: automation
+              mountPath: /opt/ranger-automation
+              readOnly: true
+      volumes:
+        - name: automation
+          configMap:
+            name: {{ include "dlh-in-a-box.ranger.admin.serviceName" . }}-automation
+            defaultMode: 0555
+---
+{{- end }}
+{{- if (dig "usersync" "enabled" true $ranger) }}
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: {{ include "dlh-in-a-box.ranger.admin.serviceName" . }}-usersync
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "dlh-in-a-box.labels" . | nindent 4 }}
+    app.kubernetes.io/component: ranger-usersync
+spec:
+  schedule: {{ default "*/15 * * * *" (dig "usersync" "schedule" "*/15 * * * *" $ranger) | quote }}
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 1
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      backoffLimit: 3
+      template:
+        metadata:
+          labels:
+            app.kubernetes.io/instance: {{ .Release.Name }}
+            app.kubernetes.io/name: {{ include "dlh-in-a-box.name" . }}
+            app.kubernetes.io/component: ranger-usersync
+        spec:
+          restartPolicy: OnFailure
+          containers:
+            - name: ranger-usersync
+              image: "{{ $ranger.usersync.image.repository }}:{{ $ranger.usersync.image.tag }}"
+              imagePullPolicy: {{ $ranger.usersync.image.pullPolicy }}
+              command:
+                - /bin/sh
+                - -ec
+                - |
+                  python -m pip install --no-cache-dir ldap3 >/tmp/ranger-usersync-pip.log
+                  python /opt/ranger-automation/usersync.py
+              env:
+                - name: RANGER_URL
+                  value: {{ include "dlh-in-a-box.ranger.admin.url" . | quote }}
+                - name: RANGER_ADMIN_PASSWORD
+                  valueFrom:
+                    secretKeyRef:
+                      name: {{ $ranger.admin.existingSecret }}
+                      key: {{ default "rangerAdminPassword" $ranger.admin.adminPasswordKey }}
+                - name: LDAP_BIND_PASSWORD
+                  valueFrom:
+                    secretKeyRef:
+                      name: {{ include "dlh-in-a-box.identity.directory.bindSecretName" . }}
+                      key: {{ include "dlh-in-a-box.identity.directory.bindSecretKey" . }}
+              volumeMounts:
+                - name: automation
+                  mountPath: /opt/ranger-automation
+                  readOnly: true
+                {{- if and $ldapTrustedCaSecretName (not (default false $ldap.allowInsecure)) }}
+                - name: ldap-trusted-ca
+                  mountPath: /opt/ranger-automation/ldap-ca
+                  readOnly: true
+                {{- end }}
+          volumes:
+            - name: automation
+              configMap:
+                name: {{ include "dlh-in-a-box.ranger.admin.serviceName" . }}-automation
+                defaultMode: 0555
+            {{- if and $ldapTrustedCaSecretName (not (default false $ldap.allowInsecure)) }}
+            - name: ldap-trusted-ca
+              secret:
+                secretName: {{ $ldapTrustedCaSecretName }}
+                items:
+                  - key: {{ $ldapTrustedCaCertKey }}
+                    path: {{ $ldapTrustedCaCertKey }}
+            {{- end }}
+{{- end }}
+{{- if (default true $exceptionRoleAudit.enabled) }}
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: {{ include "dlh-in-a-box.ranger.admin.serviceName" . }}-exception-audit
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "dlh-in-a-box.labels" . | nindent 4 }}
+    app.kubernetes.io/component: ranger-exception-audit
+spec:
+  schedule: {{ default "23 * * * *" $exceptionRoleAudit.schedule | quote }}
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 1
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      backoffLimit: 3
+      template:
+        metadata:
+          labels:
+            app.kubernetes.io/instance: {{ .Release.Name }}
+            app.kubernetes.io/name: {{ include "dlh-in-a-box.name" . }}
+            app.kubernetes.io/component: ranger-exception-audit
+        spec:
+          restartPolicy: OnFailure
+          containers:
+            - name: ranger-exception-audit
+              image: "{{ $ranger.bootstrap.image.repository }}:{{ $ranger.bootstrap.image.tag }}"
+              imagePullPolicy: {{ $ranger.bootstrap.image.pullPolicy }}
+              command:
+                - python
+                - /opt/ranger-automation/exception_audit.py
+              env:
+                - name: RANGER_URL
+                  value: {{ include "dlh-in-a-box.ranger.admin.url" . | quote }}
+                - name: RANGER_ADMIN_PASSWORD
+                  valueFrom:
+                    secretKeyRef:
+                      name: {{ $ranger.admin.existingSecret }}
+                      key: {{ default "rangerAdminPassword" $ranger.admin.adminPasswordKey }}
+              volumeMounts:
+                - name: automation
+                  mountPath: /opt/ranger-automation
+                  readOnly: true
+          volumes:
+            - name: automation
+              configMap:
+                name: {{ include "dlh-in-a-box.ranger.admin.serviceName" . }}-automation
+                defaultMode: 0555
+{{- end }}
+{{- end }}

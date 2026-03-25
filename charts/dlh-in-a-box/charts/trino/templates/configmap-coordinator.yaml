@@ -6,15 +6,38 @@
 {{- $trinoIdentity := get $identityClients "trino" | default (dict) -}}
 {{- $directory := get $identity "directory" | default (dict) -}}
 {{- $ldap := get $directory "ldap" | default (dict) -}}
+{{- $authorization := get .Values.global "authorization" | default (dict) -}}
+{{- $ranger := get $authorization "ranger" | default (dict) -}}
 {{- $identityEnabled := and (default false $identity.enabled) (default false $trinoIdentity.enabled) -}}
-{{- $ldapEnabled := and $identityEnabled (default false $ldap.enabled) -}}
+{{- $directoryMode := default "externalLdap" $directory.mode -}}
+{{- $ldapEnabled := and $identityEnabled (or (default false $ldap.enabled) (eq $directoryMode "embeddedLdap")) -}}
+{{- $rangerEnabled := default false $ranger.enabled -}}
+{{- $issuer := include "dlh-in-a-box.identity.issuer" . -}}
+{{- $ldapUrl := include "dlh-in-a-box.identity.directory.url" . -}}
+{{- $ldapUserBaseDn := include "dlh-in-a-box.identity.directory.userBaseDn" . -}}
+{{- $ldapGroupBaseDn := include "dlh-in-a-box.identity.directory.groupBaseDn" . -}}
+{{- $ldapBindDn := include "dlh-in-a-box.identity.directory.bindDn" . -}}
+{{- $ldapTrustedCaSecretName := include "dlh-in-a-box.identity.directory.trustedCaSecretName" . -}}
+{{- $ldapTrustedCaCertKey := include "dlh-in-a-box.identity.directory.trustedCaCertKey" . -}}
+{{- $ldapUsernameAttribute := default "uid" $ldap.usernameAttribute -}}
+{{- $ldapAllowInsecure := or (eq $directoryMode "embeddedLdap") (default false $ldap.allowInsecure) -}}
+{{- $ldapTrustedCaPath := printf "%s/auth/ldap/ca/%s" .Values.server.config.path $ldapTrustedCaCertKey -}}
+{{- $ldapUseTrustedCa := and $ldapEnabled (not $ldapAllowInsecure) $ldapTrustedCaSecretName -}}
+{{- $legacyPasswordAuthRequested := contains "PASSWORD" (default "" .Values.server.config.authenticationType) -}}
+{{- $passwordAuthRequested := and $identityEnabled (default false $trinoIdentity.passwordAuthEnabled) -}}
+{{- $ldapUserBindPattern := default "" $ldap.userBindPattern -}}
+{{- if and $identityEnabled $passwordAuthRequested (eq $directoryMode "embeddedLdap") (not $ldapUserBindPattern) -}}
+  {{- $ldapUserBindPattern = printf "%s=${USER},%s" $ldapUsernameAttribute $ldapUserBaseDn -}}
+{{- end -}}
 {{- if $identityEnabled }}
-  {{- if not $oidc.issuer }}{{- fail "global.identity.external.oidc.issuer is required when Trino identity integration is enabled." }}{{- end }}
+  {{- if not $issuer }}{{- fail "An OIDC issuer is required when Trino identity integration is enabled. Set global.identity.external.oidc.issuer or use identity.provider.mode=bundledKeycloak." }}{{- end }}
   {{- if not $trinoIdentity.clientId }}{{- fail "global.identity.external.clients.trino.clientId is required when Trino identity integration is enabled." }}{{- end }}
   {{- if not $trinoIdentity.existingSecret }}{{- fail "global.identity.external.clients.trino.existingSecret is required when Trino identity integration is enabled." }}{{- end }}
   {{- if not $trinoIdentity.sharedSecretExistingSecret }}{{- fail "global.identity.external.clients.trino.sharedSecretExistingSecret is required when Trino identity integration is enabled." }}{{- end }}
   {{- if not $ldapEnabled }}{{- fail "global.identity.directory.ldap.enabled must be true when Trino identity integration is enabled." }}{{- end }}
-  {{- if not $ldap.bindExistingSecret }}{{- fail "global.identity.directory.ldap.bindExistingSecret is required when Trino identity integration is enabled." }}{{- end }}
+  {{- if not (include "dlh-in-a-box.identity.directory.bindSecretName" .) }}{{- fail "global.identity.directory.ldap.bindExistingSecret is required when Trino identity integration is enabled." }}{{- end }}
+  {{- if $legacyPasswordAuthRequested }}{{- fail "Use global.identity.external.clients.trino.passwordAuthEnabled instead of trino.server.config.authenticationType=PASSWORD when shared identity is enabled." }}{{- end }}
+  {{- if and $passwordAuthRequested (not $ldapUserBindPattern) }}{{- fail "global.identity.directory.ldap.userBindPattern is required when Trino PASSWORD auth is enabled against a shared identity directory. Embedded LDAP gets a default if this is omitted." }}{{- end }}
 {{- end }}
 apiVersion: v1
 kind: ConfigMap
@@ -83,13 +106,16 @@ data:
     {{- if $identityEnabled }}
     http-server.process-forwarded={{ default true $oidc.processForwardedHeaders }}
     internal-communication.shared-secret=${ENV:TRINO_INTERNAL_SHARED_SECRET}
-    http-server.authentication.type=OAUTH2
-    http-server.authentication.oauth2.issuer={{ $oidc.issuer }}
+    http-server.authentication.type={{ ternary "OAUTH2,PASSWORD" "OAUTH2" $passwordAuthRequested }}
+    http-server.authentication.oauth2.issuer={{ $issuer }}
     http-server.authentication.oauth2.client-id={{ $trinoIdentity.clientId }}
     http-server.authentication.oauth2.client-secret=${ENV:TRINO_OIDC_CLIENT_SECRET}
     http-server.authentication.oauth2.principal-field={{ default "email" $oidc.usernameClaim }}
     {{- if $oidc.scopes }}
     http-server.authentication.oauth2.scopes={{ join "," $oidc.scopes }}
+    {{- end }}
+    {{- if $passwordAuthRequested }}
+    http-server.authentication.password.user-mapping.pattern={{ default "([^@]+)" $oidc.userMappingPattern }}
     {{- end }}
     {{- else if .Values.server.config.authenticationType }}
     http-server.authentication.type={{ .Values.server.config.authenticationType }}
@@ -98,7 +124,10 @@ data:
     internal-communication.shared-secret={{ $internalSharedSecret }}
     {{- end }}
     {{- range $configValue := .Values.additionalConfigProperties }}
+    {{- if and $identityEnabled (hasPrefix "internal-communication.shared-secret=" $configValue) }}
+    {{- else }}
     {{ $configValue }}
+    {{- end }}
     {{- end }}
     {{- if .Values.server.config.https.enabled }}
     http-server.https.enabled=true
@@ -116,7 +145,99 @@ data:
     {{- .Values.server.coordinatorExtraConfig | nindent 4 }}
     {{- end }}
 
-{{- if .Values.accessControl }}
+{{- if $rangerEnabled }}
+  access-control.properties: |
+    access-control.name=ranger
+    ranger.service.name={{ default "trino" $ranger.serviceName }}
+    ranger.plugin.config.resource={{ .Values.server.config.path }}/ranger-trino-security.xml,{{ .Values.server.config.path }}/ranger-trino-audit.xml,{{ .Values.server.config.path }}/ranger-policymgr-ssl.xml
+
+  ranger-trino-security.xml: |
+    <?xml-stylesheet type="text/xsl" href="configuration.xsl"?>
+    <configuration>
+      <property>
+        <name>ranger.plugin.trino.service.name</name>
+        <value>{{ default "trino" $ranger.serviceName }}</value>
+      </property>
+      <property>
+        <name>ranger.plugin.trino.policy.source.impl</name>
+        <value>org.apache.ranger.admin.client.RangerAdminRESTClient</value>
+      </property>
+      <property>
+        <name>ranger.plugin.trino.policy.rest.url</name>
+        <value>{{ include "dlh-in-a-box.ranger.admin.url" . }}</value>
+      </property>
+      <property>
+        <name>ranger.plugin.trino.policy.rest.ssl.config.file</name>
+        <value>{{ .Values.server.config.path }}/ranger-policymgr-ssl.xml</value>
+      </property>
+      <property>
+        <name>ranger.plugin.trino.policy.pollIntervalMs</name>
+        <value>30000</value>
+      </property>
+      <property>
+        <name>ranger.plugin.trino.policy.rest.client.connection.timeoutMs</name>
+        <value>30000</value>
+      </property>
+      <property>
+        <name>ranger.plugin.trino.policy.rest.client.read.timeoutMs</name>
+        <value>30000</value>
+      </property>
+      <property>
+        <name>ranger.plugin.trino.policy.cache.dir</name>
+        <value>/tmp</value>
+      </property>
+      <property>
+        <name>ranger.plugin.trino.use.rangerGroups</name>
+        <value>{{ ternary "true" "false" (default false $ranger.useRangerGroups) }}</value>
+      </property>
+      <property>
+        <name>ranger.plugin.trino.use.only.rangerGroups</name>
+        <value>{{ ternary "true" "false" (default false $ranger.useRangerGroups) }}</value>
+      </property>
+    </configuration>
+
+  ranger-trino-audit.xml: |
+    <?xml version="1.0"?>
+    <?xml-stylesheet type="text/xsl" href="configuration.xsl"?>
+    <configuration xmlns:xi="http://www.w3.org/2001/XInclude">
+      <property>
+        <name>xasecure.audit.is.enabled</name>
+        <value>{{ ternary "true" "false" (eq (default "log4j" $ranger.trino.auditMode) "log4j") }}</value>
+      </property>
+      <property>
+        <name>xasecure.audit.hdfs.is.enabled</name>
+        <value>false</value>
+      </property>
+      <property>
+        <name>xasecure.audit.log4j.is.enabled</name>
+        <value>{{ ternary "true" "false" (eq (default "log4j" $ranger.trino.auditMode) "log4j") }}</value>
+      </property>
+      <property>
+        <name>xasecure.audit.log4j.is.async</name>
+        <value>true</value>
+      </property>
+      <property>
+        <name>xasecure.audit.log4j.async.max.queue.size</name>
+        <value>10240</value>
+      </property>
+      <property>
+        <name>xasecure.audit.log4j.async.max.flush.interval.ms</name>
+        <value>30000</value>
+      </property>
+      <property>
+        <name>xasecure.audit.trino.is.enabled</name>
+        <value>false</value>
+      </property>
+      <property>
+        <name>xasecure.audit.solr.is.enabled</name>
+        <value>false</value>
+      </property>
+    </configuration>
+
+  ranger-policymgr-ssl.xml: |
+    <?xml version="1.0"?>
+    <configuration />
+{{- else if .Values.accessControl }}
   {{- if eq .Values.accessControl.type "configmap" }}
   access-control.properties: |
     access-control.name=file
@@ -168,7 +289,16 @@ data:
     {{ $configValue }}
   {{- end }}
 
-  {{- if contains "PASSWORD" .Values.server.config.authenticationType }}{{- if not (index .Values.coordinator.additionalConfigFiles "password-authenticator.properties") }}
+  {{- if and $identityEnabled $passwordAuthRequested }}{{- if not (index .Values.coordinator.additionalConfigFiles "password-authenticator.properties") }}
+  password-authenticator.properties: |
+    password-authenticator.name=ldap
+    ldap.url={{ $ldapUrl }}
+    ldap.allow-insecure={{ $ldapAllowInsecure }}
+    {{- if $ldapUseTrustedCa }}
+    ldap.ssl.truststore.path={{ $ldapTrustedCaPath }}
+    {{- end }}
+    ldap.user-bind-pattern={{ $ldapUserBindPattern }}
+  {{- end }}{{- else if $legacyPasswordAuthRequested }}{{- if not (index .Values.coordinator.additionalConfigFiles "password-authenticator.properties") }}
   password-authenticator.properties: |
     password-authenticator.name=file
     file.password-file={{ .Values.server.config.path }}/auth/password/password.db
@@ -178,16 +308,19 @@ data:
   group-provider.properties: |
     group-provider.name=ldap
     group-provider.group-case=lower
-    ldap.url={{ $ldap.url }}
-    ldap.allow-insecure={{ default false $ldap.allowInsecure }}
-    ldap.admin-user={{ $ldap.bindDistinguishedName }}
+    ldap.url={{ $ldapUrl }}
+    ldap.allow-insecure={{ $ldapAllowInsecure }}
+    {{- if $ldapUseTrustedCa }}
+    ldap.ssl.truststore.path={{ $ldapTrustedCaPath }}
+    {{- end }}
+    ldap.admin-user={{ $ldapBindDn }}
     ldap.admin-password=${ENV:TRINO_LDAP_BIND_PASSWORD}
     ldap.group-name-attribute={{ default "cn" $ldap.groupNameAttribute }}
-    ldap.user-base-dn={{ $ldap.userBaseDn }}
-    ldap.user-search-filter={{ default "(uid={0})" $ldap.userSearchFilter }}
+    ldap.user-base-dn={{ $ldapUserBaseDn }}
+    ldap.user-search-filter={{ default (printf "(%s={0})" $ldapUsernameAttribute) $ldap.userSearchFilter }}
     ldap.use-group-filter={{ ternary "true" "false" (default false $ldap.useGroupFilter) }}
     {{- if default false $ldap.useGroupFilter }}
-    ldap.group-base-dn={{ $ldap.groupBaseDn }}
+    ldap.group-base-dn={{ $ldapGroupBaseDn }}
     ldap.group-search-filter={{ default "(cn=trino_*)" $ldap.groupSearchFilter }}
     ldap.group-search-member-attribute={{ default "member" $ldap.groupSearchMemberAttribute }}
     {{- else }}
