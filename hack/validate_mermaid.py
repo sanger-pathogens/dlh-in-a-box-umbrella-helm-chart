@@ -17,6 +17,7 @@ FENCE_RE = re.compile(r"^```mermaid[^\n]*\n(.*?)^```[ \t]*$", re.MULTILINE | re.
 DEFAULT_IMAGE = os.environ.get("MERMAID_CLI_IMAGE", "minlag/mermaid-cli:10.9.1")
 STRICT_ENV_VALUES = {"1", "true", "yes", "on"}
 DOCKER_PROBE_TIMEOUT_SECONDS = float(os.environ.get("MERMAID_DOCKER_PROBE_TIMEOUT_SECONDS", "5"))
+MERMAID_RENDER_TIMEOUT_SECONDS = float(os.environ.get("MERMAID_RENDER_TIMEOUT_SECONDS", "30"))
 
 
 def parse_args() -> argparse.Namespace:
@@ -74,25 +75,32 @@ def validate_block(path: Path, block_index: int, block: str) -> str | None:
         output_path = tmp_path / "diagram.svg"
         input_path.write_text(block, encoding="utf-8")
 
-        result = subprocess.run(
-            [
-                "docker",
-                "run",
-                "--rm",
-                "-u",
-                f"{os.getuid()}:{os.getgid()}",
-                "-v",
-                f"{tmpdir}:/work",
-                DEFAULT_IMAGE,
-                "-i",
-                "/work/diagram.mmd",
-                "-o",
-                "/work/diagram.svg",
-            ],
-            capture_output=True,
-            text=True,
-            check=False,
-        )
+        try:
+            result = subprocess.run(
+                [
+                    "docker",
+                    "run",
+                    "--rm",
+                    "-u",
+                    f"{os.getuid()}:{os.getgid()}",
+                    "-v",
+                    f"{tmpdir}:/work",
+                    DEFAULT_IMAGE,
+                    "-i",
+                    "/work/diagram.mmd",
+                    "-o",
+                    "/work/diagram.svg",
+                ],
+                capture_output=True,
+                text=True,
+                check=False,
+                timeout=MERMAID_RENDER_TIMEOUT_SECONDS,
+            )
+        except subprocess.TimeoutExpired:
+            return (
+                f"{path} mermaid block {block_index}: render timed out after "
+                f"{MERMAID_RENDER_TIMEOUT_SECONDS:g}s"
+            )
 
         if result.returncode == 0 and output_path.exists() and output_path.stat().st_size > 0:
             return None

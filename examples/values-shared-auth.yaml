@@ -39,7 +39,7 @@ global:
           existingSecret: superset-oidc-client
           clientSecretKey: clientSecret
           redirectUris:
-            - https://superset.shared.example.org/oauth-authorized/oidc
+            - https://superset.shared.example.org/oauth-authorized/keycloak
           webOrigins:
             - https://superset.shared.example.org
           authorizeUrl: https://login.example.org/realms/dlh/protocol/openid-connect/auth
@@ -74,8 +74,8 @@ global:
           webOrigins:
             - https://cloudbeaver.shared.example.org
           allowedGroups:
-            - dlh-app-cloudbeaver
-            - dlh-role-data-engineer
+            - platform-app-cloudbeaver
+            - platform-role-data-engineer
           emailDomains:
             - sanger.ac.uk
           ingress:
@@ -96,8 +96,8 @@ global:
           webOrigins:
             - https://prefect.shared.example.org
           allowedGroups:
-            - dlh-app-prefect
-            - dlh-role-data-engineer
+            - platform-app-prefect
+            - platform-role-data-engineer
           emailDomains:
             - sanger.ac.uk
     directory:
@@ -106,28 +106,29 @@ global:
         enabled: true
         url: ldaps://ldap.example.org:636
         userBaseDn: ou=People,dc=example,dc=org
+        groupBaseDn: ou=Groups,dc=example,dc=org
         userBindPattern: "uid=${USER},ou=People,dc=example,dc=org"
         userSearchFilter: "(uid={0})"
         groupNameAttribute: cn
         useGroupFilter: false
         userMemberOfAttribute: memberOf
-        bindDistinguishedName: cn=svc-dlh-trino,ou=Service Accounts,dc=example,dc=org
+        bindDistinguishedName: cn=svc-platform-trino,ou=Service Accounts,dc=example,dc=org
         bindExistingSecret: trino-ldap-bind
         bindPasswordKey: bindPassword
         trustedCaExistingSecret: shared-ldap-ca
         trustedCaCertKey: ca.crt
         allowInsecure: false
     groupConventions:
-      appAccessPrefix: dlh-app-
-      rolePrefix: dlh-role-
-      dataPrefix: dlh-data-
+      appAccessPrefix: platform-app-
+      rolePrefix: platform-role-
+      dataPrefix: platform-data-
   authorization:
     platformRoles:
       platform-admin:
         description: Platform administrators with full browser access and broad Trino administration rights.
         members:
           directoryGroups:
-            - dlh-role-platform-admin
+            - platform-role-platform-admin
         apps:
           superset: true
           datahub: true
@@ -138,7 +139,7 @@ global:
         description: Shared-environment read-only users for the default catalog.
         members:
           directoryGroups:
-            - dlh-data-default-ro
+            - platform-data-default-ro
         apps:
           superset: true
           datahub: true
@@ -149,7 +150,7 @@ global:
         description: Shared-environment read-write operators for the default catalog.
         members:
           directoryGroups:
-            - dlh-data-default-rw
+            - platform-data-default-rw
         apps:
           superset: true
           datahub: true
@@ -162,9 +163,9 @@ global:
       serviceName: trino
       serviceUsername: trino
       serviceAdminGroups:
-        - dlh-role-platform-admin
+        - platform-role-platform-admin
       superGroups:
-        - dlh-role-platform-admin
+        - platform-role-platform-admin
       useRangerGroups: false
       admin:
         browserUrl: https://ranger.shared.example.org
@@ -334,15 +335,16 @@ datahub:
       enabled: true
       groupsClaim: groups
       viewers:
-        - dlh-data-default-ro
+        - platform-data-default-ro
       editors:
-        - dlh-data-default-rw
+        - platform-data-default-rw
   datahub-frontend:
     ingress:
       enabled: true
       hosts:
         - host: datahub.shared.example.org
-          paths: []
+          paths:
+            - /
       tls:
         - secretName: datahub-shared-tls
           hosts:

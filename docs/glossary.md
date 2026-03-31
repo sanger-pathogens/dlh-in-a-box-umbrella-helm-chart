@@ -24,7 +24,7 @@ documentation.
   The default OIDC provider in the documented platform model.
 - `LDAP`
   Lightweight Directory Access Protocol. In this project it is the interface
-  used to read users and groups from OpenLDAP or Active Directory.
+  used to read users and groups from an organizational LDAP directory or Active Directory.
 - `Active Directory`
   Microsoft’s directory service. In this project it is treated as an LDAP/LDAPS
   directory plus a source of institutional users and groups.
@@ -89,6 +89,6 @@ documentation.
   system even though Prefect OSS does not provide the same native auth model as
   the other applications.
 - `Bundled component`
-  A dependency this chart can deploy directly, such as Keycloak or OpenLDAP.
+  A dependency this chart can deploy directly, such as Keycloak or Ranger.
 - `Reference-only doc`
   Documentation kept for context, but not part of the main onboarding path.

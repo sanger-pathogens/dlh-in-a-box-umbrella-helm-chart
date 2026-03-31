@@ -5,7 +5,7 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "${ROOT_DIR}"
 
 CHART_PATH="${1:-charts/dlh-in-a-box}"
-VALUES_FILE="${2:-examples/values-local-auth.yaml}"
+VALUES_FILE="${2:-examples/values-local.yaml}"
 RELEASE_NAME="${RELEASE_NAME:-dlh}"
 NAMESPACE="${NAMESPACE:-data-lakehouse-local}"
 TIMEOUT="${TIMEOUT:-20m}"
@@ -29,8 +29,8 @@ seed_local_auth_demo_secrets() {
   seed_secret dlh-keycloak-admin \
     --from-literal=adminPassword=admin123
 
-  seed_secret dlh-openldap-admin \
-    --from-literal=adminPassword=local-admin-password
+  seed_secret dlh-directory-bind \
+    --from-literal=bindPassword=local-directory-bind-password
 
   seed_secret dlh-oidc-clients \
     --from-literal=trinoClientSecret=local-trino-client-secret \
@@ -58,13 +58,13 @@ seed_local_auth_demo_secrets() {
       adminPassword: "cloudbeaver-admin-password",
       teams: [
         {
-          subjectId: "dlh-role-platform-admin",
+          subjectId: "platform-role-platform-admin",
           teamName: "Platform administrators",
           description: "Platform administrators with CloudBeaver admin access.",
           permissions: ["admin"]
         },
         {
-          subjectId: "dlh-app-cloudbeaver",
+          subjectId: "platform-app-cloudbeaver",
           teamName: "CloudBeaver users",
           description: "Approved CloudBeaver browser users.",
           permissions: []
@@ -73,7 +73,7 @@ seed_local_auth_demo_secrets() {
     }'
 
   seed_secret dlh-keycloak-config-cli-env \
-    --from-literal=LDAP_BIND_PASSWORD=local-admin-password \
+    --from-literal=LDAP_BIND_PASSWORD=local-directory-bind-password \
     --from-literal=KC_TRINO_CLIENT_SECRET=local-trino-client-secret \
     --from-literal=KC_SUPERSET_CLIENT_SECRET=local-superset-client-secret \
     --from-literal=KC_DATAHUB_CLIENT_SECRET=local-datahub-client-secret \

@@ -34,7 +34,38 @@ data:
         sslConfigurationPath: "${CLOUDBEAVER_SSL_CONF_PATH:workspace/.data/ssl-config.xml}",
         rootURI: "/",
         serviceURI: "/api/",
-        supportedHosts: []
+        supportedHosts: [],
+        expireSessionAfterPeriod: "${CLOUDBEAVER_EXPIRE_SESSION_AFTER_PERIOD:1800000}",
+        bindSessionToIp: "${CLOUDBEAVER_BIND_SESSION_TO_IP:disable}",
+        develMode: "${CLOUDBEAVER_DEVEL_MODE:false}",
+        enableSecurityManager: false,
+        sm: {
+          enableBruteForceProtection: "${CLOUDBEAVER_BRUTE_FORCE_PROTECTION_ENABLED:true}",
+          maxFailedLogin: "${CLOUDBEAVER_MAX_FAILED_LOGINS:10}",
+          minimumLoginTimeout: "${CLOUDBEAVER_MINIMUM_LOGIN_TIMEOUT:1}",
+          blockLoginPeriod: "${CLOUDBEAVER_BLOCK_PERIOD:300}",
+          passwordPolicy: {
+            minLength: "${CLOUDBEAVER_POLICY_MIN_LENGTH:8}",
+            requireMixedCase: "${CLOUDBEAVER_POLICY_REQUIRE_MIXED_CASE:true}",
+            minNumberCount: "${CLOUDBEAVER_POLICY_MIN_NUMBER_COUNT:1}",
+            minSymbolCount: "${CLOUDBEAVER_POLICY_MIN_SYMBOL_COUNT:0}"
+          }
+        },
+        database: {
+          driver: "${CLOUDBEAVER_DB_DRIVER:h2_embedded}",
+          url: "${CLOUDBEAVER_DB_URL:jdbc:h2:${workspace}/.data/cb.h2.dat}",
+          schema: "${CLOUDBEAVER_DB_SCHEMA:''}",
+          user: "${CLOUDBEAVER_DB_USER:''}",
+          password: "${CLOUDBEAVER_DB_PASSWORD:''}",
+          initialDataConfiguration: "${CLOUDBEAVER_DB_INITIAL_DATA:conf/initial-data.conf}",
+          pool: {
+            minIdleConnections: "${CLOUDBEAVER_DB_MIN_IDLE_CONNECTIONS:4}",
+            maxIdleConnections: "${CLOUDBEAVER_DB_MAX_IDLE_CONNECTIONS:10}",
+            maxConnections: "${CLOUDBEAVER_DB_MAX_CONNECTIONS:100}",
+            validationQuery: "${CLOUDBEAVER_DB_VALIDATION_QUERY:SELECT 1}"
+          },
+          backupEnabled: "${CLOUDBEAVER_DB_BACKUP_ENABLED:true}"
+        }
       },
       app: {
         anonymousAccessEnabled: false,

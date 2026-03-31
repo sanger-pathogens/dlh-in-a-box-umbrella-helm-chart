@@ -1,6 +1,7 @@
 {{- $authorization := .Values.global.authorization | default dict -}}
 {{- $platformRoles := get $authorization "platformRoles" | default dict -}}
 {{- $platformRoleExceptions := get $authorization "platformRoleExceptions" | default (list) -}}
+{{- $platformRoleMembershipSource := default "git" (get $authorization "platformRoleMembershipSource") -}}
 {{- $ranger := get $authorization "ranger" | default dict -}}
 {{- $exceptionRoleAudit := get $ranger "exceptionRoleAudit" | default dict -}}
 {{- $identity := .Values.global.identity | default dict -}}
@@ -36,6 +37,7 @@ data:
         "serviceAdminGroups" ($ranger.serviceAdminGroups | default (list))
         "superUsers" ($ranger.superUsers | default (list))
         "superGroups" ($ranger.superGroups | default (list))
+        "platformRoleMembershipSource" $platformRoleMembershipSource
         "importCatalogAcls" $importCatalogAcls
         "bootstrapPolicies" $bootstrapPolicies
         "exceptionRoleAudit" (dict
@@ -87,7 +89,7 @@ data:
             return json.load(handle)
 
 
-    def request(method, path, payload=None, ok=(200, 201)):
+    def request(method, path, payload=None, ok=(200, 201), parse_json=True):
         url = f"{RANGER_URL}{path}"
         headers = {
             "Authorization": "Basic "
@@ -102,10 +104,14 @@ data:
         try:
             with urllib.request.urlopen(req, timeout=30) as response:
                 data = response.read().decode("utf-8")
+                if not parse_json:
+                    return data
                 return json.loads(data) if data else None
         except urllib.error.HTTPError as exc:
             if exc.code in ok:
                 data = exc.read().decode("utf-8")
+                if not parse_json:
+                    return data
                 return json.loads(data) if data else None
             raise
 
@@ -114,7 +120,7 @@ data:
         deadline = time.time() + 600
         while time.time() < deadline:
             try:
-                request("GET", "/login.jsp", ok=(200,))
+                request("GET", "/login.jsp", ok=(200,), parse_json=False)
                 return
             except Exception:
                 time.sleep(5)
@@ -147,7 +153,19 @@ data:
 
 
     def normalize_role_members(items):
-        return [role_member(name) for name in normalize_names(items)]
+        members = {}
+        for item in items or []:
+            if isinstance(item, dict):
+                name = str(item.get("name", "")).strip()
+                is_admin = bool(item.get("isAdmin", False))
+            else:
+                name = str(item).strip()
+                is_admin = False
+            if not name:
+                continue
+            current = members.get(name)
+            members[name] = role_member(name, is_admin or bool(current and current.get("isAdmin")))
+        return [members[name] for name in sorted(members)]
 
 
     def access_item(users, groups, roles, accesses):
@@ -220,25 +238,30 @@ data:
         return normalized
 
 
-    def role_lookup_path(service_name, role_name):
-        return (
-            "/service/public/v2/api/roles/roles/name/"
-            + urllib.parse.quote(role_name, safe="")
-            + "?serviceName="
-            + urllib.parse.quote(service_name, safe="")
-        )
-
-
     def role_create_path(service_name):
-        return (
-            "/service/public/v2/api/roles/roles?serviceName="
-            + urllib.parse.quote(service_name, safe="")
-            + "&createNonExistUserGroup=true"
-        )
+        del service_name
+        return "/service/public/v2/api/roles?createNonExistUserGroup=true"
 
 
     def role_update_path(role_id):
-        return f"/service/public/v2/api/roles/roles/{role_id}?createNonExistUserGroup=true"
+        return f"/service/public/v2/api/roles/{role_id}?createNonExistUserGroup=true"
+
+
+    def list_roles():
+        roles = []
+        start_index = 0
+        page_size = 200
+        while True:
+            page = request(
+                "GET",
+                f"/service/public/v2/api/roles?startIndex={start_index}&pageSize={page_size}",
+                ok=(200,),
+            ) or []
+            roles.extend(page)
+            if len(page) < page_size:
+                break
+            start_index += page_size
+        return roles
 
 
     def exception_role_name(base_role_name, username, expires_at):
@@ -261,15 +284,14 @@ data:
 
 
     def get_role(service_name, role_name):
-        try:
-            return request("GET", role_lookup_path(service_name, role_name), ok=(200,))
-        except urllib.error.HTTPError as exc:
-            if exc.code != 404:
-                raise
-            return None
+        del service_name
+        for role in list_roles():
+            if str(role.get("name", "")) == str(role_name):
+                return role
+        return None
 
 
-    def upsert_role(service_name, role):
+    def upsert_role(service_name, role, existing=None):
         payload = {
             "name": role["name"],
             "description": role.get("description", ""),
@@ -278,7 +300,7 @@ data:
             "groups": normalize_role_members(role.get("groups", [])),
             "roles": normalize_role_members(role.get("roles", [])),
         }
-        existing = get_role(service_name, role["name"])
+        existing = existing or get_role(service_name, role["name"])
         if existing:
             payload["id"] = existing["id"]
             payload["guid"] = existing.get("guid")
@@ -340,49 +362,6 @@ data:
         write_accesses = read_accesses + ["insert", "create", "delete", "drop", "alter", "grant", "revoke"]
         policies = []
 
-        super_users = config["ranger"].get("superUsers", [])
-        super_groups = config["ranger"].get("superGroups", [])
-        admin_item = access_item(
-            super_users,
-            super_groups,
-            [],
-            [
-                "select",
-                "insert",
-                "create",
-                "delete",
-                "drop",
-                "use",
-                "alter",
-                "grant",
-                "revoke",
-                "show",
-                "impersonate",
-                "execute",
-                "read_sysinfo",
-                "write_sysinfo",
-            ],
-        )
-        if admin_item:
-            policies.append(
-                normalize_policy(
-                    {
-                        "name": f"{service_name}-platform-admins",
-                        "description": "Platform administrators get full Trino access through Ranger.",
-                        "resources": {
-                            "catalog": "*",
-                            "schema": "*",
-                            "table": "*",
-                            "column": "*",
-                            "queryid": "*",
-                            "trinouser": "*",
-                        },
-                        "policyItems": [admin_item],
-                    },
-                    service_name,
-                )
-            )
-
         if not config["ranger"].get("importCatalogAcls", False):
             return policies
 
@@ -432,20 +411,37 @@ data:
 
     def reconcile_roles(config):
         service_name = config["ranger"]["serviceName"]
+        membership_source = str(config["ranger"].get("platformRoleMembershipSource", "git") or "git").lower()
+        if membership_source not in {"git", "ranger"}:
+            membership_source = "git"
         base_roles = build_platform_roles(config)
         base_roles_by_key = {role["key"]: role for role in base_roles}
+        existing_roles_by_name = {
+            str(role.get("name", "")): role
+            for role in list_roles()
+            if str(role.get("name", "")).strip()
+        }
 
         for role in base_roles:
+            existing = existing_roles_by_name.get(role["name"])
+            effective_users = role["users"]
+            effective_groups = role["groups"]
+            if membership_source == "ranger" and existing:
+                effective_users = existing.get("users", [])
+                effective_groups = existing.get("groups", [])
             upsert_role(
                 service_name,
                 {
                     "name": role["name"],
                     "description": role["description"],
-                    "users": role["users"],
-                    "groups": role["groups"],
+                    "users": effective_users,
+                    "groups": effective_groups,
                     "roles": [],
                 },
+                existing=existing,
             )
+            role["effectiveUsers"] = effective_users
+            role["effectiveGroups"] = effective_groups
             print(f"Reconciled Ranger role: {role['name']}")
 
         exception_roles = build_exception_roles(config, base_roles)
@@ -467,8 +463,8 @@ data:
                 {
                     "name": role["name"],
                     "description": role["description"],
-                    "users": role["users"],
-                    "groups": role["groups"],
+                    "users": role.get("effectiveUsers", role["users"]),
+                    "groups": role.get("effectiveGroups", role["groups"]),
                     "roles": nested_role_names,
                 },
             )
@@ -537,7 +533,7 @@ data:
             return json.load(handle)
 
 
-    def request(method, path, payload=None, ok=(200, 201)):
+    def request(method, path, payload=None, ok=(200, 201), parse_json=True):
         url = f"{RANGER_URL}{path}"
         headers = {
             "Authorization": "Basic "
@@ -552,10 +548,14 @@ data:
         try:
             with urllib.request.urlopen(req, timeout=30) as response:
                 data = response.read().decode("utf-8")
+                if not parse_json:
+                    return data
                 return json.loads(data) if data else None
         except urllib.error.HTTPError as exc:
             if exc.code in ok:
                 data = exc.read().decode("utf-8")
+                if not parse_json:
+                    return data
                 return json.loads(data) if data else None
             raise
 
@@ -564,46 +564,48 @@ data:
         deadline = time.time() + 600
         while time.time() < deadline:
             try:
-                request("GET", "/login.jsp", ok=(200,))
+                request("GET", "/login.jsp", ok=(200,), parse_json=False)
                 return
             except Exception:
                 time.sleep(5)
         raise RuntimeError("Timed out waiting for Ranger Admin")
 
 
-    def role_lookup_path(service_name, role_name):
-        return (
-            "/service/public/v2/api/roles/roles/name/"
-            + urllib.parse.quote(role_name, safe="")
-            + "?serviceName="
-            + urllib.parse.quote(service_name, safe="")
-        )
+    def list_roles():
+        roles = []
+        start_index = 0
+        page_size = 200
+        while True:
+            page = request(
+                "GET",
+                f"/service/public/v2/api/roles?startIndex={start_index}&pageSize={page_size}",
+                ok=(200,),
+            ) or []
+            roles.extend(page)
+            if len(page) < page_size:
+                break
+            start_index += page_size
+        return roles
 
 
     def list_role_names(service_name):
-        path = (
-            "/service/public/v2/api/roles/roles/names?serviceName="
-            + urllib.parse.quote(service_name, safe="")
-        )
-        return request("GET", path, ok=(200,)) or []
+        del service_name
+        return [str(role.get("name", "")) for role in list_roles() if str(role.get("name", "")).strip()]
 
 
     def get_role(service_name, role_name):
-        try:
-            return request("GET", role_lookup_path(service_name, role_name), ok=(200,))
-        except urllib.error.HTTPError as exc:
-            if exc.code != 404:
-                raise
-            return None
+        del service_name
+        for role in list_roles():
+            if str(role.get("name", "")) == str(role_name):
+                return role
+        return None
 
 
     def delete_role(service_name, role_name):
-        path = (
-            "/service/public/v2/api/roles/roles/name/"
-            + urllib.parse.quote(role_name, safe="")
-            + "?serviceName="
-            + urllib.parse.quote(service_name, safe="")
-        )
+        existing = get_role(service_name, role_name)
+        if not existing:
+            return
+        path = "/service/public/v2/api/roles/" + urllib.parse.quote(str(existing["id"]), safe="")
         request("DELETE", path, ok=(204, 404))
 
 
@@ -693,7 +695,7 @@ data:
             return json.load(handle)
 
 
-    def ranger_request(method, path, payload=None, ok=(200, 201)):
+    def ranger_request(method, path, payload=None, ok=(200, 201), parse_json=True):
         url = f"{RANGER_URL}{path}"
         headers = {
             "Authorization": "Basic "
@@ -708,10 +710,14 @@ data:
         try:
             with urllib.request.urlopen(req, timeout=30) as response:
                 data = response.read().decode("utf-8")
+                if not parse_json:
+                    return data
                 return json.loads(data) if data else None
         except urllib.error.HTTPError as exc:
             if exc.code in ok:
                 data = exc.read().decode("utf-8")
+                if not parse_json:
+                    return data
                 return json.loads(data) if data else None
             raise
 
@@ -720,7 +726,7 @@ data:
         deadline = time.time() + 600
         while time.time() < deadline:
             try:
-                ranger_request("GET", "/login.jsp", ok=(200,))
+                ranger_request("GET", "/login.jsp", ok=(200,), parse_json=False)
                 return
             except Exception:
                 time.sleep(5)
@@ -802,7 +808,7 @@ data:
                         "name": username,
                         "firstName": attr_value(user_entry, ldap_cfg["firstNameAttribute"]) or username,
                         "lastName": attr_value(user_entry, ldap_cfg["lastNameAttribute"]) or "User",
-                        "emailAddress": attr_value(user_entry, ldap_cfg["emailAttribute"]) or f"{username}@example.org",
+                        "emailAddress": attr_value(user_entry, ldap_cfg["emailAttribute"]) or "",
                         "status": 1,
                         "isVisible": 1,
                         "userSource": 1,
@@ -817,7 +823,7 @@ data:
                             "name": member_dn,
                             "firstName": member_dn,
                             "lastName": "User",
-                            "emailAddress": f"{member_dn}@example.org",
+                            "emailAddress": "",
                             "status": 1,
                             "isVisible": 1,
                             "userSource": 1,
@@ -911,6 +917,7 @@ spec:
           imagePullPolicy: {{ $ranger.bootstrap.image.pullPolicy }}
           command:
             - python
+            - -u
             - /opt/ranger-automation/bootstrap.py
           env:
             - name: RANGER_URL
@@ -1034,6 +1041,7 @@ spec:
               imagePullPolicy: {{ $ranger.bootstrap.image.pullPolicy }}
               command:
                 - python
+                - -u
                 - /opt/ranger-automation/exception_audit.py
               env:
                 - name: RANGER_URL

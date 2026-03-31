@@ -1,6 +1,6 @@
-# Shared development baseline using bundled Keycloak, embedded OpenLDAP, and
-# Apache Ranger. Keep this file free of inline credentials so it can be reused
-# safely across clusters.
+# Shared development baseline using bundled Keycloak, external organizational
+# LDAP or AD, and Apache Ranger. Keep this file free of inline credentials so
+# it can be reused safely across clusters.
 global:
   environment: dev
   domain: dev.example.org
@@ -33,9 +33,9 @@ global:
           existingSecret: dlh-oidc-clients
           clientSecretKey: trinoClientSecret
           redirectUris:
-            - https://127.0.0.1:28443/oauth2/callback
+            - https://trino.dev.example.org/oauth2/callback
           webOrigins:
-            - https://127.0.0.1:28443
+            - https://trino.dev.example.org
           sharedSecretExistingSecret: dlh-trino-internal-communication
           sharedSecretKey: sharedSecret
           passwordAuthEnabled: true
@@ -63,8 +63,8 @@ global:
           webOrigins:
             - https://cloudbeaver.dev.example.org
           allowedGroups:
-            - dlh-app-cloudbeaver
-            - dlh-role-platform-admin
+            - platform-app-cloudbeaver
+            - platform-role-platform-admin
           emailDomains:
             - "*"
           ingress:
@@ -85,15 +85,15 @@ global:
           webOrigins:
             - https://prefect.dev.example.org
           allowedGroups:
-            - dlh-app-prefect
-            - dlh-role-platform-admin
+            - platform-app-prefect
+            - platform-role-platform-admin
           emailDomains:
             - "*"
     directory:
-      mode: embeddedLdap
+      mode: externalLdap
       ldap:
         enabled: true
-        url: ldap://dlh-openldap.data-lakehouse-dev.svc.cluster.local:389
+        url: ldaps://ldap.dev.example.org:636
         userBaseDn: ou=people,dc=example,dc=org
         usernameAttribute: uid
         firstNameAttribute: givenName
@@ -108,24 +108,25 @@ global:
         groupObjectClasses: groupOfNames
         useGroupFilter: true
         groupBaseDn: ou=groups,dc=example,dc=org
-        groupSearchFilter: "(cn=dlh-*)"
+        groupSearchFilter: "(cn=platform-*)"
         groupSearchMemberAttribute: member
         userMemberOfAttribute: memberOf
-        bindDistinguishedName: cn=admin,dc=example,dc=org
-        bindExistingSecret: dlh-openldap-admin
-        bindPasswordKey: adminPassword
-        allowInsecure: true
+        bindDistinguishedName: cn=svc-platform-keycloak,ou=service-accounts,dc=example,dc=org
+        bindExistingSecret: dlh-directory-bind
+        bindPasswordKey: bindPassword
+        useSystemTrustStore: true
+        allowInsecure: false
     groupConventions:
-      appAccessPrefix: dlh-app-
-      rolePrefix: dlh-role-
-      dataPrefix: dlh-data-
+      appAccessPrefix: platform-app-
+      rolePrefix: platform-role-
+      dataPrefix: platform-data-
   authorization: &authorization
     platformRoles:
       platform-admin:
         description: Platform administrators with full browser access and broad Trino administration rights.
         members:
           directoryGroups:
-            - dlh-role-platform-admin
+            - platform-role-platform-admin
         apps:
           superset: true
           datahub: true
@@ -136,7 +137,7 @@ global:
         description: Read-only analysts for approved REDCap data.
         members:
           directoryGroups:
-            - dlh-data-redcap-ro
+            - platform-data-redcap-ro
         apps:
           superset: true
           datahub: true
@@ -147,7 +148,7 @@ global:
         description: Site-scoped analysts limited to the approved site subset.
         members:
           directoryGroups:
-            - dlh-data-redcap-site-ro
+            - platform-data-redcap-site-ro
         apps:
           superset: true
           datahub: true
@@ -160,9 +161,9 @@ global:
       serviceName: trino
       serviceUsername: trino
       serviceAdminGroups:
-        - dlh-role-platform-admin
+        - platform-role-platform-admin
       superGroups:
-        - dlh-role-platform-admin
+        - platform-role-platform-admin
       useRangerGroups: false
       postgresql:
         enabled: true
@@ -180,8 +181,8 @@ global:
         syncSource: LDAP
       importCatalogAcls: false
       bootstrapPolicies:
-        - name: trino-redcap-read
-          description: Allow approved analyst roles to query the redcap catalog.
+        - name: trino-redcap-access
+          description: Allow approved analyst roles to read the redcap catalog and platform administrators to manage it.
           resources:
             catalog: redcap
             schema: "*"
@@ -204,14 +205,6 @@ global:
                   isAllowed: true
               conditions: []
               delegateAdmin: false
-        - name: trino-redcap-write
-          description: Allow the platform administrator role to manage the redcap catalog.
-          resources:
-            catalog: redcap
-            schema: "*"
-            table: "*"
-            column: "*"
-          policyItems:
             - groups: []
               users: []
               roles:
@@ -371,12 +364,6 @@ keycloak:
     passwordSecretKey: adminPassword
   keycloakConfigCli:
     extraEnvVarsSecret: *keycloak_config_cli_env_secret
-
-openldap:
-  enabled: true
-  auth:
-    existingSecret: dlh-openldap-admin
-    adminPasswordKey: adminPassword
 
 datahub:
   enabled: false

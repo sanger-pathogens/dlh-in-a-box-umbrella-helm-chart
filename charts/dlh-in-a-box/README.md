@@ -19,7 +19,6 @@ flowchart LR
   Umbrella --> CloudBeaver[CloudBeaver plus oauth2-proxy]
   Umbrella --> Keycloak[Keycloak optional]
   Umbrella --> Ranger[Ranger optional]
-  Umbrella --> OpenLDAP[OpenLDAP optional]
   Umbrella --> DataHub[DataHub optional]
   Umbrella --> Superset[Superset optional]
   Umbrella --> Hive[Generated Hive metastores]
@@ -30,13 +29,17 @@ flowchart LR
 The default documented shared-environment model is:
 
 - `Keycloak` issues OIDC tokens.
-- `LDAP/OpenLDAP` supplies users and groups in development.
+- `Organizational LDAP or Active Directory` supplies users and groups in every environment.
 - `Active Directory over LDAPS` supplies users and groups in production.
 - `Trino` authenticates with OIDC and optional LDAP password auth, and
   authorizes with `Ranger`.
 - `Superset`, `DataHub`, and the `Prefect` proxy trust the same OIDC issuer.
-- `platformHome` is the default browser entrypoint and only hides links based
-  on Keycloak group claims.
+- deployment-owned admin tools such as `MinIO Console`, standalone `Vault`,
+  and `Headlamp` can reuse the same Keycloak realm through reusable OIDC
+  client blocks owned by the umbrella chart.
+- `platformHome` is the default browser entrypoint, renders grouped launch
+  cards, exposes health/status information, and only hides links based on
+  Keycloak group claims.
 - `oauth2-proxy` protects Prefect and CloudBeaver because both tools are
   front-door integrations around the same Keycloak session.
 
@@ -65,11 +68,10 @@ escape hatch, not the main reference architecture.
 | `global.authorization.platformRoles` | Git-managed data-access roles that map directory groups or approved direct users into Ranger roles. |
 | `global.dataCatalogs` | Catalog definitions, access groups, and governance metadata. |
 | `global.dataCatalogs.*.governance` | Required non-local dataset classification and approval metadata. |
-| `platformHome` | Lightweight launchpad UI served by NGINX. |
+| `platformHome` | Lightweight launchpad UI served by NGINX plus a small same-origin API for live role membership and health aggregation. |
 | `cloudbeaver` and `cloudbeaver-auth-proxy` | CloudBeaver Community Edition plus its Keycloak-backed reverse-proxy front door. |
 | `prefect.authProxy` and `prefect-auth-proxy` | Prefect front-door protection with OIDC. |
 | `keycloak` | Bundled Keycloak deployment settings, including trusted CA input for LDAPS federation. |
-| `openldap` | Bundled OpenLDAP settings for development or demo environments. |
 
 ## Governance And Policy
 
@@ -121,20 +123,134 @@ page.
 ## Portal And CloudBeaver
 
 `platformHome` is the default browser entrypoint. It uses a public Keycloak
-client, reads `groups` claims in the browser, and shows only the cards the user
-should see. It does not replace downstream authorization.
+client, reads `groups` claims in the browser, and shows only the grouped app
+cards the user should see after sign-in. Anonymous users only see the product
+branding and a sign-in action. It does not replace downstream authorization.
 
-Platform administrators also get an Access Admin section in the portal. That
-section is read-only and shows:
+Platform administrators also get embedded administration sections on the same
+signed-in page:
 
-- the Git-managed platform roles
-- the directory groups mapped into them
-- app entitlements per role
-- any Git-declared direct-user exceptions
+- grouped admin-tool launch cards
+- live platform-role membership management backed by Ranger
+- the Git-managed role catalog, with live Ranger user and group membership
+- optional links to downstream admin tools such as Ranger Admin
 
-If `global.authorization.ranger.admin.browserUrl` is set, the portal also
-links to Ranger Admin as the writable UI for short-lived data-access
-exceptions.
+Git remains the source of truth for role definitions, app entitlements, and
+nested role topology. When
+`global.authorization.platformRoleMembershipSource=ranger`, the portal writes
+live user or group membership to Ranger so those changes survive later chart
+reconciliation.
+
+## Portal Theming And Branding
+
+The umbrella chart owns the reusable portal behavior. Consumer repositories own
+deployment-specific branding.
+
+That split is intentional:
+
+- keep structure, auth flow, app grouping, health rendering, and admin UX in
+  this chart
+- keep organization-specific titles, logos, colors, fonts, favicons, and any
+  one-off visual polish in downstream values overlays
+
+The main values surface is:
+
+| Values path | Purpose |
+| --- | --- |
+| `platformHome.branding.title` | Portal title shown in the page and browser chrome. |
+| `platformHome.branding.subtitle` | Optional subtitle below the title. |
+| `platformHome.branding.logoUrl` | Optional logo image. |
+| `platformHome.branding.logoAlt` | Accessible text for the logo. |
+| `platformHome.branding.faviconUrl` | Optional favicon for browser tabs. |
+| `platformHome.theme.metaThemeColor` | Browser theme color for mobile/browser UI. |
+| `platformHome.theme.colors.*` | CSS custom properties for background, surface, brand, accent, and line tokens. |
+| `platformHome.theme.fonts.bodyFamily` | Body font-family stack. |
+| `platformHome.theme.fonts.headingFamily` | Heading font-family stack. |
+| `platformHome.theme.fonts.preloads[]` | Optional preload links for remote or hosted font assets. |
+| `platformHome.theme.fonts.fontFaces[]` | Optional `@font-face` declarations emitted by the template. |
+| `platformHome.theme.customCss` | Small deployment-specific CSS escape hatch. |
+
+Minimal neutral example:
+
+```yaml
+platformHome:
+  enabled: true
+  branding:
+    title: Data Platform
+    subtitle: Shared analytics environment
+  theme:
+    colors:
+      brand: "#1f5f7a"
+      accent: "#e58a18"
+```
+
+Branded example:
+
+```yaml
+platformHome:
+  enabled: true
+  branding:
+    title: Example Institute Data Platform
+    subtitle: Secure access to approved tools and services
+    logoUrl: https://example.org/assets/platform-logo.svg
+    logoAlt: Example Institute logo
+    faviconUrl: https://example.org/assets/favicon.ico
+  theme:
+    metaThemeColor: "#7a1331"
+    fonts:
+      bodyFamily: '"Source Sans Pro", sans-serif'
+      headingFamily: '"Example Serif", Georgia, serif'
+      preloads:
+        - href: https://example.org/assets/fonts/example-serif.woff2
+          as: font
+          type: font/woff2
+          crossorigin: anonymous
+      fontFaces:
+        - family: Example Serif
+          src: 'url("https://example.org/assets/fonts/example-serif.woff2") format("woff2")'
+          weight: "700"
+          style: normal
+    colors:
+      brand: "#7a1331"
+      brandDeep: "#571024"
+      accent: "#cf8d2e"
+```
+
+## Portal Icons And Health
+
+Each portal item can now carry icon and health metadata through values so the
+reusable chart can render a polished launchpad without hard-coding any
+institution-specific assets.
+
+Use `platformHome.itemMeta.<id>` for chart-owned items such as `superset`,
+`datahub`, `prefect`, `cloudbeaver`, `trino`, `ranger-admin`, or
+`keycloak-admin`, and set equivalent fields directly on
+`platformHome.adminTools[]` for custom admin cards.
+
+If the consumer repo also needs Keycloak-managed OIDC clients for external
+portal-linked tools, the umbrella chart now exposes reusable client blocks for:
+
+- `global.identity.external.clients.minio`
+- `global.identity.external.clients.vault`
+- `global.identity.external.clients.headlamp`
+
+Supported fields are:
+
+| Values path | Purpose |
+| --- | --- |
+| `iconUrl` | Optional image URL or hosted asset path for the card icon. |
+| `iconAlt` | Accessible text for the icon image. |
+| `iconBackground` | Optional background color behind the icon. |
+| `iconText` | Fallback initials when no image is configured. |
+| `health.targetUrl` | Endpoint checked by the same-origin portal backend. |
+| `health.expectedStatusCodes[]` | Allowed HTTP codes for a healthy or degraded response. |
+| `health.bodyIncludes` | Optional response-body marker for lightweight content checks. |
+| `health.timeoutSeconds` | Per-probe timeout. |
+| `health.public` | Whether the target is intended to be browser-public. |
+
+When `platformHome.health.enabled=true`, the portal exposes `GET /api/health`
+and renders periodic status badges such as `Healthy`, `Degraded`, `Down`, or
+`Unknown` on the launch cards.
 
 CloudBeaver is intentionally different from the browser-only apps:
 
@@ -145,14 +261,16 @@ CloudBeaver is intentionally different from the browser-only apps:
 
 ## LDAPS And Trust Material
 
-When the chart talks to LDAP or AD over LDAPS, three things need to agree:
+When the chart talks to LDAP or AD over LDAPS, use one of these trust modes:
 
-1. `global.identity.directory.ldap.trustedCaExistingSecret`
-2. `keycloak.trustedCertsExistingSecret`
-3. the secret mounted for Trino and Ranger usersync
+1. provide a custom CA Secret through
+   `global.identity.directory.ldap.trustedCaExistingSecret`
+2. mirror that same Secret to `keycloak.trustedCertsExistingSecret`
+3. or, when the directory already chains to a public CA trusted by the base
+   images, set `global.identity.directory.ldap.useSystemTrustStore=true`
 
-The chart validates that alignment so Keycloak, Trino, and Ranger trust the
-same CA chain.
+The chart validates that Keycloak, Trino, and Ranger all use the same trust
+mode.
 
 ## Keycloak Client Secret Contract
 
@@ -170,6 +288,10 @@ provide the config-cli environment variables consumed during realm bootstrap.
   `KC_DATAHUB_CLIENT_SECRET`
   `KC_CLOUDBEAVER_CLIENT_SECRET`
   `KC_PREFECT_CLIENT_SECRET`
+- Optional local/dev-only keys:
+  any `passwordEnvVar` referenced by
+  `global.identity.provider.keycloak.bootstrapUsers`, for example
+  `KC_BOOTSTRAP_TRINO_ADMIN_PASSWORD`
 
 Only include the client secret keys for the clients you actually enable, but
 the secret name itself is now part of the supported contract.
@@ -177,8 +299,8 @@ the secret name itself is now part of the supported contract.
 ## Example Overlays
 
 - `examples/values-dev.yaml`
-  Bundled Keycloak + OpenLDAP + Ranger development pattern with the portal and
-  CloudBeaver enabled.
+  Bundled Keycloak + external LDAP/AD + Ranger development pattern with the
+  portal and CloudBeaver enabled.
 - `examples/values-prod.yaml`
   Bundled Keycloak + external LDAPS + Ranger production-shaped pattern with the
   portal and CloudBeaver enabled.

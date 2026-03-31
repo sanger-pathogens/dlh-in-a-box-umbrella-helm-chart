@@ -86,7 +86,32 @@
                 "browserHost": { "type": "string" },
                 "internalScheme": { "type": "string" },
                 "loginTheme": { "type": "string" },
-                "configCliEnvExistingSecret": { "type": "string" }
+                "configCliEnvExistingSecret": { "type": "string" },
+                "bootstrapUsers": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                      "username": { "type": "string", "minLength": 1 },
+                      "email": { "type": "string" },
+                      "firstName": { "type": "string" },
+                      "lastName": { "type": "string" },
+                      "enabled": { "type": "boolean" },
+                      "passwordEnvVar": { "type": "string", "minLength": 1 },
+                      "temporaryPassword": { "type": "boolean" },
+                      "groups": {
+                        "type": "array",
+                        "items": { "type": "string" }
+                      },
+                      "realmRoles": {
+                        "type": "array",
+                        "items": { "type": "string" }
+                      }
+                    },
+                    "required": ["username", "passwordEnvVar"]
+                  }
+                }
               }
             }
           }
@@ -259,6 +284,93 @@
                     }
                   ]
                 },
+                "minio": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "properties": {
+                    "enabled": { "type": "boolean" },
+                    "clientId": { "type": "string" },
+                    "existingSecret": { "type": "string" },
+                    "clientSecretKey": { "type": "string" },
+                    "redirectUris": {
+                      "type": "array",
+                      "items": { "type": "string" }
+                    },
+                    "webOrigins": {
+                      "type": "array",
+                      "items": { "type": "string" }
+                    }
+                  },
+                  "allOf": [
+                    {
+                      "if": {
+                        "properties": { "enabled": { "const": true } },
+                        "required": ["enabled"]
+                      },
+                      "then": {
+                        "required": ["clientId", "existingSecret"]
+                      }
+                    }
+                  ]
+                },
+                "vault": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "properties": {
+                    "enabled": { "type": "boolean" },
+                    "clientId": { "type": "string" },
+                    "existingSecret": { "type": "string" },
+                    "clientSecretKey": { "type": "string" },
+                    "redirectUris": {
+                      "type": "array",
+                      "items": { "type": "string" }
+                    },
+                    "webOrigins": {
+                      "type": "array",
+                      "items": { "type": "string" }
+                    }
+                  },
+                  "allOf": [
+                    {
+                      "if": {
+                        "properties": { "enabled": { "const": true } },
+                        "required": ["enabled"]
+                      },
+                      "then": {
+                        "required": ["clientId", "existingSecret"]
+                      }
+                    }
+                  ]
+                },
+                "headlamp": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "properties": {
+                    "enabled": { "type": "boolean" },
+                    "clientId": { "type": "string" },
+                    "existingSecret": { "type": "string" },
+                    "clientSecretKey": { "type": "string" },
+                    "redirectUris": {
+                      "type": "array",
+                      "items": { "type": "string" }
+                    },
+                    "webOrigins": {
+                      "type": "array",
+                      "items": { "type": "string" }
+                    }
+                  },
+                  "allOf": [
+                    {
+                      "if": {
+                        "properties": { "enabled": { "const": true } },
+                        "required": ["enabled"]
+                      },
+                      "then": {
+                        "required": ["clientId", "existingSecret"]
+                      }
+                    }
+                  ]
+                },
                 "cloudbeaverProxy": {
                   "type": "object",
                   "additionalProperties": true,
@@ -385,7 +497,7 @@
           "properties": {
             "mode": {
               "type": "string",
-              "enum": ["externalLdap", "embeddedLdap"]
+              "enum": ["externalLdap"]
             },
             "ldap": {
               "type": "object",
@@ -415,6 +527,7 @@
                 "bindPasswordKey": { "type": "string" },
                 "trustedCaExistingSecret": { "type": "string" },
                 "trustedCaCertKey": { "type": "string" },
+                "useSystemTrustStore": { "type": "boolean" },
                 "allowInsecure": { "type": "boolean" }
               },
               "allOf": [
@@ -427,6 +540,7 @@
                     "required": [
                       "url",
                       "userBaseDn",
+                      "groupBaseDn",
                       "bindDistinguishedName",
                       "bindExistingSecret"
                     ]
@@ -467,6 +581,10 @@
           "additionalProperties": {
             "$ref": "#/definitions/platformRole"
           }
+        },
+        "platformRoleMembershipSource": {
+          "type": "string",
+          "enum": ["git", "ranger"]
         },
         "platformRoleExceptions": {
           "type": "array",
@@ -746,14 +864,6 @@
         "enabled": { "type": "boolean" }
       }
     },
-    "openldap": {
-      "description": "Chart-owned OpenLDAP configuration used for embedded development identity.",
-      "type": "object",
-      "additionalProperties": true,
-      "properties": {
-        "enabled": { "type": "boolean" }
-      }
-    },
     "platformHome": {
       "description": "Lightweight static launchpad that becomes the default browser entrypoint in shared environments.",
       "type": "object",
@@ -761,6 +871,7 @@
       "properties": {
         "enabled": { "type": "boolean" },
         "replicaCount": { "type": "integer", "minimum": 1 },
+        "keycloakBrowserBaseUrl": { "type": "string" },
         "image": {
           "type": "object",
           "additionalProperties": true,
@@ -768,6 +879,22 @@
             "repository": { "type": "string" },
             "tag": { "type": "string" },
             "pullPolicy": { "type": "string" }
+          }
+        },
+        "api": {
+          "type": "object",
+          "additionalProperties": true,
+          "properties": {
+            "port": { "type": "integer", "minimum": 1 },
+            "image": {
+              "type": "object",
+              "additionalProperties": true,
+              "properties": {
+                "repository": { "type": "string" },
+                "tag": { "type": "string" },
+                "pullPolicy": { "type": "string" }
+              }
+            }
           }
         },
         "service": {
@@ -796,7 +923,142 @@
           "additionalProperties": true,
           "properties": {
             "title": { "type": "string" },
-            "subtitle": { "type": "string" }
+            "subtitle": { "type": "string" },
+            "logoUrl": { "type": "string" },
+            "logoAlt": { "type": "string" },
+            "faviconUrl": { "type": "string" }
+          }
+        },
+        "theme": {
+          "type": "object",
+          "additionalProperties": true,
+          "properties": {
+            "metaThemeColor": { "type": "string" },
+            "customCss": { "type": "string" },
+            "colors": {
+              "type": "object",
+              "additionalProperties": true,
+              "properties": {
+                "bg": { "type": "string" },
+                "bgDeep": { "type": "string" },
+                "surface": { "type": "string" },
+                "surfaceSoft": { "type": "string" },
+                "ink": { "type": "string" },
+                "inkDeep": { "type": "string" },
+                "muted": { "type": "string" },
+                "brand": { "type": "string" },
+                "brandDeep": { "type": "string" },
+                "brandSoft": { "type": "string" },
+                "accent": { "type": "string" },
+                "accentRose": { "type": "string" },
+                "line": { "type": "string" },
+                "shadow": { "type": "string" }
+              }
+            },
+            "fonts": {
+              "type": "object",
+              "additionalProperties": true,
+              "properties": {
+                "bodyFamily": { "type": "string" },
+                "headingFamily": { "type": "string" },
+                "preloads": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": true,
+                    "properties": {
+                      "href": { "type": "string" },
+                      "as": { "type": "string" },
+                      "type": { "type": "string" },
+                      "crossorigin": { "type": "string" }
+                    }
+                  }
+                },
+                "fontFaces": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": true,
+                    "properties": {
+                      "family": { "type": "string" },
+                      "src": { "type": "string" },
+                      "format": { "type": "string" },
+                      "weight": { "type": ["string", "integer"] },
+                      "style": { "type": "string" },
+                      "display": { "type": "string" }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "health": {
+          "type": "object",
+          "additionalProperties": true,
+          "properties": {
+            "enabled": { "type": "boolean" },
+            "refreshIntervalSeconds": { "type": "integer", "minimum": 15 }
+          }
+        },
+        "itemMeta": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "object",
+            "additionalProperties": true,
+            "properties": {
+              "iconUrl": { "type": "string" },
+              "iconAlt": { "type": "string" },
+              "iconBackground": { "type": "string" },
+              "iconText": { "type": "string" },
+              "health": {
+                "type": "object",
+                "additionalProperties": true,
+                "properties": {
+                  "targetUrl": { "type": "string" },
+                  "expectedStatusCodes": {
+                    "type": "array",
+                    "items": { "type": "integer", "minimum": 100, "maximum": 599 }
+                  },
+                  "bodyIncludes": { "type": "string" },
+                  "timeoutSeconds": { "type": "integer", "minimum": 1 },
+                  "public": { "type": "boolean" }
+                }
+              }
+            }
+          }
+        },
+        "adminTools": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": true,
+            "properties": {
+              "id": { "type": "string" },
+              "name": { "type": "string" },
+              "summary": { "type": "string" },
+              "url": { "type": "string" },
+              "icon": { "type": "string" },
+              "iconUrl": { "type": "string" },
+              "iconAlt": { "type": "string" },
+              "iconBackground": { "type": "string" },
+              "iconText": { "type": "string" },
+              "health": {
+                "type": "object",
+                "additionalProperties": true,
+                "properties": {
+                  "targetUrl": { "type": "string" },
+                  "expectedStatusCodes": {
+                    "type": "array",
+                    "items": { "type": "integer", "minimum": 100, "maximum": 599 }
+                  },
+                  "bodyIncludes": { "type": "string" },
+                  "timeoutSeconds": { "type": "integer", "minimum": 1 },
+                  "public": { "type": "boolean" }
+                }
+              },
+              "group": { "type": "string" }
+            }
           }
         }
       }

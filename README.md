@@ -10,8 +10,8 @@ around upstream components, the example overlays used for validation, and the
 release automation that publishes the OCI package.
 
 It does not own environment-specific infrastructure, live cluster operations,
-or institution-specific secret material. Those live in the downstream infra
-repository.
+institution-specific secret material, or organization-specific portal branding.
+Those live in the downstream infra repository.
 
 ## Start Here
 
@@ -73,12 +73,16 @@ The default documented model is now:
 
 - `platformHome` is the browser launchpad and the default entrypoint for human users.
 - `Keycloak` is the platform OIDC provider.
-- `LDAP/OpenLDAP` is the source of users and groups in development.
-- `Active Directory over LDAPS` is the source of users and groups in
-  production.
+- development and production both federate Keycloak to an external
+  organizational LDAP or AD source.
+- temporary `bootstrapUsers` are allowed only for local or dev browser-flow
+  validation while real directory bind details are still pending.
 - `Ranger` is the steady-state Trino authorization plane.
 - `oauth2-proxy` sits in front of Prefect and CloudBeaver so both tools can
   reuse the central Keycloak session.
+- the umbrella chart owns the reusable portal UX, live role-management UI, and
+  health aggregation API, while downstream repos own logos, fonts, favicons,
+  color palettes, and environment-specific extra tools.
 - `global.dataCatalogs.*.governance` is the chart-side governance contract used
   to stop unclassified or unapproved datasets from being exposed by accident.
 
@@ -90,8 +94,9 @@ escape hatch, not the main story.
 - The chart values contract, including identity, authorization, and governance
   metadata.
 - Trino catalog generation and Ranger bootstrap glue.
-- Keycloak, OpenLDAP, and Ranger composition for chart-managed deployments.
-- The lightweight platform launchpad and the chart-owned CloudBeaver deployment.
+- Keycloak and Ranger composition for chart-managed deployments.
+- The lightweight platform launchpad, live role-management surface, health
+  aggregation API, and the chart-owned CloudBeaver deployment.
 - Example overlays that prove local, development, and production-shaped
   installs render cleanly.
 - Documentation for the chart API and architecture.
@@ -100,6 +105,8 @@ escape hatch, not the main story.
 
 - Real production secrets.
 - Institution-specific LDAP/AD endpoint values and trust material.
+- Institution-specific portal branding, such as logos, fonts, colors, favicons,
+  and extra organization-owned admin tools.
 - Bastion workflows, kubeconfigs, Vault operations, or cluster access.
 - Dataset approval decisions, PI sign-off, DCC/DRC process, or IRB process.
 

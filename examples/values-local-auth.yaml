@@ -1,4 +1,4 @@
-# Disposable local auth overlay for kind smoke testing.
+# Disposable local auth overlay for render-oriented smoke checks.
 # These credentials are intentionally non-secret demo values and must never be
 # reused in a shared or production environment.
 global:
@@ -14,6 +14,19 @@ global:
         internalScheme: http
         loginTheme: ""
         configCliEnvExistingSecret: &keycloak_config_cli_env_secret dlh-keycloak-config-cli-env
+        bootstrapUsers:
+          - username: trino-admin
+            email: trino-admin@local.test
+            firstName: Local
+            lastName: Administrator
+            passwordEnvVar: KC_BOOTSTRAP_TRINO_ADMIN_PASSWORD
+            groups:
+              - platform-app-cloudbeaver
+              - platform-app-datahub
+              - platform-app-prefect
+              - platform-app-superset
+              - platform-app-trino
+              - platform-role-platform-admin
     external:
       oidc:
         issuer: http://dlh-keycloak.data-lakehouse-local.svc.cluster.local/realms/dlh
@@ -38,7 +51,7 @@ global:
             - http://dlh-trino.data-lakehouse-local.svc.cluster.local
           sharedSecretExistingSecret: dlh-trino-internal-communication
           sharedSecretKey: sharedSecret
-          passwordAuthEnabled: true
+          passwordAuthEnabled: false
         superset:
           enabled: false
         datahub:
@@ -63,8 +76,8 @@ global:
           webOrigins:
             - http://dlh-cloudbeaver-auth-proxy.data-lakehouse-local.svc.cluster.local
           allowedGroups:
-            - dlh-app-cloudbeaver
-            - dlh-role-platform-admin
+            - platform-app-cloudbeaver
+            - platform-role-platform-admin
           emailDomains:
             - "*"
         prefectProxy:
@@ -80,16 +93,14 @@ global:
           webOrigins:
             - http://dlh-prefect-auth-proxy.data-lakehouse-local.svc.cluster.local
           allowedGroups:
-            - dlh-app-prefect
-            - dlh-role-platform-admin
+            - platform-app-prefect
+            - platform-role-platform-admin
           emailDomains:
             - "*"
     directory:
-      mode: embeddedLdap
+      mode: externalLdap
       ldap:
-        enabled: true
-        url: ldap://dlh-openldap.data-lakehouse-local.svc.cluster.local:389
-        userBaseDn: ou=people,dc=example,dc=org
+        enabled: false
         usernameAttribute: uid
         firstNameAttribute: givenName
         lastNameAttribute: sn
@@ -97,30 +108,24 @@ global:
         uuidAttribute: entryUUID
         userObjectClasses: inetOrgPerson,organizationalPerson,person
         userSearchFilter: "(uid={0})"
-        userBindPattern: "uid=${USER},ou=people,dc=example,dc=org"
         groupNameAttribute: cn
         membershipUserAttribute: uid
         groupObjectClasses: groupOfNames
         useGroupFilter: true
-        groupBaseDn: ou=groups,dc=example,dc=org
-        groupSearchFilter: "(cn=dlh-*)"
+        groupSearchFilter: "(cn=platform-*)"
         groupSearchMemberAttribute: member
         userMemberOfAttribute: memberOf
-        bindDistinguishedName: cn=admin,dc=example,dc=org
-        bindExistingSecret: dlh-openldap-admin
-        bindPasswordKey: adminPassword
-        allowInsecure: true
     groupConventions:
-      appAccessPrefix: dlh-app-
-      rolePrefix: dlh-role-
-      dataPrefix: dlh-data-
+      appAccessPrefix: platform-app-
+      rolePrefix: platform-role-
+      dataPrefix: platform-data-
   authorization:
     platformRoles:
       platform-admin:
         description: Local administrators with full browser access and broad Trino administration rights.
         members:
           directoryGroups:
-            - dlh-role-platform-admin
+            - platform-role-platform-admin
         apps:
           superset: true
           datahub: true
@@ -131,7 +136,7 @@ global:
         description: Demo read-only users for the default catalog.
         members:
           directoryGroups:
-            - dlh-data-default-ro
+            - platform-data-default-ro
         apps:
           superset: true
           datahub: true
@@ -143,10 +148,16 @@ global:
       enabled: true
       serviceName: trino
       serviceUsername: trino
+      serviceAdminUsers:
+        - trino-admin
+        - trino-admin@local.test
       serviceAdminGroups:
-        - dlh-role-platform-admin
+        - platform-role-platform-admin
+      superUsers:
+        - trino-admin
+        - trino-admin@local.test
       superGroups:
-        - dlh-role-platform-admin
+        - platform-role-platform-admin
       useRangerGroups: false
       postgresql:
         enabled: true
@@ -159,7 +170,7 @@ global:
         adminPasswordKey: rangerAdminPassword
         usersyncPasswordKey: rangerUsersyncPassword
       usersync:
-        enabled: true
+        enabled: false
         schedule: "*/15 * * * *"
         syncSource: LDAP
       importCatalogAcls: false
@@ -368,41 +379,6 @@ keycloak:
     passwordSecretKey: adminPassword
   keycloakConfigCli:
     extraEnvVarsSecret: *keycloak_config_cli_env_secret
-
-openldap:
-  enabled: true
-  auth:
-    existingSecret: dlh-openldap-admin
-    adminPasswordKey: adminPassword
-  seed:
-    organization: Example
-    domain: example.org
-    baseDn: dc=example,dc=org
-    users:
-      - username: local-admin
-        givenName: Local
-        sn: Admin
-        mail: local-admin@example.org
-        password: local-admin-password
-        groups:
-          - dlh-role-platform-admin
-          - dlh-data-default-rw
-          - dlh-app-cloudbeaver
-          - dlh-app-prefect
-      - username: local-reader
-        givenName: Local
-        sn: Reader
-        mail: local-reader@example.org
-        password: local-reader-password
-        groups:
-          - dlh-app-cloudbeaver
-          - dlh-data-default-ro
-    groups:
-      - name: dlh-role-platform-admin
-      - name: dlh-data-default-ro
-      - name: dlh-data-default-rw
-      - name: dlh-app-cloudbeaver
-      - name: dlh-app-prefect
 
 sparkOperator:
   enabled: true

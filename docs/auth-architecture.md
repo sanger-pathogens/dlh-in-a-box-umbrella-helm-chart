@@ -12,7 +12,7 @@ Keycloak, LDAP/AD, Trino, Ranger, and Prefect fit together.
 flowchart LR
   User[User] --> Portal[platformHome]
   Portal --> Keycloak[Keycloak]
-  LDAP[OpenLDAP or Active Directory] --> Keycloak
+  LDAP[Organizational LDAP or Active Directory] --> Keycloak
   LDAP --> RangerUsersync[Ranger usersync]
   Keycloak --> Trino[Trino]
   Keycloak --> Superset[Superset]
@@ -49,8 +49,18 @@ documented architecture.
 
 | Environment | Identity source | Group source | Notes |
 | --- | --- | --- | --- |
-| Development | Bundled Keycloak | Bundled OpenLDAP | Useful for proving the full login and group flow end to end |
+| Development | Bundled Keycloak | External organizational LDAP/AD | Keeps development aligned with the real identity source instead of inventing an in-cluster directory |
 | Production | Bundled Keycloak | External AD/LDAP over LDAPS | Matches the institutional source of truth while keeping one platform OIDC issuer |
+
+Temporary bring-up exception:
+
+- in `local` or `dev`, bundled Keycloak can also seed a very small set of
+  `bootstrapUsers`
+- this is only for browser-session validation while real LDAP or AD details are
+  still pending
+- when that fallback is active, Ranger LDAP usersync must stay off and Trino
+  LDAP password auth must stay off
+- it is not allowed in `prod`
 
 ## Username And Group Alignment
 
@@ -143,7 +153,8 @@ the other components. The recommended pattern is:
 
 - put `oauth2-proxy` in front of Prefect
 - redirect login to Keycloak
-- allow access based on groups such as `dlh-app-prefect`
+- allow access based on approved application-access mappings from the platform
+  role model
 
 If you want a branded login page, customize the Keycloak theme and set
 `global.identity.provider.keycloak.loginTheme`. Do not build a custom Prefect login
@@ -165,29 +176,58 @@ flowchart LR
   TrinoPassword --> Ranger[Ranger]
 ```
 
-The launchpad hides links using Keycloak group claims such as:
+The launchpad is intentionally minimal:
 
-- `dlh-app-superset`
-- `dlh-app-datahub`
-- `dlh-app-trino`
-- `dlh-app-prefect`
-- `dlh-app-cloudbeaver`
+- anonymous users see the product name and a sign-in action, with no
+  application tiles rendered before login
+- authenticated users see grouped application cards such as `Data Access`,
+  `Analysis`, and `Workflows`
+- platform administrators see additional administration sections lower on the
+  same signed-in page
+
+The launchpad hides links using Keycloak group claims derived from the
+platform-side application-access model. The default chart convention uses
+prefixes such as `platform-app-` and `platform-role-`, but those are generated
+platform conventions, not assumptions about pre-existing LDAP or AD group names
+in an institution.
 
 The launchpad is not the security boundary. The app or Trino itself still
 enforces the real access decision.
 
-Platform administrators also get an Access Admin section in the portal. It is a
-read-only map of:
+Platform administrators get three additional sections on the same signed-in
+front page:
 
-- the Git-managed platform roles
-- their directory group mappings
-- their app entitlements
-- any declared direct-user exception grants
+- grouped governance and operations links such as Ranger Admin, Keycloak Admin,
+  Vault, Trino UI, Headlamp, and MinIO Console when configured
+- a live `Platform role management` console for assigning direct users and
+  LDAP or AD-synced groups to Git-defined platform roles through Ranger
+- a compatibility redirect from `/admin.html` back to the main front-page admin
+  section
 
-That section links to Ranger Admin when
-`global.authorization.ranger.admin.browserUrl` is configured. Ranger Admin is
-the first writable UI for data-access exceptions; it does not replace the Git
-baseline.
+The live membership editor is intentionally narrow:
+
+- Git remains the source of truth for role definitions, app entitlements,
+  nested roles, and declared exceptions
+- Ranger becomes the writable source of truth for live role memberships when
+  `global.authorization.platformRoleMembershipSource=ranger`
+- when `global.authorization.platformRoleMembershipSource=git`, the portal
+  shows the role-management surface but disables live edits so reconciliation
+  semantics remain backward-compatible
+- when Ranger usersync is unavailable, group assignment stays disabled and the
+  portal degrades honestly instead of pretending directory management is active
+
+## Browser URLs Versus In-Cluster URLs
+
+The chart now deliberately separates:
+
+- browser-facing Keycloak URLs used for redirects and OIDC issuer claims
+- in-cluster Keycloak URLs used by `oauth2-proxy` and other server-side token
+  exchange flows
+
+That split matters in development, where operators may validate the platform
+through bastion tunnels and localhost ports before final internal DNS exists.
+User-facing redirects still go to the browser host, but server-side token
+exchange stays on the cluster-local Keycloak service.
 
 ## LDAPS Trust Material
 

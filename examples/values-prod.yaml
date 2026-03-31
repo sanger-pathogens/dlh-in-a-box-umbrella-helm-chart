@@ -63,8 +63,8 @@ global:
           webOrigins:
             - https://cloudbeaver.data-platform.example.org
           allowedGroups:
-            - dlh-app-cloudbeaver
-            - dlh-role-platform-admin
+            - platform-app-cloudbeaver
+            - platform-role-platform-admin
           emailDomains:
             - example.org
           ingress:
@@ -85,8 +85,8 @@ global:
           webOrigins:
             - https://prefect.data-platform.example.org
           allowedGroups:
-            - dlh-app-prefect
-            - dlh-role-platform-admin
+            - platform-app-prefect
+            - platform-role-platform-admin
           emailDomains:
             - "*"
     directory:
@@ -108,26 +108,26 @@ global:
         groupObjectClasses: group
         useGroupFilter: true
         groupBaseDn: OU=Groups,DC=example,DC=org
-        groupSearchFilter: "(cn=dlh-*)"
+        groupSearchFilter: "(cn=platform-*)"
         groupSearchMemberAttribute: member
         userMemberOfAttribute: memberOf
-        bindDistinguishedName: CN=svc-dlh-keycloak,OU=Service Accounts,DC=example,DC=org
+        bindDistinguishedName: CN=svc-platform-keycloak,OU=Service Accounts,DC=example,DC=org
         bindExistingSecret: dlh-ad-bind
         bindPasswordKey: bindPassword
         trustedCaExistingSecret: dlh-ad-ca
         trustedCaCertKey: ca.crt
         allowInsecure: false
     groupConventions:
-      appAccessPrefix: dlh-app-
-      rolePrefix: dlh-role-
-      dataPrefix: dlh-data-
+      appAccessPrefix: platform-app-
+      rolePrefix: platform-role-
+      dataPrefix: platform-data-
   authorization:
     platformRoles:
       platform-admin:
         description: Platform administrators with full browser access and broad Trino administration rights.
         members:
           directoryGroups:
-            - dlh-role-platform-admin
+            - platform-role-platform-admin
         apps:
           superset: true
           datahub: true
@@ -138,7 +138,7 @@ global:
         description: Read-only analysts for approved REDCap data.
         members:
           directoryGroups:
-            - dlh-data-redcap-ro
+            - platform-data-redcap-ro
         apps:
           superset: true
           datahub: true
@@ -151,9 +151,9 @@ global:
       serviceName: trino
       serviceUsername: trino
       serviceAdminGroups:
-        - dlh-role-platform-admin
+        - platform-role-platform-admin
       superGroups:
-        - dlh-role-platform-admin
+        - platform-role-platform-admin
       useRangerGroups: false
       postgresql:
         enabled: true
@@ -171,8 +171,8 @@ global:
         syncSource: LDAP
       importCatalogAcls: false
       bootstrapPolicies:
-        - name: trino-redcap-read
-          description: Allow approved analyst roles to query the redcap catalog.
+        - name: trino-redcap-access
+          description: Allow approved analyst roles to read the redcap catalog and platform administrators to manage it.
           resources:
             catalog: redcap
             schema: "*"
@@ -194,14 +194,6 @@ global:
                   isAllowed: true
               conditions: []
               delegateAdmin: false
-        - name: trino-redcap-write
-          description: Allow the platform administrator role to manage the redcap catalog.
-          resources:
-            catalog: redcap
-            schema: "*"
-            table: "*"
-            column: "*"
-          policyItems:
             - groups: []
               users: []
               roles:

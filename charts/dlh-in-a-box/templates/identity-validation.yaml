@@ -7,11 +7,14 @@
 {{- $ldap := get $directory "ldap" | default dict -}}
 {{- $external := get $identity "external" | default dict -}}
 {{- $clients := get $external "clients" | default dict -}}
+{{- $trinoIdentity := get $clients "trino" | default dict -}}
 {{- $supersetIdentity := get $clients "superset" | default dict -}}
 {{- $datahubIdentity := get $clients "datahub" | default dict -}}
 {{- $platformHomeIdentity := get $clients "platformHome" | default dict -}}
 {{- $cloudbeaverIdentity := get $clients "cloudbeaverProxy" | default dict -}}
 {{- $prefectIdentity := get $clients "prefectProxy" | default dict -}}
+{{- $authorization := $global.authorization | default dict -}}
+{{- $ranger := get $authorization "ranger" | default dict -}}
 {{- $datahubValues := .Values.datahub | default dict -}}
 {{- $datahubFrontend := get $datahubValues "datahub-frontend" | default dict -}}
 {{- $datahubFrontendIngress := get $datahubFrontend "ingress" | default dict -}}
@@ -32,10 +35,13 @@
 {{- $ldapUrl := default "" $ldap.url -}}
 {{- $ldapUsesLdaps := hasPrefix "ldaps://" $ldapUrl -}}
 {{- $trustedCaSecretName := include "dlh-in-a-box.identity.directory.trustedCaSecretName" . -}}
+{{- $ldapUsesSystemTrustStore := default false $ldap.useSystemTrustStore -}}
 {{- $keycloakValues := .Values.keycloak | default dict -}}
 {{- $keycloakConfigCli := get $keycloakValues "keycloakConfigCli" | default dict -}}
 {{- $keycloakProvider := get $provider "keycloak" | default dict -}}
 {{- $configCliEnvSecretName := default "" $keycloakProvider.configCliEnvExistingSecret -}}
+{{- $bootstrapUsers := default (list) $keycloakProvider.bootstrapUsers -}}
+{{- $bootstrapUsersEnabled := gt (len $bootstrapUsers) 0 -}}
 {{- $hasSupersetOauthClientId := false -}}
 {{- $hasSupersetOauthClientSecret := false -}}
 
@@ -47,6 +53,20 @@
 {{- end -}}
 {{- if and (default false $identity.enabled) (or (not $hasEnvironment) (not (has $environment (list "local" "dev" "prod")))) -}}
 {{- fail "global.environment must be set to local, dev, or prod when shared identity is enabled." -}}
+{{- end -}}
+{{- if and $bootstrapUsersEnabled (ne $providerMode "bundledKeycloak") -}}
+{{- fail "global.identity.provider.keycloak.bootstrapUsers requires global.identity.provider.mode=bundledKeycloak." -}}
+{{- end -}}
+{{- if and $bootstrapUsersEnabled (eq $environment "prod") -}}
+{{- fail "global.identity.provider.keycloak.bootstrapUsers is a dev/local-only fallback and must not be enabled in prod." -}}
+{{- end -}}
+{{- range $index, $user := $bootstrapUsers -}}
+  {{- if not (get $user "username") -}}
+    {{- fail (printf "global.identity.provider.keycloak.bootstrapUsers[%d].username is required." $index) -}}
+  {{- end -}}
+  {{- if not (get $user "passwordEnvVar") -}}
+    {{- fail (printf "global.identity.provider.keycloak.bootstrapUsers[%d].passwordEnvVar is required." $index) -}}
+  {{- end -}}
 {{- end -}}
 
 {{- range $env := $supersetExtraEnvRaw -}}
@@ -73,13 +93,37 @@
 {{- if and (default false $identity.enabled) (eq $providerMode "bundledKeycloak") (not (get $keycloakConfigCli "enabled")) -}}
 {{- fail "Bundled Keycloak requires keycloak.keycloakConfigCli.enabled=true so the realm and LDAP federation can be bootstrapped." -}}
 {{- end -}}
+{{- if and (default false $identity.enabled) (not (default false $ldap.enabled)) (not $bootstrapUsersEnabled) -}}
+{{- fail "global.identity.directory.ldap.enabled must be true when shared identity is enabled, unless you are using bundled Keycloak bootstrapUsers for a local or dev-only browser-auth fallback." -}}
+{{- end -}}
+{{- if and (default false $identity.enabled) (default false $ldap.enabled) (not $ldapUrl) -}}
+{{- fail "global.identity.directory.ldap.url is required when shared identity is enabled." -}}
+{{- end -}}
+{{- if and (default false $identity.enabled) (default false $ldap.enabled) (not (include "dlh-in-a-box.identity.directory.userBaseDn" .)) -}}
+{{- fail "global.identity.directory.ldap.userBaseDn is required when shared identity is enabled." -}}
+{{- end -}}
+{{- if and (default false $identity.enabled) (default false $ldap.enabled) (not (include "dlh-in-a-box.identity.directory.groupBaseDn" .)) -}}
+{{- fail "global.identity.directory.ldap.groupBaseDn is required when shared identity is enabled." -}}
+{{- end -}}
+{{- if and (default false $identity.enabled) (default false $ldap.enabled) (not (include "dlh-in-a-box.identity.directory.bindDn" .)) -}}
+{{- fail "global.identity.directory.ldap.bindDistinguishedName is required when shared identity is enabled." -}}
+{{- end -}}
+{{- if and (default false $identity.enabled) (default false $ldap.enabled) (not (include "dlh-in-a-box.identity.directory.bindSecretName" .)) -}}
+{{- fail "global.identity.directory.ldap.bindExistingSecret is required when shared identity is enabled." -}}
+{{- end -}}
+{{- if and $bootstrapUsersEnabled (not (default false $ldap.enabled)) (default false $trinoIdentity.passwordAuthEnabled) -}}
+{{- fail "global.identity.external.clients.trino.passwordAuthEnabled must be false when using bundled Keycloak bootstrapUsers without an organizational LDAP connection." -}}
+{{- end -}}
+{{- if and $bootstrapUsersEnabled (not (default false $ldap.enabled)) (default false $ranger.enabled) (dig "usersync" "enabled" true $ranger) -}}
+{{- fail "global.authorization.ranger.usersync.enabled must be false when using bundled Keycloak bootstrapUsers without an organizational LDAP connection." -}}
+{{- end -}}
 {{- if and (default false $identity.enabled) (eq $providerMode "bundledKeycloak") (not $configCliEnvSecretName) -}}
 {{- fail "global.identity.provider.keycloak.configCliEnvExistingSecret is required when bundled Keycloak is enabled." -}}
 {{- end -}}
 {{- if and (default false $identity.enabled) (eq $providerMode "bundledKeycloak") (ne (default "" (get $keycloakConfigCli "extraEnvVarsSecret")) $configCliEnvSecretName) -}}
 {{- fail "keycloak.keycloakConfigCli.extraEnvVarsSecret must match global.identity.provider.keycloak.configCliEnvExistingSecret." -}}
 {{- end -}}
-{{- range $clientName := list "trino" "superset" "datahub" "platformHome" "cloudbeaverProxy" "prefectProxy" -}}
+{{- range $clientName := list "trino" "superset" "datahub" "platformHome" "minio" "vault" "headlamp" "cloudbeaverProxy" "prefectProxy" -}}
   {{- $client := get $clients $clientName | default dict -}}
   {{- if and (eq $providerMode "bundledKeycloak") (default false (get $client "enabled")) -}}
     {{- $redirectUris := get $client "redirectUris" | default list -}}
@@ -116,12 +160,6 @@
 {{- if and (get $datahubIdentity "enabled") (not .Values.datahub.enabled) -}}
 {{- fail "global.identity.external.clients.datahub.enabled requires datahub.enabled=true." -}}
 {{- end -}}
-{{- if and (get $datahubIdentity "enabled") (not (get $datahubFrontendIngress "enabled")) -}}
-{{- fail "datahub.datahub-frontend.ingress.enabled must be true when DataHub OIDC is enabled through the shared identity contract." -}}
-{{- end -}}
-{{- if and (get $datahubIdentity "enabled") (eq (len (get $datahubFrontendIngress "hosts" | default list)) 0) -}}
-{{- fail "datahub.datahub-frontend.ingress.hosts must contain at least one host when DataHub OIDC is enabled." -}}
-{{- end -}}
 {{- if and (get $datahubIdentity "enabled") (not (get $datahubOidc "enabled")) -}}
 {{- fail "datahub.datahub-frontend.oidcAuthentication.enabled must be true when global.identity.external.clients.datahub.enabled=true." -}}
 {{- end -}}
@@ -139,12 +177,6 @@
 {{- end -}}
 {{- if and .Values.platformHome.enabled (not (get $platformHomeIdentity "enabled")) -}}
 {{- fail "platformHome.enabled requires global.identity.external.clients.platformHome.enabled=true." -}}
-{{- end -}}
-{{- if and .Values.platformHome.enabled (ne $environment "local") (not (get $platformHomeIngress "enabled")) -}}
-{{- fail "platformHome.ingress.enabled must be true in dev and prod so the launchpad has a stable browser URL." -}}
-{{- end -}}
-{{- if and .Values.platformHome.enabled (ne $environment "local") (not (get $platformHomeIngress "host")) -}}
-{{- fail "platformHome.ingress.host is required when platformHome is enabled in dev or prod." -}}
 {{- end -}}
 {{- if and .Values.platformHome.enabled (get $platformHomeIngress "enabled") (get $platformHomeIngress "host") -}}
   {{- $platformHomeOrigin := printf "%s://%s" (ternary "https" "http" (ne (default "" (get $platformHomeIngress "tlsSecretName")) "")) (get $platformHomeIngress "host") -}}
@@ -195,12 +227,6 @@
 {{- if and (get $cloudbeaverIdentity "enabled") (ne $environment "local") (has "*" (get $cloudbeaverIdentity "allowedGroups" | default list)) -}}
 {{- fail "global.identity.external.clients.cloudbeaverProxy.allowedGroups must not contain wildcard values outside local environments." -}}
 {{- end -}}
-{{- if and (get $cloudbeaverIdentity "enabled") (ne $environment "local") (not (get (get $cloudbeaverIdentity "ingress" | default dict) "enabled")) -}}
-{{- fail "global.identity.external.clients.cloudbeaverProxy.ingress.enabled must be true in dev and prod so CloudBeaver has a stable browser URL." -}}
-{{- end -}}
-{{- if and (get $cloudbeaverIdentity "enabled") (ne $environment "local") (not (get (get $cloudbeaverIdentity "ingress" | default dict) "host")) -}}
-{{- fail "global.identity.external.clients.cloudbeaverProxy.ingress.host is required in dev and prod." -}}
-{{- end -}}
 {{- if and (get $cloudbeaverIdentity "enabled") (get $cloudbeaverAuthProxyIngress "enabled") (gt (len (get $cloudbeaverAuthProxyIngress "hosts" | default list)) 0) -}}
   {{- $cloudbeaverOrigin := printf "%s://%s" (ternary "https" "http" (gt (len (get $cloudbeaverAuthProxyIngress "tls" | default list)) 0)) (index (get $cloudbeaverAuthProxyIngress "hosts") 0) -}}
   {{- if not (has $cloudbeaverOrigin (get $cloudbeaverIdentity "webOrigins" | default list)) -}}
@@ -248,12 +274,12 @@
     {{- fail "global.identity.external.clients.prefectProxy.redirectUrl must match the Prefect auth-proxy ingress callback URL." -}}
   {{- end -}}
 {{- end -}}
-{{- if and $ldapUsesLdaps (not (default false $ldap.allowInsecure)) (not $trustedCaSecretName) -}}
-{{- fail "global.identity.directory.ldap.trustedCaExistingSecret is required when using LDAPS with allowInsecure=false so Trino and Ranger can validate the directory certificate chain." -}}
+{{- if and (default false $ldap.enabled) $ldapUsesLdaps (not (default false $ldap.allowInsecure)) (not $trustedCaSecretName) (not $ldapUsesSystemTrustStore) -}}
+{{- fail "When using LDAPS with allowInsecure=false, set either global.identity.directory.ldap.trustedCaExistingSecret or global.identity.directory.ldap.useSystemTrustStore=true so Trino and Ranger can validate the directory certificate chain." -}}
 {{- end -}}
-{{- if and (eq $providerMode "bundledKeycloak") $ldapUsesLdaps (not (default false $ldap.allowInsecure)) (not .Values.keycloak.trustedCertsExistingSecret) -}}
-{{- fail "keycloak.trustedCertsExistingSecret must be set when bundled Keycloak federates to LDAPS." -}}
+{{- if and (eq $providerMode "bundledKeycloak") (default false $ldap.enabled) $ldapUsesLdaps (not (default false $ldap.allowInsecure)) (not .Values.keycloak.trustedCertsExistingSecret) (not $ldapUsesSystemTrustStore) -}}
+{{- fail "When bundled Keycloak federates to LDAPS, set keycloak.trustedCertsExistingSecret or global.identity.directory.ldap.useSystemTrustStore=true." -}}
 {{- end -}}
-{{- if and (eq $providerMode "bundledKeycloak") $ldapUsesLdaps (not (default false $ldap.allowInsecure)) .Values.keycloak.trustedCertsExistingSecret $trustedCaSecretName (ne .Values.keycloak.trustedCertsExistingSecret $trustedCaSecretName) -}}
+{{- if and (eq $providerMode "bundledKeycloak") (default false $ldap.enabled) $ldapUsesLdaps (not (default false $ldap.allowInsecure)) (not $ldapUsesSystemTrustStore) .Values.keycloak.trustedCertsExistingSecret $trustedCaSecretName (ne .Values.keycloak.trustedCertsExistingSecret $trustedCaSecretName) -}}
 {{- fail "keycloak.trustedCertsExistingSecret must match global.identity.directory.ldap.trustedCaExistingSecret so Keycloak, Trino, and Ranger validate the same LDAP/AD CA." -}}
 {{- end -}}

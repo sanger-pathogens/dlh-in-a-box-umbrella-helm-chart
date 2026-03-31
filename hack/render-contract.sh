@@ -69,22 +69,33 @@ expect_fail() {
 }
 
 echo "--- Positive contract renders"
+default_manifest="$(render_manifest)"
 local_manifest="$(render_manifest -f examples/values-local-auth.yaml)"
 dev_manifest="$(render_manifest -f examples/values-dev.yaml)"
 prod_manifest="$(render_manifest -f examples/values-prod.yaml)"
 shared_manifest="$(render_manifest -f examples/values-shared-auth.yaml)"
 
+assert_not_contains "${default_manifest}" "{{"
 assert_not_contains "${local_manifest}" "{{"
 assert_not_contains "${dev_manifest}" "{{"
 assert_not_contains "${prod_manifest}" "{{"
 assert_not_contains "${shared_manifest}" "{{"
 
-assert_contains "${local_manifest}" "name: dlh-openldap"
+assert_not_contains "${default_manifest}" "icddr,b"
+assert_not_contains "${default_manifest}" "icddrb.org"
+assert_not_contains "${default_manifest}" "background_logo"
+assert_not_contains "${default_manifest}" "FSLolaWeb"
+assert_not_contains "${default_manifest}" "SourceSansPro"
 assert_contains "${local_manifest}" "name: dlh-ranger-admin"
 assert_contains "${local_manifest}" "name: dlh-ranger-admin-exception-audit"
 assert_contains "${local_manifest}" "name: dlh-platform-home"
-assert_contains "${local_manifest}" "Access Admin"
+assert_contains "${local_manifest}" "Administration"
 assert_contains "${local_manifest}" "name: dlh-cloudbeaver"
+assert_contains "${local_manifest}" 'username: "trino-admin"'
+assert_contains "${local_manifest}" "KC_BOOTSTRAP_TRINO_ADMIN_PASSWORD"
+assert_not_contains "${local_manifest}" "ldap-directory"
+assert_not_contains "${local_manifest}" "access-control.name=ranger"
+assert_contains "${local_manifest}" "access-control.name=file"
 assert_contains "${dev_manifest}" "name: dlh-keycloak-config-cli-env"
 assert_contains "${prod_manifest}" "name: dlh-keycloak-config-cli-env"
 assert_contains "${prod_manifest}" "name: dlh-ranger-postgresql"
@@ -94,14 +105,20 @@ assert_contains "${dev_manifest}" "KC_CLOUDBEAVER_CLIENT_SECRET"
 assert_contains "${prod_manifest}" "KC_CLOUDBEAVER_CLIENT_SECRET"
 assert_contains "${dev_manifest}" "https://portal.dev.example.org/"
 assert_contains "${prod_manifest}" "https://portal.data-platform.example.org/"
-assert_contains "${dev_manifest}" "Access Admin"
-assert_contains "${prod_manifest}" "Access Admin"
+assert_contains "${dev_manifest}" "Administration"
+assert_contains "${prod_manifest}" "Administration"
+assert_not_contains "${dev_manifest}" "Unified access to approved platform tools"
+assert_not_contains "${prod_manifest}" "Unified access to approved platform tools"
+assert_not_contains "${dev_manifest}" "How access works"
+assert_not_contains "${prod_manifest}" "How access works"
+assert_not_contains "${dev_manifest}" "Query sessions still use your Trino credentials."
+assert_not_contains "${prod_manifest}" "Query sessions still use your Trino credentials."
 assert_contains "${dev_manifest}" "https://ranger.dev.example.org"
 assert_contains "${prod_manifest}" "https://ranger.data-platform.example.org"
 assert_contains "${dev_manifest}" "https://cloudbeaver.dev.example.org/oauth2/callback"
 assert_contains "${prod_manifest}" "https://cloudbeaver.data-platform.example.org/oauth2/callback"
 assert_contains "${shared_manifest}" "https://cloudbeaver.shared.example.org/oauth2/callback"
-assert_contains "${dev_manifest}" "https://127.0.0.1:28443/oauth2/callback"
+assert_contains "${dev_manifest}" "https://trino.dev.example.org/oauth2/callback"
 assert_contains "${prod_manifest}" "https://trino.data-platform.example.org/oauth2/callback"
 assert_contains "${prod_manifest}" "https://trino.data-platform.example.org"
 assert_contains "${prod_manifest}" "https://prefect.data-platform.example.org/oauth2/callback"
@@ -110,10 +127,13 @@ assert_contains "${dev_manifest}" "http-server.authentication.type=OAUTH2,PASSWO
 assert_contains "${prod_manifest}" "http-server.authentication.type=OAUTH2,PASSWORD"
 assert_contains "${dev_manifest}" "access-control.name=ranger"
 assert_contains "${prod_manifest}" "access-control.name=ranger"
-assert_contains "${dev_manifest}" 'allowed_groups = [\"dlh-app-prefect\", \"dlh-role-platform-admin\"]'
-assert_contains "${prod_manifest}" 'allowed_groups = [\"dlh-app-prefect\", \"dlh-role-platform-admin\"]'
-assert_contains "${dev_manifest}" 'allowed_groups = [\"dlh-app-cloudbeaver\", \"dlh-role-platform-admin\"]'
-assert_contains "${prod_manifest}" 'allowed_groups = [\"dlh-app-cloudbeaver\", \"dlh-role-platform-admin\"]'
+assert_contains "${dev_manifest}" 'allowed_groups = [\"platform-app-prefect\", \"platform-role-platform-admin\"]'
+assert_contains "${prod_manifest}" 'allowed_groups = [\"platform-app-prefect\", \"platform-role-platform-admin\"]'
+assert_contains "${dev_manifest}" 'allowed_groups = [\"platform-app-cloudbeaver\", \"platform-role-platform-admin\"]'
+assert_contains "${prod_manifest}" 'allowed_groups = [\"platform-app-cloudbeaver\", \"platform-role-platform-admin\"]'
+assert_contains "${dev_manifest}" 'skip_oidc_discovery = true'
+assert_contains "${dev_manifest}" 'redeem_url = \"http://dlh-keycloak.data-lakehouse.svc.cluster.local/realms/dlh/protocol/openid-connect/token\"'
+assert_contains "${prod_manifest}" 'redeem_url = \"http://dlh-keycloak.data-lakehouse.svc.cluster.local/realms/dlh/protocol/openid-connect/token\"'
 assert_contains "${dev_manifest}" "\"platformRoles\": {"
 assert_contains "${dev_manifest}" "\"redcap-readonly-analyst\""
 assert_contains "${dev_manifest}" "\"redcap-site-analyst\""
@@ -166,6 +186,21 @@ expect_fail \
   "global.identity.provider.keycloak.configCliEnvExistingSecret is required when bundled Keycloak is enabled." \
   -f examples/values-dev.yaml \
   -f "${FIXTURE_DIR}/missing-config-cli-secret.yaml"
+
+expect_fail \
+  "global.identity.directory.ldap.url is required when Trino identity integration is enabled." \
+  -f examples/values-dev.yaml \
+  -f "${FIXTURE_DIR}/missing-directory-url.yaml"
+
+expect_fail \
+  "global.identity.directory.ldap.enabled must be true when Trino PASSWORD auth is enabled through the shared identity contract." \
+  -f examples/values-local-auth.yaml \
+  -f "${FIXTURE_DIR}/bootstrap-password-auth-without-ldap.yaml"
+
+expect_fail \
+  "global.authorization.ranger.usersync.enabled must be false when using bundled Keycloak bootstrapUsers without an organizational LDAP connection." \
+  -f examples/values-local-auth.yaml \
+  -f "${FIXTURE_DIR}/bootstrap-usersync-without-ldap.yaml"
 
 expect_fail \
   "global.environment must be one of the following: \"local\", \"dev\", \"prod\"" \

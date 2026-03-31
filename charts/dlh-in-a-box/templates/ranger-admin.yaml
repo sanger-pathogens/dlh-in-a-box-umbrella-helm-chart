@@ -16,8 +16,11 @@ metadata:
 data:
   install.properties.tmpl: |
     PYTHON_COMMAND_INVOKER=python3
+    LOGFILE=/var/log/ranger/ranger-admin-setup.log
     RANGER_ADMIN_LOG_DIR=/var/log/ranger
+    RANGER_ADMIN_LOGBACK_CONF_FILE=/opt/ranger/admin/ews/webapp/WEB-INF/classes/conf/logback.xml
     RANGER_PID_DIR_PATH=/var/run/ranger
+    app_home=/opt/ranger/admin/ews/webapp
     DB_FLAVOR=POSTGRES
     SQL_CONNECTOR_JAR=/usr/share/java/postgresql.jar
     db_root_user=postgres
@@ -29,24 +32,67 @@ data:
     audit_db_name=${RANGER_DB_NAME}
     audit_db_user=${RANGER_DB_USERNAME}
     audit_db_password=${RANGER_DB_PASSWORD}
+    mysql_core_file=db/mysql/optimized/current/ranger_core_db_mysql.sql
+    oracle_core_file=db/oracle/optimized/current/ranger_core_db_oracle.sql
     postgres_core_file=db/postgres/optimized/current/ranger_core_db_postgres.sql
+    sqlserver_core_file=db/sqlserver/optimized/current/ranger_core_db_sqlserver.sql
+    sqlanywhere_core_file=db/sqlanywhere/optimized/current/ranger_core_db_sqlanywhere.sql
     postgres_audit_file=db/postgres/xa_audit_db_postgres.sql
     rangerAdmin_password=${RANGER_ADMIN_PASSWORD}
-    rangerTagsync_password=${RANGER_USERSYNC_PASSWORD}
-    rangerUsersync_password=${RANGER_USERSYNC_PASSWORD}
-    keyadmin_password=${RANGER_ADMIN_PASSWORD}
+    rangerTagsync_password=rangertagsync
+    rangerUsersync_password=rangerusersync
+    keyadmin_password=keyadmin
+    JAVA_VERSION_REQUIRED=1.8
     audit_store=db
     policymgr_external_url=${RANGER_POLICYMGR_EXTERNAL_URL}
     policymgr_http_enabled=true
-    policymgr_supportedcomponents=trino
+    policymgr_supportedcomponents=tag,trino
     unix_user=ranger
     unix_user_pwd=ranger
     unix_group=ranger
     authentication_method=NONE
+    remoteLoginEnabled=true
+    authServiceHostName=localhost
+    authServicePort=5151
+    token_valid=30
+    cookie_domain=
+    cookie_path=/
+    admin_principal=
+    admin_keytab=
+    lookup_principal=
+    lookup_keytab=
+    audit_jaas_client_loginModuleName=
+    audit_jaas_client_loginModuleControlFlag=
+    audit_jaas_client_option_useKeyTab=
+    audit_jaas_client_option_storeKey=
+    audit_jaas_client_option_useTicketCache=
+    audit_jaas_client_option_serviceName=
+    audit_jaas_client_option_keyTab=
+    audit_jaas_client_option_principal=
+    hadoop_conf=/etc/hadoop/conf
+    sso_enabled=false
+    sso_providerurl=
+    sso_publickey=
     cred_keystore_filename=
   ranger-admin-start.sh: |
     #!/bin/bash
     set -euo pipefail
+
+    find_ranger_admin_pid() {
+      ps -ef \
+        | grep -v grep \
+        | grep -E 'org\.apache\.ranger\.server\.tomcat\.EmbeddedServer|org\.apache\.catalina\.startup\.Bootstrap' \
+        | awk '{print $2}' \
+        | head -n1
+    }
+
+    dump_ranger_logs() {
+      shopt -s nullglob
+      for log_file in /var/log/ranger/*; do
+        echo "==== ${log_file} ===="
+        cat "${log_file}" || true
+      done
+    }
 
     python3 - <<'PY'
     import os
@@ -73,6 +119,9 @@ data:
     pathlib.Path("/opt/ranger/admin/install.properties").write_text(rendered)
     PY
 
+    mkdir -p /var/log/ranger /var/run/ranger
+    export LOGFILE=/var/log/ranger/ranger-admin-setup.log
+
     if [ ! -e /opt/ranger/.setupDone ]; then
       cd /opt/ranger/admin
       ./setup.sh
@@ -80,15 +129,28 @@ data:
     fi
 
     cd /opt/ranger/admin && ./ews/ranger-admin-services.sh start
-    sleep 5
-    RANGER_ADMIN_PID="$(ps -ef | grep -v grep | grep -i 'org.apache.ranger.server.tomcat.EmbeddedServer' | awk '{print $2}' | head -n1)"
+    RANGER_ADMIN_PID=""
+    for _ in {1..24}; do
+      RANGER_ADMIN_PID="$(find_ranger_admin_pid)"
+      if [ -n "${RANGER_ADMIN_PID}" ]; then
+        break
+      fi
+      sleep 5
+    done
 
     if [ -z "${RANGER_ADMIN_PID}" ]; then
       echo "Ranger Admin process did not stay up" >&2
+      dump_ranger_logs
       exit 1
     fi
 
-    tail --pid="${RANGER_ADMIN_PID}" -f /dev/null
+    while kill -0 "${RANGER_ADMIN_PID}" >/dev/null 2>&1; do
+      sleep 5
+    done
+
+    echo "Ranger Admin process exited unexpectedly" >&2
+    dump_ranger_logs
+    exit 1
 ---
 apiVersion: v1
 kind: Service
@@ -135,6 +197,9 @@ spec:
         - name: ranger-admin
           image: "{{ $ranger.admin.image.repository }}:{{ $ranger.admin.image.tag }}"
           imagePullPolicy: {{ $ranger.admin.image.pullPolicy }}
+          securityContext:
+            runAsUser: 0
+            runAsGroup: 0
           command:
             - /bin/bash
             - /opt/ranger/bootstrap/ranger-admin-start.sh
@@ -162,28 +227,27 @@ spec:
                 secretKeyRef:
                   name: {{ $ranger.admin.existingSecret }}
                   key: {{ default "rangerAdminPassword" $ranger.admin.adminPasswordKey }}
-            - name: RANGER_USERSYNC_PASSWORD
-              valueFrom:
-                secretKeyRef:
-                  name: {{ $ranger.admin.existingSecret }}
-                  key: {{ default "rangerUsersyncPassword" $ranger.admin.usersyncPasswordKey }}
             - name: RANGER_POLICYMGR_EXTERNAL_URL
               value: {{ include "dlh-in-a-box.ranger.admin.url" . | quote }}
           ports:
             - name: http
               containerPort: 6080
               protocol: TCP
+          startupProbe:
+            httpGet:
+              path: /login.jsp
+              port: http
+            periodSeconds: 10
+            failureThreshold: 60
           readinessProbe:
             httpGet:
               path: /login.jsp
               port: http
-            initialDelaySeconds: 45
             periodSeconds: 10
           livenessProbe:
             httpGet:
               path: /login.jsp
               port: http
-            initialDelaySeconds: 90
             periodSeconds: 20
           volumeMounts:
             - name: bootstrap

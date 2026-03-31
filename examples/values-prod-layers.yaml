@@ -14,7 +14,7 @@ global:
         description: Approved read-write users for the bronze catalog.
         members:
           directoryGroups:
-            - dlh-data-bronze-rw
+            - platform-data-bronze-rw
       silver-reader:
         description: Approved read-only users for the silver catalog.
         members:
@@ -25,7 +25,7 @@ global:
         description: Approved read-write users for the silver catalog.
         members:
           directoryGroups:
-            - dlh-data-silver-rw
+            - platform-data-silver-rw
       geospatial-reader:
         description: Approved read-only users for the geospatial catalog.
         members:
@@ -36,7 +36,7 @@ global:
         description: Approved read-write users for the geospatial catalog.
         members:
           directoryGroups:
-            - dlh-data-geospatial-rw
+            - platform-data-geospatial-rw
     platformRoleExceptions: []
     ranger:
       enabled: true

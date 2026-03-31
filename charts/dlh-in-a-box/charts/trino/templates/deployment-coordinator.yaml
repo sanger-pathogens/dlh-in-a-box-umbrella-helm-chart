@@ -14,12 +14,16 @@ through environment variables.
 {{- $authorization := get .Values.global "authorization" | default (dict) -}}
 {{- $ranger := get $authorization "ranger" | default (dict) -}}
 {{- $identityEnabled := and (default false $identity.enabled) (default false $trinoIdentity.enabled) -}}
-{{- $ldapEnabled := and $identityEnabled (or (default false $ldap.enabled) (eq (default "externalLdap" $directory.mode) "embeddedLdap")) -}}
-{{- $ldapAllowInsecure := or (eq (default "externalLdap" $directory.mode) "embeddedLdap") (default false $ldap.allowInsecure) -}}
+{{- $ldapEnabled := and $identityEnabled (default false $ldap.enabled) -}}
+{{- $ldapAllowInsecure := default false $ldap.allowInsecure -}}
 {{- $ldapTrustedCaSecretName := include "dlh-in-a-box.identity.directory.trustedCaSecretName" . -}}
 {{- $ldapTrustedCaCertKey := include "dlh-in-a-box.identity.directory.trustedCaCertKey" . -}}
 {{- $mountTrustedLdapCa := and $ldapEnabled (not $ldapAllowInsecure) $ldapTrustedCaSecretName -}}
 {{- $rangerEnabled := default false $ranger.enabled -}}
+{{- $keycloakProvider := get (get $identity "provider" | default (dict)) "keycloak" | default (dict) -}}
+{{- $bootstrapUsersEnabled := gt (len (default (list) $keycloakProvider.bootstrapUsers)) 0 -}}
+{{- $bootstrapOnlyMode := and $bootstrapUsersEnabled (not $ldapEnabled) -}}
+{{- $rangerTrinoEnabled := and $rangerEnabled (not $bootstrapOnlyMode) -}}
 {{- $legacyPasswordAuthRequested := contains "PASSWORD" (default "" .Values.server.config.authenticationType) -}}
 {{- $passwordAuthRequested := or (default false $trinoIdentity.passwordAuthEnabled) $legacyPasswordAuthRequested -}}
 {{- $filePasswordAuthConfigured := or .Values.auth.passwordAuth .Values.auth.passwordAuthSecret -}}
@@ -52,7 +56,7 @@ spec:
   template:
     metadata:
       annotations:
-        {{- if and (not $rangerEnabled) (eq .Values.accessControl.type "configmap") (not .Values.accessControl.refreshPeriod) }}
+        {{- if and (not $rangerTrinoEnabled) (eq .Values.accessControl.type "configmap") (not .Values.accessControl.refreshPeriod) }}
         checksum/access-control-config: {{ include (print $.Template.BasePath "/configmap-access-control-coordinator.yaml") . | sha256sum }}
         {{- end }}
         {{- if or .Values.global.dataCatalogs .Values.catalogs .Values.additionalCatalogs }}
@@ -91,7 +95,7 @@ spec:
         - name: schemas-volume
           configMap:
             name: {{ template "trino.fullname" . }}-schemas-volume-coordinator
-        {{- if and (not $rangerEnabled) (eq .Values.accessControl.type "configmap") }}
+        {{- if and (not $rangerTrinoEnabled) (eq .Values.accessControl.type "configmap") }}
         - name: access-control-volume
           configMap:
             name: {{ template "trino.fullname" . }}-access-control-volume-coordinator
@@ -206,7 +210,7 @@ spec:
             {{- end }}
             - mountPath: {{ .Values.kafka.mountPath }}
               name: schemas-volume
-            {{- if and (not $rangerEnabled) (eq .Values.accessControl.type "configmap") }}
+            {{- if and (not $rangerTrinoEnabled) (eq .Values.accessControl.type "configmap") }}
             - mountPath: {{ .Values.server.config.path }}/access-control
               name: access-control-volume
             {{- end }}

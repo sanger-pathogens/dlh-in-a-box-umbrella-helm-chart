@@ -44,6 +44,10 @@ app.kubernetes.io/managed-by: {{ .Release.Service }}
 {{- printf "%s://%s.%s.svc.cluster.local" $scheme (include "dlh-in-a-box.keycloak.serviceName" .) .Release.Namespace -}}
 {{- end -}}
 
+{{- define "dlh-in-a-box.keycloak.internalRealmBaseUrl" -}}
+{{- printf "%s/realms/%s" (include "dlh-in-a-box.keycloak.internalBaseUrl" .) (include "dlh-in-a-box.keycloak.realm" .) -}}
+{{- end -}}
+
 {{- define "dlh-in-a-box.keycloak.browserBaseUrl" -}}
 {{- $identity := .Values.global.identity | default dict -}}
 {{- $provider := get $identity "provider" | default dict -}}
@@ -77,6 +81,17 @@ app.kubernetes.io/managed-by: {{ .Release.Service }}
 {{- end -}}
 {{- end -}}
 
+{{- define "dlh-in-a-box.identity.internalIssuer" -}}
+{{- $identity := .Values.global.identity | default dict -}}
+{{- $provider := get $identity "provider" | default dict -}}
+{{- $providerMode := default "externalOidc" $provider.mode -}}
+{{- if eq $providerMode "bundledKeycloak" -}}
+{{- include "dlh-in-a-box.keycloak.internalRealmBaseUrl" . -}}
+{{- else -}}
+{{- include "dlh-in-a-box.identity.issuer" . -}}
+{{- end -}}
+{{- end -}}
+
 {{- define "dlh-in-a-box.identity.authorizeUrl" -}}
 {{- $identity := .Values.global.identity | default dict -}}
 {{- $client := dig "external" "clients" "superset" dict $identity -}}
@@ -97,6 +112,16 @@ app.kubernetes.io/managed-by: {{ .Release.Service }}
 {{- end -}}
 {{- end -}}
 
+{{- define "dlh-in-a-box.identity.internalAccessTokenUrl" -}}
+{{- $identity := .Values.global.identity | default dict -}}
+{{- $client := dig "external" "clients" "superset" dict $identity -}}
+{{- if $client.internalAccessTokenUrl -}}
+{{- $client.internalAccessTokenUrl -}}
+{{- else -}}
+{{- printf "%s/protocol/openid-connect/token" (include "dlh-in-a-box.identity.internalIssuer" .) -}}
+{{- end -}}
+{{- end -}}
+
 {{- define "dlh-in-a-box.identity.apiBaseUrl" -}}
 {{- $identity := .Values.global.identity | default dict -}}
 {{- $client := dig "external" "clients" "superset" dict $identity -}}
@@ -104,6 +129,16 @@ app.kubernetes.io/managed-by: {{ .Release.Service }}
 {{- $client.apiBaseUrl -}}
 {{- else -}}
 {{- printf "%s/protocol/openid-connect" (include "dlh-in-a-box.identity.issuer" .) -}}
+{{- end -}}
+{{- end -}}
+
+{{- define "dlh-in-a-box.identity.internalApiBaseUrl" -}}
+{{- $identity := .Values.global.identity | default dict -}}
+{{- $client := dig "external" "clients" "superset" dict $identity -}}
+{{- if $client.internalApiBaseUrl -}}
+{{- $client.internalApiBaseUrl -}}
+{{- else -}}
+{{- printf "%s/protocol/openid-connect" (include "dlh-in-a-box.identity.internalIssuer" .) -}}
 {{- end -}}
 {{- end -}}
 
@@ -117,6 +152,16 @@ app.kubernetes.io/managed-by: {{ .Release.Service }}
 {{- end -}}
 {{- end -}}
 
+{{- define "dlh-in-a-box.identity.internalJwksUri" -}}
+{{- $identity := .Values.global.identity | default dict -}}
+{{- $client := dig "external" "clients" "superset" dict $identity -}}
+{{- if $client.internalJwksUri -}}
+{{- $client.internalJwksUri -}}
+{{- else -}}
+{{- printf "%s/protocol/openid-connect/certs" (include "dlh-in-a-box.identity.internalIssuer" .) -}}
+{{- end -}}
+{{- end -}}
+
 {{- define "dlh-in-a-box.identity.userInfoUrl" -}}
 {{- $identity := .Values.global.identity | default dict -}}
 {{- $client := dig "external" "clients" "superset" dict $identity -}}
@@ -127,8 +172,14 @@ app.kubernetes.io/managed-by: {{ .Release.Service }}
 {{- end -}}
 {{- end -}}
 
-{{- define "dlh-in-a-box.openldap.serviceName" -}}
-{{- printf "%s-openldap" .Release.Name -}}
+{{- define "dlh-in-a-box.identity.internalUserInfoUrl" -}}
+{{- $identity := .Values.global.identity | default dict -}}
+{{- $client := dig "external" "clients" "superset" dict $identity -}}
+{{- if $client.internalUserInfoUrl -}}
+{{- $client.internalUserInfoUrl -}}
+{{- else -}}
+{{- printf "%s/protocol/openid-connect/userinfo" (include "dlh-in-a-box.identity.internalIssuer" .) -}}
+{{- end -}}
 {{- end -}}
 
 {{- define "dlh-in-a-box.platformHome.serviceName" -}}
@@ -144,7 +195,7 @@ app.kubernetes.io/managed-by: {{ .Release.Service }}
 {{- $name := .name -}}
 {{- $identity := $root.Values.global.identity | default dict -}}
 {{- $conventions := get $identity "groupConventions" | default dict -}}
-{{- printf "%s%s" (default "dlh-app-" $conventions.appAccessPrefix) $name -}}
+{{- printf "%s%s" (default "platform-app-" $conventions.appAccessPrefix) $name -}}
 {{- end -}}
 
 {{- define "dlh-in-a-box.group.role" -}}
@@ -152,90 +203,49 @@ app.kubernetes.io/managed-by: {{ .Release.Service }}
 {{- $name := .name -}}
 {{- $identity := $root.Values.global.identity | default dict -}}
 {{- $conventions := get $identity "groupConventions" | default dict -}}
-{{- printf "%s%s" (default "dlh-role-" $conventions.rolePrefix) $name -}}
-{{- end -}}
-
-{{- define "dlh-in-a-box.identity.directory.baseDn" -}}
-{{- $identity := .Values.global.identity | default dict -}}
-{{- $directory := get $identity "directory" | default dict -}}
-{{- $ldap := get $directory "ldap" | default dict -}}
-{{- $openldap := .Values.openldap | default dict -}}
-{{- $seed := get $openldap "seed" | default dict -}}
-{{- if $seed.baseDn -}}
-{{- $seed.baseDn -}}
-{{- else if $ldap.userBaseDn -}}
-{{- regexReplaceAll "^ou=[^,]+," $ldap.userBaseDn "" -}}
-{{- else -}}
-{{- printf "dc=%s" (replace "." ",dc=" (default "example.org" $seed.domain)) -}}
-{{- end -}}
+{{- printf "%s%s" (default "platform-role-" $conventions.rolePrefix) $name -}}
 {{- end -}}
 
 {{- define "dlh-in-a-box.identity.directory.url" -}}
 {{- $identity := .Values.global.identity | default dict -}}
 {{- $directory := get $identity "directory" | default dict -}}
 {{- $ldap := get $directory "ldap" | default dict -}}
-{{- $openldap := .Values.openldap | default dict -}}
-{{- $service := get $openldap "service" | default dict -}}
-{{- if $ldap.url -}}
-{{- $ldap.url -}}
-{{- else -}}
-{{- printf "ldap://%s.%s.svc.cluster.local:%v" (include "dlh-in-a-box.openldap.serviceName" .) .Release.Namespace (default 389 $service.port) -}}
-{{- end -}}
+{{- default "" $ldap.url -}}
 {{- end -}}
 
 {{- define "dlh-in-a-box.identity.directory.userBaseDn" -}}
 {{- $identity := .Values.global.identity | default dict -}}
 {{- $directory := get $identity "directory" | default dict -}}
 {{- $ldap := get $directory "ldap" | default dict -}}
-{{- if $ldap.userBaseDn -}}
-{{- $ldap.userBaseDn -}}
-{{- else -}}
-{{- printf "ou=people,%s" (include "dlh-in-a-box.identity.directory.baseDn" .) -}}
-{{- end -}}
+{{- default "" $ldap.userBaseDn -}}
 {{- end -}}
 
 {{- define "dlh-in-a-box.identity.directory.groupBaseDn" -}}
 {{- $identity := .Values.global.identity | default dict -}}
 {{- $directory := get $identity "directory" | default dict -}}
 {{- $ldap := get $directory "ldap" | default dict -}}
-{{- if $ldap.groupBaseDn -}}
-{{- $ldap.groupBaseDn -}}
-{{- else -}}
-{{- printf "ou=groups,%s" (include "dlh-in-a-box.identity.directory.baseDn" .) -}}
-{{- end -}}
+{{- default "" $ldap.groupBaseDn -}}
 {{- end -}}
 
 {{- define "dlh-in-a-box.identity.directory.bindDn" -}}
 {{- $identity := .Values.global.identity | default dict -}}
 {{- $directory := get $identity "directory" | default dict -}}
 {{- $ldap := get $directory "ldap" | default dict -}}
-{{- if $ldap.bindDistinguishedName -}}
-{{- $ldap.bindDistinguishedName -}}
-{{- else -}}
-{{- printf "cn=admin,%s" (include "dlh-in-a-box.identity.directory.baseDn" .) -}}
-{{- end -}}
+{{- default "" $ldap.bindDistinguishedName -}}
 {{- end -}}
 
 {{- define "dlh-in-a-box.identity.directory.bindSecretName" -}}
 {{- $identity := .Values.global.identity | default dict -}}
 {{- $directory := get $identity "directory" | default dict -}}
 {{- $ldap := get $directory "ldap" | default dict -}}
-{{- if $ldap.bindExistingSecret -}}
-{{- $ldap.bindExistingSecret -}}
-{{- else -}}
-{{- default "dlh-openldap-admin" (dig "auth" "existingSecret" "dlh-openldap-admin" .Values.openldap) -}}
-{{- end -}}
+{{- default "" $ldap.bindExistingSecret -}}
 {{- end -}}
 
 {{- define "dlh-in-a-box.identity.directory.bindSecretKey" -}}
 {{- $identity := .Values.global.identity | default dict -}}
 {{- $directory := get $identity "directory" | default dict -}}
 {{- $ldap := get $directory "ldap" | default dict -}}
-{{- if $ldap.bindPasswordKey -}}
-{{- $ldap.bindPasswordKey -}}
-{{- else -}}
-{{- default "adminPassword" (dig "auth" "adminPasswordKey" "adminPassword" .Values.openldap) -}}
-{{- end -}}
+{{- default "bindPassword" $ldap.bindPasswordKey -}}
 {{- end -}}
 
 {{- define "dlh-in-a-box.identity.directory.trustedCaSecretName" -}}

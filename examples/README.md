@@ -28,11 +28,11 @@ flowchart TD
 
 | File | Primary use | Characteristics |
 | --- | --- | --- |
-| `values-local-auth.yaml` | Canonical kind smoke-install path | Bundled Keycloak, embedded OpenLDAP, Ranger, portal, CloudBeaver, Prefect proxy, MinIO, Hive, Spark Operator, and local demo secrets |
+| `values-local-auth.yaml` | Local render-oriented auth example | Bundled Keycloak, external LDAP placeholder settings, Ranger, portal, CloudBeaver, Prefect proxy, MinIO, Hive, Spark Operator, and local demo secrets |
 | `values-local.yaml` | Canonical kind validation path | MinIO, Hive, Prefect, Spark Operator, Vault dev mode, reduced Trino footprint |
 | `values-local-superset.yaml` | Focused local BI validation path | MinIO, Trino, and Superset with demo credentials, seeded local Trino datasource, bundled Superset PostgreSQL and Redis |
 | `values-local-layers.yaml` | Richer local topology example | Multiple catalogs, layered access patterns, self-contained object storage |
-| `values-dev.yaml` | Shared development baseline | Bundled Keycloak, embedded OpenLDAP, Ranger, portal, CloudBeaver, and Prefect proxy |
+| `values-dev.yaml` | Shared development baseline | Bundled Keycloak, external organizational LDAP/AD, Ranger, portal, CloudBeaver, and Prefect proxy |
 | `values-shared-auth.yaml` | Shared external-identity escape hatch | Externally managed OIDC plus LDAP/AD scaffold |
 | `values-prod.yaml` | Minimal production-shaped baseline | Bundled Keycloak, external LDAPS, Ranger, portal, CloudBeaver, and Prefect proxy |
 | `values-prod-layers.yaml` | Layered production example | Multiple catalogs and production-style access patterns |
@@ -45,8 +45,8 @@ flowchart TD
   directory.
 - `./hack/template.sh` renders the umbrella chart against every file in this
   directory.
-- `values-local-auth.yaml` is the canonical end-to-end deployment proof point.
-- `values-local.yaml` remains the lighter local topology reference.
+- `values-local.yaml` is the canonical local smoke-install proof point.
+- `values-local-auth.yaml` is a render-oriented auth example for the external-directory model.
 - `values-local-superset.yaml` is the focused local proof point for the
   optional Superset integration.
 - `values-dev.yaml` and `values-prod.yaml` are the primary shared-environment
@@ -90,3 +90,8 @@ decorative. It is part of the supported chart contract and is validated during
 
 Keep example overlays readable. They are part of the handover and consumer
 story, not just test inputs.
+
+Shared-environment examples should also stay organization-neutral. They may
+demonstrate the reusable `platformHome` contract, but institution-specific
+branding such as logos, fonts, and color systems belongs in downstream
+consumer overlays rather than in the chart defaults.
