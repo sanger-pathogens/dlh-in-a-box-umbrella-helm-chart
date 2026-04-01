@@ -1,352 +1,163 @@
-# dlh-in-a-box-umbrella-helm-chart
+# dlh-in-a-box Umbrella Helm Chart
 
 [![Helm Lint](https://github.com/sanger-pathogens/dlh-in-a-box-umbrella-helm-chart/actions/workflows/helm-lint.yaml/badge.svg)](https://github.com/sanger-pathogens/dlh-in-a-box-umbrella-helm-chart/actions/workflows/helm-lint.yaml)
 [![Helm Smoke Install](https://github.com/sanger-pathogens/dlh-in-a-box-umbrella-helm-chart/actions/workflows/helm-smoke-install.yaml/badge.svg)](https://github.com/sanger-pathogens/dlh-in-a-box-umbrella-helm-chart/actions/workflows/helm-smoke-install.yaml)
 [![Helm Publish](https://github.com/sanger-pathogens/dlh-in-a-box-umbrella-helm-chart/actions/workflows/helm-publish.yaml/badge.svg)](https://github.com/sanger-pathogens/dlh-in-a-box-umbrella-helm-chart/actions/workflows/helm-publish.yaml)
 
-`dlh-in-a-box` packages a modular lakehouse control plane as a single OCI
-Helm chart. This repository is the source of truth for the chart itself, the
-small amount of local composition logic that sits around upstream components,
-the validation overlays used to prove it works, and the GitHub Actions flow
-that publishes it for downstream consumers.
+This repository is the source of truth for the `dlh-in-a-box` chart itself.
+It owns the chart API, the small amount of umbrella-only composition logic
+around upstream components, the example overlays used for validation, and the
+release automation that publishes the OCI package.
 
-## Quick links
+It does not own environment-specific infrastructure, live cluster operations,
+institution-specific secret material, or organization-specific portal branding.
+Those live in the downstream infra repository.
 
-- chart consumer guide: [charts/dlh-in-a-box/README.md](charts/dlh-in-a-box/README.md)
-- first five minutes: [docs/quickstart.md](docs/quickstart.md)
-- release playbook: [docs/release-playbook.md](docs/release-playbook.md)
-- example overlays: [examples/README.md](examples/README.md)
-- maintainer scripts: [hack/README.md](hack/README.md)
-- contribution workflow: [CONTRIBUTING.md](CONTRIBUTING.md)
-- support policy: [SUPPORT.md](SUPPORT.md)
-- security reporting: [SECURITY.md](SECURITY.md)
-- conduct expectations: [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md)
+## Start Here
 
-## Handover summary
+Choose the path that matches what you are trying to do:
 
-This repository exists to do four things well:
+- New chart consumer:
+  [`charts/dlh-in-a-box/README.md`](charts/dlh-in-a-box/README.md)
+- Need the fastest install/evaluation path:
+  [`docs/quickstart.md`](docs/quickstart.md)
+- Need the default identity and access model:
+  [`docs/auth-architecture.md`](docs/auth-architecture.md)
+- Need the data-governance and Ranger model:
+  [`docs/data-governance.md`](docs/data-governance.md)
+- Need terminology explained first:
+  [`docs/glossary.md`](docs/glossary.md)
+- Need example values:
+  [`examples/README.md`](examples/README.md)
+- Need maintainer and release tasks:
+  [`hack/README.md`](hack/README.md),
+  [`docs/release-playbook.md`](docs/release-playbook.md)
 
-- define a reusable Helm-packaged platform baseline
-- keep the dependency surface pinned and reviewable
-- validate the chart locally and in CI with realistic overlays
-- publish a consumable OCI artifact to GitHub Container Registry
-
-It is intentionally not the home for pipelines, Spark applications, or
-environment-specific business logic.
-
-## Platform architecture
+## Repository Mental Model
 
 ```mermaid
 flowchart LR
-  subgraph Consumers[Platform consumers]
-    Analysts[Analysts and SQL clients]
-    BIUsers[Dashboard authors and BI users]
-    Operators[Platform operators]
-    Flows[Scheduled and event-driven flows]
+  subgraph ThisRepo[This repository]
+    API[Chart API and values schema]
+    Glue[Umbrella-only templates and helpers]
+    Examples[Validation overlays]
+    Release[Lint, package, publish automation]
   end
 
-  subgraph Release[dlh-in-a-box Helm release]
+  subgraph Upstream[Mostly upstream components]
     Trino[Trino]
-    Superset[Superset<br/>optional]
-    Prefect[Prefect Server]
-    Worker[Prefect Workers]
+    Superset[Superset]
+    Prefect[Prefect]
+    Keycloak[Keycloak]
+    DataHub[DataHub]
     Spark[Spark Operator]
-    Hive[Hive Metastore]
     Vault[Vault]
-    DataHub[DataHub<br/>optional]
   end
 
-  subgraph State[Stateful dependencies]
-    ObjectStore[(External S3 or MinIO)]
-    HivePg[(Hive PostgreSQL)]
-    PrefectPg[(Prefect PostgreSQL)]
-    SupersetPg[(Superset PostgreSQL)]
-    Redis[(Superset Redis)]
+  subgraph Downstream[Consumer repository]
+    Infra[Environment overlays]
+    Secrets[Vault and Kubernetes secrets]
+    Cluster[Real cluster deployment]
   end
 
-  Analysts --> Trino
-  BIUsers --> Superset
-  Operators --> Prefect
-  Flows --> Worker
-  Worker --> Prefect
-  Worker --> Spark
-  Worker --> ObjectStore
-  Trino --> Hive
-  Trino --> ObjectStore
-  Superset --> Trino
-  Superset --> SupersetPg
-  Superset --> Redis
-  Hive --> HivePg
-  Hive --> ObjectStore
-  Prefect --> PrefectPg
-  Vault -. optional secret delivery .-> Trino
-  Vault -. optional secret delivery .-> Worker
-  DataHub -. optional metadata integration .-> Hive
-  DataHub -. optional metadata integration .-> Trino
+  API --> Glue --> Upstream
+  Examples --> Glue
+  Release --> Downstream
+  Downstream --> Cluster
+  Secrets --> Cluster
 ```
 
-## Repository architecture
+## Default Platform Model
 
-```mermaid
-flowchart TD
-  Repo[Repository root]
-  Repo --> Github[.github]
-  Github --> Workflows[.github/workflows]
-  Repo --> VSCode[.vscode]
-  Repo --> Charts[charts]
-  Charts --> Umbrella[charts/dlh-in-a-box]
-  Umbrella --> UmbrellaTemplates[templates]
-  Umbrella --> Subcharts[charts]
-  Subcharts --> Hive[hive]
-  Subcharts --> Trino[trino]
-  Subcharts --> Archives[vendored upstream tgz archives]
-  Umbrella --> ThirdParty[third_party]
-  Repo --> Examples[examples]
-  Repo --> Hack[hack]
-  Repo --> Docs[docs]
-  Docs --> Assets[docs/assets]
-```
+The default documented model is now:
 
-## Delivery lifecycle
+- `platformHome` is the browser launchpad and the default entrypoint for human users.
+- `Keycloak` is the platform OIDC provider.
+- development and production both federate Keycloak to an external
+  organizational LDAP or AD source.
+- temporary `bootstrapUsers` are allowed only for local or dev browser-flow
+  validation while real directory bind details are still pending.
+- `Ranger` is the steady-state Trino authorization plane.
+- `oauth2-proxy` sits in front of Prefect and CloudBeaver so both tools can
+  reuse the central Keycloak session.
+- the umbrella chart owns the reusable portal UX, live role-management UI, and
+  health aggregation API, while downstream repos own logos, fonts, favicons,
+  color palettes, and environment-specific extra tools.
+- `global.dataCatalogs.*.governance` is the chart-side governance contract used
+  to stop unclassified or unapproved datasets from being exposed by accident.
 
-```mermaid
-flowchart LR
-  Author[Maintain chart source<br/>and overlays] --> Validate[Run lint, render,<br/>license, and packaging checks]
-  Validate --> Smoke[Test install on kind<br/>with the validated local overlay]
-  Smoke --> Publish[GitHub Actions packages<br/>and pushes to GHCR]
-  Publish --> Stable[Tagged release versions]
-  Publish --> Prerelease[main branch prereleases]
-  Stable --> Consumers[Consumer repositories]
-  Prerelease --> Consumers
-```
+The older `external OIDC + LDAP/AD` path still exists, but it is now the
+escape hatch, not the main story.
 
-## Design principles
+## What This Repo Owns
 
-- Upstream first: Trino, Superset, Prefect, Spark Operator, MinIO, Vault,
-  PostgreSQL, and DataHub stay upstream wherever possible.
-- Minimal local ownership: local templates are only added for cross-component
-  composition, not to replace entire upstream charts.
-- OCI-native distribution: other repositories should consume the chart from a
-  registry, not by copying source directories around.
-- Pinned inputs: `Chart.yaml` and `Chart.lock` are treated as release inputs.
-- Operational clarity: the repo keeps examples, scripts, publication metadata,
-  licensing, and governance explicit.
+- The chart values contract, including identity, authorization, and governance
+  metadata.
+- Trino catalog generation and Ranger bootstrap glue.
+- Keycloak and Ranger composition for chart-managed deployments.
+- The lightweight platform launchpad, live role-management surface, health
+  aggregation API, and the chart-owned CloudBeaver deployment.
+- Example overlays that prove local, development, and production-shaped
+  installs render cleanly.
+- Documentation for the chart API and architecture.
 
-## Locally owned logic
+## What This Repo Does Not Own
 
-These are the main behaviors that are authored here rather than delegated to an
-upstream dependency:
+- Real production secrets.
+- Institution-specific LDAP/AD endpoint values and trust material.
+- Institution-specific portal branding, such as logos, fonts, colors, favicons,
+  and extra organization-owned admin tools.
+- Bastion workflows, kubeconfigs, Vault operations, or cluster access.
+- Dataset approval decisions, PI sign-off, DCC/DRC process, or IRB process.
 
-- Trino catalog generation from `global.dataCatalogs`
-- Trino access-control generation from catalog ACLs
-- Hive metastore provisioning for one metastore per catalog
-- DataHub prerequisite service compatibility shims
-- Superset compatibility defaults for chart-managed PostgreSQL and Redis images
-  plus the missing runtime PostgreSQL driver
-- local, layered, and production-shaped example overlays
-- packaging, publication, and licensing automation
+The platform can enforce approved access. It does not replace institutional
+governance.
 
-## Component inventory
+## Documentation Philosophy
 
-| Component | Role in the platform | Default state | Ownership model |
-| --- | --- | --- | --- |
-| Trino | Interactive SQL query engine over object storage and Hive metadata | Enabled | Vendored upstream chart with local patches |
-| Superset | Optional business-intelligence and dashboarding layer over Trino | Disabled by default | Upstream chart |
-| Prefect Server | Flow API and UI | Enabled | Upstream chart |
-| Prefect Workers | Flow execution workers | Enabled | Upstream chart |
-| Spark Operator | Spark workload controller | Enabled | Upstream chart |
-| Hive Metastore | Per-catalog metadata service for Trino and Spark-compatible engines | Disabled by default | Local subchart |
-| Vault | Secrets platform for cluster-native workflows | Enabled | Upstream chart |
-| MinIO | Self-contained S3-compatible storage for local or demo deployments | Disabled by default | Upstream chart |
-| DataHub | Optional metadata governance and discovery layer | Disabled by default | Upstream chart |
-| PostgreSQL | Stateful dependency for Hive metastore | Enabled when Hive is enabled | Upstream chart |
+The docs in this repository follow four rules:
 
-## Deployment and consumption
+1. Route first, explain second.
+2. Define terms before assuming them.
+3. Keep primary docs separate from vendored or reference-only material.
+4. Be explicit about what the chart enforces versus what operators must do
+   outside Helm.
 
-### First five minutes
+Vendored upstream READMEs under `charts/dlh-in-a-box/charts/` are reference
+material, not the primary onboarding path.
 
-If you are new to the repository, start with
-[docs/quickstart.md](docs/quickstart.md). It covers:
+## Validation Model
 
-- inspecting the published chart
-- deploying the validated local overlay
-- consuming the package from another repository
-- the fastest route into the deeper docs
-
-### Security posture
-
-- locally generated Trino catalog files and Hive metastore config are mounted
-  from Kubernetes `Secret` resources rather than `ConfigMap`
-- tracked non-local example overlays are kept free of inline credentials
-- the disposable local overlays still use demo credentials for laptop testing
-  and should never be reused outside throwaway environments
-- if Superset is enabled, set a real `SUPERSET_SECRET_KEY` and avoid tracked
-  inline admin or metadata-database passwords outside local overlays
-- shared or production environments should enable upstream network policies
-  where the target cluster supports them
-- real secrets should be injected at deploy time, not committed to tracked
-  values files
-
-### Local validation
-
-The canonical local proof point is `examples/values-local.yaml`, which enables
-MinIO, Hive, Prefect, Spark Operator, and Vault with laptop-sized Trino
-settings.
+The main validation commands are:
 
 ```bash
 ./hack/helm-dependency-update.sh
 ./hack/lint.sh
-helm upgrade --install dlh charts/dlh-in-a-box \
-  -n data-lakehouse-local \
-  --create-namespace \
-  -f examples/values-local.yaml
+./hack/template.sh
+./hack/package.sh
+./hack/smoke-install.sh
 ```
 
-If you prefer task aliases, use:
+`./hack/lint.sh` now validates chart structure, docs guardrails, the values
+schema, security checks, and every example overlay.
 
-```bash
-make lint
-make template
-make package
-make local-install
-```
+## Reference Map
 
-### Example overlays
-
-The full overlay catalog is documented in [examples/README.md](examples/README.md).
-In brief:
-
-- `values-local.yaml` is the validated kind deployment path
-- `values-local-superset.yaml` is a focused local BI overlay for Superset + Trino
-- `values-local-layers.yaml` shows a richer multi-catalog local topology
-- `values-dev.yaml` is a lightweight shared-development baseline
-- `values-prod.yaml` is a minimal production-shaped baseline
-- `values-prod-layers.yaml` shows layered production catalog patterns
-- `values-external-s3.yaml` is the simplest external object-storage starting point
-- `values-minio.yaml` isolates the in-cluster MinIO scenario
-
-### Install from GHCR
-
-```bash
-helm install dlh \
-  oci://ghcr.io/sanger-pathogens/charts/dlh-in-a-box \
-  --version <chart-version> \
-  -n data-lakehouse \
-  --create-namespace \
-  -f my-values.yaml
-```
-
-### Consume from another repository
-
-Use the chart as a dependency:
-
-```yaml
-dependencies:
-  - name: dlh-in-a-box
-    version: <chart-version>
-    repository: oci://ghcr.io/sanger-pathogens/charts
-```
-
-`main` publishes prerelease versions in this form:
-
-```text
-<base-version>-main.<run-number>.<run-attempt>.<short-sha>
-```
-
-Tagged releases publish stable `X.Y.Z` versions that must match
-`charts/dlh-in-a-box/Chart.yaml`.
-
-### Same-organization consumer repositories
-
-For a consumer repository inside the same GitHub organization:
-
-1. ensure the package exists at `ghcr.io/sanger-pathogens/charts/dlh-in-a-box`
-2. if package permissions are not inherited automatically, add the consumer
-   repository under `Manage Actions access`
-3. grant that repository at least `Read` access
-
-In the consumer workflow:
-
-```yaml
-permissions:
-  contents: read
-  packages: read
-
-steps:
-  - uses: actions/checkout@v4
-  - uses: azure/setup-helm@v4
-  - name: Log in to GHCR
-    run: |
-      printf '%s' "${{ secrets.GITHUB_TOKEN }}" | \
-        helm registry login ghcr.io -u "${{ github.actor }}" --password-stdin
-  - name: Build chart dependencies
-    run: helm dependency build
-```
-
-For manual local access outside GitHub Actions, use a personal access token
-classic with `read:packages`:
-
-```bash
-export GHCR_TOKEN=YOUR_CLASSIC_PAT
-printf '%s' "$GHCR_TOKEN" | helm registry login ghcr.io -u YOUR_GITHUB_USERNAME --password-stdin
-```
-
-## Directory guides
-
-Every maintained directory in the repository now carries its own guide so a
-new maintainer can navigate the tree top-down. Helm template directories are
-the one exception: those use `_README.txt` because source-based `helm lint` and
-`helm template` cannot tolerate Markdown files inside `templates/`.
-
-| Path | Guide | Purpose |
-| --- | --- | --- |
-| `.github/` | [.github/OVERVIEW.md](.github/OVERVIEW.md) | Ownership model, repository automation, and CI/CD entry points |
-| `.github/ISSUE_TEMPLATE/` | [.github/ISSUE_TEMPLATE/README.md](.github/ISSUE_TEMPLATE/README.md) | Public issue intake, contact routing, and support forms |
-| `.github/workflows/` | [.github/workflows/README.md](.github/workflows/README.md) | Lint and publish workflow behavior |
-| `.vscode/` | [.vscode/README.md](.vscode/README.md) | Optional workspace settings for maintainers |
-| `charts/` | [charts/README.md](charts/README.md) | Chart source tree and packaging map |
-| `charts/dlh-in-a-box/` | [charts/dlh-in-a-box/README.md](charts/dlh-in-a-box/README.md) | Umbrella chart API, values surface, and runtime composition |
-| `charts/dlh-in-a-box/charts/` | [charts/dlh-in-a-box/charts/README.md](charts/dlh-in-a-box/charts/README.md) | Local subcharts, vendored chart source, and dependency archives |
-| `charts/dlh-in-a-box/charts/hive/` | [charts/dlh-in-a-box/charts/hive/README.md](charts/dlh-in-a-box/charts/hive/README.md) | Local Hive subchart ownership and design |
-| `charts/dlh-in-a-box/charts/hive/templates/` | [charts/dlh-in-a-box/charts/hive/templates/_README.txt](charts/dlh-in-a-box/charts/hive/templates/_README.txt) | Hive template-by-template implementation guide |
-| `charts/dlh-in-a-box/charts/trino/` | [charts/dlh-in-a-box/charts/trino/README.md](charts/dlh-in-a-box/charts/trino/README.md) | Vendored upstream Trino chart documentation |
-| `charts/dlh-in-a-box/charts/trino/templates/` | [charts/dlh-in-a-box/charts/trino/templates/_README.txt](charts/dlh-in-a-box/charts/trino/templates/_README.txt) | Local Trino patch points and generated resources |
-| `charts/dlh-in-a-box/charts/trino/templates/tests/` | [charts/dlh-in-a-box/charts/trino/templates/tests/_README.txt](charts/dlh-in-a-box/charts/trino/templates/tests/_README.txt) | Helm test coverage bundled with the vendored Trino chart |
-| `charts/dlh-in-a-box/templates/` | [charts/dlh-in-a-box/templates/_README.txt](charts/dlh-in-a-box/templates/_README.txt) | Umbrella-only glue templates |
-| `charts/dlh-in-a-box/third_party/` | [charts/dlh-in-a-box/third_party/README.md](charts/dlh-in-a-box/third_party/README.md) | Bundled notice material and provenance |
-| `charts/dlh-in-a-box/third_party/datahub/` | [charts/dlh-in-a-box/third_party/datahub/README.md](charts/dlh-in-a-box/third_party/datahub/README.md) | DataHub `NOTICE` provenance |
-| `charts/dlh-in-a-box/third_party/gcloud-sqlproxy/` | [charts/dlh-in-a-box/third_party/gcloud-sqlproxy/README.md](charts/dlh-in-a-box/third_party/gcloud-sqlproxy/README.md) | MIT license provenance for bundled `gcloud-sqlproxy` material |
-| `docs/` | [docs/README.md](docs/README.md) | Static documentation assets and documentation strategy |
-| `docs/assets/` | [docs/assets/README.md](docs/assets/README.md) | Brand and package assets used by the chart |
-| `docs/quickstart.md` | [docs/quickstart.md](docs/quickstart.md) | First-run onboarding for new consumers |
-| `docs/release-playbook.md` | [docs/release-playbook.md](docs/release-playbook.md) | Stable and prerelease publication runbook |
-| `examples/` | [examples/README.md](examples/README.md) | Overlay selection and configuration patterns |
-| `hack/` | [hack/README.md](hack/README.md) | Maintainer scripts for validation and release tasks |
-
-## Governance and operating expectations
-
-- Pull requests are restricted to repository collaborators even if the
-  repository is publicly visible.
-- Repository ownership is managed through `.github/CODEOWNERS`.
-- Contributor workflow and release expectations are documented in
-  [CONTRIBUTING.md](CONTRIBUTING.md).
-- Operational and user-facing support guidance is documented in
-  [SUPPORT.md](SUPPORT.md).
-- Security reporting guidance is documented in [SECURITY.md](SECURITY.md).
-- Community interaction expectations are documented in
-  [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md).
-- Third-party redistribution obligations are tracked in
-  [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
-
-## Out of scope
-
-- pipeline code and application logic
-- Spark application definitions
-- business-specific schemas and datasets
-- one-off environment customization that belongs in a consumer repository
+- Chart source:
+  [`charts/dlh-in-a-box/README.md`](charts/dlh-in-a-box/README.md)
+- Long-form docs:
+  [`docs/README.md`](docs/README.md)
+- Example overlays:
+  [`examples/README.md`](examples/README.md)
+- Maintainer scripts:
+  [`hack/README.md`](hack/README.md)
+- Contribution and support:
+  [`CONTRIBUTING.md`](CONTRIBUTING.md),
+  [`SUPPORT.md`](SUPPORT.md),
+  [`SECURITY.md`](SECURITY.md),
+  [`CODE_OF_CONDUCT.md`](CODE_OF_CONDUCT.md)
 
 ## License
 
-This repository is licensed under Apache-2.0. See `LICENSE`.
-Third-party dependency notices and bundled notice material are documented in
-[THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
+Apache-2.0 applies to the umbrella chart itself. Third-party notices are listed
+in [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md).

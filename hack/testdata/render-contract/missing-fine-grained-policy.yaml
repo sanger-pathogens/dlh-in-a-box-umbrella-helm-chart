@@ -1,0 +1,102 @@
+global:
+  authorization:
+    ranger:
+      bootstrapPolicies:
+        - name: trino-redcap-read
+          description: Allow approved analyst roles to query the redcap catalog.
+          resources:
+            catalog: redcap
+            schema: "*"
+            table: "*"
+            column: "*"
+          policyItems:
+            - groups: []
+              users: []
+              roles:
+                - redcap-readonly-analyst
+                - redcap-site-analyst
+              accesses:
+                - type: select
+                  isAllowed: true
+                - type: show
+                  isAllowed: true
+                - type: use
+                  isAllowed: true
+                - type: execute
+                  isAllowed: true
+              conditions: []
+              delegateAdmin: false
+        - name: trino-redcap-write
+          description: Allow the platform administrator role to manage the redcap catalog.
+          resources:
+            catalog: redcap
+            schema: "*"
+            table: "*"
+            column: "*"
+          policyItems:
+            - groups: []
+              users: []
+              roles:
+                - platform-admin
+              accesses:
+                - type: select
+                  isAllowed: true
+                - type: show
+                  isAllowed: true
+                - type: use
+                  isAllowed: true
+                - type: execute
+                  isAllowed: true
+                - type: insert
+                  isAllowed: true
+                - type: create
+                  isAllowed: true
+                - type: delete
+                  isAllowed: true
+                - type: drop
+                  isAllowed: true
+                - type: alter
+                  isAllowed: true
+                - type: grant
+                  isAllowed: true
+                - type: revoke
+                  isAllowed: true
+              conditions: []
+              delegateAdmin: false
+        - name: trino-pii-smoke-read
+          description: Deliberately incomplete policy set for render-contract validation.
+          resources:
+            catalog: pii_smoke
+            schema: "*"
+            table: "*"
+            column: "*"
+          policyItems:
+            - groups: []
+              users: []
+              roles:
+                - pii-smoke-readonly
+              accesses:
+                - type: select
+                  isAllowed: true
+                - type: show
+                  isAllowed: true
+                - type: use
+                  isAllowed: true
+              conditions: []
+              delegateAdmin: false
+  dataCatalogs:
+    pii_smoke:
+      type: deltaLake
+      governance:
+        dataType: research
+        classification: restricted-identifiable
+        containsDirectIdentifiers: true
+        containsQuasiIdentifiers: false
+        consentBasis: approved-secondary-use
+        irbStatus: required-approved
+        sharingStatus: internal-only
+        ownerPi: pii-smoke-pi
+        dataSteward: data-platform-team
+        sourceSystem: pii-smoke-source
+        approvalReference: DCC-DEV-PII-SMOKE
+        retentionNotes: Render-contract negative test fixture.

@@ -446,6 +446,17 @@ auth: {}
 # ```yaml
 #  groupAuthSecret: "trino-group-authentication"
 # ```
+#
+# Internal cluster-to-cluster communication can also read its shared secret
+# from an existing Kubernetes Secret:
+# ```yaml
+#  internalCommunicationSharedSecretSecret: "trino-internal-communication"
+#  internalCommunicationSharedSecretKey: "sharedSecret"
+# ```
+auth:
+  internalCommunicationSharedSecret: ""
+  internalCommunicationSharedSecretSecret: ""
+  internalCommunicationSharedSecretKey: "sharedSecret"
 
 serviceAccount:
   # -- Specifies whether a service account should be created

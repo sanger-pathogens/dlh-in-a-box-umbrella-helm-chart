@@ -31,6 +31,7 @@ make deps
 make lint
 make template
 make package
+make smoke-install
 ```
 
 Or the underlying scripts:
@@ -40,15 +41,17 @@ Or the underlying scripts:
 ./hack/lint.sh
 ./hack/template.sh
 ./hack/package.sh
+./hack/smoke-install.sh
 ```
 
 Checklist:
 
 - `charts/dlh-in-a-box/Chart.yaml` version is correct
 - `Chart.lock` matches dependency intent
-- documentation reflects any values or workflow changes
+- documentation and Mermaid diagrams reflect any values, auth, or workflow changes
 - license and third-party notices are still current
 - example overlays still lint and render
+- the validated local smoke install still succeeds before you cut a tag
 
 ## Stable release procedure
 

@@ -11,6 +11,7 @@ required_files=(
   "charts/dlh-in-a-box/charts/trino/LICENSE"
   "charts/dlh-in-a-box/third_party/datahub/NOTICE"
   "charts/dlh-in-a-box/third_party/gcloud-sqlproxy/LICENSE"
+  "charts/dlh-in-a-box/third_party/oauth2-proxy/LICENSE"
 )
 
 for file in "${required_files[@]}"; do
@@ -21,7 +22,7 @@ for file in "${required_files[@]}"; do
 done
 
 deps="$(
-  ruby -e 'require "yaml"; lock = YAML.load_file("charts/dlh-in-a-box/Chart.lock"); lock.fetch("dependencies").each { |dep| puts dep.fetch("name") }'
+  ruby -e 'require "yaml"; content = File.read("charts/dlh-in-a-box/Chart.lock"); lock = begin; YAML.safe_load(content, aliases: true); rescue ArgumentError; YAML.load(content); end; lock.fetch("dependencies").each { |dep| puts dep.fetch("name") }'
 )"
 
 for doc in "THIRD_PARTY_NOTICES.md" "charts/dlh-in-a-box/THIRD_PARTY_NOTICES.md"; do

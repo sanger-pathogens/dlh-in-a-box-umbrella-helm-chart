@@ -11,6 +11,15 @@ dependencies:
 - name: prefect-worker
   repository: https://prefecthq.github.io/prefect-helm
   version: 2025.12.31221620
+- name: oauth2-proxy
+  repository: https://oauth2-proxy.github.io/manifests
+  version: 10.1.4
+- name: oauth2-proxy
+  repository: https://oauth2-proxy.github.io/manifests
+  version: 10.1.4
+- name: keycloak
+  repository: oci://registry-1.docker.io/bitnamicharts
+  version: 25.2.0
 - name: spark-operator
   repository: https://kubeflow.github.io/spark-operator
   version: 2.4.0
@@ -32,5 +41,8 @@ dependencies:
 - name: postgresql
   repository: https://charts.bitnami.com/bitnami
   version: 14.3.3
-digest: sha256:284d7c79a8f0db537ec7012a072a4aef31dced1bc6eb90b052d2ead2d023978d
-generated: "2026-03-20T11:06:14.93159Z"
+- name: postgresql
+  repository: https://charts.bitnami.com/bitnami
+  version: 14.3.3
+digest: sha256:ca5d96b65a8a945aa411c4ab75f9cf955ec2d2906fe4c6d675a863de33276755
+generated: "2026-03-25T15:38:13.593789Z"

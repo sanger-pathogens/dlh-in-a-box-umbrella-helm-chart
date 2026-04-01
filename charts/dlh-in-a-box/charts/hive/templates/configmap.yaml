@@ -1,4 +1,5 @@
 {{- $catalogs := default dict .Values.global.dataCatalogs }}
+{{- $postgresHost := include "hive.postgresHost" . }}
 {{- range $catalogName, $catalog := $catalogs }}
 {{- $safeCatalog := include "hive.sanitize" $catalogName }}
 
@@ -29,11 +30,11 @@ stringData:
       </property>
       <property>
         <name>fs.s3a.access.key</name>
-        <value>{{ $.Values.s3.accessKey }}</value>
+        <value>{{ include "hive.s3AccessKey" $ }}</value>
       </property>
       <property>
         <name>fs.s3a.secret.key</name>
-        <value>{{ $.Values.s3.secretKey }}</value>
+        <value>{{ include "hive.s3SecretKey" $ }}</value>
       </property>
       <property>
         <name>fs.s3a.path.style.access</name>
@@ -57,15 +58,15 @@ stringData:
       </property>
       <property>
         <name>javax.jdo.option.ConnectionURL</name>
-        <value>jdbc:postgresql://{{ $.Values.postgres.host }}:{{ $.Values.postgres.port }}/{{ $catalogName }}</value>
+        <value>jdbc:postgresql://{{ $postgresHost }}:{{ $.Values.postgres.port }}/{{ $catalogName }}</value>
       </property>
       <property>
         <name>javax.jdo.option.ConnectionUserName</name>
-        <value>{{ $.Values.postgres.username }}</value>
+        <value>{{ include "hive.postgresUsername" $ }}</value>
       </property>
       <property>
         <name>javax.jdo.option.ConnectionPassword</name>
-        <value>{{ $.Values.postgres.password }}</value>
+        <value>{{ include "hive.postgresPassword" $ }}</value>
       </property>
       <property>
         <name>datanucleus.connectionPoolingType</name>

@@ -1,12 +1,12 @@
 CHART_PATH ?= charts/dlh-in-a-box
 DEST_DIR ?= dist
-LOCAL_VALUES ?= examples/values-local.yaml
+LOCAL_VALUES ?= examples/values-local-auth.yaml
 RELEASE_NAME ?= dlh
 NAMESPACE ?= data-lakehouse-local
 
 .DEFAULT_GOAL := help
 
-.PHONY: help deps docs-check lint template package smoke-install local-install
+.PHONY: help deps docs-check render-contract lint template package smoke-install local-install
 
 help: ## Show common maintainer targets.
 	@awk 'BEGIN {FS = ": ## "}; /^[a-zA-Z0-9_.-]+: ## / {printf "%-15s %s\n", $$1, $$2}' $(MAKEFILE_LIST)
@@ -16,6 +16,9 @@ deps: ## Refresh Helm dependencies and Chart.lock.
 
 docs-check: ## Verify maintained directories still have local guide files.
 	./hack/docs-check.sh
+
+render-contract: ## Prove supported renders succeed and unsafe values fail.
+	./hack/render-contract.sh
 
 lint: ## Run repository validation, including license, docs, schema, and Helm lint checks.
 	./hack/lint.sh

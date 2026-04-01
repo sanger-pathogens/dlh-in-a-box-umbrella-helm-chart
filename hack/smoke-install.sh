@@ -12,6 +12,83 @@ TIMEOUT="${TIMEOUT:-20m}"
 ARTIFACT_DIR="${ARTIFACT_DIR:-}"
 SKIP_DEPENDENCY_UPDATE="${SKIP_DEPENDENCY_UPDATE:-false}"
 
+seed_secret() {
+  local name="$1"
+  shift
+
+  kubectl create secret generic "${name}" \
+    -n "${NAMESPACE}" \
+    "$@" \
+    --dry-run=client \
+    -o yaml | kubectl apply -f -
+}
+
+seed_local_auth_demo_secrets() {
+  kubectl create namespace "${NAMESPACE}" --dry-run=client -o yaml | kubectl apply -f -
+
+  seed_secret dlh-keycloak-admin \
+    --from-literal=adminPassword=admin123
+
+  seed_secret dlh-directory-bind \
+    --from-literal=bindPassword=local-directory-bind-password
+
+  seed_secret dlh-oidc-clients \
+    --from-literal=trinoClientSecret=local-trino-client-secret \
+    --from-literal=supersetClientSecret=local-superset-client-secret \
+    --from-literal=datahubClientSecret=local-datahub-client-secret \
+    --from-literal=cloudbeaverClientSecret=local-cloudbeaver-client-secret \
+    --from-literal=prefectClientSecret=local-prefect-client-secret
+
+  seed_secret dlh-trino-internal-communication \
+    --from-literal=sharedSecret=local-trino-shared-secret
+
+  seed_secret dlh-cloudbeaver-oauth2-proxy \
+    --from-literal=client-id=cloudbeaver \
+    --from-literal=client-secret=local-cloudbeaver-client-secret \
+    --from-literal=cookie-secret=abcdef0123456789abcdef0123456789
+
+  seed_secret dlh-prefect-oauth2-proxy \
+    --from-literal=client-id=prefect \
+    --from-literal=client-secret=local-prefect-client-secret \
+    --from-literal=cookie-secret=0123456789abcdef0123456789abcdef
+
+  seed_secret dlh-cloudbeaver-bootstrap \
+    --from-literal=initial-data.conf='{
+      adminName: "cbadmin",
+      adminPassword: "cloudbeaver-admin-password",
+      teams: [
+        {
+          subjectId: "platform-role-platform-admin",
+          teamName: "Platform administrators",
+          description: "Platform administrators with CloudBeaver admin access.",
+          permissions: ["admin"]
+        },
+        {
+          subjectId: "platform-app-cloudbeaver",
+          teamName: "CloudBeaver users",
+          description: "Approved CloudBeaver browser users.",
+          permissions: []
+        }
+      ]
+    }'
+
+  seed_secret dlh-keycloak-config-cli-env \
+    --from-literal=LDAP_BIND_PASSWORD=local-directory-bind-password \
+    --from-literal=KC_TRINO_CLIENT_SECRET=local-trino-client-secret \
+    --from-literal=KC_SUPERSET_CLIENT_SECRET=local-superset-client-secret \
+    --from-literal=KC_DATAHUB_CLIENT_SECRET=local-datahub-client-secret \
+    --from-literal=KC_CLOUDBEAVER_CLIENT_SECRET=local-cloudbeaver-client-secret \
+    --from-literal=KC_PREFECT_CLIENT_SECRET=local-prefect-client-secret
+
+  seed_secret dlh-ranger-admin \
+    --from-literal=rangerAdminPassword=admin123 \
+    --from-literal=rangerUsersyncPassword=usersync123
+
+  seed_secret dlh-ranger-postgresql \
+    --from-literal=password=rangerdb123 \
+    --from-literal=postgres-password=rangerdbadmin123
+}
+
 capture_command() {
   local name="$1"
   shift
@@ -62,6 +139,10 @@ trap dump_diagnostics ERR
 
 if [[ "${SKIP_DEPENDENCY_UPDATE}" != "true" ]]; then
   ./hack/helm-dependency-update.sh
+fi
+
+if [[ "$(basename "${VALUES_FILE}")" == "values-local-auth.yaml" ]]; then
+  seed_local_auth_demo_secrets
 fi
 
 helm upgrade --install "${RELEASE_NAME}" "${CHART_PATH}" \

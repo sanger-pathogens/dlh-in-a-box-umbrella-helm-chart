@@ -1,4 +1,12 @@
 {{- $workerJmx := merge .Values.jmx.worker (omit .Values.jmx "coordinator" "worker") -}}
+{{- $identity := get .Values.global "identity" | default (dict) -}}
+{{- $externalIdentity := get $identity "external" | default (dict) -}}
+{{- $identityClients := get $externalIdentity "clients" | default (dict) -}}
+{{- $trinoIdentity := get $identityClients "trino" | default (dict) -}}
+{{- $identityEnabled := and (default false $identity.enabled) (default false $trinoIdentity.enabled) -}}
+{{- if $identityEnabled }}
+  {{- if not $trinoIdentity.sharedSecretExistingSecret }}{{- fail "global.identity.external.clients.trino.sharedSecretExistingSecret is required when Trino identity integration is enabled." }}{{- end }}
+{{- end }}
 {{- if gt (int .Values.server.workers) 0 }}
 apiVersion: v1
 kind: ConfigMap
@@ -58,8 +66,17 @@ data:
     memory.heap-headroom-per-node={{ .Values.worker.config.memory.heapHeadroomPerNode }}
     {{- end }}
     discovery.uri=http://{{ template "trino.fullname" . }}:{{ .Values.service.port }}
+    {{- $internalSharedSecret := include "trino.internalCommunicationSharedSecret" . }}
+    {{- if $identityEnabled }}
+    internal-communication.shared-secret=${ENV:TRINO_INTERNAL_SHARED_SECRET}
+    {{- else if $internalSharedSecret }}
+    internal-communication.shared-secret={{ $internalSharedSecret }}
+    {{- end }}
     {{- range $configValue := .Values.additionalConfigProperties }}
+    {{- if and $identityEnabled (hasPrefix "internal-communication.shared-secret=" $configValue) }}
+    {{- else }}
     {{ $configValue }}
+    {{- end }}
     {{- end }}
     {{- if $workerJmx.enabled }}
     jmx.rmiregistry.port={{- $workerJmx.registryPort }}

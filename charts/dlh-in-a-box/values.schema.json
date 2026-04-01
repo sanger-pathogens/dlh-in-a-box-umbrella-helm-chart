@@ -3,6 +3,728 @@
   "title": "dlh-in-a-box umbrella values schema",
   "type": "object",
   "additionalProperties": true,
+  "definitions": {
+    "catalogAcl": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "read": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "write": {
+          "type": "array",
+          "items": { "type": "string" }
+        }
+      }
+    },
+    "catalogGovernance": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "dataType": {
+          "type": "string",
+          "enum": ["research", "surveillance", "routineClinical", "derived", "public"]
+        },
+        "classification": {
+          "type": "string",
+          "enum": ["restricted-identifiable", "restricted-deidentified", "internal-deidentified", "public"]
+        },
+        "containsDirectIdentifiers": { "type": "boolean" },
+        "containsQuasiIdentifiers": { "type": "boolean" },
+        "consentBasis": { "type": "string", "minLength": 1 },
+        "irbStatus": {
+          "type": "string",
+          "enum": ["required-approved", "required-pending", "not-required"]
+        },
+        "sharingStatus": {
+          "type": "string",
+          "enum": ["pi-exclusive", "internal-only", "approved-secondary-use", "public"]
+        },
+        "ownerPi": { "type": "string", "minLength": 1 },
+        "dataSteward": { "type": "string", "minLength": 1 },
+        "sourceSystem": { "type": "string", "minLength": 1 },
+        "approvalReference": { "type": "string", "minLength": 1 },
+        "retentionNotes": { "type": "string", "minLength": 1 }
+      },
+      "required": [
+        "dataType",
+        "classification",
+        "containsDirectIdentifiers",
+        "containsQuasiIdentifiers",
+        "consentBasis",
+        "irbStatus",
+        "sharingStatus",
+        "ownerPi",
+        "dataSteward",
+        "sourceSystem",
+        "approvalReference",
+        "retentionNotes"
+      ]
+    },
+    "identityContract": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "description": "Enable the shared external identity contract used by Trino and the optional UI integrations."
+        },
+        "provider": {
+          "type": "object",
+          "additionalProperties": true,
+          "properties": {
+            "mode": {
+              "type": "string",
+              "enum": ["externalOidc", "bundledKeycloak"]
+            },
+            "keycloak": {
+              "type": "object",
+              "additionalProperties": true,
+              "properties": {
+                "realm": { "type": "string" },
+                "browserHost": { "type": "string" },
+                "internalScheme": { "type": "string" },
+                "loginTheme": { "type": "string" },
+                "configCliEnvExistingSecret": { "type": "string" },
+                "bootstrapUsers": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                      "username": { "type": "string", "minLength": 1 },
+                      "email": { "type": "string" },
+                      "firstName": { "type": "string" },
+                      "lastName": { "type": "string" },
+                      "enabled": { "type": "boolean" },
+                      "passwordEnvVar": { "type": "string", "minLength": 1 },
+                      "temporaryPassword": { "type": "boolean" },
+                      "groups": {
+                        "type": "array",
+                        "items": { "type": "string" }
+                      },
+                      "realmRoles": {
+                        "type": "array",
+                        "items": { "type": "string" }
+                      }
+                    },
+                    "required": ["username", "passwordEnvVar"]
+                  }
+                }
+              }
+            }
+          }
+        },
+        "external": {
+          "type": "object",
+          "additionalProperties": true,
+          "properties": {
+            "oidc": {
+              "type": "object",
+              "additionalProperties": true,
+              "properties": {
+                "issuer": { "type": "string" },
+                "usernameClaim": { "type": "string" },
+                "groupsClaim": { "type": "string" },
+                "userMappingPattern": { "type": "string" },
+                "processForwardedHeaders": { "type": "boolean" },
+                "scopes": {
+                  "type": "array",
+                  "items": { "type": "string" }
+                }
+              }
+            },
+            "clients": {
+              "type": "object",
+              "additionalProperties": true,
+              "properties": {
+                "trino": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "properties": {
+                    "enabled": { "type": "boolean" },
+                    "clientId": { "type": "string" },
+                    "existingSecret": { "type": "string" },
+                    "clientSecretKey": { "type": "string" },
+                    "redirectUris": {
+                      "type": "array",
+                      "items": { "type": "string" }
+                    },
+                    "webOrigins": {
+                      "type": "array",
+                      "items": { "type": "string" }
+                    },
+                    "passwordAuthEnabled": { "type": "boolean" },
+                    "sharedSecretExistingSecret": { "type": "string" },
+                    "sharedSecretKey": { "type": "string" }
+                  },
+                  "allOf": [
+                    {
+                      "if": {
+                        "properties": { "enabled": { "const": true } },
+                        "required": ["enabled"]
+                      },
+                      "then": {
+                        "required": [
+                          "clientId",
+                          "existingSecret",
+                          "sharedSecretExistingSecret"
+                        ]
+                      }
+                    }
+                  ]
+                },
+                "superset": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "properties": {
+                    "enabled": { "type": "boolean" },
+                    "clientId": { "type": "string" },
+                    "existingSecret": { "type": "string" },
+                    "clientSecretKey": { "type": "string" },
+                    "redirectUris": {
+                      "type": "array",
+                      "items": { "type": "string" }
+                    },
+                    "webOrigins": {
+                      "type": "array",
+                      "items": { "type": "string" }
+                    },
+                    "authorizeUrl": { "type": "string" },
+                    "accessTokenUrl": { "type": "string" },
+                    "apiBaseUrl": { "type": "string" },
+                    "jwksUri": { "type": "string" },
+                    "userInfoUrl": { "type": "string" },
+                    "providerName": { "type": "string" },
+                    "roleKeysPath": { "type": "string" }
+                  },
+                  "allOf": [
+                    {
+                      "if": {
+                        "properties": { "enabled": { "const": true } },
+                        "required": ["enabled"]
+                      },
+                      "then": {
+                        "required": [
+                          "clientId",
+                          "existingSecret",
+                          "authorizeUrl",
+                          "accessTokenUrl",
+                          "apiBaseUrl",
+                          "jwksUri",
+                          "userInfoUrl"
+                        ]
+                      }
+                    }
+                  ]
+                },
+                "datahub": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "properties": {
+                    "enabled": { "type": "boolean" },
+                    "provider": { "type": "string" },
+                    "clientId": { "type": "string" },
+                    "existingSecret": { "type": "string" },
+                    "clientSecretKey": { "type": "string" },
+                    "redirectUris": {
+                      "type": "array",
+                      "items": { "type": "string" }
+                    },
+                    "webOrigins": {
+                      "type": "array",
+                      "items": { "type": "string" }
+                    },
+                    "discoveryUri": { "type": "string" },
+                    "scope": { "type": "string" },
+                    "userNameClaim": { "type": "string" },
+                    "userNameClaimRegex": { "type": "string" }
+                  },
+                  "allOf": [
+                    {
+                      "if": {
+                        "properties": { "enabled": { "const": true } },
+                        "required": ["enabled"]
+                      },
+                      "then": {
+                        "required": [
+                          "clientId",
+                          "existingSecret",
+                          "discoveryUri"
+                        ]
+                      }
+                    }
+                  ]
+                },
+                "platformHome": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "properties": {
+                    "enabled": { "type": "boolean" },
+                    "clientId": { "type": "string" },
+                    "redirectUris": {
+                      "type": "array",
+                      "items": { "type": "string" }
+                    },
+                    "webOrigins": {
+                      "type": "array",
+                      "items": { "type": "string" }
+                    }
+                  },
+                  "allOf": [
+                    {
+                      "if": {
+                        "properties": { "enabled": { "const": true } },
+                        "required": ["enabled"]
+                      },
+                      "then": {
+                        "required": ["clientId"]
+                      }
+                    }
+                  ]
+                },
+                "minio": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "properties": {
+                    "enabled": { "type": "boolean" },
+                    "clientId": { "type": "string" },
+                    "existingSecret": { "type": "string" },
+                    "clientSecretKey": { "type": "string" },
+                    "redirectUris": {
+                      "type": "array",
+                      "items": { "type": "string" }
+                    },
+                    "webOrigins": {
+                      "type": "array",
+                      "items": { "type": "string" }
+                    }
+                  },
+                  "allOf": [
+                    {
+                      "if": {
+                        "properties": { "enabled": { "const": true } },
+                        "required": ["enabled"]
+                      },
+                      "then": {
+                        "required": ["clientId", "existingSecret"]
+                      }
+                    }
+                  ]
+                },
+                "vault": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "properties": {
+                    "enabled": { "type": "boolean" },
+                    "clientId": { "type": "string" },
+                    "existingSecret": { "type": "string" },
+                    "clientSecretKey": { "type": "string" },
+                    "redirectUris": {
+                      "type": "array",
+                      "items": { "type": "string" }
+                    },
+                    "webOrigins": {
+                      "type": "array",
+                      "items": { "type": "string" }
+                    }
+                  },
+                  "allOf": [
+                    {
+                      "if": {
+                        "properties": { "enabled": { "const": true } },
+                        "required": ["enabled"]
+                      },
+                      "then": {
+                        "required": ["clientId", "existingSecret"]
+                      }
+                    }
+                  ]
+                },
+                "headlamp": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "properties": {
+                    "enabled": { "type": "boolean" },
+                    "clientId": { "type": "string" },
+                    "existingSecret": { "type": "string" },
+                    "clientSecretKey": { "type": "string" },
+                    "redirectUris": {
+                      "type": "array",
+                      "items": { "type": "string" }
+                    },
+                    "webOrigins": {
+                      "type": "array",
+                      "items": { "type": "string" }
+                    }
+                  },
+                  "allOf": [
+                    {
+                      "if": {
+                        "properties": { "enabled": { "const": true } },
+                        "required": ["enabled"]
+                      },
+                      "then": {
+                        "required": ["clientId", "existingSecret"]
+                      }
+                    }
+                  ]
+                },
+                "cloudbeaverProxy": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "properties": {
+                    "enabled": { "type": "boolean" },
+                    "clientId": { "type": "string" },
+                    "existingSecret": { "type": "string" },
+                    "clientSecretKey": { "type": "string" },
+                    "cookieExistingSecret": { "type": "string" },
+                    "cookieSecretKey": { "type": "string" },
+                    "redirectUrl": { "type": "string" },
+                    "redirectUris": {
+                      "type": "array",
+                      "items": { "type": "string" }
+                    },
+                    "webOrigins": {
+                      "type": "array",
+                      "items": { "type": "string" }
+                    },
+                    "allowedGroups": {
+                      "type": "array",
+                      "items": { "type": "string" }
+                    },
+                    "emailDomains": {
+                      "type": "array",
+                      "items": { "type": "string" }
+                    },
+                    "ingress": {
+                      "type": "object",
+                      "additionalProperties": true,
+                      "properties": {
+                        "enabled": { "type": "boolean" },
+                        "className": { "type": "string" },
+                        "host": { "type": "string" },
+                        "tlsSecretName": { "type": "string" },
+                        "annotations": {
+                          "type": "object",
+                          "additionalProperties": true
+                        }
+                      }
+                    }
+                  },
+                  "allOf": [
+                    {
+                      "if": {
+                        "properties": { "enabled": { "const": true } },
+                        "required": ["enabled"]
+                      },
+                      "then": {
+                        "required": [
+                          "clientId",
+                          "existingSecret",
+                          "redirectUrl"
+                        ]
+                      }
+                    }
+                  ]
+                },
+                "prefectProxy": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "properties": {
+                    "enabled": { "type": "boolean" },
+                    "clientId": { "type": "string" },
+                    "existingSecret": { "type": "string" },
+                    "clientSecretKey": { "type": "string" },
+                    "cookieExistingSecret": { "type": "string" },
+                    "cookieSecretKey": { "type": "string" },
+                    "redirectUrl": { "type": "string" },
+                    "redirectUris": {
+                      "type": "array",
+                      "items": { "type": "string" }
+                    },
+                    "webOrigins": {
+                      "type": "array",
+                      "items": { "type": "string" }
+                    },
+                    "allowedGroups": {
+                      "type": "array",
+                      "items": { "type": "string" }
+                    },
+                    "emailDomains": {
+                      "type": "array",
+                      "items": { "type": "string" }
+                    },
+                    "ingress": {
+                      "type": "object",
+                      "additionalProperties": true,
+                      "properties": {
+                        "enabled": { "type": "boolean" },
+                        "className": { "type": "string" },
+                        "host": { "type": "string" },
+                        "tlsSecretName": { "type": "string" },
+                        "annotations": {
+                          "type": "object",
+                          "additionalProperties": true
+                        }
+                      }
+                    }
+                  },
+                  "allOf": [
+                    {
+                      "if": {
+                        "properties": { "enabled": { "const": true } },
+                        "required": ["enabled"]
+                      },
+                      "then": {
+                        "required": [
+                          "clientId",
+                          "existingSecret",
+                          "redirectUrl"
+                        ]
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "directory": {
+          "type": "object",
+          "additionalProperties": true,
+          "properties": {
+            "mode": {
+              "type": "string",
+              "enum": ["externalLdap"]
+            },
+            "ldap": {
+              "type": "object",
+              "additionalProperties": true,
+              "properties": {
+                "enabled": { "type": "boolean" },
+                "url": { "type": "string" },
+                "userBaseDn": { "type": "string" },
+                "usernameAttribute": { "type": "string" },
+                "firstNameAttribute": { "type": "string" },
+                "lastNameAttribute": { "type": "string" },
+                "emailAttribute": { "type": "string" },
+                "uuidAttribute": { "type": "string" },
+                "userObjectClasses": { "type": "string" },
+                "userSearchFilter": { "type": "string" },
+                "userBindPattern": { "type": "string" },
+                "groupNameAttribute": { "type": "string" },
+                "membershipUserAttribute": { "type": "string" },
+                "groupObjectClasses": { "type": "string" },
+                "useGroupFilter": { "type": "boolean" },
+                "groupBaseDn": { "type": "string" },
+                "groupSearchFilter": { "type": "string" },
+                "groupSearchMemberAttribute": { "type": "string" },
+                "userMemberOfAttribute": { "type": "string" },
+                "bindDistinguishedName": { "type": "string" },
+                "bindExistingSecret": { "type": "string" },
+                "bindPasswordKey": { "type": "string" },
+                "trustedCaExistingSecret": { "type": "string" },
+                "trustedCaCertKey": { "type": "string" },
+                "useSystemTrustStore": { "type": "boolean" },
+                "allowInsecure": { "type": "boolean" }
+              },
+              "allOf": [
+                {
+                  "if": {
+                    "properties": { "enabled": { "const": true } },
+                    "required": ["enabled"]
+                  },
+                  "then": {
+                    "required": [
+                      "url",
+                      "userBaseDn",
+                      "groupBaseDn",
+                      "bindDistinguishedName",
+                      "bindExistingSecret"
+                    ]
+                  }
+                }
+              ]
+            }
+          }
+        },
+        "groupConventions": {
+          "type": "object",
+          "additionalProperties": true,
+          "properties": {
+            "appAccessPrefix": { "type": "string" },
+            "rolePrefix": { "type": "string" },
+            "dataPrefix": { "type": "string" }
+          }
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": { "enabled": { "const": true } },
+            "required": ["enabled"]
+          },
+          "then": {
+            "required": ["external", "directory"]
+          }
+        }
+      ]
+    },
+    "authorizationContract": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "platformRoles": {
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/definitions/platformRole"
+          }
+        },
+        "platformRoleMembershipSource": {
+          "type": "string",
+          "enum": ["git", "ranger"]
+        },
+        "platformRoleExceptions": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/platformRoleException"
+          }
+        },
+        "ranger": {
+          "type": "object",
+          "additionalProperties": true,
+          "properties": {
+            "enabled": { "type": "boolean" },
+            "serviceName": { "type": "string" },
+            "serviceUsername": { "type": "string" },
+            "serviceAdminUsers": {
+              "type": "array",
+              "items": { "type": "string" }
+            },
+            "serviceAdminGroups": {
+              "type": "array",
+              "items": { "type": "string" }
+            },
+            "superUsers": {
+              "type": "array",
+              "items": { "type": "string" }
+            },
+            "superGroups": {
+              "type": "array",
+              "items": { "type": "string" }
+            },
+            "useRangerGroups": { "type": "boolean" },
+            "admin": {
+              "type": "object",
+              "additionalProperties": true,
+              "properties": {
+                "browserUrl": { "type": "string" }
+              }
+            },
+            "usersync": {
+              "type": "object",
+              "additionalProperties": true,
+              "properties": {
+                "enabled": { "type": "boolean" },
+                "schedule": { "type": "string" },
+                "syncSource": { "type": "string" }
+              }
+            },
+            "importCatalogAcls": { "type": "boolean" },
+            "exceptionRoleAudit": {
+              "type": "object",
+              "additionalProperties": true,
+              "properties": {
+                "enabled": { "type": "boolean" },
+                "prefix": { "type": "string" },
+                "schedule": { "type": "string" },
+                "gracePeriodDays": { "type": "integer", "minimum": 0 },
+                "deleteExpired": { "type": "boolean" },
+                "logUndocumented": { "type": "boolean" }
+              }
+            },
+            "bootstrapPolicies": {
+              "type": "array",
+              "items": { "type": "object" }
+            },
+            "bootstrap": {
+              "type": "object",
+              "additionalProperties": true,
+              "properties": {
+                "enabled": { "type": "boolean" },
+                "importCatalogAcls": { "type": "boolean" },
+                "policies": {
+                  "type": "array",
+                  "items": { "type": "object" }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "platformRole": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "description": { "type": "string" },
+        "members": {
+          "type": "object",
+          "additionalProperties": true,
+          "properties": {
+            "directoryGroups": {
+              "type": "array",
+              "items": { "type": "string" }
+            },
+            "users": {
+              "type": "array",
+              "items": { "type": "string" }
+            },
+            "nestedRoles": {
+              "type": "array",
+              "items": { "type": "string" }
+            }
+          }
+        },
+        "apps": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "superset": { "type": "boolean" },
+            "datahub": { "type": "boolean" },
+            "trinoUi": { "type": "boolean" },
+            "cloudbeaver": { "type": "boolean" },
+            "prefect": { "type": "boolean" }
+          }
+        },
+        "ranger": {
+          "type": "object",
+          "additionalProperties": true,
+          "properties": {
+            "roleName": { "type": "string" }
+          }
+        }
+      }
+    },
+    "platformRoleException": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "platformRole": { "type": "string" },
+        "username": { "type": "string" },
+        "approvalRef": { "type": "string" },
+        "reason": { "type": "string" },
+        "grantedBy": { "type": "string" },
+        "expiresAt": {
+          "type": "string",
+          "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$"
+        }
+      },
+      "required": ["platformRole", "username", "approvalRef", "reason", "grantedBy", "expiresAt"]
+    }
+  },
   "properties": {
     "global": {
       "description": "Cross-cutting settings shared across the umbrella chart, including storage and catalog definitions.",
@@ -24,7 +746,7 @@
         "environment": {
           "type": "string",
           "description": "Short environment label used to distinguish local, development, or production-style deployments.",
-          "pattern": "^[a-zA-Z0-9-]*$"
+          "enum": ["local", "dev", "prod"]
         },
         "imagePullSecrets": {
           "type": "array",
@@ -32,6 +754,14 @@
           "items": {
             "type": "object"
           }
+        },
+        "identity": {
+          "$ref": "#/definitions/identityContract",
+          "description": "Runtime copy of the shared identity contract consumed by subcharts."
+        },
+        "authorization": {
+          "$ref": "#/definitions/authorizationContract",
+          "description": "Runtime copy of the shared authorization contract consumed by subcharts."
         },
         "storage": {
           "description": "Object-store configuration shared by locally owned composition logic and downstream components.",
@@ -72,6 +802,10 @@
                   "type": "string",
                   "description": "Inline secret key used by example overlays or simple local deployments."
                 },
+                "existingSecret": {
+                  "type": "string",
+                  "description": "Existing Kubernetes Secret name containing object-store credentials for chart renders that read secrets from the cluster."
+                },
                 "accessKeyKey": {
                   "type": "string",
                   "description": "Secret key name to read the access key from when external secret delivery is used."
@@ -97,22 +831,17 @@
                   "description": "Logical catalog type used by the local Trino and Hive composition logic.",
                   "enum": ["deltaLake", "hive"]
                 },
+                "authorizedGroups": {
+                  "description": "Preferred catalog-level group access lists used by generated Trino access rules.",
+                  "$ref": "#/definitions/catalogAcl"
+                },
                 "authorizedUsers": {
                   "description": "Simple catalog-level access-control lists used by generated Trino access rules.",
-                  "type": "object",
-                  "additionalProperties": true,
-                  "properties": {
-                    "read": {
-                      "type": "array",
-                      "description": "User or group identifiers granted read access to the catalog.",
-                      "items": { "type": "string" }
-                    },
-                    "write": {
-                      "type": "array",
-                      "description": "User or group identifiers granted write access to the catalog.",
-                      "items": { "type": "string" }
-                    }
-                  }
+                  "$ref": "#/definitions/catalogAcl"
+                },
+                "governance": {
+                  "description": "Mandatory governance metadata for shared, development, and production datasets.",
+                  "$ref": "#/definitions/catalogGovernance"
                 }
               }
             }
@@ -127,9 +856,293 @@
         "enabled": { "type": "boolean" }
       }
     },
+    "keycloak": {
+      "description": "Pass-through values for the bundled Keycloak dependency used when identity.provider.mode is bundledKeycloak.",
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "enabled": { "type": "boolean" }
+      }
+    },
+    "platformHome": {
+      "description": "Lightweight static launchpad that becomes the default browser entrypoint in shared environments.",
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "replicaCount": { "type": "integer", "minimum": 1 },
+        "keycloakBrowserBaseUrl": { "type": "string" },
+        "image": {
+          "type": "object",
+          "additionalProperties": true,
+          "properties": {
+            "repository": { "type": "string" },
+            "tag": { "type": "string" },
+            "pullPolicy": { "type": "string" }
+          }
+        },
+        "api": {
+          "type": "object",
+          "additionalProperties": true,
+          "properties": {
+            "port": { "type": "integer", "minimum": 1 },
+            "image": {
+              "type": "object",
+              "additionalProperties": true,
+              "properties": {
+                "repository": { "type": "string" },
+                "tag": { "type": "string" },
+                "pullPolicy": { "type": "string" }
+              }
+            }
+          }
+        },
+        "service": {
+          "type": "object",
+          "additionalProperties": true,
+          "properties": {
+            "port": { "type": "integer", "minimum": 1 }
+          }
+        },
+        "ingress": {
+          "type": "object",
+          "additionalProperties": true,
+          "properties": {
+            "enabled": { "type": "boolean" },
+            "className": { "type": "string" },
+            "host": { "type": "string" },
+            "tlsSecretName": { "type": "string" },
+            "annotations": {
+              "type": "object",
+              "additionalProperties": true
+            }
+          }
+        },
+        "branding": {
+          "type": "object",
+          "additionalProperties": true,
+          "properties": {
+            "title": { "type": "string" },
+            "subtitle": { "type": "string" },
+            "logoUrl": { "type": "string" },
+            "logoAlt": { "type": "string" },
+            "faviconUrl": { "type": "string" }
+          }
+        },
+        "theme": {
+          "type": "object",
+          "additionalProperties": true,
+          "properties": {
+            "metaThemeColor": { "type": "string" },
+            "customCss": { "type": "string" },
+            "colors": {
+              "type": "object",
+              "additionalProperties": true,
+              "properties": {
+                "bg": { "type": "string" },
+                "bgDeep": { "type": "string" },
+                "surface": { "type": "string" },
+                "surfaceSoft": { "type": "string" },
+                "ink": { "type": "string" },
+                "inkDeep": { "type": "string" },
+                "muted": { "type": "string" },
+                "brand": { "type": "string" },
+                "brandDeep": { "type": "string" },
+                "brandSoft": { "type": "string" },
+                "accent": { "type": "string" },
+                "accentRose": { "type": "string" },
+                "line": { "type": "string" },
+                "shadow": { "type": "string" }
+              }
+            },
+            "fonts": {
+              "type": "object",
+              "additionalProperties": true,
+              "properties": {
+                "bodyFamily": { "type": "string" },
+                "headingFamily": { "type": "string" },
+                "preloads": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": true,
+                    "properties": {
+                      "href": { "type": "string" },
+                      "as": { "type": "string" },
+                      "type": { "type": "string" },
+                      "crossorigin": { "type": "string" }
+                    }
+                  }
+                },
+                "fontFaces": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": true,
+                    "properties": {
+                      "family": { "type": "string" },
+                      "src": { "type": "string" },
+                      "format": { "type": "string" },
+                      "weight": { "type": ["string", "integer"] },
+                      "style": { "type": "string" },
+                      "display": { "type": "string" }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "health": {
+          "type": "object",
+          "additionalProperties": true,
+          "properties": {
+            "enabled": { "type": "boolean" },
+            "refreshIntervalSeconds": { "type": "integer", "minimum": 15 }
+          }
+        },
+        "itemMeta": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "object",
+            "additionalProperties": true,
+            "properties": {
+              "iconUrl": { "type": "string" },
+              "iconAlt": { "type": "string" },
+              "iconBackground": { "type": "string" },
+              "iconText": { "type": "string" },
+              "health": {
+                "type": "object",
+                "additionalProperties": true,
+                "properties": {
+                  "targetUrl": { "type": "string" },
+                  "expectedStatusCodes": {
+                    "type": "array",
+                    "items": { "type": "integer", "minimum": 100, "maximum": 599 }
+                  },
+                  "bodyIncludes": { "type": "string" },
+                  "timeoutSeconds": { "type": "integer", "minimum": 1 },
+                  "public": { "type": "boolean" }
+                }
+              }
+            }
+          }
+        },
+        "adminTools": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": true,
+            "properties": {
+              "id": { "type": "string" },
+              "name": { "type": "string" },
+              "summary": { "type": "string" },
+              "url": { "type": "string" },
+              "icon": { "type": "string" },
+              "iconUrl": { "type": "string" },
+              "iconAlt": { "type": "string" },
+              "iconBackground": { "type": "string" },
+              "iconText": { "type": "string" },
+              "health": {
+                "type": "object",
+                "additionalProperties": true,
+                "properties": {
+                  "targetUrl": { "type": "string" },
+                  "expectedStatusCodes": {
+                    "type": "array",
+                    "items": { "type": "integer", "minimum": 100, "maximum": 599 }
+                  },
+                  "bodyIncludes": { "type": "string" },
+                  "timeoutSeconds": { "type": "integer", "minimum": 1 },
+                  "public": { "type": "boolean" }
+                }
+              },
+              "group": { "type": "string" }
+            }
+          }
+        }
+      }
+    },
+    "cloudbeaver": {
+      "description": "Chart-owned CloudBeaver Community Edition deployment protected by oauth2-proxy.",
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "image": {
+          "type": "object",
+          "additionalProperties": true,
+          "properties": {
+            "repository": { "type": "string" },
+            "tag": { "type": "string" },
+            "pullPolicy": { "type": "string" }
+          }
+        },
+        "service": {
+          "type": "object",
+          "additionalProperties": true,
+          "properties": {
+            "port": { "type": "integer", "minimum": 1 }
+          }
+        },
+        "workspace": {
+          "type": "object",
+          "additionalProperties": true,
+          "properties": {
+            "persistence": {
+              "type": "object",
+              "additionalProperties": true,
+              "properties": {
+                "enabled": { "type": "boolean" },
+                "existingClaim": { "type": "string" },
+                "size": { "type": "string" },
+                "storageClass": { "type": "string" }
+              }
+            }
+          }
+        },
+        "bootstrap": {
+          "type": "object",
+          "additionalProperties": true,
+          "properties": {
+            "existingSecret": { "type": "string" },
+            "initialDataKey": { "type": "string" }
+          }
+        },
+        "authProxy": {
+          "type": "object",
+          "additionalProperties": true,
+          "properties": {
+            "enabled": { "type": "boolean" },
+            "userHeader": { "type": "string" },
+            "groupHeader": { "type": "string" },
+            "groupDelimiter": { "type": "string" },
+            "firstNameHeader": { "type": "string" },
+            "lastNameHeader": { "type": "string" },
+            "logoutUrl": { "type": "string" }
+          }
+        },
+        "app": {
+          "type": "object",
+          "additionalProperties": true,
+          "properties": {
+            "supportsCustomConnections": { "type": "boolean" },
+            "showReadOnlyConnectionInfo": { "type": "boolean" },
+            "publicCredentialsSaveEnabled": { "type": "boolean" },
+            "adminCredentialsSaveEnabled": { "type": "boolean" }
+          }
+        }
+      }
+    },
+    "rangerPostgresql": {
+      "description": "Pass-through values for the Ranger PostgreSQL dependency.",
+      "type": "object",
+      "additionalProperties": true
+    },
     "prefect": {
       "description": "Feature toggles for the Prefect server and worker subcomponents.",
       "type": "object",
+      "additionalProperties": true,
       "properties": {
         "enabled": { "type": "boolean" },
         "server": {
@@ -143,6 +1156,13 @@
           "properties": {
             "enabled": { "type": "boolean" }
           }
+        },
+        "authProxy": {
+          "type": "object",
+          "additionalProperties": true,
+          "properties": {
+            "enabled": { "type": "boolean" }
+          }
         }
       }
     },
@@ -153,6 +1173,16 @@
     },
     "prefectWorker": {
       "description": "Direct pass-through values for the upstream Prefect Worker chart.",
+      "type": "object",
+      "additionalProperties": true
+    },
+    "prefect-auth-proxy": {
+      "description": "Pass-through values for the oauth2-proxy dependency that can protect Prefect in shared environments.",
+      "type": "object",
+      "additionalProperties": true
+    },
+    "cloudbeaver-auth-proxy": {
+      "description": "Pass-through values for the oauth2-proxy dependency that protects CloudBeaver.",
       "type": "object",
       "additionalProperties": true
     },
@@ -176,7 +1206,29 @@
       "type": "object",
       "additionalProperties": true,
       "properties": {
-        "enabled": { "type": "boolean" }
+        "enabled": { "type": "boolean" },
+        "auth": {
+          "type": "object",
+          "additionalProperties": true,
+          "properties": {
+            "groupProvisioning": {
+              "type": "object",
+              "additionalProperties": true,
+              "properties": {
+                "enabled": { "type": "boolean" },
+                "groupsClaim": { "type": "string" },
+                "viewers": {
+                  "type": "array",
+                  "items": { "type": "string" }
+                },
+                "editors": {
+                  "type": "array",
+                  "items": { "type": "string" }
+                }
+              }
+            }
+          }
+        }
       }
     },
     "datahubPrerequisites": {
@@ -189,7 +1241,20 @@
       "type": "object",
       "additionalProperties": true,
       "properties": {
-        "enabled": { "type": "boolean" }
+        "enabled": { "type": "boolean" },
+        "auth": {
+          "type": "object",
+          "additionalProperties": true,
+          "properties": {
+            "roleMappings": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "array",
+                "items": { "type": "string" }
+              }
+            }
+          }
+        }
       }
     },
     "hive": {
@@ -283,7 +1348,7 @@
         "enabled": { "type": "boolean" }
       }
     },
-    "postgresql": {
+    "hivePostgresql": {
       "description": "Pass-through values for the PostgreSQL dependency used by the Hive subchart.",
       "type": "object",
       "additionalProperties": true,

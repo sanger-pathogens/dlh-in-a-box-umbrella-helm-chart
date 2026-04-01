@@ -32,10 +32,21 @@ non_local_examples=(
   "examples/values-minio.yaml"
   "examples/values-prod.yaml"
   "examples/values-prod-layers.yaml"
+  "examples/values-shared-auth.yaml"
 )
 
 ruby - "${non_local_examples[@]}" <<'RUBY'
 require "yaml"
+
+def load_yaml(path)
+  content = File.read(path)
+
+  begin
+    YAML.safe_load(content, aliases: true) || {}
+  rescue ArgumentError
+    YAML.load(content) || {}
+  end
+end
 
 paths = {
   "global.storage.s3.accessKey" => %w[global storage s3 accessKey],
@@ -45,7 +56,7 @@ paths = {
   "hive.s3.accessKey" => %w[hive s3 accessKey],
   "hive.s3.secretKey" => %w[hive s3 secretKey],
   "minio.auth.rootPassword" => %w[minio auth rootPassword],
-  "postgresql.auth.postgresPassword" => %w[postgresql auth postgresPassword],
+  "hivePostgresql.auth.postgresPassword" => %w[hivePostgresql auth postgresPassword],
   "superset.extraSecretEnv.SUPERSET_SECRET_KEY" => %w[superset extraSecretEnv SUPERSET_SECRET_KEY],
   "superset.init.adminUser.password" => %w[superset init adminUser password],
   "superset.postgresql.auth.password" => %w[superset postgresql auth password],
@@ -54,7 +65,7 @@ paths = {
 }
 
 ARGV.each do |path|
-  data = YAML.load_file(path) || {}
+  data = load_yaml(path)
   hits = []
 
   paths.each do |label, segments|
@@ -72,3 +83,28 @@ ARGV.each do |path|
   exit 1
 end
 RUBY
+
+allowed_bitnamilegacy_paths=(
+  "charts/dlh-in-a-box/values.yaml"
+  "examples/values-local-auth.yaml"
+  "examples/values-local.yaml"
+  "examples/values-local-layers.yaml"
+  "examples/values-local-superset.yaml"
+)
+
+while IFS=: read -r path _; do
+  [[ -z "${path}" ]] && continue
+
+  allowed=false
+  for expected in "${allowed_bitnamilegacy_paths[@]}"; do
+    if [[ "${path}" == "${expected}" ]]; then
+      allowed=true
+      break
+    fi
+  done
+
+  if [[ "${allowed}" != "true" ]]; then
+    echo "Unexpected bitnamilegacy image reference found in ${path}. Keep new references out of the chart until the temporary supply-chain debt is removed." >&2
+    exit 1
+  fi
+done < <(rg -n 'bitnamilegacy/' charts/dlh-in-a-box/values.yaml examples/*.yaml || true)

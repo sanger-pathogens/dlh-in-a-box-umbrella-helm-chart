@@ -32,8 +32,8 @@ spec:
       annotations:
         checksum/init-config: {{ include (print $.Template.BasePath "/init-config.yaml") $ | sha256sum }}
         checksum/metastore-config: {{ include (print $.Template.BasePath "/configmap.yaml") $ | sha256sum }}
-        checksum/postgres-secret: {{ ($.Values.postgres.existingSecret | default (include (print $.Template.BasePath "/postgres-secret.yaml") $)) | sha256sum }}
-        checksum/s3-secret: {{ ($.Values.s3.existingSecret | default (include (print $.Template.BasePath "/s3-secret.yaml") $)) | sha256sum }}
+        checksum/postgres-secret: {{ include "hive.postgresSecretChecksum" $ }}
+        checksum/s3-secret: {{ include "hive.s3SecretChecksum" $ }}
       labels:
         app: {{ include "hive.fullname" $ }}-{{ $safeCatalog }}-metastore
     spec:
@@ -72,12 +72,12 @@ spec:
             - name: POSTGRES_USER
               valueFrom:
                 secretKeyRef:
-                  name: {{ include "hive.fullname" $ }}-postgres-secret
+                  name: {{ include "hive.postgresSecretName" $ }}
                   key: username
             - name: POSTGRES_PASSWORD
               valueFrom:
                 secretKeyRef:
-                  name: {{ include "hive.fullname" $ }}-postgres-secret
+                  name: {{ include "hive.postgresSecretName" $ }}
                   key: password
             - name: POSTGRES_HOST
               valueFrom:
@@ -115,12 +115,12 @@ spec:
             - name: POSTGRES_USER
               valueFrom:
                 secretKeyRef:
-                  name: {{ include "hive.fullname" $ }}-postgres-secret
+                  name: {{ include "hive.postgresSecretName" $ }}
                   key: username
             - name: POSTGRES_PASSWORD
               valueFrom:
                 secretKeyRef:
-                  name: {{ include "hive.fullname" $ }}-postgres-secret
+                  name: {{ include "hive.postgresSecretName" $ }}
                   key: password
             - name: POSTGRES_HOST
               valueFrom:
@@ -155,9 +155,9 @@ spec:
               value: /opt/hadoop/share/hadoop/tools/lib/*
           envFrom:
             - secretRef:
-                name: {{ include "hive.fullname" $ }}-postgres-secret
+                name: {{ include "hive.postgresSecretName" $ }}
             - secretRef:
-                name: {{ include "hive.fullname" $ }}-s3-secret
+                name: {{ include "hive.s3SecretName" $ }}
             - configMapRef:
                 name: {{ include "hive.fullname" $ }}-init-config
           ports:

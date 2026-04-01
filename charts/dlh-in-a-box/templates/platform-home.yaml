@@ -1,0 +1,3025 @@
+{{- if .Values.platformHome.enabled }}
+{{- $serviceName := include "dlh-in-a-box.platformHome.serviceName" . -}}
+{{- $port := default 8080 .Values.platformHome.service.port -}}
+{{- $apiPort := default 18080 (dig "api" "port" 18080 .Values.platformHome) -}}
+{{- $platformHomeValues := .Values.platformHome | default dict -}}
+{{- $keycloakBrowserBaseUrl := trimSuffix "/" (default "" (get $platformHomeValues "keycloakBrowserBaseUrl")) -}}
+{{- $branding := .Values.platformHome.branding | default dict -}}
+{{- $theme := get $platformHomeValues "theme" | default dict -}}
+{{- $themeColors := get $theme "colors" | default dict -}}
+{{- $themeFonts := get $theme "fonts" | default dict -}}
+{{- $themeFontPreloads := get $themeFonts "preloads" | default (list) -}}
+{{- $themeFontFaces := get $themeFonts "fontFaces" | default (list) -}}
+{{- $itemMeta := get $platformHomeValues "itemMeta" | default dict -}}
+{{- $portalHealth := get $platformHomeValues "health" | default dict -}}
+{{- $global := .Values.global | default dict -}}
+{{- $identity := get $global "identity" | default dict -}}
+{{- $authorization := get $global "authorization" | default dict -}}
+{{- $platformRoles := get $authorization "platformRoles" | default dict -}}
+{{- $platformRoleExceptions := get $authorization "platformRoleExceptions" | default (list) -}}
+{{- $platformRoleMembershipSource := default "git" (get $authorization "platformRoleMembershipSource") -}}
+{{- $ranger := get $authorization "ranger" | default dict -}}
+{{- $rangerAdmin := get $ranger "admin" | default dict -}}
+{{- $usersyncEnabled := dig "usersync" "enabled" true $ranger -}}
+{{- $external := get $identity "external" | default dict -}}
+{{- $clients := get $external "clients" | default dict -}}
+{{- $oidc := get $external "oidc" | default dict -}}
+{{- $adminRequiredGroup := include "dlh-in-a-box.group.role" (dict "root" . "name" "platform-admin") -}}
+{{- $brandingTitle := default "Data Platform" $branding.title -}}
+{{- $brandingSubtitle := default "" $branding.subtitle -}}
+{{- $brandingLogoUrl := default "" $branding.logoUrl -}}
+{{- $brandingLogoAlt := default "Platform logo" $branding.logoAlt -}}
+{{- $brandingFaviconUrl := default "" $branding.faviconUrl -}}
+{{- $metaThemeColor := default "#1f5f7a" (get $theme "metaThemeColor") -}}
+{{- $fontBodyFamily := default "system-ui, -apple-system, BlinkMacSystemFont, \"Segoe UI\", sans-serif" (get $themeFonts "bodyFamily") -}}
+{{- $fontHeadingFamily := default "Georgia, \"Times New Roman\", serif" (get $themeFonts "headingFamily") -}}
+{{- $platformRoleViews := list -}}
+{{- $appRoleGroups := dict
+  "superset" (list)
+  "datahub" (list)
+  "cloudbeaver" (list)
+  "prefect" (list)
+-}}
+{{- range $roleKey := keys $platformRoles | sortAlpha -}}
+  {{- $role := get $platformRoles $roleKey | default dict -}}
+  {{- $members := get $role "members" | default dict -}}
+  {{- $roleApps := get $role "apps" | default dict -}}
+  {{- $directoryGroups := get $members "directoryGroups" | default (list) -}}
+  {{- if default false (get $roleApps "superset") -}}
+    {{- $_ := set $appRoleGroups "superset" (uniq (concat (get $appRoleGroups "superset") $directoryGroups)) -}}
+  {{- end -}}
+  {{- if default false (get $roleApps "datahub") -}}
+    {{- $_ := set $appRoleGroups "datahub" (uniq (concat (get $appRoleGroups "datahub") $directoryGroups)) -}}
+  {{- end -}}
+  {{- if default false (get $roleApps "cloudbeaver") -}}
+    {{- $_ := set $appRoleGroups "cloudbeaver" (uniq (concat (get $appRoleGroups "cloudbeaver") $directoryGroups)) -}}
+  {{- end -}}
+  {{- if default false (get $roleApps "prefect") -}}
+    {{- $_ := set $appRoleGroups "prefect" (uniq (concat (get $appRoleGroups "prefect") $directoryGroups)) -}}
+  {{- end -}}
+  {{- $declaredExceptions := list -}}
+  {{- range $exception := $platformRoleExceptions -}}
+    {{- if eq (default "" (get $exception "platformRole")) $roleKey -}}
+      {{- $declaredExceptions = append $declaredExceptions (dict
+        "username" (default "" (get $exception "username"))
+        "approvalRef" (default "" (get $exception "approvalRef"))
+        "reason" (default "" (get $exception "reason"))
+        "grantedBy" (default "" (get $exception "grantedBy"))
+        "expiresAt" (default "" (get $exception "expiresAt"))
+      ) -}}
+    {{- end -}}
+  {{- end -}}
+  {{- $platformRoleViews = append $platformRoleViews (dict
+    "key" $roleKey
+    "name" (default $roleKey (dig "ranger" "roleName" "" $role))
+    "description" (default "" (get $role "description"))
+    "directoryGroups" $directoryGroups
+    "users" (get $members "users" | default (list))
+    "nestedRoles" (get $members "nestedRoles" | default (list))
+    "apps" (dict
+      "superset" (default false (get $roleApps "superset"))
+      "datahub" (default false (get $roleApps "datahub"))
+      "trinoUi" (default false (get $roleApps "trinoUi"))
+      "cloudbeaver" (default false (get $roleApps "cloudbeaver"))
+      "prefect" (default false (get $roleApps "prefect"))
+    )
+    "declaredExceptions" $declaredExceptions
+  ) -}}
+{{- end -}}
+{{- $adminTools := list -}}
+{{- if (default "" (get $rangerAdmin "browserUrl")) -}}
+  {{- $toolMeta := get $itemMeta "ranger-admin" | default dict -}}
+  {{- $adminTools = append $adminTools (dict
+    "id" "ranger-admin"
+    "name" "Ranger Admin"
+    "summary" "Manage Trino access policies"
+    "url" (get $rangerAdmin "browserUrl")
+    "icon" "RA"
+    "iconText" (default "RA" (get $toolMeta "iconText"))
+    "iconUrl" (default "" (get $toolMeta "iconUrl"))
+    "iconAlt" (default "Ranger Admin logo" (get $toolMeta "iconAlt"))
+    "iconBackground" (default "" (get $toolMeta "iconBackground"))
+    "health" (get $toolMeta "health" | default dict)
+    "group" "Governance & Access"
+  ) -}}
+{{- end -}}
+{{- if $keycloakBrowserBaseUrl -}}
+  {{- $toolMeta := get $itemMeta "keycloak-admin" | default dict -}}
+  {{- $adminTools = append $adminTools (dict
+    "id" "keycloak-admin"
+    "name" "Keycloak Admin"
+    "summary" "Identity realm, groups, and OIDC client configuration"
+    "url" (printf "%s/admin/master/console/" $keycloakBrowserBaseUrl)
+    "icon" "KC"
+    "iconText" (default "KC" (get $toolMeta "iconText"))
+    "iconUrl" (default "" (get $toolMeta "iconUrl"))
+    "iconAlt" (default "Keycloak Admin logo" (get $toolMeta "iconAlt"))
+    "iconBackground" (default "" (get $toolMeta "iconBackground"))
+    "health" (get $toolMeta "health" | default dict)
+    "group" "Governance & Access"
+  ) -}}
+{{- end -}}
+{{- if default false (dig "trino" "enabled" false $clients) -}}
+  {{- $toolMeta := get $itemMeta "trino" | default dict -}}
+  {{- $adminTools = append $adminTools (dict
+    "id" "trino"
+    "name" "Trino UI"
+    "summary" "Inspect running and completed queries"
+    "url" (first (default (list) (dig "trino" "webOrigins" list $clients)))
+    "icon" "TR"
+    "iconText" (default "TR" (get $toolMeta "iconText"))
+    "iconUrl" (default "" (get $toolMeta "iconUrl"))
+    "iconAlt" (default "Trino logo" (get $toolMeta "iconAlt"))
+    "iconBackground" (default "" (get $toolMeta "iconBackground"))
+    "health" (get $toolMeta "health" | default dict)
+    "group" "Platform Operations"
+  ) -}}
+{{- end -}}
+{{- range $tool := (get $platformHomeValues "adminTools" | default (list)) -}}
+  {{- $toolId := default "" (get $tool "id") -}}
+  {{- $toolMeta := get $itemMeta $toolId | default dict -}}
+  {{- $adminTools = append $adminTools (dict
+    "id" $toolId
+    "name" (default "" (get $tool "name"))
+    "summary" (default "" (get $tool "summary"))
+    "url" (default "" (get $tool "url"))
+    "icon" (default "" (get $tool "icon"))
+    "iconText" (default (default "" (get $toolMeta "iconText")) (default "" (get $tool "icon")))
+    "iconUrl" (default (default "" (get $toolMeta "iconUrl")) (default "" (get $tool "iconUrl")))
+    "iconAlt" (default (default "" (get $toolMeta "iconAlt")) (default "" (get $tool "iconAlt")))
+    "iconBackground" (default (default "" (get $toolMeta "iconBackground")) (default "" (get $tool "iconBackground")))
+    "health" (mergeOverwrite (get $toolMeta "health" | default dict) (get $tool "health" | default dict))
+    "group" (default "Platform Operations" (get $tool "group"))
+  ) -}}
+{{- end -}}
+{{- $apps := list -}}
+{{- if and .Values.superset.enabled (default false (dig "superset" "enabled" false $clients)) -}}
+  {{- $supersetOrigin := trimSuffix "/" (first (default (list) (dig "superset" "webOrigins" list $clients))) -}}
+  {{- $supersetProvider := default "keycloak" (dig "superset" "providerName" "" $clients) -}}
+  {{- $appMeta := get $itemMeta "superset" | default dict -}}
+  {{- $apps = append $apps (dict
+    "id" "superset"
+    "name" "Superset"
+    "summary" "Dashboards and visual analysis"
+    "url" (printf "%s/login/%s" $supersetOrigin $supersetProvider)
+    "group" "Analysis"
+    "icon" "SU"
+    "iconText" (default "SU" (get $appMeta "iconText"))
+    "iconUrl" (default "" (get $appMeta "iconUrl"))
+    "iconAlt" (default "Superset logo" (get $appMeta "iconAlt"))
+    "iconBackground" (default "" (get $appMeta "iconBackground"))
+    "health" (get $appMeta "health" | default dict)
+    "requiredGroups" (uniq (concat (list (include "dlh-in-a-box.group.app" (dict "root" . "name" "superset"))) (get $appRoleGroups "superset")))
+  ) -}}
+{{- end -}}
+{{- if and .Values.datahub.enabled (default false (dig "datahub" "enabled" false $clients)) -}}
+  {{- $appMeta := get $itemMeta "datahub" | default dict -}}
+  {{- $apps = append $apps (dict
+    "id" "datahub"
+    "name" "DataHub"
+    "summary" "Catalog and discover datasets"
+    "url" (first (default (list) (dig "datahub" "webOrigins" list $clients)))
+    "group" "Data Access"
+    "icon" "DH"
+    "iconText" (default "DH" (get $appMeta "iconText"))
+    "iconUrl" (default "" (get $appMeta "iconUrl"))
+    "iconAlt" (default "DataHub logo" (get $appMeta "iconAlt"))
+    "iconBackground" (default "" (get $appMeta "iconBackground"))
+    "health" (get $appMeta "health" | default dict)
+    "requiredGroups" (uniq (concat (list (include "dlh-in-a-box.group.app" (dict "root" . "name" "datahub"))) (get $appRoleGroups "datahub")))
+  ) -}}
+{{- end -}}
+{{- if default false (dig "prefectProxy" "enabled" false $clients) -}}
+  {{- $prefectOrigin := trimSuffix "/" (first (default (list) (dig "prefectProxy" "webOrigins" list $clients))) -}}
+  {{- $appMeta := get $itemMeta "prefect" | default dict -}}
+  {{- $apps = append $apps (dict
+    "id" "prefect"
+    "name" "Prefect"
+    "summary" "Monitor scheduled and running flows"
+    "url" (printf "%s/oauth2/start?rd=%s" $prefectOrigin (urlquery "/"))
+    "group" "Workflows"
+    "icon" "PF"
+    "iconText" (default "PF" (get $appMeta "iconText"))
+    "iconUrl" (default "" (get $appMeta "iconUrl"))
+    "iconAlt" (default "Prefect logo" (get $appMeta "iconAlt"))
+    "iconBackground" (default "" (get $appMeta "iconBackground"))
+    "health" (get $appMeta "health" | default dict)
+    "requiredGroups" (uniq (concat (list (include "dlh-in-a-box.group.app" (dict "root" . "name" "prefect"))) (get $appRoleGroups "prefect")))
+  ) -}}
+{{- end -}}
+{{- if and .Values.cloudbeaver.enabled (default false (dig "cloudbeaverProxy" "enabled" false $clients)) -}}
+  {{- $cloudbeaverOrigin := trimSuffix "/" (first (default (list) (dig "cloudbeaverProxy" "webOrigins" list $clients))) -}}
+  {{- $appMeta := get $itemMeta "cloudbeaver" | default dict -}}
+  {{- $apps = append $apps (dict
+    "id" "cloudbeaver"
+    "name" "CloudBeaver"
+    "summary" "Browser SQL workspace"
+    "url" (printf "%s/oauth2/start?rd=%s" $cloudbeaverOrigin (urlquery "/"))
+    "group" "Data Access"
+    "icon" "CB"
+    "iconText" (default "CB" (get $appMeta "iconText"))
+    "iconUrl" (default "" (get $appMeta "iconUrl"))
+    "iconAlt" (default "CloudBeaver logo" (get $appMeta "iconAlt"))
+    "iconBackground" (default "" (get $appMeta "iconBackground"))
+    "health" (get $appMeta "health" | default dict)
+    "requiredGroups" (uniq (concat (list (include "dlh-in-a-box.group.app" (dict "root" . "name" "cloudbeaver"))) (get $appRoleGroups "cloudbeaver")))
+  ) -}}
+{{- end -}}
+{{- $healthItems := list -}}
+{{- range $app := $apps -}}
+  {{- $healthItems = append $healthItems (dict
+    "id" (get $app "id")
+    "name" (get $app "name")
+    "group" (get $app "group")
+    "url" (get $app "url")
+    "requiredGroups" (get $app "requiredGroups" | default (list))
+    "adminOnly" false
+    "health" (get $app "health" | default dict)
+  ) -}}
+{{- end -}}
+{{- range $tool := $adminTools -}}
+  {{- $healthItems = append $healthItems (dict
+    "id" (get $tool "id")
+    "name" (get $tool "name")
+    "group" (get $tool "group")
+    "url" (get $tool "url")
+    "requiredGroups" (list)
+    "adminOnly" true
+    "health" (get $tool "health" | default dict)
+  ) -}}
+{{- end -}}
+{{- $portalConfig := dict
+  "branding" (dict
+    "title" $brandingTitle
+    "subtitle" $brandingSubtitle
+    "logoUrl" $brandingLogoUrl
+    "logoAlt" $brandingLogoAlt
+    "faviconUrl" $brandingFaviconUrl
+    "metaThemeColor" $metaThemeColor
+  )
+  "health" (dict
+    "enabled" (default false (get $portalHealth "enabled"))
+    "refreshIntervalSeconds" (default 90 (get $portalHealth "refreshIntervalSeconds"))
+  )
+  "identity" (dict
+    "groupsClaim" (default "groups" $oidc.groupsClaim)
+    "keycloak" (dict
+      "baseUrl" (default (include "dlh-in-a-box.keycloak.browserBaseUrl" .) .Values.platformHome.keycloakBrowserBaseUrl)
+      "realm" (include "dlh-in-a-box.keycloak.realm" .)
+      "clientId" (default "" (get (get $clients "platformHome" | default dict) "clientId"))
+    )
+  )
+  "apps" $apps
+  "admin" (dict
+    "requiredGroups" (list $adminRequiredGroup)
+    "tools" $adminTools
+    "roleManagementEnabled" (and $ranger.enabled (gt (len $platformRoleViews) 0))
+  )
+-}}
+{{- $platformHomeAdminConfig := dict
+  "roles" $platformRoleViews
+  "health" (dict
+    "enabled" (default false (get $portalHealth "enabled"))
+    "refreshIntervalSeconds" (default 90 (get $portalHealth "refreshIntervalSeconds"))
+  )
+  "items" $healthItems
+  "ranger" (dict
+    "enabled" (default false $ranger.enabled)
+    "browserUrl" (default "" (get $rangerAdmin "browserUrl"))
+    "usersyncEnabled" (default true $usersyncEnabled)
+    "membershipSource" $platformRoleMembershipSource
+  )
+-}}
+{{- $platformHomeChecksum := (printf "%s\n%s\n%s\n%s" (toPrettyJson $portalConfig) (toPrettyJson $platformHomeAdminConfig) (toPrettyJson $theme) (.Files.Get "files/platform-home/keycloak.js") | sha256sum) -}}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ $serviceName }}-assets
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "dlh-in-a-box.labels" . | nindent 4 }}
+    app.kubernetes.io/component: platform-home
+data:
+  index.html: |
+    <!doctype html>
+    <html lang="en">
+    <head>
+      <meta charset="utf-8" />
+      <meta name="viewport" content="width=device-width, initial-scale=1" />
+      <meta id="portal-theme-color" name="theme-color" content="{{ $metaThemeColor }}" />
+      <title>{{ $brandingTitle }}</title>
+      {{- if $brandingFaviconUrl }}
+      <link id="portal-favicon" rel="icon" href="{{ $brandingFaviconUrl }}" type="image/x-icon" />
+      {{- end }}
+      {{- range $preload := $themeFontPreloads }}
+      <link
+        rel="preload"
+        href="{{ default "" (get $preload "href") }}"
+        as="{{ default "font" (get $preload "as") }}"
+        {{- with (get $preload "type") }} type="{{ . }}"{{- end }}
+        {{- if default false (get $preload "crossorigin") }} crossorigin="anonymous"{{- end }}
+      />
+      {{- end }}
+      <link rel="stylesheet" href="/styles.css" />
+    </head>
+    <body>
+      <div class="shell">
+        <div class="top-ribbon"></div>
+        <header class="hero">
+          <div class="brand-block">
+            <div class="brand-lockup">
+              <img id="portal-logo" class="brand-logo is-hidden" alt="{{ $brandingLogoAlt }}" />
+              <div class="brand-copy">
+                <h1 id="portal-title">{{ $brandingTitle }}</h1>
+                <p id="portal-subtitle" class="portal-subtitle">{{ $brandingSubtitle }}</p>
+              </div>
+            </div>
+          </div>
+          <div id="anonymous-actions" class="hero-actions hero-actions-stack">
+            <button id="login-button" class="primary-button" type="button">Sign in</button>
+          </div>
+          <div id="session-bar" class="session-bar is-hidden">
+            <div>
+              <p id="session-name" class="session-name">Authenticated user</p>
+            </div>
+            <button id="logout-button" class="secondary-button" type="button">Sign out</button>
+          </div>
+        </header>
+        <main id="signed-in-content" class="content is-hidden">
+          <section id="launch-groups" class="group-stack"></section>
+          <section id="empty-panel" class="panel is-hidden">
+            <div class="panel-header">
+              <h2>No applications assigned</h2>
+            </div>
+            <p class="panel-note">Your account signed in successfully, but no browser applications are currently assigned.</p>
+          </section>
+          <section id="administration" class="group-stack is-hidden">
+            <section id="admin-tools-panel" class="panel panel-secondary is-hidden">
+              <div class="panel-header">
+                <div>
+                  <p class="eyebrow">Administration</p>
+                  <h2>Administrative tools</h2>
+                  <p class="detail-note">Platform administration stays on the same signed-in page.</p>
+                </div>
+              </div>
+              <div id="admin-tools" class="group-stack"></div>
+            </section>
+            <section id="role-management-panel" class="panel panel-secondary is-hidden">
+              <div class="panel-header">
+                <div>
+                  <p class="eyebrow">Access control</p>
+                  <h2>Platform role management</h2>
+                  <p class="detail-note">Assign Ranger platform roles to direct users and synced directory groups. Role definitions, nested roles, and declared exceptions remain Git-managed.</p>
+                </div>
+              </div>
+              <div id="role-management-status" class="status-banner is-hidden"></div>
+              <div class="role-management-layout">
+                <aside class="role-catalog-shell">
+                  <h3 class="role-catalog-title">Platform roles</h3>
+                  <div id="role-catalog" class="role-catalog"></div>
+                </aside>
+                <section id="role-detail" class="role-detail panel-subtle">
+                  <p class="panel-note">Select a platform role to review and edit its live Ranger membership.</p>
+                </section>
+              </div>
+            </section>
+          </section>
+        </main>
+        <main id="anonymous-state" class="content content-minimal">
+          <section class="panel panel-inline-status panel-signin">
+            <p class="panel-note panel-note-strong">Sign in to continue.</p>
+          </section>
+        </main>
+      </div>
+      <script src="/app.js"></script>
+    </body>
+    </html>
+  admin.html: |
+    <!doctype html>
+    <html lang="en">
+    <head>
+      <meta charset="utf-8" />
+      <meta name="viewport" content="width=device-width, initial-scale=1" />
+      <meta name="theme-color" content="{{ $metaThemeColor }}" />
+      <title>{{ $brandingTitle }}</title>
+      {{- if $brandingFaviconUrl }}
+      <link rel="icon" href="{{ $brandingFaviconUrl }}" type="image/x-icon" />
+      {{- end }}
+      <meta http-equiv="refresh" content="0; url=/" />
+    </head>
+    <body>
+      <script>
+        try {
+          window.sessionStorage.setItem("platform-home-target-section", "administration");
+        } catch (error) {
+          console.warn("Unable to persist the administration redirect target.", error);
+        }
+        window.location.replace("/");
+      </script>
+    </body>
+    </html>
+  app.js: |
+    const anonymousState = document.getElementById("anonymous-state");
+    const anonymousActions = document.getElementById("anonymous-actions");
+    const signedInContent = document.getElementById("signed-in-content");
+    const launchGroups = document.getElementById("launch-groups");
+    const emptyPanel = document.getElementById("empty-panel");
+    const loginButton = document.getElementById("login-button");
+    const sessionBar = document.getElementById("session-bar");
+    const sessionName = document.getElementById("session-name");
+    const logoutButton = document.getElementById("logout-button");
+    const administration = document.getElementById("administration");
+    const adminToolsPanel = document.getElementById("admin-tools-panel");
+    const adminTools = document.getElementById("admin-tools");
+    const roleManagementPanel = document.getElementById("role-management-panel");
+    const roleManagementStatus = document.getElementById("role-management-status");
+    const roleCatalog = document.getElementById("role-catalog");
+    const roleDetail = document.getElementById("role-detail");
+    const titleElement = document.getElementById("portal-title");
+    const subtitleElement = document.getElementById("portal-subtitle");
+    const portalLogo = document.getElementById("portal-logo");
+    const portalFavicon = document.getElementById("portal-favicon");
+    const portalThemeColor = document.getElementById("portal-theme-color");
+    const defaultLoginLabel = loginButton ? loginButton.textContent : "Sign in";
+    const sectionStorageKey = "platform-home-target-section";
+
+    const state = {
+      config: null,
+      keycloak: null,
+      groups: [],
+      isAdmin: false,
+      adminStatus: null,
+      roles: [],
+      selectedRoleKey: null,
+      search: {
+        user: { query: "", results: [], loading: false, error: "" },
+        group: { query: "", results: [], loading: false, error: "" },
+      },
+      health: {
+        items: {},
+        timer: null,
+        lastUpdated: "",
+      },
+    };
+
+    function show(element) {
+      if (element) {
+        element.classList.remove("is-hidden");
+      }
+    }
+
+    function hide(element) {
+      if (element) {
+        element.classList.add("is-hidden");
+      }
+    }
+
+    function escapeHtml(value) {
+      return String(value)
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll('"', "&quot;")
+        .replaceAll("'", "&#39;");
+    }
+
+    function humanizeSlug(value) {
+      return String(value || "")
+        .split("-")
+        .filter(Boolean)
+        .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+        .join(" ");
+    }
+
+    function buildPortalRedirectUri() {
+      const path = window.location.pathname === "/admin.html" ? "/" : window.location.pathname;
+      return `${window.location.origin}${path}`;
+    }
+
+    function expireCookie(name) {
+      document.cookie = `${name}=; expires=Thu, 01 Jan 1970 00:00:00 GMT; Max-Age=0; path=/; SameSite=Lax`;
+    }
+
+    function rememberTargetSection(section) {
+      if (!section) {
+        return;
+      }
+      try {
+        window.sessionStorage.setItem(sectionStorageKey, section);
+      } catch (error) {
+        console.warn("Unable to persist the requested portal section.", error);
+      }
+    }
+
+    function getTargetSection() {
+      if (window.location.hash === "#administration") {
+        return "administration";
+      }
+      try {
+        return window.sessionStorage.getItem(sectionStorageKey) || "";
+      } catch (error) {
+        return "";
+      }
+    }
+
+    function clearTargetSection() {
+      try {
+        window.sessionStorage.removeItem(sectionStorageKey);
+      } catch (error) {
+        console.warn("Unable to clear the requested portal section.", error);
+      }
+    }
+
+    function clearTunnelOauthProxyCookies() {
+      document.cookie
+        .split(";")
+        .map((entry) => entry.trim().split("=", 1)[0])
+        .filter(Boolean)
+        .filter((name) => name.startsWith("_oauth2_proxy"))
+        .forEach((name) => expireCookie(name));
+    }
+
+    function groupItems(items, orderedGroups) {
+      const buckets = new Map();
+      items.forEach((item) => {
+        const group = item.group || "Applications";
+        if (!buckets.has(group)) {
+          buckets.set(group, []);
+        }
+        buckets.get(group).push(item);
+      });
+
+      const ordered = [];
+      orderedGroups.forEach((group) => {
+        if (buckets.has(group)) {
+          ordered.push([group, buckets.get(group)]);
+          buckets.delete(group);
+        }
+      });
+
+      Array.from(buckets.keys())
+        .sort()
+        .forEach((group) => ordered.push([group, buckets.get(group)]));
+
+      return ordered;
+    }
+
+    function renderCardIcon(item) {
+      const iconStyle = item.iconBackground ? ` style="background: ${escapeHtml(item.iconBackground)}"` : "";
+      if (item.iconUrl) {
+        return `
+          <div class="app-icon has-image"${iconStyle}>
+            <img src="${escapeHtml(item.iconUrl)}" alt="${escapeHtml(item.iconAlt || `${item.name} logo`)}" loading="lazy" />
+          </div>
+        `;
+      }
+      const iconText = item.iconText || item.icon || item.name.slice(0, 2).toUpperCase();
+      return `<div class="app-icon"${iconStyle} aria-hidden="true">${escapeHtml(iconText)}</div>`;
+    }
+
+    function healthLabel(status) {
+      switch (String(status || "unknown")) {
+        case "healthy":
+          return "Healthy";
+        case "degraded":
+          return "Degraded";
+        case "down":
+          return "Down";
+        default:
+          return "Unknown";
+      }
+    }
+
+    function healthStateFor(item) {
+      if (!state.config?.health?.enabled) {
+        return null;
+      }
+      return (
+        state.health.items[item.id] || {
+          status: "unknown",
+          summary: "Waiting for the latest platform health check.",
+          checkedAt: state.health.lastUpdated || "",
+        }
+      );
+    }
+
+    function formatHealthTimestamp(value) {
+      if (!value) {
+        return "";
+      }
+      const timestamp = new Date(value);
+      if (Number.isNaN(timestamp.getTime())) {
+        return "";
+      }
+      return timestamp.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+    }
+
+    function renderHealthStatus(item) {
+      const health = healthStateFor(item);
+      if (!health) {
+        return "";
+      }
+      const checkedAt = formatHealthTimestamp(health.checkedAt);
+      return `
+        <div class="launch-card-meta">
+          <span class="health-pill is-${escapeHtml(health.status || "unknown")}" title="${escapeHtml(health.summary || "")}">${escapeHtml(healthLabel(health.status))}</span>
+          ${checkedAt ? `<span class="health-timestamp">Checked ${escapeHtml(checkedAt)}</span>` : ""}
+        </div>
+        <p class="health-summary">${escapeHtml(health.summary || "No health details available yet.")}</p>
+      `;
+    }
+
+    function renderLaunchCard(item) {
+      return `
+        <article class="launch-card">
+          <div class="launch-card-header">
+            ${renderCardIcon(item)}
+            <div class="launch-copy">
+              <h3>${escapeHtml(item.name)}</h3>
+              <p>${escapeHtml(item.summary || "")}</p>
+            </div>
+          </div>
+          ${renderHealthStatus(item)}
+          <a class="primary-button launch-button" href="${escapeHtml(item.url)}">Open</a>
+        </article>
+      `;
+    }
+
+    function renderGroupedCards(container, items, orderedGroups) {
+      if (!container) {
+        return;
+      }
+      container.innerHTML = groupItems(items, orderedGroups)
+        .map(
+          ([group, groupedItems]) => `
+            <section class="panel panel-group">
+              <div class="panel-header">
+                <h2>${escapeHtml(group)}</h2>
+              </div>
+              <div class="launch-grid">
+                ${groupedItems.map((item) => renderLaunchCard(item)).join("")}
+              </div>
+            </section>
+          `,
+        )
+        .join("");
+    }
+
+    function setAnonymousState() {
+      show(anonymousState);
+      show(anonymousActions);
+      hide(signedInContent);
+      hide(sessionBar);
+      hide(administration);
+      hide(adminToolsPanel);
+      hide(roleManagementPanel);
+    }
+
+    function setLoginPending(label = "Starting sign-in...") {
+      if (!loginButton) {
+        return;
+      }
+      loginButton.disabled = true;
+      loginButton.setAttribute("aria-busy", "true");
+      loginButton.dataset.authReady = "false";
+      loginButton.textContent = label;
+    }
+
+    function setLoginReady() {
+      if (!loginButton) {
+        return;
+      }
+      loginButton.disabled = false;
+      loginButton.removeAttribute("aria-busy");
+      loginButton.dataset.authReady = "true";
+      loginButton.textContent = defaultLoginLabel;
+    }
+
+    function setAuthenticatedState(displayName, isAdmin) {
+      hide(anonymousState);
+      hide(anonymousActions);
+      show(signedInContent);
+      show(sessionBar);
+      sessionName.textContent = displayName;
+      if (isAdmin && administration) {
+        show(administration);
+      } else {
+        hide(administration);
+      }
+    }
+
+    function applyBranding(config) {
+      const branding = config.branding || {};
+      document.title = branding.title || "Data Platform";
+      titleElement.textContent = branding.title || "Data Platform";
+      if (branding.subtitle) {
+        subtitleElement.textContent = branding.subtitle;
+        show(subtitleElement);
+      } else {
+        subtitleElement.textContent = "";
+        hide(subtitleElement);
+      }
+
+      if (branding.logoUrl) {
+        portalLogo.src = branding.logoUrl;
+        portalLogo.alt = branding.logoAlt || "Platform logo";
+        show(portalLogo);
+      } else {
+        portalLogo.removeAttribute("src");
+        hide(portalLogo);
+      }
+
+      if (portalFavicon) {
+        if (branding.faviconUrl) {
+          portalFavicon.href = branding.faviconUrl;
+        } else {
+          portalFavicon.removeAttribute("href");
+        }
+      }
+
+      if (portalThemeColor && branding.metaThemeColor) {
+        portalThemeColor.setAttribute("content", branding.metaThemeColor);
+      }
+    }
+
+    function renderApps(config, groups) {
+      if (!launchGroups) {
+        return;
+      }
+
+      const visibleApps = (config.apps || []).filter((app) => {
+        const requiredGroups = app.requiredGroups || [];
+        return requiredGroups.length === 0 || requiredGroups.some((group) => groups.includes(group));
+      });
+
+      if (visibleApps.length === 0) {
+        launchGroups.innerHTML = "";
+        show(emptyPanel);
+        return;
+      }
+
+      hide(emptyPanel);
+      renderGroupedCards(launchGroups, visibleApps, ["Data Access", "Analysis", "Workflows"]);
+    }
+
+    function renderAdminTools(config, isAdmin) {
+      if (!adminToolsPanel || !adminTools) {
+        return;
+      }
+
+      if (!isAdmin) {
+        hide(adminToolsPanel);
+        return;
+      }
+
+      const tools = (config.admin?.tools || []).filter((tool) => tool.url);
+      if (tools.length === 0) {
+        hide(adminToolsPanel);
+        return;
+      }
+
+      show(adminToolsPanel);
+      renderGroupedCards(adminTools, tools, ["Governance & Access", "Platform Operations", "Cluster Operations"]);
+    }
+
+    function setRoleManagementMessage(level, message) {
+      if (!roleManagementStatus) {
+        return;
+      }
+      if (!message) {
+        roleManagementStatus.textContent = "";
+        roleManagementStatus.className = "status-banner is-hidden";
+        return;
+      }
+      roleManagementStatus.innerHTML = message;
+      roleManagementStatus.className = `status-banner is-${level}`;
+      show(roleManagementStatus);
+    }
+
+    function currentRole() {
+      if (state.roles.length === 0) {
+        return null;
+      }
+      return (
+        state.roles.find((role) => role.key === state.selectedRoleKey) ||
+        state.roles[0] ||
+        null
+      );
+    }
+
+    function memberKindLabel(kind) {
+      return kind === "group" ? "Group" : "User";
+    }
+
+    function canEditUsers() {
+      return Boolean(state.adminStatus && state.adminStatus.membershipSource === "ranger");
+    }
+
+    function canEditGroups() {
+      return canEditUsers() && Boolean(state.adminStatus && state.adminStatus.groupAssignmentEnabled);
+    }
+
+    function isAssigned(role, kind, name) {
+      const members = kind === "group" ? role.members.groups : role.members.users;
+      return members.includes(name);
+    }
+
+    function renderMemberList(kind, role, members, emptyText, editable) {
+      if (!members || members.length === 0) {
+        return `<span class="detail-empty">${escapeHtml(emptyText)}</span>`;
+      }
+
+      return members
+        .map(
+          (name) => `
+            <span class="member-chip">
+              <span class="member-kind">${escapeHtml(memberKindLabel(kind))}</span>
+              <span class="member-name">${escapeHtml(name)}</span>
+              ${
+                editable
+                  ? `<button type="button" class="member-remove" data-action="remove-member" data-kind="${escapeHtml(kind)}" data-name="${escapeHtml(name)}" data-role-key="${escapeHtml(role.key)}">Remove</button>`
+                  : ""
+              }
+            </span>
+          `,
+        )
+        .join("");
+    }
+
+    function renderSearchResults(kind, role) {
+      const search = state.search[kind];
+      const editable = kind === "group" ? canEditGroups() : canEditUsers();
+      if (!editable) {
+        return `<p class="detail-empty">${
+          kind === "group"
+            ? "Directory-group assignment is unavailable until LDAP and Ranger usersync are enabled."
+            : "Live membership edits are disabled while platformRoleMembershipSource is set to git."
+        }</p>`;
+      }
+      if (search.loading) {
+        return `<p class="detail-empty">Searching Ranger-known ${kind === "group" ? "groups" : "users"}...</p>`;
+      }
+      if (search.error) {
+        return `<p class="detail-empty">${escapeHtml(search.error)}</p>`;
+      }
+      if (!search.query.trim()) {
+        return `<p class="detail-empty">Search Ranger-known ${kind === "group" ? "groups" : "users"} to add them to this platform role.</p>`;
+      }
+      if (search.results.length === 0) {
+        return `<p class="detail-empty">No matching Ranger-known ${kind === "group" ? "groups" : "users"} found.</p>`;
+      }
+      return search.results
+        .map((name) => {
+          const assigned = isAssigned(role, kind, name);
+          return `
+            <div class="search-result-row">
+              <div class="search-result-copy">
+                <span class="member-kind">${escapeHtml(memberKindLabel(kind))}</span>
+                <strong>${escapeHtml(name)}</strong>
+              </div>
+              <button
+                type="button"
+                class="secondary-button compact-button"
+                data-action="add-member"
+                data-kind="${escapeHtml(kind)}"
+                data-name="${escapeHtml(name)}"
+                data-role-key="${escapeHtml(role.key)}"
+                ${assigned ? "disabled" : ""}
+              >
+                ${assigned ? "Assigned" : "Add"}
+              </button>
+            </div>
+          `;
+        })
+        .join("");
+    }
+
+    function renderRoleCatalog() {
+      if (!roleCatalog) {
+        return;
+      }
+
+      if (state.roles.length === 0) {
+        roleCatalog.innerHTML = `
+          <div class="panel-subtle">
+            <p class="panel-note">No Git-defined platform roles are available for administration.</p>
+          </div>
+        `;
+        return;
+      }
+
+      roleCatalog.innerHTML = state.roles
+        .map((role) => {
+          const selected = currentRole() && currentRole().key === role.key;
+          const membershipCount = (role.members?.users?.length || 0) + (role.members?.groups?.length || 0);
+          return `
+            <button type="button" class="role-catalog-item ${selected ? "is-active" : ""}" data-action="select-role" data-role-key="${escapeHtml(role.key)}">
+              <span class="role-catalog-copy">
+                <strong>${escapeHtml(humanizeSlug(role.key))}</strong>
+                <span>${escapeHtml(role.description || "Git-defined platform role")}</span>
+              </span>
+              <span class="badge">${membershipCount}</span>
+            </button>
+          `;
+        })
+        .join("");
+    }
+
+    function renderRoleDetail() {
+      if (!roleDetail) {
+        return;
+      }
+
+      const role = currentRole();
+      if (!role) {
+        roleDetail.innerHTML = `<p class="panel-note">Select a platform role to review and edit its live Ranger membership.</p>`;
+        return;
+      }
+
+      const groupSearchDisabled = !canEditGroups();
+      const userSearchDisabled = !canEditUsers();
+      const auditLink =
+        state.adminStatus && state.adminStatus.auditUrl
+          ? `<a href="${escapeHtml(state.adminStatus.auditUrl)}" target="_blank" rel="noreferrer">Open Ranger Admin</a>`
+          : "Ranger Admin";
+
+      roleDetail.innerHTML = `
+        <article class="role-editor">
+          <div class="admin-card-header">
+            <div>
+              <p class="eyebrow eyebrow-tight">Platform role</p>
+              <h3>${escapeHtml(humanizeSlug(role.key))}</h3>
+              <p class="detail-note">${escapeHtml(role.description || "Git-defined role catalog entry.")}</p>
+            </div>
+            <span class="badge">${escapeHtml(role.name || role.key)}</span>
+          </div>
+          <div class="detail-row role-metadata-row">
+            <span class="detail-chip">Nested roles: ${escapeHtml(role.nestedRoles && role.nestedRoles.length ? role.nestedRoles.join(", ") : "None")}</span>
+            <span class="detail-chip">Declared exceptions: ${escapeHtml(String(role.declaredExceptionsCount || 0))}</span>
+          </div>
+          <p class="detail-note role-editor-note">Role definitions, application entitlements, nested roles, and declared exceptions stay Git-managed. Use ${auditLink} for deeper audit context.</p>
+          <div class="role-editor-grid">
+            <section class="admin-section">
+              <div class="membership-header">
+                <h4>Directory groups</h4>
+                <span class="badge">${escapeHtml(String(role.members.groups.length))}</span>
+              </div>
+              <div class="member-list">
+                ${renderMemberList("group", role, role.members.groups, "No directory groups assigned", canEditGroups())}
+              </div>
+              <form class="principal-search-form" data-kind="group">
+                <label class="search-label" for="group-principal-query">Add synced directory group</label>
+                <div class="search-input-row">
+                  <input id="group-principal-query" class="search-input" name="query" type="search" value="${escapeHtml(state.search.group.query)}" placeholder="Search Ranger-known groups" ${groupSearchDisabled ? "disabled" : ""} />
+                  <button type="submit" class="secondary-button compact-button" ${groupSearchDisabled ? "disabled" : ""}>Search</button>
+                </div>
+              </form>
+              <div class="search-results">
+                ${renderSearchResults("group", role)}
+              </div>
+            </section>
+            <section class="admin-section">
+              <div class="membership-header">
+                <h4>Direct users</h4>
+                <span class="badge">${escapeHtml(String(role.members.users.length))}</span>
+              </div>
+              <div class="member-list">
+                ${renderMemberList("user", role, role.members.users, "No direct users assigned", canEditUsers())}
+              </div>
+              <form class="principal-search-form" data-kind="user">
+                <label class="search-label" for="user-principal-query">Add direct user</label>
+                <div class="search-input-row">
+                  <input id="user-principal-query" class="search-input" name="query" type="search" value="${escapeHtml(state.search.user.query)}" placeholder="Search Ranger-known users" ${userSearchDisabled ? "disabled" : ""} />
+                  <button type="submit" class="secondary-button compact-button" ${userSearchDisabled ? "disabled" : ""}>Search</button>
+                </div>
+              </form>
+              <div class="search-results">
+                ${renderSearchResults("user", role)}
+              </div>
+            </section>
+          </div>
+        </article>
+      `;
+
+      roleDetail.querySelectorAll("[data-action='select-role']").forEach((element) => {
+        element.addEventListener("click", handleRoleAction);
+      });
+      roleDetail.querySelectorAll("[data-action='add-member'], [data-action='remove-member']").forEach((element) => {
+        element.addEventListener("click", handleRoleAction);
+      });
+      roleDetail.querySelectorAll(".principal-search-form").forEach((form) => {
+        form.addEventListener("submit", handlePrincipalSearch);
+      });
+    }
+
+    function renderRoleManagement() {
+      if (!roleManagementPanel) {
+        return;
+      }
+
+      if (!state.isAdmin || !state.config?.admin?.roleManagementEnabled) {
+        hide(roleManagementPanel);
+        return;
+      }
+
+      show(roleManagementPanel);
+      renderRoleCatalog();
+      renderRoleDetail();
+
+      if (!state.adminStatus) {
+        setRoleManagementMessage("info", "Loading live Ranger role memberships...");
+        return;
+      }
+
+      const rangerAdminLink =
+        state.adminStatus.auditUrl
+          ? `<a href="${escapeHtml(state.adminStatus.auditUrl)}" target="_blank" rel="noreferrer">Ranger Admin</a>`
+          : "Ranger Admin";
+
+      if (state.adminStatus.membershipSource !== "ranger") {
+        setRoleManagementMessage(
+          "warning",
+          `Live membership edits are disabled because <code>global.authorization.platformRoleMembershipSource</code> is set to <code>${escapeHtml(state.adminStatus.membershipSource)}</code>. Switch it to <code>ranger</code> to make portal edits persist through reconciliation.`,
+        );
+        return;
+      }
+
+      if (!state.adminStatus.groupAssignmentEnabled) {
+        setRoleManagementMessage(
+          "info",
+          `Directory-group assignment is unavailable until LDAP and Ranger usersync are enabled. Direct user assignment remains available for Ranger-known principals. For exception auditing, use ${rangerAdminLink}.`,
+        );
+        return;
+      }
+
+      setRoleManagementMessage(
+        "success",
+        `Live Ranger membership management is enabled. Role definitions stay in Git; use ${rangerAdminLink} for advanced policy and exception auditing.`,
+      );
+    }
+
+    function attachRoleCatalogHandlers() {
+      if (!roleCatalog) {
+        return;
+      }
+      roleCatalog.querySelectorAll("[data-action='select-role']").forEach((element) => {
+        element.addEventListener("click", handleRoleAction);
+      });
+    }
+
+    async function apiRequest(path, options = {}) {
+      if (!state.keycloak) {
+        throw new Error("Authentication context is not ready.");
+      }
+      await state.keycloak.updateToken(60).catch(() => {
+        throw new Error("Your session expired. Please sign in again.");
+      });
+
+      const headers = new Headers(options.headers || {});
+      headers.set("Authorization", `Bearer ${state.keycloak.token}`);
+      if (options.body !== undefined) {
+        headers.set("Content-Type", "application/json");
+      }
+
+      const response = await fetch(path, {
+        method: options.method || "GET",
+        headers,
+        body: options.body !== undefined ? JSON.stringify(options.body) : undefined,
+        credentials: "same-origin",
+      });
+
+      const contentType = response.headers.get("content-type") || "";
+      const payload = contentType.includes("application/json") ? await response.json() : await response.text();
+
+      if (!response.ok) {
+        const message =
+          (payload && typeof payload === "object" && payload.error) ||
+          (typeof payload === "string" && payload) ||
+          `Request failed with status ${response.status}`;
+        throw new Error(message);
+      }
+
+      return payload;
+    }
+
+    async function refreshRoleData() {
+      const [statusPayload, rolesPayload] = await Promise.all([
+        apiRequest("/api/admin/status"),
+        apiRequest("/api/admin/platform-roles"),
+      ]);
+      state.adminStatus = statusPayload || {};
+      state.roles = Array.isArray(rolesPayload?.roles) ? rolesPayload.roles : [];
+      if (!state.roles.some((role) => role.key === state.selectedRoleKey)) {
+        state.selectedRoleKey = state.roles.length > 0 ? state.roles[0].key : null;
+      }
+    }
+
+    async function refreshHealth() {
+      if (!state.config?.health?.enabled) {
+        return;
+      }
+      try {
+        const payload = await apiRequest("/api/health");
+        const nextItems = {};
+        (payload?.items || []).forEach((item) => {
+          if (item && item.id) {
+            nextItems[item.id] = item;
+          }
+        });
+        state.health.items = nextItems;
+        state.health.lastUpdated = payload?.checkedAt || new Date().toISOString();
+      } catch (error) {
+        console.warn("Unable to refresh portal health status.", error);
+      }
+      renderApps(state.config, state.groups);
+      renderAdminTools(state.config, state.isAdmin);
+    }
+
+    async function handlePrincipalSearch(event) {
+      event.preventDefault();
+      const kind = event.currentTarget.dataset.kind;
+      const formData = new FormData(event.currentTarget);
+      const query = String(formData.get("query") || "").trim();
+      state.search[kind] = { query, results: [], loading: false, error: "" };
+
+      if (query.length < 2) {
+        state.search[kind].error = "Enter at least two characters to search Ranger-known principals.";
+        renderRoleDetail();
+        return;
+      }
+
+      state.search[kind].loading = true;
+      renderRoleDetail();
+      try {
+        const payload = await apiRequest(`/api/admin/principals?kind=${encodeURIComponent(kind)}&query=${encodeURIComponent(query)}`);
+        state.search[kind] = {
+          query,
+          results: Array.isArray(payload?.results) ? payload.results : [],
+          loading: false,
+          error: "",
+        };
+      } catch (error) {
+        state.search[kind] = { query, results: [], loading: false, error: error.message };
+      }
+      renderRoleDetail();
+    }
+
+    async function mutateRoleMembership(method, roleKey, kind, name) {
+      const actionLabel = method === "DELETE" ? "Removing membership..." : "Adding membership...";
+      setRoleManagementMessage("info", actionLabel);
+      await apiRequest(`/api/admin/platform-roles/${encodeURIComponent(roleKey)}/members`, {
+        method,
+        body: { kind, name },
+      });
+      await refreshRoleData();
+      state.search[kind] = { query: "", results: [], loading: false, error: "" };
+      renderRoleManagement();
+    }
+
+    async function handleRoleAction(event) {
+      const action = event.currentTarget.dataset.action;
+      const roleKey = event.currentTarget.dataset.roleKey;
+      const kind = event.currentTarget.dataset.kind;
+      const name = event.currentTarget.dataset.name;
+
+      if (action === "select-role") {
+        state.selectedRoleKey = roleKey;
+        state.search.user = { query: "", results: [], loading: false, error: "" };
+        state.search.group = { query: "", results: [], loading: false, error: "" };
+        renderRoleCatalog();
+        attachRoleCatalogHandlers();
+        renderRoleDetail();
+        return;
+      }
+
+      try {
+        await mutateRoleMembership(action === "remove-member" ? "DELETE" : "POST", roleKey, kind, name);
+        renderRoleCatalog();
+        attachRoleCatalogHandlers();
+      } catch (error) {
+        renderRoleManagement();
+        setRoleManagementMessage("error", escapeHtml(error.message));
+      }
+    }
+
+    async function loadAdminExperience() {
+      renderAdminTools(state.config, state.isAdmin);
+      if (!state.isAdmin || !state.config?.admin?.roleManagementEnabled) {
+        hide(roleManagementPanel);
+        return;
+      }
+
+      show(roleManagementPanel);
+      setRoleManagementMessage("info", "Loading live Ranger role memberships...");
+      try {
+        await refreshRoleData();
+      } catch (error) {
+        state.adminStatus = null;
+        state.roles = [];
+        renderRoleManagement();
+        setRoleManagementMessage("error", escapeHtml(error.message));
+        return;
+      }
+
+      renderRoleManagement();
+      attachRoleCatalogHandlers();
+
+      if (getTargetSection() === "administration" && administration) {
+        clearTargetSection();
+        if (window.location.hash !== "#administration") {
+          window.history.replaceState(null, document.title, `${buildPortalRedirectUri()}#administration`);
+        }
+        window.setTimeout(() => {
+          administration.scrollIntoView({ behavior: "smooth", block: "start" });
+        }, 120);
+      }
+    }
+
+    async function bootstrap() {
+      clearTunnelOauthProxyCookies();
+      setLoginPending();
+
+      const response = await fetch("/config.json", { credentials: "same-origin" });
+      if (!response.ok) {
+        throw new Error(`Unable to load config.json: ${response.status}`);
+      }
+
+      state.config = await response.json();
+      applyBranding(state.config);
+      if (window.location.hash === "#administration") {
+        rememberTargetSection("administration");
+      }
+
+      const keycloakModule = await import("/keycloak.js");
+      const Keycloak = keycloakModule.default || keycloakModule.Keycloak;
+
+      if (typeof Keycloak !== "function") {
+        throw new Error("Keycloak browser adapter did not expose a constructor.");
+      }
+
+      const keycloak = new Keycloak({
+        url: state.config.identity.keycloak.baseUrl,
+        realm: state.config.identity.keycloak.realm,
+        clientId: state.config.identity.keycloak.clientId,
+      });
+      state.keycloak = keycloak;
+
+      const redirectUri = buildPortalRedirectUri();
+      const authenticated = await keycloak.init({
+        onLoad: "check-sso",
+        pkceMethod: "S256",
+        checkLoginIframe: false,
+      });
+
+      if (window.location.href !== redirectUri) {
+        window.history.replaceState(null, document.title, redirectUri);
+      }
+
+      loginButton.addEventListener("click", () => {
+        setLoginPending("Redirecting...");
+        keycloak.login({ redirectUri });
+      });
+
+      if (!authenticated) {
+        setLoginReady();
+        setAnonymousState();
+        return;
+      }
+
+      const claimName = state.config.identity.groupsClaim || "groups";
+      const rawGroups = keycloak.tokenParsed?.[claimName];
+      state.groups = Array.isArray(rawGroups) ? rawGroups : [];
+      const adminConfig = state.config.admin || {};
+      const requiredGroups = adminConfig.requiredGroups || [];
+      state.isAdmin = requiredGroups.length > 0 && requiredGroups.some((group) => state.groups.includes(group));
+      const displayName =
+        keycloak.tokenParsed?.name ||
+        keycloak.tokenParsed?.preferred_username ||
+        keycloak.tokenParsed?.email ||
+        "Authenticated user";
+
+      setAuthenticatedState(displayName, state.isAdmin);
+      logoutButton.addEventListener("click", () => {
+        keycloak.logout({ redirectUri: `${window.location.origin}/` });
+      });
+
+      window.setInterval(() => {
+        keycloak.updateToken(60).catch(() => {
+          keycloak.login({ redirectUri });
+        });
+      }, 30000);
+
+      renderApps(state.config, state.groups);
+      await refreshHealth();
+      if (state.config?.health?.enabled && !state.health.timer) {
+        const refreshIntervalSeconds = Number(state.config.health.refreshIntervalSeconds || 90);
+        state.health.timer = window.setInterval(() => {
+          refreshHealth().catch((error) => {
+            console.warn("Periodic health refresh failed.", error);
+          });
+        }, Math.max(15, refreshIntervalSeconds) * 1000);
+      }
+      await loadAdminExperience();
+    }
+
+    bootstrap().catch((error) => {
+      setLoginReady();
+      setAnonymousState();
+      anonymousState.innerHTML = `
+        <section class="panel panel-inline-status">
+          <p class="panel-note">Sign-in is currently unavailable. Please try again in a moment.</p>
+        </section>
+      `;
+      console.error(error);
+    });
+  styles.css: |
+    {{- range $fontFace := $themeFontFaces }}
+    @font-face {
+      font-family: {{ quote (default "" (get $fontFace "family")) }};
+      src: {{ default "" (get $fontFace "src") }};
+      {{- with (get $fontFace "weight") }}
+      font-weight: {{ . }};
+      {{- end }}
+      {{- with (get $fontFace "style") }}
+      font-style: {{ . }};
+      {{- end }}
+      font-display: {{ default "swap" (get $fontFace "display") }};
+    }
+    {{- end }}
+
+    :root {
+      --bg: {{ default "#f4f6f8" (get $themeColors "bg") }};
+      --bg-deep: {{ default "#e5edf1" (get $themeColors "bgDeep") }};
+      --surface: {{ default "rgba(255, 255, 255, 0.98)" (get $themeColors "surface") }};
+      --surface-soft: {{ default "rgba(255, 255, 255, 0.95)" (get $themeColors "surfaceSoft") }};
+      --ink: {{ default "#29485d" (get $themeColors "ink") }};
+      --ink-deep: {{ default "#17384d" (get $themeColors "inkDeep") }};
+      --muted: {{ default "#5a6c78" (get $themeColors "muted") }};
+      --brand: {{ default "#1f5f7a" (get $themeColors "brand") }};
+      --brand-deep: {{ default "#173f56" (get $themeColors "brandDeep") }};
+      --brand-soft: {{ default "#d3e4ec" (get $themeColors "brandSoft") }};
+      --accent: {{ default "#e58a18" (get $themeColors "accent") }};
+      --accent-rose: {{ default "#8a4366" (get $themeColors "accentRose") }};
+      --line: {{ default "rgba(102, 126, 143, 0.26)" (get $themeColors "line") }};
+      --shadow: {{ default "0 18px 48px rgba(23, 56, 77, 0.12)" (get $themeColors "shadow") }};
+      --radius-xl: 28px;
+      --radius-lg: 22px;
+      --radius-md: 18px;
+      --font-heading: {{ $fontHeadingFamily }};
+      --font-body: {{ $fontBodyFamily }};
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body,
+    button,
+    input,
+    textarea,
+    select {
+      font-family: var(--font-body);
+      -webkit-font-smoothing: antialiased;
+      text-rendering: optimizeLegibility;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      color: var(--ink);
+      background:
+        linear-gradient(180deg, var(--brand) 0 4.7rem, transparent 4.7rem),
+        linear-gradient(180deg, rgba(255, 255, 255, 0.84) 4.7rem, var(--bg) 14rem, var(--bg-deep) 100%);
+    }
+
+    h1,
+    h2,
+    h3,
+    h4,
+    h5,
+    h6 {
+      font-family: var(--font-heading);
+      font-weight: 700;
+    }
+
+    a {
+      color: inherit;
+      font-family: var(--font-body);
+    }
+
+    p,
+    span,
+    small,
+    strong,
+    label {
+      font-family: var(--font-body);
+    }
+
+    .shell {
+      width: min(1180px, calc(100% - 2rem));
+      margin: 0 auto;
+      padding: 1.5rem 0 3rem;
+    }
+
+    .top-ribbon {
+      height: 0.42rem;
+      width: 100%;
+      border-radius: 999px;
+      margin-bottom: 1rem;
+      background: linear-gradient(90deg, var(--accent-rose) 0%, var(--accent-rose) 18%, var(--accent) 18%, var(--accent) 31%, #7c7b7b 31%, #7c7b7b 42%, #82c8c9 42%, #82c8c9 51%, #5bacb7 51%, #5bacb7 66%, #29799c 66%, #29799c 82%, #1b5571 82%, #1b5571 100%);
+      box-shadow: 0 8px 24px rgba(18, 89, 116, 0.12);
+    }
+
+    .hero {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 1rem;
+      align-items: stretch;
+      margin-bottom: 1.5rem;
+    }
+
+    .brand-block,
+    .panel {
+      background: var(--surface);
+      border: 1px solid var(--line);
+      border-radius: var(--radius-xl);
+      box-shadow: var(--shadow);
+    }
+
+    .brand-block {
+      padding: 1.6rem 1.8rem;
+      min-height: 10rem;
+      background:
+        linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(255, 255, 255, 0.98)),
+        linear-gradient(90deg, rgba(177, 222, 221, 0.35), rgba(255, 255, 255, 0));
+    }
+
+    .brand-lockup {
+      display: flex;
+      align-items: center;
+      gap: 1.25rem;
+      min-height: 100%;
+    }
+
+    .brand-logo {
+      width: clamp(8rem, 14vw, 11rem);
+      height: auto;
+      object-fit: contain;
+      filter: saturate(0.96);
+      flex: 0 0 auto;
+    }
+
+    .brand-copy {
+      display: grid;
+      gap: 0.45rem;
+    }
+
+    .eyebrow {
+      margin: 0;
+      text-transform: uppercase;
+      letter-spacing: 0.18em;
+      font-size: 0.72rem;
+      font-weight: 700;
+      font-family: var(--font-body);
+      color: var(--brand);
+    }
+
+    .eyebrow-tight {
+      margin-bottom: 0.25rem;
+    }
+
+    #portal-title,
+    h2,
+    .launch-card h3,
+    .admin-card h3 {
+      margin: 0;
+      font-family: var(--font-heading);
+      letter-spacing: -0.03em;
+    }
+
+    #portal-title {
+      color: var(--ink-deep);
+      font-size: clamp(2rem, 4.6vw, 3.35rem);
+      line-height: 0.98;
+    }
+
+    .portal-subtitle,
+    .launch-card p,
+    .panel-note,
+    .detail-note {
+      margin: 0;
+      font-family: var(--font-body);
+      color: var(--muted);
+      line-height: 1.55;
+    }
+
+    .panel-note-strong {
+      font-size: 1.04rem;
+      font-weight: 700;
+      color: var(--ink-deep);
+    }
+
+    .hero-actions,
+    .session-bar {
+      align-self: stretch;
+    }
+
+    .hero-actions-stack {
+      display: flex;
+      align-items: stretch;
+      justify-content: flex-end;
+    }
+
+    .hero-actions-stack .primary-button,
+    .hero-actions-stack .secondary-button {
+      min-width: 11rem;
+    }
+
+    .session-bar {
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      gap: 0.9rem;
+      padding: 1rem 1.05rem;
+      border-radius: var(--radius-xl);
+      border: 1px solid rgba(18, 89, 116, 0.14);
+      background: rgba(255, 255, 255, 0.94);
+      box-shadow: var(--shadow);
+    }
+
+    .session-name {
+      margin: 0;
+      font-size: 1rem;
+      font-weight: 700;
+      font-family: var(--font-body);
+    }
+
+    .primary-button,
+    .secondary-button {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.4rem;
+      padding: 0.82rem 1.15rem;
+      border-radius: 999px;
+      border: 1px solid transparent;
+      text-decoration: none;
+      font-family: var(--font-body);
+      font-size: 0.98rem;
+      font-weight: 700;
+      cursor: pointer;
+      transition: transform 160ms ease, background 160ms ease, border-color 160ms ease, color 160ms ease;
+    }
+
+    .primary-button {
+      color: #fff;
+      background: linear-gradient(135deg, var(--brand) 0%, var(--brand-deep) 100%);
+      box-shadow: 0 12px 28px rgba(18, 89, 116, 0.18);
+    }
+
+    .secondary-button {
+      background: rgba(255, 255, 255, 0.72);
+      border-color: rgba(18, 89, 116, 0.18);
+      color: var(--ink-deep);
+    }
+
+    .primary-button:hover,
+    .secondary-button:hover {
+      transform: translateY(-1px);
+    }
+
+    .primary-button:hover {
+      background: linear-gradient(135deg, #1b5571 0%, var(--brand-deep) 100%);
+    }
+
+    .secondary-button:hover {
+      background: rgba(255, 255, 255, 0.96);
+      border-color: rgba(18, 89, 116, 0.28);
+    }
+
+    .primary-button:disabled,
+    .secondary-button:disabled {
+      cursor: wait;
+      opacity: 0.72;
+      transform: none;
+    }
+
+    .content {
+      display: grid;
+      gap: 1.5rem;
+    }
+
+    .content-minimal {
+      min-height: 0;
+    }
+
+    .panel {
+      padding: 1.4rem;
+    }
+
+    .panel-secondary {
+      background: linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(239, 243, 244, 0.92));
+    }
+
+    .panel-group {
+      padding: 1.2rem;
+    }
+
+    .panel-inline-status {
+      max-width: 34rem;
+      background: rgba(255, 255, 255, 0.78);
+    }
+
+    .panel-signin {
+      min-height: 7rem;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      margin-inline: auto;
+    }
+
+    .panel-header {
+      display: flex;
+      gap: 1rem;
+      justify-content: space-between;
+      align-items: end;
+      margin-bottom: 1rem;
+    }
+
+    .group-stack,
+    .admin-grid {
+      display: grid;
+      gap: 1.25rem;
+    }
+
+    #administration {
+      gap: 1.5rem;
+    }
+
+    .launch-grid {
+      display: grid;
+      gap: 1rem;
+      grid-template-columns: repeat(auto-fit, minmax(15.5rem, 1fr));
+    }
+
+    .launch-card,
+    .admin-card {
+      padding: 1.2rem;
+      border-radius: var(--radius-lg);
+      border: 1px solid var(--line);
+      background: rgba(255, 255, 255, 0.96);
+    }
+
+    .launch-card {
+      position: relative;
+      overflow: hidden;
+    }
+
+    .launch-card::before {
+      content: "";
+      position: absolute;
+      inset: 0 auto auto 0;
+      width: 100%;
+      height: 0.35rem;
+      background: linear-gradient(90deg, var(--brand) 0%, #5bacb7 46%, var(--accent) 100%);
+    }
+
+    .launch-card-header {
+      display: flex;
+      gap: 0.95rem;
+      align-items: start;
+      margin: 0.35rem 0 1rem;
+    }
+
+    .launch-copy {
+      display: grid;
+      gap: 0.25rem;
+      flex: 1 1 auto;
+    }
+
+    .launch-button {
+      width: 100%;
+    }
+
+    .app-icon {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 3.2rem;
+      height: 3.2rem;
+      border-radius: 1.2rem;
+      background: linear-gradient(135deg, var(--brand-soft) 0%, rgba(255, 255, 255, 0.98) 100%);
+      color: var(--brand-deep);
+      font-family: var(--font-body);
+      font-weight: 800;
+      letter-spacing: 0.06em;
+      flex: 0 0 auto;
+      border: 1px solid var(--line);
+      overflow: hidden;
+    }
+
+    .app-icon.has-image {
+      padding: 0.45rem;
+    }
+
+    .app-icon img {
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+    }
+
+    .launch-card-meta {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 0.75rem;
+      margin-bottom: 0.45rem;
+    }
+
+    .health-pill {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 0.34rem 0.68rem;
+      border-radius: 999px;
+      font-size: 0.8rem;
+      font-weight: 700;
+      letter-spacing: 0.02em;
+      border: 1px solid transparent;
+    }
+
+    .health-pill.is-healthy {
+      background: rgba(76, 145, 92, 0.14);
+      border-color: rgba(76, 145, 92, 0.18);
+      color: #25553d;
+    }
+
+    .health-pill.is-degraded {
+      background: rgba(229, 138, 24, 0.12);
+      border-color: rgba(229, 138, 24, 0.18);
+      color: #885208;
+    }
+
+    .health-pill.is-down {
+      background: rgba(138, 67, 102, 0.14);
+      border-color: rgba(138, 67, 102, 0.2);
+      color: #74264b;
+    }
+
+    .health-pill.is-unknown {
+      background: rgba(90, 108, 120, 0.1);
+      border-color: rgba(90, 108, 120, 0.15);
+      color: var(--muted);
+    }
+
+    .health-summary,
+    .health-timestamp {
+      color: var(--muted);
+      font-size: 0.84rem;
+      line-height: 1.45;
+    }
+
+    .health-summary {
+      margin: 0 0 0.9rem;
+      min-height: 2.4em;
+    }
+
+    .badge-row,
+    .detail-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+    }
+
+    .badge,
+    .detail-chip {
+      display: inline-flex;
+      padding: 0.38rem 0.7rem;
+      border-radius: 999px;
+      font-family: var(--font-body);
+      font-size: 0.82rem;
+      font-weight: 700;
+    }
+
+    .badge {
+      background: rgba(177, 222, 221, 0.68);
+      color: var(--brand-deep);
+    }
+
+    .badge-muted {
+      background: rgba(88, 112, 128, 0.12);
+      color: var(--muted);
+    }
+
+    .detail-chip {
+      border: 1px solid var(--line);
+      background: rgba(255, 255, 255, 0.98);
+      color: var(--ink);
+      font-weight: 600;
+    }
+
+    .detail-empty,
+    .detail-note,
+    .exception-card span {
+      color: var(--muted);
+      line-height: 1.45;
+    }
+
+    .is-hidden {
+      display: none;
+    }
+
+    .admin-grid {
+      grid-template-columns: repeat(auto-fit, minmax(18rem, 1fr));
+    }
+
+    .panel-subtle {
+      padding: 1rem;
+      border-radius: var(--radius-md);
+      border: 1px solid rgba(18, 89, 116, 0.12);
+      background: rgba(255, 255, 255, 0.72);
+    }
+
+    .admin-card-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: start;
+      gap: 1rem;
+      margin-bottom: 0.9rem;
+    }
+
+    .admin-section + .admin-section {
+      margin-top: 0.95rem;
+    }
+
+    .admin-section h4 {
+      margin: 0 0 0.45rem;
+      font-family: var(--font-heading);
+      font-size: 0.98rem;
+    }
+
+    .status-banner {
+      margin-bottom: 1rem;
+      padding: 0.9rem 1rem;
+      border-radius: 16px;
+      border: 1px solid transparent;
+      line-height: 1.55;
+      font-family: var(--font-body);
+    }
+
+    .status-banner a,
+    .status-banner code {
+      color: inherit;
+    }
+
+    .status-banner.is-info {
+      background: rgba(177, 222, 221, 0.24);
+      border-color: rgba(18, 89, 116, 0.14);
+      color: var(--ink);
+    }
+
+    .status-banner.is-success {
+      background: rgba(129, 188, 152, 0.18);
+      border-color: rgba(44, 118, 73, 0.18);
+      color: #25553d;
+    }
+
+    .status-banner.is-warning {
+      background: rgba(232, 146, 1, 0.1);
+      border-color: rgba(232, 146, 1, 0.22);
+      color: #7f5205;
+    }
+
+    .status-banner.is-error {
+      background: rgba(153, 19, 97, 0.1);
+      border-color: rgba(153, 19, 97, 0.22);
+      color: #7a1b51;
+    }
+
+    .role-management-layout {
+      display: grid;
+      grid-template-columns: minmax(15rem, 18rem) minmax(0, 1fr);
+      gap: 1.2rem;
+      align-items: start;
+    }
+
+    .role-catalog-shell {
+      display: grid;
+      gap: 0.75rem;
+    }
+
+    .role-catalog-title {
+      margin: 0;
+      font-size: 1.06rem;
+    }
+
+    .role-catalog {
+      display: grid;
+      gap: 0.75rem;
+    }
+
+    .role-catalog-item {
+      display: flex;
+      width: 100%;
+      align-items: start;
+      justify-content: space-between;
+      gap: 0.85rem;
+      padding: 1rem;
+      border-radius: var(--radius-md);
+      border: 1px solid rgba(18, 89, 116, 0.14);
+      background: rgba(255, 255, 255, 0.94);
+      text-align: left;
+      cursor: pointer;
+      transition: border-color 160ms ease, transform 160ms ease, box-shadow 160ms ease;
+    }
+
+    .role-catalog-item:hover {
+      transform: translateY(-1px);
+      border-color: rgba(18, 89, 116, 0.24);
+      box-shadow: 0 14px 26px rgba(18, 89, 116, 0.08);
+    }
+
+    .role-catalog-item.is-active {
+      border-color: rgba(18, 89, 116, 0.34);
+      box-shadow: 0 16px 32px rgba(18, 89, 116, 0.12);
+      background: linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(177, 222, 221, 0.12));
+    }
+
+    .role-catalog-copy {
+      display: grid;
+      gap: 0.28rem;
+      font-family: var(--font-body);
+    }
+
+    .role-catalog-copy strong {
+      font-size: 1rem;
+      color: var(--ink-deep);
+    }
+
+    .role-catalog-copy span {
+      color: var(--muted);
+      line-height: 1.4;
+    }
+
+    .role-detail {
+      min-height: 100%;
+    }
+
+    .role-editor {
+      display: grid;
+      gap: 1rem;
+    }
+
+    .role-editor-note {
+      margin-top: -0.15rem;
+    }
+
+    .role-metadata-row {
+      gap: 0.6rem;
+    }
+
+    .role-editor-grid {
+      display: grid;
+      gap: 1rem;
+      grid-template-columns: repeat(auto-fit, minmax(18rem, 1fr));
+    }
+
+    .membership-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 0.7rem;
+      margin-bottom: 0.7rem;
+    }
+
+    .member-list {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.6rem;
+      min-height: 2rem;
+    }
+
+    .member-chip {
+      display: inline-flex;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 0.45rem;
+      padding: 0.42rem 0.55rem 0.42rem 0.42rem;
+      border-radius: 999px;
+      border: 1px solid rgba(18, 89, 116, 0.14);
+      background: rgba(255, 255, 255, 0.98);
+      color: var(--ink);
+    }
+
+    .member-kind {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-width: 3.2rem;
+      padding: 0.18rem 0.45rem;
+      border-radius: 999px;
+      background: rgba(177, 222, 221, 0.5);
+      color: var(--brand-deep);
+      font-size: 0.72rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+
+    .member-name {
+      font-weight: 700;
+    }
+
+    .member-remove {
+      border: 0;
+      background: transparent;
+      color: var(--accent-rose);
+      font-family: var(--font-body);
+      font-weight: 700;
+      cursor: pointer;
+      padding: 0 0.15rem;
+    }
+
+    .principal-search-form {
+      display: grid;
+      gap: 0.45rem;
+      margin-top: 1rem;
+    }
+
+    .search-label {
+      font-size: 0.88rem;
+      font-weight: 700;
+      color: var(--ink-deep);
+    }
+
+    .search-input-row {
+      display: grid;
+      gap: 0.65rem;
+      grid-template-columns: minmax(0, 1fr) auto;
+      align-items: center;
+    }
+
+    .search-input {
+      min-width: 0;
+      padding: 0.78rem 0.92rem;
+      border-radius: 14px;
+      border: 1px solid rgba(18, 89, 116, 0.18);
+      background: rgba(255, 255, 255, 0.98);
+      color: var(--ink);
+      font-size: 0.96rem;
+    }
+
+    .search-input:disabled {
+      background: rgba(239, 243, 244, 0.94);
+      color: var(--muted);
+      cursor: not-allowed;
+    }
+
+    .search-results {
+      display: grid;
+      gap: 0.55rem;
+      margin-top: 0.75rem;
+    }
+
+    .search-result-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 0.75rem;
+      padding: 0.75rem 0.85rem;
+      border-radius: 16px;
+      border: 1px solid rgba(18, 89, 116, 0.12);
+      background: rgba(255, 255, 255, 0.92);
+    }
+
+    .search-result-copy {
+      display: flex;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 0.45rem;
+      min-width: 0;
+    }
+
+    .compact-button {
+      min-width: 5rem;
+      padding: 0.62rem 0.8rem;
+      font-size: 0.88rem;
+      line-height: 1;
+      white-space: nowrap;
+    }
+
+    .exception-card {
+      display: grid;
+      gap: 0.2rem;
+      padding: 0.75rem;
+      border-radius: 14px;
+      border: 1px dashed rgba(214, 88, 69, 0.28);
+      background: rgba(214, 88, 69, 0.05);
+    }
+
+    @media (max-width: 920px) {
+      .hero {
+        grid-template-columns: 1fr;
+      }
+
+      .brand-lockup {
+        align-items: start;
+      }
+
+      .hero-actions-stack,
+      .session-bar {
+        justify-content: stretch;
+      }
+
+      .session-bar {
+        display: grid;
+      }
+
+      .session-bar > * {
+        width: 100%;
+      }
+
+      .role-management-layout,
+      .role-editor-grid,
+      .search-input-row,
+      .search-result-row {
+        grid-template-columns: 1fr;
+      }
+
+      .search-result-row {
+        align-items: stretch;
+      }
+    }
+    {{- with (get $theme "customCss") }}
+
+{{ . | indent 4 }}
+    {{- end }}
+  keycloak.js: |
+{{ .Files.Get "files/platform-home/keycloak.js" | indent 4 }}
+  config.json: |
+{{ toPrettyJson $portalConfig | nindent 4 }}
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ $serviceName }}-api
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "dlh-in-a-box.labels" . | nindent 4 }}
+    app.kubernetes.io/component: platform-home
+data:
+  admin-config.json: |
+{{ toPrettyJson $platformHomeAdminConfig | nindent 4 }}
+  admin-api.py: |
+    import base64
+    import json
+    import os
+    import ssl
+    import time
+    import urllib.error
+    import urllib.parse
+    import urllib.request
+    from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+
+    CONFIG_PATH = "/opt/platform-home-api/admin-config.json"
+    PORT = int(os.environ.get("PORT", "18080"))
+    RANGER_URL = os.environ.get("RANGER_URL", "").rstrip("/")
+    RANGER_PASSWORD = os.environ.get("RANGER_ADMIN_PASSWORD", "")
+    USERINFO_URL = os.environ.get("IDENTITY_USERINFO_URL", "")
+    EXPECTED_ISSUER = os.environ.get("IDENTITY_EXPECTED_ISSUER", "")
+    GROUPS_CLAIM = os.environ.get("OIDC_GROUPS_CLAIM", "groups")
+    ADMIN_GROUP = os.environ.get("PLATFORM_ADMIN_GROUP", "")
+    CACHE_TTL_SECONDS = 60
+
+
+    class ApiError(Exception):
+        def __init__(self, status, message):
+            super().__init__(message)
+            self.status = int(status)
+            self.message = str(message)
+
+
+    def load_config():
+        with open(CONFIG_PATH, "r", encoding="utf-8") as handle:
+            return json.load(handle)
+
+
+    CONFIG = load_config()
+    ROLE_CATALOG = {
+        str(role.get("key", "")): role
+        for role in CONFIG.get("roles", [])
+        if str(role.get("key", "")).strip()
+    }
+    HEALTH_CACHE = {}
+    HEALTH_CACHE_TTL_SECONDS = max(
+        15,
+        int(CONFIG.get("health", {}).get("refreshIntervalSeconds") or CACHE_TTL_SECONDS),
+    )
+    HTTPS_CONTEXT = ssl._create_unverified_context()
+    PRINCIPAL_CACHE = {
+        "user": {"expires_at": 0, "items": []},
+        "group": {"expires_at": 0, "items": []},
+    }
+
+
+    def json_response(handler, status, payload):
+        body = json.dumps(payload, sort_keys=True).encode("utf-8")
+        handler.send_response(status)
+        handler.send_header("Content-Type", "application/json")
+        handler.send_header("Cache-Control", "no-store")
+        handler.send_header("Content-Length", str(len(body)))
+        handler.end_headers()
+        handler.wfile.write(body)
+
+
+    def utc_timestamp():
+        return time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
+
+
+    def read_json(handler):
+        raw_length = handler.headers.get("Content-Length", "0")
+        try:
+            length = int(raw_length)
+        except ValueError as exc:
+            raise ApiError(400, "Invalid Content-Length header.") from exc
+        if length <= 0:
+            return {}
+        payload = handler.rfile.read(length).decode("utf-8")
+        if not payload.strip():
+            return {}
+        try:
+            return json.loads(payload)
+        except json.JSONDecodeError as exc:
+            raise ApiError(400, "Request body must be valid JSON.") from exc
+
+
+    def bearer_token(handler):
+        auth_header = str(handler.headers.get("Authorization", ""))
+        if not auth_header.startswith("Bearer "):
+            raise ApiError(401, "A bearer access token is required.")
+        token = auth_header.split(" ", 1)[1].strip()
+        if not token:
+            raise ApiError(401, "A bearer access token is required.")
+        return token
+
+
+    def decode_token_claims(token):
+        parts = token.split(".")
+        if len(parts) < 2:
+            return {}
+        payload = parts[1]
+        payload += "=" * (-len(payload) % 4)
+        try:
+            decoded = base64.urlsafe_b64decode(payload.encode("ascii")).decode("utf-8")
+            claims = json.loads(decoded)
+        except Exception:
+            return {}
+        return claims if isinstance(claims, dict) else {}
+
+
+    def userinfo(token):
+        if not USERINFO_URL:
+            raise ApiError(500, "The portal admin API is missing its identity userinfo endpoint.")
+        request = urllib.request.Request(
+            USERINFO_URL,
+            headers={
+                "Accept": "application/json",
+                "Authorization": f"Bearer {token}",
+            },
+            method="GET",
+        )
+        try:
+            with urllib.request.urlopen(request, timeout=30) as response:
+                payload = response.read().decode("utf-8")
+                return json.loads(payload) if payload else {}
+        except urllib.error.HTTPError as exc:
+            if exc.code in (401, 403):
+                raise ApiError(401, "Your session is no longer valid. Please sign in again.") from exc
+            raise
+
+
+    def normalize_groups(value):
+        if isinstance(value, list):
+            return [str(item) for item in value if str(item).strip()]
+        if isinstance(value, str) and value.strip():
+            return [value.strip()]
+        return []
+
+
+    def validate_token_claims(claims):
+        if not isinstance(claims, dict) or not claims:
+            raise ApiError(401, "Your session is no longer valid. Please sign in again.")
+
+        now = int(time.time())
+        exp = claims.get("exp")
+        if not isinstance(exp, (int, float)) or int(exp) <= now:
+            raise ApiError(401, "Your session is no longer valid. Please sign in again.")
+
+        nbf = claims.get("nbf")
+        if isinstance(nbf, (int, float)) and int(nbf) > now:
+            raise ApiError(401, "Your session is not active yet. Please sign in again.")
+
+        issuer = str(claims.get("iss", "")).strip()
+        if EXPECTED_ISSUER and issuer and issuer != EXPECTED_ISSUER:
+            raise ApiError(401, "Your session is no longer valid. Please sign in again.")
+
+
+    def authenticate(handler, require_admin=True):
+        token = bearer_token(handler)
+        claims = decode_token_claims(token)
+        validate_token_claims(claims)
+        profile = {}
+        try:
+            profile = userinfo(token)
+        except ApiError as exc:
+            if exc.status != 401:
+                raise
+        groups = normalize_groups(profile.get(GROUPS_CLAIM))
+        if not groups:
+            groups = normalize_groups(claims.get(GROUPS_CLAIM))
+        is_admin = bool(ADMIN_GROUP and ADMIN_GROUP in groups)
+        if require_admin and not is_admin:
+            raise ApiError(403, "Platform administration is limited to platform administrators.")
+        merged = dict(claims)
+        merged.update(profile if isinstance(profile, dict) else {})
+        merged["groups"] = groups
+        merged["is_admin"] = is_admin
+        return merged
+
+
+    def ranger_enabled():
+        return bool(CONFIG.get("ranger", {}).get("enabled")) and bool(RANGER_URL) and bool(RANGER_PASSWORD)
+
+
+    def ranger_request(method, path, payload=None, ok=(200, 201), parse_json=True):
+        if not ranger_enabled():
+            raise ApiError(503, "Ranger administration is not enabled for this environment.")
+        url = f"{RANGER_URL}{path}"
+        headers = {
+            "Authorization": "Basic "
+            + base64.b64encode(f"admin:{RANGER_PASSWORD}".encode("utf-8")).decode("ascii"),
+            "Accept": "application/json",
+        }
+        body = None
+        if payload is not None:
+            body = json.dumps(payload).encode("utf-8")
+            headers["Content-Type"] = "application/json"
+        request = urllib.request.Request(url, data=body, headers=headers, method=method)
+        try:
+            with urllib.request.urlopen(request, timeout=30) as response:
+                raw = response.read().decode("utf-8")
+                if not parse_json:
+                    return raw
+                return json.loads(raw) if raw else None
+        except urllib.error.HTTPError as exc:
+            if exc.code in ok:
+                raw = exc.read().decode("utf-8")
+                if not parse_json:
+                    return raw
+                return json.loads(raw) if raw else None
+            if exc.code == 404:
+                raise ApiError(404, "Requested Ranger resource was not found.") from exc
+            raise
+
+
+    def role_update_path(role_id):
+        return f"/service/public/v2/api/roles/{role_id}?createNonExistUserGroup=true"
+
+
+    def normalize_role_members(items):
+        members = {}
+        for item in items or []:
+            if isinstance(item, dict):
+                name = str(item.get("name", "")).strip()
+                is_admin = bool(item.get("isAdmin", False))
+            else:
+                name = str(item).strip()
+                is_admin = False
+            if not name:
+                continue
+            current = members.get(name)
+            members[name] = {"name": name, "isAdmin": is_admin or bool(current and current.get("isAdmin"))}
+        return [members[name] for name in sorted(members)]
+
+
+    def extract_member_names(items):
+        return [item["name"] for item in normalize_role_members(items)]
+
+
+    def list_roles():
+        roles = []
+        start_index = 0
+        page_size = 200
+        while True:
+            page = ranger_request(
+                "GET",
+                f"/service/public/v2/api/roles?startIndex={start_index}&pageSize={page_size}",
+                ok=(200,),
+            ) or []
+            if not isinstance(page, list):
+                break
+            roles.extend(page)
+            if len(page) < page_size:
+                break
+            start_index += page_size
+        return roles
+
+
+    def get_role_by_name(role_name):
+        for role in list_roles():
+            if str(role.get("name", "")) == str(role_name):
+                return role
+        return None
+
+
+    def principal_name(kind, item):
+        if isinstance(item, str):
+            return item.strip()
+        if not isinstance(item, dict):
+            return ""
+        if kind == "group":
+            return str(item.get("name") or item.get("groupName") or "").strip()
+        return str(item.get("name") or item.get("userName") or "").strip()
+
+
+    def extract_page_items(page, kind):
+        if isinstance(page, list):
+            return page
+        if not isinstance(page, dict):
+            return []
+        candidate_keys = ["vXGroups", "vXUsers", "list", "items", "data", "result"]
+        for key in candidate_keys:
+            value = page.get(key)
+            if isinstance(value, list):
+                return value
+        return []
+
+
+    def list_known_principals(kind):
+        cache = PRINCIPAL_CACHE[kind]
+        now = time.time()
+        if cache["expires_at"] > now:
+            return cache["items"]
+
+        if not ranger_enabled():
+            return []
+
+        path = "/service/xusers/groups" if kind == "group" else "/service/xusers/users"
+        known = []
+        seen = set()
+        start_index = 0
+        page_size = 200
+        while True:
+            separator = "&" if "?" in path else "?"
+            page = ranger_request(
+                "GET",
+                f"{path}{separator}startIndex={start_index}&pageSize={page_size}",
+                ok=(200,),
+            )
+            items = extract_page_items(page, kind)
+            for item in items:
+                name = principal_name(kind, item)
+                if name and name not in seen:
+                    seen.add(name)
+                    known.append(name)
+            if len(items) < page_size:
+                break
+            start_index += page_size
+
+        known.sort(key=str.casefold)
+        cache["items"] = known
+        cache["expires_at"] = now + CACHE_TTL_SECONDS
+        return known
+
+
+    def principal_exists(kind, name):
+        target = str(name).strip()
+        return target in set(list_known_principals(kind))
+
+
+    def role_view(role_entry, live_role):
+        users = extract_member_names(live_role.get("users", [])) if live_role else extract_member_names(role_entry.get("users", []))
+        groups = extract_member_names(live_role.get("groups", [])) if live_role else extract_member_names(role_entry.get("directoryGroups", []))
+        return {
+            "key": role_entry.get("key"),
+            "name": role_entry.get("name") or role_entry.get("key"),
+            "description": role_entry.get("description", ""),
+            "nestedRoles": role_entry.get("nestedRoles", []),
+            "declaredExceptionsCount": len(role_entry.get("declaredExceptions", [])),
+            "members": {
+                "users": users,
+                "groups": groups,
+            },
+        }
+
+
+    def list_platform_roles():
+        live_roles = {}
+        if ranger_enabled():
+            live_roles = {
+                str(role.get("name", "")): role
+                for role in list_roles()
+                if str(role.get("name", "")).strip()
+            }
+        views = []
+        for role_key in sorted(ROLE_CATALOG):
+            role_entry = ROLE_CATALOG[role_key]
+            live_role = live_roles.get(role_entry.get("name") or role_key)
+            views.append(role_view(role_entry, live_role))
+        return views
+
+
+    def visible_items_for(profile):
+        groups = set(normalize_groups(profile.get("groups")))
+        is_admin = bool(profile.get("is_admin"))
+        visible = []
+        for item in CONFIG.get("items", []):
+            if not isinstance(item, dict):
+                continue
+            if item.get("adminOnly") and not is_admin:
+                continue
+            required_groups = {
+                str(group).strip()
+                for group in (item.get("requiredGroups") or [])
+                if str(group).strip()
+            }
+            if required_groups and groups.isdisjoint(required_groups):
+                continue
+            visible.append(item)
+        return visible
+
+
+    def normalize_expected_status_codes(values):
+        codes = []
+        for value in values or []:
+            try:
+                codes.append(int(value))
+            except (TypeError, ValueError):
+                continue
+        return codes or [200]
+
+
+    def health_payload(item, status, summary, checked_at=None):
+        health = item.get("health") if isinstance(item, dict) else {}
+        if not isinstance(health, dict):
+            health = {}
+        browser_target = str(item.get("url", "")).strip()
+        probe_target = str(health.get("targetUrl", "")).strip()
+        return {
+            "id": str(item.get("id", "")).strip(),
+            "label": str(item.get("name", "")).strip(),
+            "group": str(item.get("group", "")).strip(),
+            "status": status,
+            "summary": summary,
+            "checkedAt": checked_at or utc_timestamp(),
+            "targetUrl": browser_target or probe_target,
+            "probeTargetUrl": probe_target or browser_target,
+        }
+
+
+    def probe_item_health(item):
+        item_id = str(item.get("id", "")).strip()
+        cache_entry = HEALTH_CACHE.get(item_id)
+        now = time.time()
+        if cache_entry and cache_entry.get("expires_at", 0) > now:
+            return cache_entry["payload"]
+
+        health = item.get("health") if isinstance(item, dict) else {}
+        if not isinstance(health, dict):
+            health = {}
+        target_url = str(health.get("targetUrl", "")).strip()
+        if not target_url:
+            payload = health_payload(item, "unknown", "No health probe is configured for this component.")
+            HEALTH_CACHE[item_id] = {"expires_at": now + HEALTH_CACHE_TTL_SECONDS, "payload": payload}
+            return payload
+
+        expected_codes = normalize_expected_status_codes(health.get("expectedStatusCodes"))
+        timeout_seconds = max(1, int(health.get("timeoutSeconds") or 5))
+        body_includes = str(health.get("bodyIncludes", "") or "").strip()
+        request = urllib.request.Request(
+            target_url,
+            headers={"Accept": "text/html,application/json;q=0.9,*/*;q=0.8"},
+            method="GET",
+        )
+
+        status_code = None
+        response_body = ""
+        checked_at = utc_timestamp()
+        try:
+            parsed_target = urllib.parse.urlparse(target_url)
+            with urllib.request.urlopen(
+                request,
+                timeout=timeout_seconds,
+                context=HTTPS_CONTEXT if parsed_target.scheme == "https" else None,
+            ) as response:
+                status_code = int(response.status)
+                response_body = response.read(4096).decode("utf-8", "replace")
+        except urllib.error.HTTPError as exc:
+            status_code = int(exc.code)
+            response_body = exc.read(4096).decode("utf-8", "replace")
+        except Exception as exc:
+            payload = health_payload(item, "down", f"Health check failed: {exc}", checked_at=checked_at)
+            HEALTH_CACHE[item_id] = {"expires_at": now + HEALTH_CACHE_TTL_SECONDS, "payload": payload}
+            return payload
+
+        if status_code in expected_codes:
+            if body_includes and body_includes not in response_body:
+                payload = health_payload(
+                    item,
+                    "degraded",
+                    f"Endpoint returned expected HTTP {status_code}, but the configured content marker was not present.",
+                    checked_at=checked_at,
+                )
+            else:
+                payload = health_payload(
+                    item,
+                    "healthy",
+                    f"Endpoint returned expected HTTP {status_code}.",
+                    checked_at=checked_at,
+                )
+        elif status_code >= 500:
+            payload = health_payload(item, "down", f"Endpoint returned HTTP {status_code}.", checked_at=checked_at)
+        else:
+            expected_label = ", ".join(str(code) for code in expected_codes)
+            payload = health_payload(
+                item,
+                "degraded",
+                f"Endpoint returned HTTP {status_code}; expected one of {expected_label}.",
+                checked_at=checked_at,
+            )
+
+        HEALTH_CACHE[item_id] = {"expires_at": now + HEALTH_CACHE_TTL_SECONDS, "payload": payload}
+        return payload
+
+
+    def update_role_membership(role_key, kind, name, add_member):
+        membership_source = str(CONFIG.get("ranger", {}).get("membershipSource", "git") or "git").lower()
+        if membership_source != "ranger":
+            raise ApiError(409, "Live role membership edits are disabled until platformRoleMembershipSource is set to ranger.")
+        if kind == "group" and not bool(CONFIG.get("ranger", {}).get("usersyncEnabled")):
+            raise ApiError(409, "Directory-group assignment is unavailable until LDAP and Ranger usersync are enabled.")
+        if kind not in {"user", "group"}:
+            raise ApiError(400, "kind must be either user or group.")
+
+        principal = str(name or "").strip()
+        if not principal:
+            raise ApiError(400, "name must be a non-empty user or group name.")
+        if not principal_exists(kind, principal):
+            raise ApiError(404, f"{kind.title()} {principal} is not known to Ranger.")
+
+        role_entry = ROLE_CATALOG.get(role_key)
+        if not role_entry:
+            raise ApiError(404, f"Platform role {role_key} is not defined in Git.")
+
+        existing = get_role_by_name(role_entry.get("name") or role_key)
+        if not existing:
+            raise ApiError(404, f"Ranger role {(role_entry.get('name') or role_key)} does not exist yet.")
+
+        users = normalize_role_members(existing.get("users", []))
+        groups = normalize_role_members(existing.get("groups", []))
+        roles = normalize_role_members(existing.get("roles", []))
+
+        target_members = users if kind == "user" else groups
+        target_map = {member["name"]: dict(member) for member in target_members}
+        if add_member:
+            target_map[principal] = {"name": principal, "isAdmin": False}
+        else:
+            target_map.pop(principal, None)
+
+        payload = {
+            "id": existing["id"],
+            "guid": existing.get("guid"),
+            "version": existing.get("version"),
+            "createdByUser": existing.get("createdByUser"),
+            "name": existing.get("name") or role_entry.get("name") or role_key,
+            "description": role_entry.get("description", existing.get("description", "")),
+            "isEnabled": True,
+            "users": normalize_role_members(target_map.values()) if kind == "user" else users,
+            "groups": normalize_role_members(target_map.values()) if kind == "group" else groups,
+            "roles": roles,
+        }
+        ranger_request("PUT", role_update_path(existing["id"]), payload, ok=(200,))
+        refreshed = get_role_by_name(role_entry.get("name") or role_key)
+        return role_view(role_entry, refreshed)
+
+
+    class PlatformAdminHandler(BaseHTTPRequestHandler):
+        server_version = "platform-home-admin/1.0"
+
+        def log_message(self, fmt, *args):
+            return
+
+        def do_GET(self):
+            self.handle_request()
+
+        def do_POST(self):
+            self.handle_request()
+
+        def do_DELETE(self):
+            self.handle_request()
+
+        def handle_request(self):
+            parsed = urllib.parse.urlparse(self.path)
+            path = parsed.path
+
+            try:
+                if path == "/healthz":
+                    json_response(self, 200, {"status": "ok"})
+                    return
+
+                if self.command == "GET" and path == "/api/health":
+                    session = authenticate(self, require_admin=False)
+                    items = [probe_item_health(item) for item in visible_items_for(session)]
+                    json_response(self, 200, {"checkedAt": utc_timestamp(), "items": items})
+                    return
+
+                authenticate(self)
+
+                if self.command == "GET" and path == "/api/admin/status":
+                    json_response(
+                        self,
+                        200,
+                        {
+                            "rangerEnabled": bool(CONFIG.get("ranger", {}).get("enabled")),
+                            "membershipSource": str(CONFIG.get("ranger", {}).get("membershipSource", "git") or "git"),
+                            "usersyncEnabled": bool(CONFIG.get("ranger", {}).get("usersyncEnabled")),
+                            "groupAssignmentEnabled": bool(CONFIG.get("ranger", {}).get("usersyncEnabled")),
+                            "userAssignmentEnabled": True,
+                            "auditUrl": CONFIG.get("ranger", {}).get("browserUrl", ""),
+                        },
+                    )
+                    return
+
+                if self.command == "GET" and path == "/api/admin/platform-roles":
+                    json_response(
+                        self,
+                        200,
+                        {
+                            "membershipSource": str(CONFIG.get("ranger", {}).get("membershipSource", "git") or "git"),
+                            "roles": list_platform_roles(),
+                        },
+                    )
+                    return
+
+                if self.command == "GET" and path == "/api/admin/principals":
+                    params = urllib.parse.parse_qs(parsed.query or "")
+                    kind = str((params.get("kind") or [""])[0]).strip().lower()
+                    query = str((params.get("query") or [""])[0]).strip()
+                    if kind not in {"user", "group"}:
+                        raise ApiError(400, "kind must be either user or group.")
+                    if kind == "group" and not bool(CONFIG.get("ranger", {}).get("usersyncEnabled")):
+                        json_response(self, 200, {"kind": kind, "results": []})
+                        return
+                    results = []
+                    if query:
+                        lowered = query.casefold()
+                        results = [
+                            name
+                            for name in list_known_principals(kind)
+                            if lowered in name.casefold()
+                        ][:20]
+                    json_response(self, 200, {"kind": kind, "results": results})
+                    return
+
+                if path.startswith("/api/admin/platform-roles/") and path.endswith("/members") and self.command in {"POST", "DELETE"}:
+                    parts = path.split("/")
+                    if len(parts) != 6:
+                        raise ApiError(404, "Unknown admin API path.")
+                    role_key = urllib.parse.unquote(parts[4])
+                    payload = read_json(self)
+                    role = update_role_membership(
+                        role_key,
+                        str(payload.get("kind", "")).strip().lower(),
+                        payload.get("name"),
+                        add_member=self.command == "POST",
+                    )
+                    json_response(self, 200, {"role": role})
+                    return
+
+                raise ApiError(404, "Unknown admin API path.")
+            except ApiError as exc:
+                json_response(self, exc.status, {"error": exc.message})
+            except Exception as exc:
+                json_response(self, 500, {"error": str(exc)})
+
+
+    if __name__ == "__main__":
+        ThreadingHTTPServer(("0.0.0.0", PORT), PlatformAdminHandler).serve_forever()
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ $serviceName }}-nginx
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "dlh-in-a-box.labels" . | nindent 4 }}
+    app.kubernetes.io/component: platform-home
+data:
+  default.conf: |
+    server {
+      listen {{ $port }};
+      server_name _;
+      # Tunnel-mode localhost access sends every 127.0.0.1 cookie back to the
+      # launchpad regardless of port. Give nginx enough headroom to render the
+      # page so the portal JS can clean up stale oauth2-proxy cookies.
+      client_header_buffer_size 16k;
+      large_client_header_buffers 8 32k;
+      root /usr/share/nginx/html;
+      index index.html;
+
+      location = /healthz {
+        access_log off;
+        add_header Content-Type text/plain;
+        return 200 'ok';
+      }
+
+      location /api/ {
+        add_header Cache-Control "no-store, no-cache, max-age=0, must-revalidate" always;
+        add_header Pragma "no-cache" always;
+        add_header Expires "0" always;
+        proxy_pass http://127.0.0.1:{{ $apiPort }};
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header Authorization $http_authorization;
+      }
+
+      location / {
+        add_header Cache-Control "no-store, no-cache, max-age=0, must-revalidate" always;
+        add_header Pragma "no-cache" always;
+        add_header Expires "0" always;
+        try_files $uri $uri/ /index.html;
+      }
+    }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ $serviceName }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "dlh-in-a-box.labels" . | nindent 4 }}
+    app.kubernetes.io/component: platform-home
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/name: {{ include "dlh-in-a-box.name" . }}
+    app.kubernetes.io/component: platform-home
+  ports:
+    - name: http
+      port: 80
+      targetPort: http
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ $serviceName }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "dlh-in-a-box.labels" . | nindent 4 }}
+    app.kubernetes.io/component: platform-home
+spec:
+  replicas: {{ default 1 .Values.platformHome.replicaCount }}
+  selector:
+    matchLabels:
+      app.kubernetes.io/instance: {{ .Release.Name }}
+      app.kubernetes.io/name: {{ include "dlh-in-a-box.name" . }}
+      app.kubernetes.io/component: platform-home
+  template:
+    metadata:
+      annotations:
+        checksum/platform-home-config: {{ $platformHomeChecksum | quote }}
+      labels:
+        app.kubernetes.io/instance: {{ .Release.Name }}
+        app.kubernetes.io/name: {{ include "dlh-in-a-box.name" . }}
+        app.kubernetes.io/component: platform-home
+    spec:
+      {{- with .Values.global.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: platform-home
+          image: "{{ .Values.platformHome.image.repository }}:{{ .Values.platformHome.image.tag }}"
+          imagePullPolicy: {{ .Values.platformHome.image.pullPolicy }}
+          ports:
+            - name: http
+              containerPort: {{ $port }}
+              protocol: TCP
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            initialDelaySeconds: 15
+            periodSeconds: 20
+          volumeMounts:
+            - name: assets
+              mountPath: /usr/share/nginx/html
+              readOnly: true
+            - name: nginx-config
+              mountPath: /etc/nginx/conf.d/default.conf
+              subPath: default.conf
+              readOnly: true
+        - name: platform-home-admin-api
+          image: "{{ .Values.platformHome.api.image.repository }}:{{ .Values.platformHome.api.image.tag }}"
+          imagePullPolicy: {{ .Values.platformHome.api.image.pullPolicy }}
+          command:
+            - python
+            - -u
+            - /opt/platform-home-api/admin-api.py
+          env:
+            - name: PORT
+              value: {{ $apiPort | quote }}
+            - name: RANGER_URL
+              value: {{ include "dlh-in-a-box.ranger.admin.url" . | quote }}
+            - name: IDENTITY_USERINFO_URL
+              value: {{ include "dlh-in-a-box.identity.internalUserInfoUrl" . | quote }}
+            - name: IDENTITY_EXPECTED_ISSUER
+              value: {{ include "dlh-in-a-box.identity.issuer" . | quote }}
+            - name: OIDC_GROUPS_CLAIM
+              value: {{ default "groups" $oidc.groupsClaim | quote }}
+            - name: PLATFORM_ADMIN_GROUP
+              value: {{ $adminRequiredGroup | quote }}
+            - name: RANGER_ADMIN_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ default "dlh-ranger-admin" $rangerAdmin.existingSecret }}
+                  key: {{ default "rangerAdminPassword" $rangerAdmin.adminPasswordKey }}
+                  optional: true
+          ports:
+            - name: admin-api
+              containerPort: {{ $apiPort }}
+              protocol: TCP
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: admin-api
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: admin-api
+            initialDelaySeconds: 15
+            periodSeconds: 20
+          volumeMounts:
+            - name: admin-api
+              mountPath: /opt/platform-home-api
+              readOnly: true
+      volumes:
+        - name: assets
+          configMap:
+            name: {{ $serviceName }}-assets
+        - name: admin-api
+          configMap:
+            name: {{ $serviceName }}-api
+            defaultMode: 0555
+        - name: nginx-config
+          configMap:
+            name: {{ $serviceName }}-nginx
+---
+{{- if .Values.platformHome.ingress.enabled }}
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ $serviceName }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "dlh-in-a-box.labels" . | nindent 4 }}
+    app.kubernetes.io/component: platform-home
+  {{- with .Values.platformHome.ingress.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  {{- if .Values.platformHome.ingress.className }}
+  ingressClassName: {{ .Values.platformHome.ingress.className }}
+  {{- end }}
+  rules:
+    - host: {{ .Values.platformHome.ingress.host | quote }}
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ $serviceName }}
+                port:
+                  number: 80
+  {{- if .Values.platformHome.ingress.tlsSecretName }}
+  tls:
+    - hosts:
+        - {{ .Values.platformHome.ingress.host | quote }}
+      secretName: {{ .Values.platformHome.ingress.tlsSecretName }}
+  {{- end }}
+{{- end }}
+{{- end }}

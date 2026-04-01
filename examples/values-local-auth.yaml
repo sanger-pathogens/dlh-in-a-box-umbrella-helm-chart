@@ -1,0 +1,460 @@
+# Disposable local auth overlay for render-oriented smoke checks.
+# These credentials are intentionally non-secret demo values and must never be
+# reused in a shared or production environment.
+global:
+  environment: local
+  domain: local.test
+  identity:
+    enabled: true
+    provider:
+      mode: bundledKeycloak
+      keycloak:
+        realm: dlh
+        browserHost: http://dlh-keycloak.data-lakehouse-local.svc.cluster.local
+        internalScheme: http
+        loginTheme: ""
+        configCliEnvExistingSecret: &keycloak_config_cli_env_secret dlh-keycloak-config-cli-env
+        bootstrapUsers:
+          - username: trino-admin
+            email: trino-admin@local.test
+            firstName: Local
+            lastName: Administrator
+            passwordEnvVar: KC_BOOTSTRAP_TRINO_ADMIN_PASSWORD
+            groups:
+              - platform-app-cloudbeaver
+              - platform-app-datahub
+              - platform-app-prefect
+              - platform-app-superset
+              - platform-app-trino
+              - platform-role-platform-admin
+    external:
+      oidc:
+        issuer: http://dlh-keycloak.data-lakehouse-local.svc.cluster.local/realms/dlh
+        usernameClaim: email
+        groupsClaim: groups
+        userMappingPattern: "([^@]+)"
+        scopes:
+          - openid
+          - profile
+          - email
+          - groups
+        processForwardedHeaders: true
+      clients:
+        trino:
+          enabled: true
+          clientId: trino
+          existingSecret: dlh-oidc-clients
+          clientSecretKey: trinoClientSecret
+          redirectUris:
+            - http://dlh-trino.data-lakehouse-local.svc.cluster.local/oauth2/callback
+          webOrigins:
+            - http://dlh-trino.data-lakehouse-local.svc.cluster.local
+          sharedSecretExistingSecret: dlh-trino-internal-communication
+          sharedSecretKey: sharedSecret
+          passwordAuthEnabled: false
+        superset:
+          enabled: false
+        datahub:
+          enabled: false
+        platformHome:
+          enabled: true
+          clientId: platform-home
+          redirectUris:
+            - http://dlh-platform-home.data-lakehouse-local.svc.cluster.local/
+          webOrigins:
+            - http://dlh-platform-home.data-lakehouse-local.svc.cluster.local
+        cloudbeaverProxy:
+          enabled: true
+          clientId: cloudbeaver
+          existingSecret: dlh-cloudbeaver-oauth2-proxy
+          clientSecretKey: client-secret
+          cookieExistingSecret: dlh-cloudbeaver-oauth2-proxy
+          cookieSecretKey: cookie-secret
+          redirectUrl: http://dlh-cloudbeaver-auth-proxy.data-lakehouse-local.svc.cluster.local/oauth2/callback
+          redirectUris:
+            - http://dlh-cloudbeaver-auth-proxy.data-lakehouse-local.svc.cluster.local/oauth2/callback
+          webOrigins:
+            - http://dlh-cloudbeaver-auth-proxy.data-lakehouse-local.svc.cluster.local
+          allowedGroups:
+            - platform-app-cloudbeaver
+            - platform-role-platform-admin
+          emailDomains:
+            - "*"
+        prefectProxy:
+          enabled: true
+          clientId: prefect
+          existingSecret: dlh-prefect-oauth2-proxy
+          clientSecretKey: client-secret
+          cookieExistingSecret: dlh-prefect-oauth2-proxy
+          cookieSecretKey: cookie-secret
+          redirectUrl: http://dlh-prefect-auth-proxy.data-lakehouse-local.svc.cluster.local/oauth2/callback
+          redirectUris:
+            - http://dlh-prefect-auth-proxy.data-lakehouse-local.svc.cluster.local/oauth2/callback
+          webOrigins:
+            - http://dlh-prefect-auth-proxy.data-lakehouse-local.svc.cluster.local
+          allowedGroups:
+            - platform-app-prefect
+            - platform-role-platform-admin
+          emailDomains:
+            - "*"
+    directory:
+      mode: externalLdap
+      ldap:
+        enabled: false
+        usernameAttribute: uid
+        firstNameAttribute: givenName
+        lastNameAttribute: sn
+        emailAttribute: mail
+        uuidAttribute: entryUUID
+        userObjectClasses: inetOrgPerson,organizationalPerson,person
+        userSearchFilter: "(uid={0})"
+        groupNameAttribute: cn
+        membershipUserAttribute: uid
+        groupObjectClasses: groupOfNames
+        useGroupFilter: true
+        groupSearchFilter: "(cn=platform-*)"
+        groupSearchMemberAttribute: member
+        userMemberOfAttribute: memberOf
+    groupConventions:
+      appAccessPrefix: platform-app-
+      rolePrefix: platform-role-
+      dataPrefix: platform-data-
+  authorization:
+    platformRoles:
+      platform-admin:
+        description: Local administrators with full browser access and broad Trino administration rights.
+        members:
+          directoryGroups:
+            - platform-role-platform-admin
+        apps:
+          superset: true
+          datahub: true
+          trinoUi: true
+          cloudbeaver: true
+          prefect: true
+      default-readonly-analyst:
+        description: Demo read-only users for the default catalog.
+        members:
+          directoryGroups:
+            - platform-data-default-ro
+        apps:
+          superset: true
+          datahub: true
+          trinoUi: true
+          cloudbeaver: true
+          prefect: false
+    platformRoleExceptions: []
+    ranger:
+      enabled: true
+      serviceName: trino
+      serviceUsername: trino
+      serviceAdminUsers:
+        - trino-admin
+        - trino-admin@local.test
+      serviceAdminGroups:
+        - platform-role-platform-admin
+      superUsers:
+        - trino-admin
+        - trino-admin@local.test
+      superGroups:
+        - platform-role-platform-admin
+      useRangerGroups: false
+      postgresql:
+        enabled: true
+        existingSecret: dlh-ranger-postgresql
+        passwordKey: password
+        adminPasswordKey: postgres-password
+      admin:
+        browserUrl: http://dlh-ranger-admin.data-lakehouse-local.svc.cluster.local:6080
+        existingSecret: dlh-ranger-admin
+        adminPasswordKey: rangerAdminPassword
+        usersyncPasswordKey: rangerUsersyncPassword
+      usersync:
+        enabled: false
+        schedule: "*/15 * * * *"
+        syncSource: LDAP
+      importCatalogAcls: false
+      bootstrapPolicies:
+        - name: trino-default-read
+          description: Local read-only access for the default catalog.
+          resources:
+            catalog: default
+            schema: "*"
+            table: "*"
+            column: "*"
+          policyItems:
+            - groups: []
+              users: []
+              roles:
+                - default-readonly-analyst
+              accesses:
+                - type: select
+                  isAllowed: true
+                - type: show
+                  isAllowed: true
+                - type: use
+                  isAllowed: true
+                - type: execute
+                  isAllowed: true
+              conditions: []
+              delegateAdmin: false
+        - name: trino-default-write
+          description: Local write access for the default catalog through the administrator role.
+          resources:
+            catalog: default
+            schema: "*"
+            table: "*"
+            column: "*"
+          policyItems:
+            - groups: []
+              users: []
+              roles:
+                - platform-admin
+              accesses:
+                - type: select
+                  isAllowed: true
+                - type: show
+                  isAllowed: true
+                - type: use
+                  isAllowed: true
+                - type: execute
+                  isAllowed: true
+                - type: insert
+                  isAllowed: true
+                - type: create
+                  isAllowed: true
+                - type: delete
+                  isAllowed: true
+                - type: drop
+                  isAllowed: true
+                - type: alter
+                  isAllowed: true
+              conditions: []
+              delegateAdmin: false
+        - name: trino-default-mask-demo
+          description: Demo masking policy so local smoke installs exercise Ranger fine-grained policy rendering.
+          policyType: 1
+          resources:
+            catalog: default
+            schema: demo
+            table: people
+            column:
+              - national_id
+          dataMaskPolicyItems:
+            - groups: []
+              users: []
+              roles:
+                - default-readonly-analyst
+              accesses:
+                - type: select
+                  isAllowed: true
+              dataMaskInfo:
+                dataMaskType: MASK_SHOW_LAST_4
+              conditions: []
+              delegateAdmin: false
+  storage:
+    backend: minio
+    s3:
+      endpoint: http://dlh-minio:9000
+      region: us-east-1
+      bucket: dlh-local
+      pathStyleAccess: true
+      accessKey: minioadmin
+      secretKey: minioadmin123
+  dataCatalogs:
+    default:
+      type: deltaLake
+
+trino:
+  accessControl:
+    type: configmap
+  auth:
+    internalCommunicationSharedSecretSecret: dlh-trino-internal-communication
+  server:
+    workers: 1
+    node:
+      environment: local
+    config:
+      query:
+        maxMemory: 512MB
+  coordinator:
+    jvm:
+      maxHeapSize: 1G
+    config:
+      query:
+        maxMemoryPerNode: 256MB
+  worker:
+    jvm:
+      maxHeapSize: 1G
+    config:
+      query:
+        maxMemoryPerNode: 256MB
+
+prefect:
+  enabled: true
+  server:
+    enabled: true
+  workers:
+    enabled: true
+  authProxy:
+    enabled: true
+
+prefectServer:
+  postgresql:
+    enabled: true
+  server:
+    resources:
+      requests:
+        cpu: 100m
+        memory: 256Mi
+      limits:
+        cpu: 500m
+        memory: 512Mi
+
+prefectWorker:
+  worker:
+    apiConfig: selfHostedServer
+    replicaCount: 1
+    initContainer:
+      extraContainers:
+        - name: wait-for-prefect-server
+          image: "{{ .Values.worker.image.repository }}:{{ .Values.worker.image.prefectTag }}"
+          imagePullPolicy: "{{ .Values.worker.image.pullPolicy }}"
+          command:
+            - /bin/sh
+            - -c
+          args:
+            - |
+              python - <<'PY'
+              import sys
+              import time
+              import urllib.request
+
+              url = "http://prefect-server:4200/api/health"
+              for _ in range(90):
+                  try:
+                      with urllib.request.urlopen(url, timeout=5) as response:
+                          if response.status < 500:
+                              sys.exit(0)
+                  except Exception:
+                      pass
+                  time.sleep(2)
+
+              sys.exit("Prefect server did not become reachable in time")
+              PY
+    config:
+      workPool: kubernetes-local
+      workQueues:
+        - default
+      jobNamespace: data-lakehouse-local
+    selfHostedServerApiConfig:
+      apiUrl: http://prefect-server:4200/api
+
+prefect-auth-proxy:
+  config:
+    existingSecret: dlh-prefect-oauth2-proxy
+
+platformHome:
+  enabled: true
+
+cloudbeaver:
+  enabled: true
+  bootstrap:
+    existingSecret: dlh-cloudbeaver-bootstrap
+  authProxy:
+    enabled: true
+
+cloudbeaver-auth-proxy:
+  config:
+    existingSecret: dlh-cloudbeaver-oauth2-proxy
+
+keycloak:
+  enabled: true
+  production: false
+  httpEnabled: true
+  proxyHeaders: xforwarded
+  auth:
+    adminUser: admin
+    existingSecret: dlh-keycloak-admin
+    passwordSecretKey: adminPassword
+  keycloakConfigCli:
+    extraEnvVarsSecret: *keycloak_config_cli_env_secret
+
+sparkOperator:
+  enabled: true
+  nameOverride: spark-operator
+
+minio:
+  enabled: true
+  global:
+    security:
+      allowInsecureImages: true
+  image:
+    registry: docker.io
+    repository: bitnamilegacy/minio
+    tag: 2025.7.23-debian-12-r5
+  auth:
+    rootUser: minioadmin
+    rootPassword: minioadmin123
+  defaultBuckets: dlh-local
+  persistence:
+    enabled: false
+
+hive:
+  enabled: true
+  metastore:
+    image:
+      registry: docker.io
+      repository: apache/hive
+      tag: 3.1.3
+  schemainit:
+    image:
+      registry: docker.io
+      repository: apache/hive
+      tag: 3.1.3
+  postgres:
+    port: "5432"
+    username: postgres
+    password: localpostgres
+  s3:
+    endpoint: http://dlh-minio:9000
+    accessKey: minioadmin
+    secretKey: minioadmin123
+    pathStyleAccess: true
+  warehouseDir: s3a://dlh-local/warehouse
+  ingress:
+    enabled: false
+
+hivePostgresql:
+  image:
+    registry: docker.io
+    repository: bitnamilegacy/postgresql
+    tag: 16.2.0-debian-12-r8
+  nameOverride: hive-postgresql
+  auth:
+    enablePostgresUser: true
+    postgresPassword: localpostgres
+  primary:
+    pgHbaConfiguration: |-
+      local   all             all                                     trust
+      host    all             all             127.0.0.1/32            trust
+      host    all             all             ::1/128                 trust
+      host    all             all             0.0.0.0/0               md5
+      host    all             all             ::/0                    md5
+    initdb:
+      scripts:
+        00-set-postgres-md5.sql: |
+          SET password_encryption = 'md5';
+          ALTER ROLE postgres WITH PASSWORD 'localpostgres';
+
+datahub:
+  enabled: false
+
+superset:
+  enabled: false
+
+vault:
+  enabled: true
+  server:
+    dev:
+      enabled: true

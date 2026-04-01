@@ -1,0 +1,4 @@
+trino:
+  server:
+    config:
+      authenticationType: PASSWORD

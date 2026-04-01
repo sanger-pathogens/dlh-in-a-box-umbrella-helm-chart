@@ -1,29 +1,36 @@
 # Documentation
 
-This directory holds repository-owned onboarding, release, and static
-documentation assets.
+This directory holds the long-form documentation for the chart repository.
 
-## Current structure
+Use it when the chart README has already told you where to start, but you now
+need the deeper explanation behind the values contract or the default platform
+model.
 
-```mermaid
-flowchart LR
-  Docs[docs/] --> Assets[docs/assets]
-  Docs --> Quickstart[quickstart.md]
-  Docs --> Release[release-playbook.md]
-  Assets --> Icon[dlh-in-a-box icon]
-  Icon --> ChartMetadata[Chart.yaml icon metadata]
-  Icon --> Readme[README and package presentation]
-```
+## Read In This Order
 
-## Child guide
+1. [../README.md](../README.md)
+2. [../charts/dlh-in-a-box/README.md](../charts/dlh-in-a-box/README.md)
+3. [quickstart.md](quickstart.md)
+4. [glossary.md](glossary.md)
+5. [auth-architecture.md](auth-architecture.md)
+6. [data-governance.md](data-governance.md)
+7. [release-playbook.md](release-playbook.md)
 
-| Path | Guide | Purpose |
-| --- | --- | --- |
-| `quickstart.md` | [quickstart.md](quickstart.md) | First-run onboarding for new consumers |
-| `release-playbook.md` | [release-playbook.md](release-playbook.md) | Release and publication runbook |
-| `assets/` | [assets/README.md](assets/README.md) | Static icons and future documentation assets |
+## What Lives Here
 
-## Maintainer note
+| File | Purpose |
+| --- | --- |
+| `quickstart.md` | Fastest route from inspection to install |
+| `glossary.md` | Definitions for the terms used across the chart docs |
+| `auth-architecture.md` | Default Keycloak, LDAP/AD, Ranger, and Prefect access model |
+| `data-governance.md` | Governance metadata contract and policy-compliance boundary |
+| `release-playbook.md` | Maintainer-oriented release and publication workflow |
+| `assets/` | Static images and branding assets used by the repo |
 
-This directory is where narrative documentation should live when it is too long
-or too operational to belong in the root README or chart README.
+## Documentation Rules
+
+- Primary docs explain the default path first.
+- Escape hatches are documented, but not presented as the main story.
+- Vendored upstream docs are reference-only.
+- The docs say clearly when Helm enforces something and when a human approval
+  process is still required.

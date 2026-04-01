@@ -140,7 +140,6 @@ hive:
       repository: apache/hive
       tag: 3.1.3
   postgres:
-    host: dlh-hive-postgresql
     port: "5432"
     username: postgres
     password: localpostgres
@@ -153,7 +152,7 @@ hive:
   ingress:
     enabled: false
 
-postgresql:
+hivePostgresql:
   image:
     registry: docker.io
     repository: bitnamilegacy/postgresql

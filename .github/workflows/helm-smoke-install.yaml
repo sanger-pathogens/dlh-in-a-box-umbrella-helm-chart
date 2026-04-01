@@ -34,6 +34,7 @@ jobs:
     runs-on: ubuntu-latest
     env:
       ARTIFACT_DIR: artifacts/kind-smoke-install
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
       NAMESPACE: data-lakehouse-local
       RELEASE_NAME: dlh
       TIMEOUT: 20m

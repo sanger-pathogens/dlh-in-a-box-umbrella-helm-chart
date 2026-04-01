@@ -1,0 +1,168 @@
+{{- $global := .Values.global | default dict -}}
+{{- $hasEnvironment := hasKey $global "environment" -}}
+{{- $environment := default "" $global.environment -}}
+{{- $catalogs := $global.dataCatalogs | default dict -}}
+{{- $authorization := $global.authorization | default dict -}}
+{{- $platformRoles := get $authorization "platformRoles" | default dict -}}
+{{- $platformRoleExceptions := get $authorization "platformRoleExceptions" | default (list) -}}
+{{- $ranger := get $authorization "ranger" | default dict -}}
+{{- $bootstrapPolicies := get $ranger "bootstrapPolicies" | default (dig "bootstrap" "policies" (list) $ranger) -}}
+{{- $importCatalogAcls := default false $ranger.importCatalogAcls -}}
+{{- $supportedPlatformApps := list "superset" "datahub" "trinoUi" "cloudbeaver" "prefect" -}}
+{{- $platformRoleKeys := dict -}}
+{{- $platformRoleNames := dict -}}
+
+{{- range $roleKey, $_ := $platformRoles -}}
+  {{- $_ := set $platformRoleKeys $roleKey true -}}
+{{- end -}}
+
+{{- range $roleKey, $role := $platformRoles -}}
+  {{- if not (trim (default "" (get $role "description"))) -}}
+    {{- fail (printf "global.authorization.platformRoles.%s.description must be set." $roleKey) -}}
+  {{- end -}}
+  {{- $members := get $role "members" | default dict -}}
+  {{- $apps := get $role "apps" | default dict -}}
+  {{- range $appName, $_ := $apps -}}
+    {{- if not (has $appName $supportedPlatformApps) -}}
+      {{- fail (printf "global.authorization.platformRoles.%s.apps.%s is not supported. Allowed app entitlements are superset, datahub, trinoUi, cloudbeaver, and prefect." $roleKey $appName) -}}
+    {{- end -}}
+  {{- end -}}
+  {{- range $nestedRole := get $members "nestedRoles" | default (list) -}}
+    {{- if not (hasKey $platformRoleKeys (toString $nestedRole)) -}}
+      {{- fail (printf "global.authorization.platformRoles.%s.members.nestedRoles references unknown platform role %s." $roleKey $nestedRole) -}}
+    {{- end -}}
+  {{- end -}}
+  {{- $rangerRoleName := default $roleKey (dig "ranger" "roleName" "" $role) -}}
+  {{- if hasKey $platformRoleNames $rangerRoleName -}}
+    {{- fail (printf "global.authorization.platformRoles.%s resolves to Ranger role name %s, but that Ranger role name is already used by another platform role." $roleKey $rangerRoleName) -}}
+  {{- end -}}
+  {{- $_ := set $platformRoleNames $rangerRoleName true -}}
+{{- end -}}
+
+{{- if and (gt (len $platformRoleExceptions) 0) (not (default false $ranger.enabled)) -}}
+  {{- fail "global.authorization.platformRoleExceptions requires global.authorization.ranger.enabled=true." -}}
+{{- end -}}
+{{- range $idx, $exception := $platformRoleExceptions -}}
+  {{- $prefix := printf "global.authorization.platformRoleExceptions[%d]" $idx -}}
+  {{- range $field := list "platformRole" "username" "approvalRef" "reason" "grantedBy" "expiresAt" -}}
+    {{- if not (trim (default "" (get $exception $field))) -}}
+      {{- fail (printf "%s.%s must be set." $prefix $field) -}}
+    {{- end -}}
+  {{- end -}}
+  {{- $targetRole := default "" (get $exception "platformRole") -}}
+  {{- if not (hasKey $platformRoleKeys $targetRole) -}}
+    {{- fail (printf "%s.platformRole references unknown platform role %s." $prefix $targetRole) -}}
+  {{- end -}}
+  {{- if not (regexMatch "^[0-9]{4}-[0-9]{2}-[0-9]{2}$" (default "" (get $exception "expiresAt"))) -}}
+    {{- fail (printf "%s.expiresAt must use YYYY-MM-DD format." $prefix) -}}
+  {{- end -}}
+{{- end -}}
+
+{{- if and (gt (len $catalogs) 0) (or (not $hasEnvironment) (not (has $environment (list "local" "dev" "prod")))) -}}
+  {{- fail "global.environment must be set to local, dev, or prod when global.dataCatalogs is not empty." -}}
+{{- end -}}
+
+{{- if and (gt (len $catalogs) 0) (ne $environment "local") -}}
+  {{- range $catalogName, $catalog := $catalogs -}}
+    {{- $governance := get $catalog "governance" | default dict -}}
+    {{- if eq (len $governance) 0 -}}
+      {{- fail (printf "global.dataCatalogs.%s.governance is required for dev and prod environments." $catalogName) -}}
+    {{- end -}}
+
+    {{- range $field := list "dataType" "classification" "consentBasis" "irbStatus" "sharingStatus" "ownerPi" "dataSteward" "sourceSystem" "approvalReference" "retentionNotes" -}}
+      {{- if not (get $governance $field) -}}
+        {{- fail (printf "global.dataCatalogs.%s.governance.%s must be set for dev and prod environments." $catalogName $field) -}}
+      {{- end -}}
+    {{- end -}}
+    {{- range $field := list "containsDirectIdentifiers" "containsQuasiIdentifiers" -}}
+      {{- if not (hasKey $governance $field) -}}
+        {{- fail (printf "global.dataCatalogs.%s.governance.%s must be set explicitly to true or false." $catalogName $field) -}}
+      {{- end -}}
+    {{- end -}}
+
+    {{- $classification := default "" $governance.classification -}}
+    {{- $sharingStatus := default "" $governance.sharingStatus -}}
+    {{- $irbStatus := default "" $governance.irbStatus -}}
+    {{- $authorizedGroups := get $catalog "authorizedGroups" | default dict -}}
+    {{- $authorizedUsers := get $catalog "authorizedUsers" | default dict -}}
+    {{- $groupRead := get $authorizedGroups "read" | default (list) -}}
+    {{- $groupWrite := get $authorizedGroups "write" | default (list) -}}
+    {{- $userRead := get $authorizedUsers "read" | default (list) -}}
+    {{- $userWrite := get $authorizedUsers "write" | default (list) -}}
+    {{- $allGroups := concat $groupRead $groupWrite -}}
+    {{- $allSubjects := concat $allGroups (concat $userRead $userWrite) -}}
+    {{- $hasWildcard := false -}}
+    {{- range $subject := $allSubjects -}}
+      {{- if eq (toString $subject) "*" -}}
+        {{- $hasWildcard = true -}}
+      {{- end -}}
+    {{- end -}}
+
+    {{- if eq $irbStatus "required-pending" -}}
+      {{- fail (printf "global.dataCatalogs.%s cannot be exposed while governance.irbStatus=required-pending." $catalogName) -}}
+    {{- end -}}
+    {{- if and (eq $sharingStatus "public") (ne $classification "public") -}}
+      {{- fail (printf "global.dataCatalogs.%s cannot declare governance.sharingStatus=public unless governance.classification=public." $catalogName) -}}
+    {{- end -}}
+    {{- if and (eq $classification "public") (or $governance.containsDirectIdentifiers $governance.containsQuasiIdentifiers) -}}
+      {{- fail (printf "global.dataCatalogs.%s cannot be classified as public while containing direct or quasi identifiers." $catalogName) -}}
+    {{- end -}}
+
+    {{- $hasCatalogScopedPolicy := false -}}
+    {{- $hasFineGrainedPolicy := false -}}
+    {{- range $policy := $bootstrapPolicies -}}
+      {{- $resources := get $policy "resources" | default dict -}}
+      {{- $catalogResource := get $resources "catalog" -}}
+      {{- $catalogMatch := false -}}
+      {{- if kindIs "slice" $catalogResource -}}
+        {{- if or (has "*" $catalogResource) (has $catalogName $catalogResource) -}}
+          {{- $catalogMatch = true -}}
+        {{- end -}}
+      {{- else if $catalogResource -}}
+        {{- if or (eq (toString $catalogResource) "*") (eq (toString $catalogResource) $catalogName) -}}
+          {{- $catalogMatch = true -}}
+        {{- end -}}
+      {{- end -}}
+      {{- if $catalogMatch -}}
+        {{- $hasDataAccess := false -}}
+        {{- range $item := concat (get $policy "policyItems" | default (list)) (concat (get $policy "dataMaskPolicyItems" | default (list)) (get $policy "rowFilterPolicyItems" | default (list))) -}}
+          {{- range $access := get $item "accesses" | default (list) -}}
+            {{- $accessType := default "" (get $access "type") -}}
+            {{- if has $accessType (list "select" "insert" "create" "delete" "drop" "use" "alter" "grant" "revoke" "show" "execute") -}}
+              {{- $hasDataAccess = true -}}
+            {{- end -}}
+          {{- end -}}
+        {{- end -}}
+        {{- if $hasDataAccess -}}
+          {{- $hasCatalogScopedPolicy = true -}}
+          {{- $policyType := int (default 0 (get $policy "policyType")) -}}
+          {{- $isFineGrained := or (eq $policyType 1) (eq $policyType 2) (gt (len (get $policy "dataMaskPolicyItems" | default (list))) 0) (gt (len (get $policy "rowFilterPolicyItems" | default (list))) 0) -}}
+          {{- if $isFineGrained -}}
+            {{- $hasFineGrainedPolicy = true -}}
+          {{- end -}}
+        {{- end -}}
+      {{- end -}}
+    {{- end -}}
+
+    {{- if or (eq $classification "restricted-identifiable") (eq $classification "restricted-deidentified") (eq $classification "internal-deidentified") -}}
+      {{- if $hasWildcard -}}
+        {{- fail (printf "global.dataCatalogs.%s uses wildcard access but governance.classification=%s requires explicit allowlists." $catalogName $classification) -}}
+      {{- end -}}
+      {{- if and $importCatalogAcls (eq (len $allGroups) 0) (not $hasCatalogScopedPolicy) -}}
+        {{- fail (printf "global.dataCatalogs.%s must declare authorizedGroups for migration import or define an explicit Ranger bootstrap policy for the catalog." $catalogName) -}}
+      {{- end -}}
+      {{- if and (not $importCatalogAcls) (not $hasCatalogScopedPolicy) -}}
+        {{- fail (printf "global.dataCatalogs.%s requires an explicit Ranger bootstrap policy because authorization.ranger.importCatalogAcls=false." $catalogName) -}}
+      {{- end -}}
+    {{- end -}}
+
+    {{- if eq $classification "restricted-identifiable" -}}
+      {{- if not (default false $ranger.enabled) -}}
+        {{- fail (printf "global.dataCatalogs.%s is restricted-identifiable, so authorization.ranger.enabled must be true." $catalogName) -}}
+      {{- end -}}
+      {{- if and (or $governance.containsDirectIdentifiers $governance.containsQuasiIdentifiers) (not $hasFineGrainedPolicy) -}}
+        {{- fail (printf "global.dataCatalogs.%s is restricted-identifiable and contains direct or quasi identifiers, so authorization.ranger.bootstrapPolicies must include a masking or row-filter policy for this catalog." $catalogName) -}}
+      {{- end -}}
+    {{- end -}}
+  {{- end -}}
+{{- end -}}
