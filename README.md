@@ -80,12 +80,13 @@ The default documented model is now:
 - `Ranger` remains the live policy and role-management plane. Trino only uses
   the Ranger plugin when `global.authorization.ranger.trino.enabled=true` is
   paired with a Ranger-capable Trino image.
-- `oauth2-proxy` sits in front of Prefect and CloudBeaver so both tools can
-  reuse the central Keycloak session.
+- `oauth2-proxy` sits in front of Prefect, CloudBeaver, and Ranger so those
+  tools can reuse the central Keycloak session.
 - the umbrella chart owns the reusable portal UX, the dedicated `Access
   Control` workspace, and the health aggregation API, while downstream repos
   own logos, fonts, favicons, color palettes, and environment-specific extra
-  tools.
+  tools. The portal is the primary admin UX for routine role membership
+  changes; Ranger remains the deeper policy and audit surface.
 - `global.dataCatalogs.*.governance` is the chart-side governance contract used
   to stop unclassified or unapproved datasets from being exposed by accident.
 

@@ -133,27 +133,27 @@ global:
           trinoUi: true
           cloudbeaver: true
           prefect: true
-      redcap-readonly-analyst:
-        description: Read-only analysts for approved REDCap data.
+      data-analyst:
+        description: Analysts who can author BI content and query approved data sources through governed tools.
         members:
           directoryGroups:
-            - platform-data-redcap-ro
+            - platform-role-data-analyst
         apps:
           superset: true
           datahub: true
-          trinoUi: true
+          trinoUi: false
           cloudbeaver: true
           prefect: false
-      redcap-site-analyst:
-        description: Site-scoped analysts limited to the approved site subset.
+      principal-investigator:
+        description: Principal investigators with read-only dashboard and catalog access.
         members:
           directoryGroups:
-            - platform-data-redcap-site-ro
+            - platform-role-principal-investigator
         apps:
           superset: true
           datahub: true
-          trinoUi: true
-          cloudbeaver: true
+          trinoUi: false
+          cloudbeaver: false
           prefect: false
     platformRoleExceptions: []
     ranger:
@@ -182,7 +182,7 @@ global:
       importCatalogAcls: false
       bootstrapPolicies:
         - name: trino-redcap-access
-          description: Allow approved analyst roles to read the redcap catalog and platform administrators to manage it.
+          description: Allow analyst and principal-investigator roles to read the redcap catalog and platform administrators to manage it.
           resources:
             catalog: redcap
             schema: "*"
@@ -192,8 +192,8 @@ global:
             - groups: []
               users: []
               roles:
-                - redcap-readonly-analyst
-                - redcap-site-analyst
+                - data-analyst
+                - principal-investigator
               accesses:
                 - type: select
                   isAllowed: true
@@ -235,7 +235,7 @@ global:
               conditions: []
               delegateAdmin: false
         - name: trino-redcap-mask-identifiers
-          description: Mask direct identifier columns for approved analyst roles.
+          description: Mask direct identifier columns for analyst and principal-investigator roles.
           policyType: 1
           resources:
             catalog: redcap
@@ -248,8 +248,8 @@ global:
             - groups: []
               users: []
               roles:
-                - redcap-readonly-analyst
-                - redcap-site-analyst
+                - data-analyst
+                - principal-investigator
               accesses:
                 - type: select
                   isAllowed: true
@@ -257,8 +257,8 @@ global:
                 dataMaskType: MASK_SHOW_LAST_4
               conditions: []
               delegateAdmin: false
-        - name: trino-redcap-site-filter
-          description: Limit site-scoped readers to one site.
+        - name: trino-redcap-pi-filter
+          description: Limit principal investigators to their approved study subset.
           policyType: 2
           resources:
             catalog: redcap
@@ -268,12 +268,12 @@ global:
             - groups: []
               users: []
               roles:
-                - redcap-site-analyst
+                - principal-investigator
               accesses:
                 - type: select
                   isAllowed: true
               rowFilterInfo:
-                filterExpr: "site_code = 'DHAKA'"
+                filterExpr: "study_visibility = 'PI_APPROVED'"
               conditions: []
               delegateAdmin: false
   storage:

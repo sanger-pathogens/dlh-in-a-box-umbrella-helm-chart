@@ -134,16 +134,27 @@ global:
           trinoUi: true
           cloudbeaver: true
           prefect: true
-      redcap-readonly-analyst:
-        description: Read-only analysts for approved REDCap data.
+      data-analyst:
+        description: Analysts who can author BI content and query approved data sources through governed tools.
         members:
           directoryGroups:
-            - platform-data-redcap-ro
+            - platform-role-data-analyst
         apps:
           superset: true
           datahub: true
-          trinoUi: true
+          trinoUi: false
           cloudbeaver: true
+          prefect: false
+      principal-investigator:
+        description: Principal investigators with read-only dashboard and catalog access.
+        members:
+          directoryGroups:
+            - platform-role-principal-investigator
+        apps:
+          superset: true
+          datahub: true
+          trinoUi: false
+          cloudbeaver: false
           prefect: false
     platformRoleExceptions: []
     ranger:
@@ -172,7 +183,7 @@ global:
       importCatalogAcls: false
       bootstrapPolicies:
         - name: trino-redcap-access
-          description: Allow approved analyst roles to read the redcap catalog and platform administrators to manage it.
+          description: Allow analyst and principal-investigator roles to read the redcap catalog and platform administrators to manage it.
           resources:
             catalog: redcap
             schema: "*"
@@ -182,7 +193,8 @@ global:
             - groups: []
               users: []
               roles:
-                - redcap-readonly-analyst
+                - data-analyst
+                - principal-investigator
               accesses:
                 - type: select
                   isAllowed: true
@@ -224,7 +236,7 @@ global:
               conditions: []
               delegateAdmin: false
         - name: trino-redcap-mask-identifiers
-          description: Mask direct identifier columns for approved analyst roles.
+          description: Mask direct identifier columns for analyst and principal-investigator roles.
           policyType: 1
           resources:
             catalog: redcap
@@ -237,7 +249,8 @@ global:
             - groups: []
               users: []
               roles:
-                - redcap-readonly-analyst
+                - data-analyst
+                - principal-investigator
               accesses:
                 - type: select
                   isAllowed: true

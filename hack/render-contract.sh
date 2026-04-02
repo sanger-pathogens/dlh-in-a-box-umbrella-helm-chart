@@ -138,8 +138,8 @@ assert_contains "${dev_manifest}" 'skip_oidc_discovery = true'
 assert_contains "${dev_manifest}" 'redeem_url = \"http://dlh-keycloak.data-lakehouse.svc.cluster.local/realms/dlh/protocol/openid-connect/token\"'
 assert_contains "${prod_manifest}" 'redeem_url = \"http://dlh-keycloak.data-lakehouse.svc.cluster.local/realms/dlh/protocol/openid-connect/token\"'
 assert_contains "${dev_manifest}" "\"platformRoles\": {"
-assert_contains "${dev_manifest}" "\"redcap-readonly-analyst\""
-assert_contains "${dev_manifest}" "\"redcap-site-analyst\""
+assert_contains "${dev_manifest}" "\"data-analyst\""
+assert_contains "${dev_manifest}" "\"principal-investigator\""
 assert_contains "${prod_manifest}" "\"platform-admin\""
 assert_contains "${dev_manifest}" "\"roles\": ["
 assert_contains "${prod_manifest}" "\"roles\": ["

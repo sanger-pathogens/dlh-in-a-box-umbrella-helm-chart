@@ -17,11 +17,17 @@ flowchart LR
   Keycloak --> Trino[Trino]
   Keycloak --> Superset[Superset]
   Keycloak --> DataHub[DataHub]
+  Keycloak --> Headlamp[Headlamp]
+  Keycloak --> Vault[Vault]
+  Keycloak --> MinIO[MinIO Console]
   Keycloak --> PrefectProxy[Prefect oauth2-proxy]
   PrefectProxy --> Prefect[Prefect]
   Keycloak --> CloudBeaverProxy[CloudBeaver oauth2-proxy]
   CloudBeaverProxy --> CloudBeaver[CloudBeaver]
+  Keycloak --> RangerProxy[Ranger oauth2-proxy]
+  RangerProxy --> RangerBrowserProxy[Ranger browser proxy]
   RangerUsersync --> Ranger[Apache Ranger]
+  RangerBrowserProxy --> Ranger
   Ranger --> Trino
 ```
 
@@ -33,7 +39,8 @@ In plain English:
   and Ranger policies.
 - `platformHome` is the browser launchpad, not an iframe container.
 - Ranger holds the Trino data-access rules.
-- Prefect and CloudBeaver are protected at the front door by `oauth2-proxy`.
+- Prefect, CloudBeaver, and Ranger are protected at the front door by
+  `oauth2-proxy`.
 
 ## Why Keycloak Is The Default
 
@@ -74,6 +81,15 @@ The following must all refer to the same person:
 
 If those identifiers drift apart, users can log in successfully but receive
 the wrong groups or no groups at all.
+
+For browser-facing apps and auth proxies, prefer:
+
+- a stable username claim such as `preferred_username`
+- a filtered platform-scoped groups claim rather than the full institutional
+  group universe
+
+That keeps headers smaller, avoids browser-proxy drift, and makes launcher or
+app authorization decisions easier to reason about.
 
 ## Trino
 
@@ -116,7 +132,7 @@ The steady-state pattern is:
 Direct-user grants are still allowed, but only as exceptions:
 
 - use short-lived exception roles with names like
-  `exception-redcap-readonly-analyst-am83-20261231`
+  `exception-data-analyst-am83-20261231`
 - store approval metadata and expiry inside the Ranger role description
 - keep the exception additive by nesting it into the base platform role
 
@@ -160,7 +176,7 @@ If you want a branded login page, customize the Keycloak theme and set
 `global.identity.provider.keycloak.loginTheme`. Do not build a custom Prefect login
 page.
 
-## Browser Entry And CloudBeaver
+## Browser Entry And Admin Surfaces
 
 ```mermaid
 flowchart LR
@@ -169,11 +185,15 @@ flowchart LR
   Portal --> Superset[Superset]
   Portal --> DataHub[DataHub]
   Portal --> Trino[Trino UI]
+  Portal --> Headlamp[Headlamp]
+  Portal --> Vault[Vault]
+  Portal --> MinIO[MinIO Console]
   Portal --> PrefectProxy[Prefect oauth2-proxy]
   Portal --> CloudBeaverProxy[CloudBeaver oauth2-proxy]
+  Portal --> RangerProxy[Ranger oauth2-proxy]
   CloudBeaverProxy --> CloudBeaver[CloudBeaver]
-  CloudBeaver --> TrinoPassword[Trino LDAP password auth]
-  TrinoPassword --> Ranger[Ranger]
+  RangerProxy --> RangerBrowserProxy[Ranger browser proxy]
+  RangerBrowserProxy --> Ranger[Ranger]
 ```
 
 The launchpad is intentionally minimal:
@@ -201,6 +221,8 @@ Platform administrators get:
 - a dedicated `/access-control` workspace for assigning LDAP-backed groups and
   governed direct-user exceptions to Git-defined platform roles through Ranger
 - a compatibility redirect from `/admin.html` to `/access-control`
+- a Ranger Admin route that reuses the same browser session rather than
+  expecting a second human login prompt
 
 The dedicated access-control workspace is intentionally narrow:
 
@@ -208,6 +230,8 @@ The dedicated access-control workspace is intentionally narrow:
   nested roles, and declared exceptions
 - Ranger becomes the writable source of truth for live role memberships when
   `global.authorization.platformRoleMembershipSource=ranger`
+- the portal is the primary admin UX for routine membership changes, while
+  Ranger remains the deeper policy and audit console
 - when `global.authorization.platformRoleMembershipSource=git`, the portal
   keeps the access-control workspace visible but disables live edits so
   reconciliation semantics remain backward-compatible

@@ -1,7 +1,7 @@
 global:
   authorization:
     platformRoleExceptions:
-      - platformRole: redcap-readonly-analyst
+      - platformRole: data-analyst
         username: am83
         approvalRef: ""
         reason: Temporary additive access for validation.

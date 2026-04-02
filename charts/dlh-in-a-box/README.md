@@ -36,6 +36,8 @@ The default documented shared-environment model is:
   `global.authorization.ranger.trino.enabled=true` is set for a Ranger-capable
   Trino image.
 - `Superset`, `DataHub`, and the `Prefect` proxy trust the same OIDC issuer.
+- `Ranger`, `CloudBeaver`, and `Prefect` reuse that same browser session
+  through chart-managed auth proxies.
 - deployment-owned admin tools such as `MinIO Console`, standalone `Vault`,
   and `Headlamp` can reuse the same Keycloak realm through reusable OIDC
   client blocks owned by the umbrella chart.
@@ -43,9 +45,11 @@ The default documented shared-environment model is:
   cards, exposes health/status information, and only hides links based on
   Keycloak group claims.
 - `platformHome` also exposes an admin-only `/access-control` destination for
-  LDAP-backed role assignment and governed direct-user exceptions.
-- `oauth2-proxy` protects Prefect and CloudBeaver because both tools are
-  front-door integrations around the same Keycloak session.
+  LDAP-backed role assignment and governed direct-user exceptions, with Ranger
+  as the live membership backend when enabled.
+- `oauth2-proxy` protects Prefect, CloudBeaver, and the Ranger browser path
+  because all three are front-door integrations around the same Keycloak
+  session.
 
 The chart still supports an externally managed OIDC provider, but that is the
 escape hatch, not the main reference architecture.
@@ -139,7 +143,8 @@ experience:
 - LDAP-backed discovery of users and groups, with Ranger as the live write
   target for role membership
 - governed direct-user exceptions with stored metadata and expiry
-- optional links to downstream admin tools such as Ranger Admin
+- optional links to downstream admin tools such as Ranger Admin, which reuses
+  the same browser session as the portal
 
 Portal role management and Ranger policy/bootstrap remain reusable chart
 features even when Trino itself stays on file-based access-control. Enable
