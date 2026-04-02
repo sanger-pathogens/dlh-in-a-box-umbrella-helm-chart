@@ -14,6 +14,8 @@
 {{- $portalHealth := get $platformHomeValues "health" | default dict -}}
 {{- $global := .Values.global | default dict -}}
 {{- $identity := get $global "identity" | default dict -}}
+{{- $directory := get $identity "directory" | default dict -}}
+{{- $ldap := get $directory "ldap" | default dict -}}
 {{- $authorization := get $global "authorization" | default dict -}}
 {{- $platformRoles := get $authorization "platformRoles" | default dict -}}
 {{- $platformRoleExceptions := get $authorization "platformRoleExceptions" | default (list) -}}
@@ -23,8 +25,25 @@
 {{- $usersyncEnabled := dig "usersync" "enabled" true $ranger -}}
 {{- $external := get $identity "external" | default dict -}}
 {{- $clients := get $external "clients" | default dict -}}
+{{- $rangerProxyIdentity := get $clients "rangerProxy" | default dict -}}
 {{- $oidc := get $external "oidc" | default dict -}}
+{{- $rangerBrowserUrl := default (default "" (get $rangerAdmin "browserUrl")) (first (default (list) (get $rangerProxyIdentity "webOrigins"))) -}}
 {{- $adminRequiredGroup := include "dlh-in-a-box.group.role" (dict "root" . "name" "platform-admin") -}}
+{{- $ldapEnabled := default false $ldap.enabled -}}
+{{- $ldapUrl := include "dlh-in-a-box.identity.directory.url" . -}}
+{{- $ldapUserBaseDn := include "dlh-in-a-box.identity.directory.userBaseDn" . -}}
+{{- $ldapGroupBaseDn := include "dlh-in-a-box.identity.directory.groupBaseDn" . -}}
+{{- $ldapBindDn := include "dlh-in-a-box.identity.directory.bindDn" . -}}
+{{- $ldapAllowAnonymousRead := default false $ldap.allowAnonymousRead -}}
+{{- $ldapEffectiveBindDn := ternary "" $ldapBindDn $ldapAllowAnonymousRead -}}
+{{- $ldapBindSecretName := include "dlh-in-a-box.identity.directory.bindSecretName" . -}}
+{{- $ldapBindPasswordKey := include "dlh-in-a-box.identity.directory.bindSecretKey" . -}}
+{{- $ldapTrustedCaSecretName := include "dlh-in-a-box.identity.directory.trustedCaSecretName" . -}}
+{{- $ldapTrustedCaCertKey := include "dlh-in-a-box.identity.directory.trustedCaCertKey" . -}}
+{{- $ldapTrustedCaPath := printf "/opt/platform-home-api/ldap-ca/%s" $ldapTrustedCaCertKey -}}
+{{- $ldapUseTrustedCa := and $ldapEnabled (not (default false $ldap.allowInsecure)) (ne $ldapTrustedCaSecretName "") -}}
+{{- $ldapHostAliases := default (list) $ldap.hostAliases -}}
+{{- $accessControlStateConfigMapName := printf "%s-access-control-state" $serviceName -}}
 {{- $brandingTitle := default "Data Platform" $branding.title -}}
 {{- $brandingSubtitle := default "" $branding.subtitle -}}
 {{- $brandingLogoUrl := default "" $branding.logoUrl -}}
@@ -44,6 +63,8 @@
   {{- $role := get $platformRoles $roleKey | default dict -}}
   {{- $members := get $role "members" | default dict -}}
   {{- $roleApps := get $role "apps" | default dict -}}
+  {{- $rolePortal := get $role "portal" | default dict -}}
+  {{- $rangerRoleName := default $roleKey (dig "ranger" "roleName" "" $role) -}}
   {{- $directoryGroups := get $members "directoryGroups" | default (list) -}}
   {{- if default false (get $roleApps "superset") -}}
     {{- $_ := set $appRoleGroups "superset" (uniq (concat (get $appRoleGroups "superset") $directoryGroups)) -}}
@@ -69,9 +90,43 @@
       ) -}}
     {{- end -}}
   {{- end -}}
+  {{- $policySummaries := list -}}
+  {{- range $policy := (get $ranger "bootstrapPolicies" | default (list)) -}}
+    {{- $policyRoles := list -}}
+    {{- range $item := (get $policy "policyItems" | default (list)) -}}
+      {{- $policyRoles = concat $policyRoles (get $item "roles" | default (list)) -}}
+    {{- end -}}
+    {{- range $item := (get $policy "dataMaskPolicyItems" | default (list)) -}}
+      {{- $policyRoles = concat $policyRoles (get $item "roles" | default (list)) -}}
+    {{- end -}}
+    {{- range $item := (get $policy "rowFilterPolicyItems" | default (list)) -}}
+      {{- $policyRoles = concat $policyRoles (get $item "roles" | default (list)) -}}
+    {{- end -}}
+    {{- $policyRoles = uniq $policyRoles -}}
+    {{- if or (has $roleKey $policyRoles) (has $rangerRoleName $policyRoles) -}}
+      {{- $policyType := default 0 (get $policy "policyType") -}}
+      {{- $policyKind := "access" -}}
+      {{- if eq (printf "%v" $policyType) "1" -}}
+        {{- $policyKind = "data-mask" -}}
+      {{- else if eq (printf "%v" $policyType) "2" -}}
+        {{- $policyKind = "row-filter" -}}
+      {{- end -}}
+      {{- $policySummaries = append $policySummaries (dict
+        "name" (default "" (get $policy "name"))
+        "description" (default "" (get $policy "description"))
+        "kind" $policyKind
+      ) -}}
+    {{- end -}}
+  {{- end -}}
+  {{- $roleManageable := true -}}
+  {{- if hasKey $rolePortal "manageable" -}}
+    {{- $roleManageable = (get $rolePortal "manageable") -}}
+  {{- end -}}
   {{- $platformRoleViews = append $platformRoleViews (dict
     "key" $roleKey
-    "name" (default $roleKey (dig "ranger" "roleName" "" $role))
+    "name" $rangerRoleName
+    "displayName" (default "" (get $rolePortal "displayName"))
+    "manageable" $roleManageable
     "description" (default "" (get $role "description"))
     "directoryGroups" $directoryGroups
     "users" (get $members "users" | default (list))
@@ -84,16 +139,33 @@
       "prefect" (default false (get $roleApps "prefect"))
     )
     "declaredExceptions" $declaredExceptions
+    "policySummaries" $policySummaries
   ) -}}
 {{- end -}}
 {{- $adminTools := list -}}
-{{- if (default "" (get $rangerAdmin "browserUrl")) -}}
+{{- if and (default false $ranger.enabled) (gt (len $platformRoleViews) 0) -}}
+  {{- $toolMeta := get $itemMeta "access-control" | default dict -}}
+  {{- $adminTools = append $adminTools (dict
+    "id" "access-control"
+    "name" "Access Control"
+    "summary" "Assign LDAP groups and governed user exceptions to platform roles"
+    "url" "/access-control"
+    "icon" "AC"
+    "iconText" (default "AC" (get $toolMeta "iconText"))
+    "iconUrl" (default "" (get $toolMeta "iconUrl"))
+    "iconAlt" (default "Access control icon" (get $toolMeta "iconAlt"))
+    "iconBackground" (default "" (get $toolMeta "iconBackground"))
+    "health" (get $toolMeta "health" | default dict)
+    "group" "Governance & Access"
+  ) -}}
+{{- end -}}
+{{- if $rangerBrowserUrl -}}
   {{- $toolMeta := get $itemMeta "ranger-admin" | default dict -}}
   {{- $adminTools = append $adminTools (dict
     "id" "ranger-admin"
     "name" "Ranger Admin"
     "summary" "Manage Trino access policies"
-    "url" (get $rangerAdmin "browserUrl")
+    "url" $rangerBrowserUrl
     "icon" "RA"
     "iconText" (default "RA" (get $toolMeta "iconText"))
     "iconUrl" (default "" (get $toolMeta "iconUrl"))
@@ -109,7 +181,7 @@
     "id" "keycloak-admin"
     "name" "Keycloak Admin"
     "summary" "Identity realm, groups, and OIDC client configuration"
-    "url" (printf "%s/admin/master/console/" $keycloakBrowserBaseUrl)
+    "url" (printf "%s/admin/%s/console/" $keycloakBrowserBaseUrl (include "dlh-in-a-box.keycloak.realm" .))
     "icon" "KC"
     "iconText" (default "KC" (get $toolMeta "iconText"))
     "iconUrl" (default "" (get $toolMeta "iconUrl"))
@@ -274,9 +346,16 @@
     "requiredGroups" (list $adminRequiredGroup)
     "tools" $adminTools
     "roleManagementEnabled" (and $ranger.enabled (gt (len $platformRoleViews) 0))
+    "accessControlPath" "/access-control"
   )
 -}}
 {{- $platformHomeAdminConfig := dict
+  "admin" (dict
+    "requiredGroups" (list $adminRequiredGroup)
+    "roleManagementEnabled" (and $ranger.enabled (gt (len $platformRoleViews) 0))
+    "accessControlPath" "/access-control"
+  )
+  "adminTools" $adminTools
   "roles" $platformRoleViews
   "health" (dict
     "enabled" (default false (get $portalHealth "enabled"))
@@ -285,9 +364,28 @@
   "items" $healthItems
   "ranger" (dict
     "enabled" (default false $ranger.enabled)
-    "browserUrl" (default "" (get $rangerAdmin "browserUrl"))
+    "browserUrl" $rangerBrowserUrl
     "usersyncEnabled" (default true $usersyncEnabled)
     "membershipSource" $platformRoleMembershipSource
+  )
+  "ldap" (dict
+    "enabled" $ldapEnabled
+    "url" $ldapUrl
+    "userBaseDn" $ldapUserBaseDn
+    "groupBaseDn" $ldapGroupBaseDn
+    "bindDn" $ldapEffectiveBindDn
+    "usernameAttribute" (default "uid" $ldap.usernameAttribute)
+    "firstNameAttribute" (default "givenName" $ldap.firstNameAttribute)
+    "lastNameAttribute" (default "sn" $ldap.lastNameAttribute)
+    "emailAttribute" (default "mail" $ldap.emailAttribute)
+    "userSearchFilter" (default "(uid=*)" $ldap.userSearchFilter)
+    "groupNameAttribute" (default "cn" $ldap.groupNameAttribute)
+    "groupSearchFilter" (default "(cn=*)" $ldap.groupSearchFilter)
+    "allowInsecure" (default false $ldap.allowInsecure)
+    "trustedCaPath" (ternary $ldapTrustedCaPath "" $ldapUseTrustedCa)
+  )
+  "state" (dict
+    "configMapName" $accessControlStateConfigMapName
   )
 -}}
 {{- $platformHomeChecksum := (printf "%s\n%s\n%s\n%s" (toPrettyJson $portalConfig) (toPrettyJson $platformHomeAdminConfig) (toPrettyJson $theme) (.Files.Get "files/platform-home/keycloak.js") | sha256sum) -}}
@@ -359,30 +457,31 @@ data:
                 <div>
                   <p class="eyebrow">Administration</p>
                   <h2>Administrative tools</h2>
-                  <p class="detail-note">Platform administration stays on the same signed-in page.</p>
+                  <p class="detail-note">Platform administration stays inside the signed-in portal experience.</p>
                 </div>
               </div>
               <div id="admin-tools" class="group-stack"></div>
             </section>
-            <section id="role-management-panel" class="panel panel-secondary is-hidden">
-              <div class="panel-header">
-                <div>
-                  <p class="eyebrow">Access control</p>
-                  <h2>Platform role management</h2>
-                  <p class="detail-note">Assign Ranger platform roles to direct users and synced directory groups. Role definitions, nested roles, and declared exceptions remain Git-managed.</p>
-                </div>
+          </section>
+          <section id="role-management-panel" class="panel panel-secondary is-hidden">
+            <div class="panel-header access-control-header">
+              <div>
+                <p class="eyebrow">Access control</p>
+                <h2>Platform access control</h2>
+                <p class="detail-note">Manage LDAP-backed platform role assignments and governed direct-user exceptions without leaving the portal.</p>
               </div>
-              <div id="role-management-status" class="status-banner is-hidden"></div>
-              <div class="role-management-layout">
-                <aside class="role-catalog-shell">
-                  <h3 class="role-catalog-title">Platform roles</h3>
-                  <div id="role-catalog" class="role-catalog"></div>
-                </aside>
-                <section id="role-detail" class="role-detail panel-subtle">
-                  <p class="panel-note">Select a platform role to review and edit its live Ranger membership.</p>
-                </section>
-              </div>
-            </section>
+              <button id="access-control-back" class="secondary-button compact-button is-hidden" type="button">Back to portal</button>
+            </div>
+            <div id="role-management-status" class="status-banner is-hidden"></div>
+            <div class="role-management-layout">
+              <aside class="role-catalog-shell">
+                <h3 class="role-catalog-title">Platform roles</h3>
+                <div id="role-catalog" class="role-catalog"></div>
+              </aside>
+              <section id="role-detail" class="role-detail panel-subtle">
+                <p class="panel-note">Select a platform role to review LDAP groups, active exceptions, and policy impact.</p>
+              </section>
+            </div>
           </section>
         </main>
         <main id="anonymous-state" class="content content-minimal">
@@ -410,11 +509,11 @@ data:
     <body>
       <script>
         try {
-          window.sessionStorage.setItem("platform-home-target-section", "administration");
+          window.sessionStorage.setItem("platform-home-target-section", "access-control");
         } catch (error) {
           console.warn("Unable to persist the administration redirect target.", error);
         }
-        window.location.replace("/");
+        window.location.replace("/access-control");
       </script>
     </body>
     </html>
@@ -435,6 +534,7 @@ data:
     const roleManagementStatus = document.getElementById("role-management-status");
     const roleCatalog = document.getElementById("role-catalog");
     const roleDetail = document.getElementById("role-detail");
+    const accessControlBack = document.getElementById("access-control-back");
     const titleElement = document.getElementById("portal-title");
     const subtitleElement = document.getElementById("portal-subtitle");
     const portalLogo = document.getElementById("portal-logo");
@@ -442,6 +542,7 @@ data:
     const portalThemeColor = document.getElementById("portal-theme-color");
     const defaultLoginLabel = loginButton ? loginButton.textContent : "Sign in";
     const sectionStorageKey = "platform-home-target-section";
+    const accessControlPath = "/access-control";
 
     const state = {
       config: null,
@@ -451,9 +552,21 @@ data:
       adminStatus: null,
       roles: [],
       selectedRoleKey: null,
+      activeRoleTab: "overview",
       search: {
         user: { query: "", results: [], loading: false, error: "" },
+        exception: { query: "", results: [], loading: false, error: "" },
         group: { query: "", results: [], loading: false, error: "" },
+      },
+      exceptionDraft: {
+        mode: "create",
+        exceptionId: "",
+        username: "",
+        displayName: "",
+        email: "",
+        reason: "",
+        approvalRef: "",
+        expiresAt: "",
       },
       health: {
         items: {},
@@ -466,6 +579,19 @@ data:
       if (element) {
         element.classList.remove("is-hidden");
       }
+    }
+
+    function emptyExceptionDraft() {
+      return {
+        mode: "create",
+        exceptionId: "",
+        username: "",
+        displayName: "",
+        email: "",
+        reason: "",
+        approvalRef: "",
+        expiresAt: "",
+      };
     }
 
     function hide(element) {
@@ -511,9 +637,13 @@ data:
       }
     }
 
+    function currentPortalRoute() {
+      return window.location.pathname === accessControlPath ? "access-control" : "home";
+    }
+
     function getTargetSection() {
-      if (window.location.hash === "#administration") {
-        return "administration";
+      if (window.location.hash === "#administration" || window.location.pathname === accessControlPath) {
+        return "access-control";
       }
       try {
         return window.sessionStorage.getItem(sectionStorageKey) || "";
@@ -562,6 +692,26 @@ data:
         .forEach((group) => ordered.push([group, buckets.get(group)]));
 
       return ordered;
+    }
+
+    function showHomeRoute() {
+      show(launchGroups);
+      if (!emptyPanel.classList.contains("is-hidden")) {
+        show(emptyPanel);
+      }
+      if (state.isAdmin && administration) {
+        show(administration);
+      }
+      hide(roleManagementPanel);
+      hide(accessControlBack);
+    }
+
+    function showAccessControlRoute() {
+      hide(launchGroups);
+      hide(emptyPanel);
+      hide(administration);
+      show(roleManagementPanel);
+      show(accessControlBack);
     }
 
     function renderCardIcon(item) {
@@ -701,7 +851,8 @@ data:
       show(signedInContent);
       show(sessionBar);
       sessionName.textContent = displayName;
-      if (isAdmin && administration) {
+      hide(roleManagementPanel);
+      if (isAdmin && administration && currentPortalRoute() !== "access-control") {
         show(administration);
       } else {
         hide(administration);
@@ -767,7 +918,7 @@ data:
         return;
       }
 
-      if (!isAdmin) {
+      if (!isAdmin || currentPortalRoute() === "access-control") {
         hide(adminToolsPanel);
         return;
       }
@@ -811,16 +962,27 @@ data:
       return kind === "group" ? "Group" : "User";
     }
 
+    function canEditUserMembers() {
+      return Boolean(
+        state.adminStatus &&
+          state.adminStatus.membershipSource === "ranger" &&
+          state.adminStatus.ldapReachable,
+      );
+    }
+
     function canEditUsers() {
-      return Boolean(state.adminStatus && state.adminStatus.membershipSource === "ranger");
+      return canEditUserMembers() && Boolean(state.adminStatus && state.adminStatus.exceptionSupportEnabled);
     }
 
     function canEditGroups() {
-      return canEditUsers() && Boolean(state.adminStatus && state.adminStatus.groupAssignmentEnabled);
+      return canEditUserMembers() && Boolean(state.adminStatus && state.adminStatus.groupAssignmentEnabled);
     }
 
     function isAssigned(role, kind, name) {
-      const members = kind === "group" ? role.members.groups : role.members.users;
+      const members =
+        kind === "group"
+          ? role.members.groups
+          : role.members.users;
       return members.includes(name);
     }
 
@@ -848,50 +1010,88 @@ data:
 
     function renderSearchResults(kind, role) {
       const search = state.search[kind];
-      const editable = kind === "group" ? canEditGroups() : canEditUsers();
+      const isExceptionSearch = kind === "exception";
+      const searchKind = isExceptionSearch ? "user" : kind;
+      const editable = searchKind === "group" ? canEditGroups() : (isExceptionSearch ? canEditUsers() : canEditUserMembers());
       if (!editable) {
         return `<p class="detail-empty">${
-          kind === "group"
+          searchKind === "group"
             ? "Directory-group assignment is unavailable until LDAP and Ranger usersync are enabled."
-            : "Live membership edits are disabled while platformRoleMembershipSource is set to git."
+            : isExceptionSearch
+              ? "Direct-user exceptions are unavailable while live access-control editing is disabled."
+              : "Direct-user role membership is unavailable while live access-control editing is disabled."
         }</p>`;
       }
       if (search.loading) {
-        return `<p class="detail-empty">Searching Ranger-known ${kind === "group" ? "groups" : "users"}...</p>`;
+        return `<p class="detail-empty">Searching LDAP-backed ${searchKind === "group" ? "groups" : "users"}...</p>`;
       }
       if (search.error) {
         return `<p class="detail-empty">${escapeHtml(search.error)}</p>`;
       }
       if (!search.query.trim()) {
-        return `<p class="detail-empty">Search Ranger-known ${kind === "group" ? "groups" : "users"} to add them to this platform role.</p>`;
+        return `<p class="detail-empty">Search the organizational directory for ${searchKind === "group" ? "groups" : "users"} to assign to this platform role.</p>`;
       }
       if (search.results.length === 0) {
-        return `<p class="detail-empty">No matching Ranger-known ${kind === "group" ? "groups" : "users"} found.</p>`;
+        return `<p class="detail-empty">No matching directory ${searchKind === "group" ? "groups" : "users"} found.</p>`;
       }
       return search.results
-        .map((name) => {
-          const assigned = isAssigned(role, kind, name);
+        .map((result) => {
+          const name = result.name || "";
+          const displayName = result.displayName || name;
+          const assigned = isAssigned(role, searchKind, name);
+          const metadata = [];
+          if (searchKind === "user" && result.email) {
+            metadata.push(result.email);
+          }
+          if (displayName !== name) {
+            metadata.unshift(name);
+          }
           return `
             <div class="search-result-row">
               <div class="search-result-copy">
-                <span class="member-kind">${escapeHtml(memberKindLabel(kind))}</span>
-                <strong>${escapeHtml(name)}</strong>
+                <span class="member-kind">${escapeHtml(memberKindLabel(searchKind))}</span>
+                <strong>${escapeHtml(displayName)}</strong>
+                ${metadata.length ? `<span>${escapeHtml(metadata.join(" • "))}</span>` : ""}
               </div>
               <button
                 type="button"
                 class="secondary-button compact-button"
-                data-action="add-member"
-                data-kind="${escapeHtml(kind)}"
+                data-action="${searchKind === "group" ? "add-member" : isExceptionSearch ? "select-exception-user" : "add-member"}"
+                data-kind="${escapeHtml(searchKind)}"
                 data-name="${escapeHtml(name)}"
+                data-display-name="${escapeHtml(displayName)}"
+                data-email="${escapeHtml(result.email || "")}"
                 data-role-key="${escapeHtml(role.key)}"
                 ${assigned ? "disabled" : ""}
               >
-                ${assigned ? "Assigned" : "Add"}
+                ${assigned ? "Assigned" : searchKind === "group" ? "Add" : isExceptionSearch ? "Use" : "Add"}
               </button>
             </div>
           `;
         })
         .join("");
+    }
+
+    function formatDateLabel(value) {
+      if (!value) {
+        return "";
+      }
+      const timestamp = new Date(value);
+      if (Number.isNaN(timestamp.getTime())) {
+        return value;
+      }
+      return timestamp.toLocaleDateString();
+    }
+
+    function normalizeDateInputValue(value) {
+      if (!value) {
+        return "";
+      }
+      const timestamp = new Date(value);
+      if (Number.isNaN(timestamp.getTime())) {
+        return "";
+      }
+      return timestamp.toISOString().slice(0, 10);
     }
 
     function renderRoleCatalog() {
@@ -902,7 +1102,7 @@ data:
       if (state.roles.length === 0) {
         roleCatalog.innerHTML = `
           <div class="panel-subtle">
-            <p class="panel-note">No Git-defined platform roles are available for administration.</p>
+            <p class="panel-note">No manageable platform roles are available for administration.</p>
           </div>
         `;
         return;
@@ -911,11 +1111,15 @@ data:
       roleCatalog.innerHTML = state.roles
         .map((role) => {
           const selected = currentRole() && currentRole().key === role.key;
-          const membershipCount = (role.members?.users?.length || 0) + (role.members?.groups?.length || 0);
+          const membershipCount =
+            (role.members?.users?.length || 0) +
+            (role.members?.groups?.length || 0) +
+            (role.exceptions?.active?.length || 0);
+          const displayName = role.displayName || humanizeSlug(role.key);
           return `
             <button type="button" class="role-catalog-item ${selected ? "is-active" : ""}" data-action="select-role" data-role-key="${escapeHtml(role.key)}">
               <span class="role-catalog-copy">
-                <strong>${escapeHtml(humanizeSlug(role.key))}</strong>
+                <strong>${escapeHtml(displayName)}</strong>
                 <span>${escapeHtml(role.description || "Git-defined platform role")}</span>
               </span>
               <span class="badge">${membershipCount}</span>
@@ -932,83 +1136,262 @@ data:
 
       const role = currentRole();
       if (!role) {
-        roleDetail.innerHTML = `<p class="panel-note">Select a platform role to review and edit its live Ranger membership.</p>`;
+        roleDetail.innerHTML = `<p class="panel-note">Select a platform role to review live membership, assign LDAP users or groups, and inspect policy impact.</p>`;
         return;
       }
 
       const groupSearchDisabled = !canEditGroups();
-      const userSearchDisabled = !canEditUsers();
+      const userSearchDisabled = !canEditUserMembers();
+      const exceptionSearchDisabled = !canEditUsers();
+      const displayName = role.displayName || humanizeSlug(role.key);
       const auditLink =
         state.adminStatus && state.adminStatus.auditUrl
           ? `<a href="${escapeHtml(state.adminStatus.auditUrl)}" target="_blank" rel="noreferrer">Open Ranger Admin</a>`
           : "Ranger Admin";
+      const activeExceptions = role.exceptions?.active || [];
+      const declaredExceptions = role.exceptions?.declared || [];
+      const appEntitlements = Object.entries(role.apps || {})
+        .filter(([, enabled]) => Boolean(enabled))
+        .map(([name]) => humanizeSlug(name.replace(/Ui$/, "-ui")));
+      const policySummaries = role.policySummaries || [];
+      const activeTab = state.activeRoleTab || "overview";
+      const hasDraft = Boolean(state.exceptionDraft.username);
+
+      const overviewPanel = `
+        <section class="detail-stack">
+          <div class="detail-row role-metadata-row">
+            <span class="detail-chip">Ranger role: ${escapeHtml(role.name || role.key)}</span>
+            <span class="detail-chip">Nested roles: ${escapeHtml(role.nestedRoles && role.nestedRoles.length ? role.nestedRoles.join(", ") : "None")}</span>
+          </div>
+          <div class="detail-row role-metadata-row">
+            <span class="detail-chip">Approved users: ${escapeHtml(String(role.members.users.length))}</span>
+            <span class="detail-chip">LDAP groups: ${escapeHtml(String(role.members.groups.length))}</span>
+            <span class="detail-chip">Active exceptions: ${escapeHtml(String(activeExceptions.length))}</span>
+          </div>
+          <section class="admin-section">
+            <h4>Current direct-user members</h4>
+            <div class="member-list">
+              ${renderMemberList("user", role, role.members.users, "No direct users assigned", canEditUserMembers())}
+            </div>
+          </section>
+          <section class="admin-section">
+            <h4>Application entitlements</h4>
+            ${
+              appEntitlements.length
+                ? `<div class="member-list">${appEntitlements
+                    .map((name) => `<span class="detail-chip">${escapeHtml(name)}</span>`)
+                    .join("")}</div>`
+                : `<p class="detail-empty">This role does not expose browser entitlements.</p>`
+            }
+          </section>
+          <section class="admin-section">
+            <h4>Linked Ranger policies</h4>
+            ${
+              policySummaries.length
+                ? `<div class="policy-summary-list">${policySummaries
+                    .map(
+                      (policy) => `
+                        <article class="policy-summary">
+                          <strong>${escapeHtml(policy.name || "Unnamed policy")}</strong>
+                          <span>${escapeHtml(policy.kind || "access")}</span>
+                          <p>${escapeHtml(policy.description || "No description provided.")}</p>
+                        </article>
+                      `,
+                    )
+                    .join("")}</div>`
+                : `<p class="detail-empty">No Ranger bootstrap policies currently target this role.</p>`
+            }
+          </section>
+        </section>
+      `;
+
+      const groupPanel = `
+        <section class="admin-section">
+          <div class="membership-header">
+            <h4>Directory groups</h4>
+            <span class="badge">${escapeHtml(String(role.members.groups.length))}</span>
+          </div>
+          <div class="member-list">
+            ${renderMemberList("group", role, role.members.groups, "No LDAP groups assigned", canEditGroups())}
+          </div>
+          <form class="principal-search-form" data-kind="group">
+            <label class="search-label" for="group-principal-query">Add LDAP group</label>
+            <div class="search-input-row">
+              <input id="group-principal-query" class="search-input" name="query" type="search" value="${escapeHtml(state.search.group.query)}" placeholder="Search LDAP groups" ${groupSearchDisabled ? "disabled" : ""} />
+              <button type="submit" class="secondary-button compact-button" ${groupSearchDisabled ? "disabled" : ""}>Search</button>
+            </div>
+          </form>
+          <div class="search-results">
+            ${renderSearchResults("group", role)}
+          </div>
+        </section>
+      `;
+
+      const userPanel = `
+        <section class="admin-section">
+          <div class="membership-header">
+            <h4>Directory users</h4>
+            <span class="badge">${escapeHtml(String(role.members.users.length))}</span>
+          </div>
+          <div class="member-list">
+            ${renderMemberList("user", role, role.members.users, "No direct users assigned", canEditUserMembers())}
+          </div>
+          <form class="principal-search-form" data-kind="user">
+            <label class="search-label" for="role-user-query">Add LDAP user</label>
+            <div class="search-input-row">
+              <input id="role-user-query" class="search-input" name="query" type="search" value="${escapeHtml(state.search.user.query)}" placeholder="Search LDAP users" ${userSearchDisabled ? "disabled" : ""} />
+              <button type="submit" class="secondary-button compact-button" ${userSearchDisabled ? "disabled" : ""}>Search</button>
+            </div>
+          </form>
+          <div class="search-results">
+            ${renderSearchResults("user", role)}
+          </div>
+        </section>
+      `;
+
+      const editableExceptions = canEditUsers();
+      const draftMode = state.exceptionDraft.mode === "edit" ? "edit" : "create";
+      const isEditingException = draftMode === "edit" && Boolean(state.exceptionDraft.exceptionId);
+
+      const activeExceptionHtml = activeExceptions.length
+        ? activeExceptions
+            .map(
+              (exception) => `
+                <article class="exception-card">
+                  <div class="search-result-copy">
+                    <span class="member-kind">User exception</span>
+                    <strong>${escapeHtml(exception.displayName || exception.username)}</strong>
+                    <span>${escapeHtml([exception.username, exception.email].filter(Boolean).join(" • "))}</span>
+                  </div>
+                  <p>${escapeHtml(exception.reason || "No reason recorded.")}</p>
+                  <p class="detail-note">Approval ${escapeHtml(exception.approvalRef || "n/a")} • Expires ${escapeHtml(formatDateLabel(exception.expiresAt))}</p>
+                  ${
+                    editableExceptions
+                      ? `
+                        <div class="detail-row role-metadata-row">
+                          <button type="button" class="secondary-button compact-button" data-action="edit-exception" data-role-key="${escapeHtml(role.key)}" data-exception-id="${escapeHtml(exception.id)}" data-name="${escapeHtml(exception.username || "")}" data-display-name="${escapeHtml(exception.displayName || exception.username || "")}" data-email="${escapeHtml(exception.email || "")}" data-reason="${escapeHtml(exception.reason || "")}" data-approval-ref="${escapeHtml(exception.approvalRef || "")}" data-expires-at="${escapeHtml(normalizeDateInputValue(exception.expiresAt) || "")}">Edit</button>
+                          <button type="button" class="secondary-button compact-button" data-action="remove-exception" data-role-key="${escapeHtml(role.key)}" data-exception-id="${escapeHtml(exception.id)}">Remove</button>
+                        </div>
+                      `
+                      : ""
+                  }
+                </article>
+              `,
+            )
+            .join("")
+        : `<p class="detail-empty">No active direct-user exceptions are recorded for this role.</p>`;
+
+      const declaredExceptionHtml = declaredExceptions.length
+        ? `<div class="declared-exception-list">${declaredExceptions
+            .map(
+              (exception) => `
+                <article class="policy-summary">
+                  <strong>${escapeHtml(exception.username || "Declared exception")}</strong>
+                  <span>${escapeHtml(exception.approvalRef || "Git-managed")}</span>
+                  <p>${escapeHtml(exception.reason || "Declared in values and managed through Git.")}</p>
+                </article>
+              `,
+            )
+            .join("")}</div>`
+        : `<p class="detail-empty">No Git-managed declared exceptions are defined for this role.</p>`;
+
+      const exceptionPanel = `
+        <section class="detail-stack">
+          <section class="admin-section">
+            <div class="membership-header">
+              <h4>Active direct-user exceptions</h4>
+              <span class="badge">${escapeHtml(String(activeExceptions.length))}</span>
+            </div>
+            ${activeExceptionHtml}
+          </section>
+          <section class="admin-section">
+            <h4>Git-managed declared exceptions</h4>
+            ${declaredExceptionHtml}
+          </section>
+          <section class="admin-section">
+            <h4>${isEditingException ? "Update direct-user exception" : "Create direct-user exception"}</h4>
+            <p class="detail-note">${
+              isEditingException
+                ? "Update the reason, approval reference, or expiry for this active exception."
+                : "Use direct users only for time-bounded exceptions. Durable access should be assigned through LDAP groups."
+            }</p>
+            ${
+              isEditingException
+                ? ""
+                : `
+                  <form class="principal-search-form" data-kind="exception">
+                    <label class="search-label" for="user-principal-query">Search LDAP user</label>
+                    <div class="search-input-row">
+                      <input id="user-principal-query" class="search-input" name="query" type="search" value="${escapeHtml(state.search.exception.query)}" placeholder="Search LDAP users" ${exceptionSearchDisabled ? "disabled" : ""} />
+                      <button type="submit" class="secondary-button compact-button" ${exceptionSearchDisabled ? "disabled" : ""}>Search</button>
+                    </div>
+                  </form>
+                  <div class="search-results">
+                    ${renderSearchResults("exception", role)}
+                  </div>
+                `
+            }
+            ${
+              hasDraft
+                ? `
+                  <form class="exception-form" data-role-key="${escapeHtml(role.key)}">
+                    <div class="detail-row role-metadata-row">
+                      <span class="detail-chip">Selected user: ${escapeHtml(state.exceptionDraft.displayName || state.exceptionDraft.username)}</span>
+                      <button type="button" class="secondary-button compact-button" data-action="clear-exception-draft">${isEditingException ? "Cancel edit" : "Clear"}</button>
+                    </div>
+                    <label class="search-label" for="exception-reason">Reason</label>
+                    <textarea id="exception-reason" class="search-input search-input-multiline" name="reason" required>${escapeHtml(state.exceptionDraft.reason)}</textarea>
+                    <label class="search-label" for="exception-approval-ref">Approval reference</label>
+                    <input id="exception-approval-ref" class="search-input" name="approvalRef" type="text" value="${escapeHtml(state.exceptionDraft.approvalRef)}" required />
+                    <label class="search-label" for="exception-expires-at">Expires at</label>
+                    <input id="exception-expires-at" class="search-input" name="expiresAt" type="date" value="${escapeHtml(state.exceptionDraft.expiresAt)}" required />
+                    <button type="submit" class="primary-button launch-button">${isEditingException ? "Update exception" : "Create exception"}</button>
+                  </form>
+                `
+                : `<p class="detail-empty">${isEditingException ? "Choose an active exception above to edit it." : "Select an LDAP user above, then provide a reason, approval reference, and expiry date."}</p>`
+            }
+          </section>
+        </section>
+      `;
+
+      const panelContent =
+        activeTab === "groups"
+          ? groupPanel
+          : activeTab === "users"
+            ? userPanel
+          : activeTab === "exceptions"
+            ? exceptionPanel
+            : overviewPanel;
 
       roleDetail.innerHTML = `
         <article class="role-editor">
           <div class="admin-card-header">
             <div>
               <p class="eyebrow eyebrow-tight">Platform role</p>
-              <h3>${escapeHtml(humanizeSlug(role.key))}</h3>
-              <p class="detail-note">${escapeHtml(role.description || "Git-defined role catalog entry.")}</p>
+              <h3>${escapeHtml(displayName)}</h3>
+              <p class="detail-note">${escapeHtml(role.description || "Platform role catalog entry.")}</p>
             </div>
             <span class="badge">${escapeHtml(role.name || role.key)}</span>
           </div>
-          <div class="detail-row role-metadata-row">
-            <span class="detail-chip">Nested roles: ${escapeHtml(role.nestedRoles && role.nestedRoles.length ? role.nestedRoles.join(", ") : "None")}</span>
-            <span class="detail-chip">Declared exceptions: ${escapeHtml(String(role.declaredExceptionsCount || 0))}</span>
+          <p class="detail-note role-editor-note">Role definitions and seeded defaults stay Git-managed. Routine membership changes happen here and persist in Ranger. Use ${auditLink} for deeper policy audit and troubleshooting.</p>
+          <div class="role-tab-strip">
+            <button type="button" class="tab-button ${activeTab === "overview" ? "is-active" : ""}" data-action="select-role-tab" data-tab="overview">Overview</button>
+            <button type="button" class="tab-button ${activeTab === "users" ? "is-active" : ""}" data-action="select-role-tab" data-tab="users">Directory Users</button>
+            <button type="button" class="tab-button ${activeTab === "groups" ? "is-active" : ""}" data-action="select-role-tab" data-tab="groups">Directory Groups</button>
+            <button type="button" class="tab-button ${activeTab === "exceptions" ? "is-active" : ""}" data-action="select-role-tab" data-tab="exceptions">Direct User Exceptions</button>
           </div>
-          <p class="detail-note role-editor-note">Role definitions, application entitlements, nested roles, and declared exceptions stay Git-managed. Use ${auditLink} for deeper audit context.</p>
-          <div class="role-editor-grid">
-            <section class="admin-section">
-              <div class="membership-header">
-                <h4>Directory groups</h4>
-                <span class="badge">${escapeHtml(String(role.members.groups.length))}</span>
-              </div>
-              <div class="member-list">
-                ${renderMemberList("group", role, role.members.groups, "No directory groups assigned", canEditGroups())}
-              </div>
-              <form class="principal-search-form" data-kind="group">
-                <label class="search-label" for="group-principal-query">Add synced directory group</label>
-                <div class="search-input-row">
-                  <input id="group-principal-query" class="search-input" name="query" type="search" value="${escapeHtml(state.search.group.query)}" placeholder="Search Ranger-known groups" ${groupSearchDisabled ? "disabled" : ""} />
-                  <button type="submit" class="secondary-button compact-button" ${groupSearchDisabled ? "disabled" : ""}>Search</button>
-                </div>
-              </form>
-              <div class="search-results">
-                ${renderSearchResults("group", role)}
-              </div>
-            </section>
-            <section class="admin-section">
-              <div class="membership-header">
-                <h4>Direct users</h4>
-                <span class="badge">${escapeHtml(String(role.members.users.length))}</span>
-              </div>
-              <div class="member-list">
-                ${renderMemberList("user", role, role.members.users, "No direct users assigned", canEditUsers())}
-              </div>
-              <form class="principal-search-form" data-kind="user">
-                <label class="search-label" for="user-principal-query">Add direct user</label>
-                <div class="search-input-row">
-                  <input id="user-principal-query" class="search-input" name="query" type="search" value="${escapeHtml(state.search.user.query)}" placeholder="Search Ranger-known users" ${userSearchDisabled ? "disabled" : ""} />
-                  <button type="submit" class="secondary-button compact-button" ${userSearchDisabled ? "disabled" : ""}>Search</button>
-                </div>
-              </form>
-              <div class="search-results">
-                ${renderSearchResults("user", role)}
-              </div>
-            </section>
-          </div>
+          ${panelContent}
         </article>
       `;
 
-      roleDetail.querySelectorAll("[data-action='select-role']").forEach((element) => {
-        element.addEventListener("click", handleRoleAction);
-      });
-      roleDetail.querySelectorAll("[data-action='add-member'], [data-action='remove-member']").forEach((element) => {
+      roleDetail.querySelectorAll("[data-action='add-member'], [data-action='remove-member'], [data-action='select-exception-user'], [data-action='clear-exception-draft'], [data-action='edit-exception'], [data-action='remove-exception'], [data-action='select-role-tab']").forEach((element) => {
         element.addEventListener("click", handleRoleAction);
       });
       roleDetail.querySelectorAll(".principal-search-form").forEach((form) => {
         form.addEventListener("submit", handlePrincipalSearch);
+      });
+      roleDetail.querySelectorAll(".exception-form").forEach((form) => {
+        form.addEventListener("submit", handleExceptionSubmit);
       });
     }
 
@@ -1022,12 +1405,18 @@ data:
         return;
       }
 
-      show(roleManagementPanel);
+      if (currentPortalRoute() === "access-control") {
+        showAccessControlRoute();
+      } else {
+        showHomeRoute();
+        return;
+      }
+
       renderRoleCatalog();
       renderRoleDetail();
 
       if (!state.adminStatus) {
-        setRoleManagementMessage("info", "Loading live Ranger role memberships...");
+        setRoleManagementMessage("info", "Loading live access-control status...");
         return;
       }
 
@@ -1039,7 +1428,15 @@ data:
       if (state.adminStatus.membershipSource !== "ranger") {
         setRoleManagementMessage(
           "warning",
-          `Live membership edits are disabled because <code>global.authorization.platformRoleMembershipSource</code> is set to <code>${escapeHtml(state.adminStatus.membershipSource)}</code>. Switch it to <code>ranger</code> to make portal edits persist through reconciliation.`,
+          `Live access-control edits are disabled because <code>global.authorization.platformRoleMembershipSource</code> is set to <code>${escapeHtml(state.adminStatus.membershipSource)}</code>. Switch it to <code>ranger</code> to make portal edits persist through reconciliation.`,
+        );
+        return;
+      }
+
+      if (!state.adminStatus.ldapReachable) {
+        setRoleManagementMessage(
+          "warning",
+          `LDAP-backed discovery is currently unavailable, so new assignments are read-only. Existing Ranger memberships remain visible. Use ${rangerAdminLink} for audit context while directory connectivity is restored.`,
         );
         return;
       }
@@ -1047,14 +1444,14 @@ data:
       if (!state.adminStatus.groupAssignmentEnabled) {
         setRoleManagementMessage(
           "info",
-          `Directory-group assignment is unavailable until LDAP and Ranger usersync are enabled. Direct user assignment remains available for Ranger-known principals. For exception auditing, use ${rangerAdminLink}.`,
+          `LDAP group discovery is active, but group assignment remains disabled until Ranger usersync is healthy. Direct-user exceptions remain available for approved break-glass cases.`,
         );
         return;
       }
 
       setRoleManagementMessage(
         "success",
-        `Live Ranger membership management is enabled. Role definitions stay in Git; use ${rangerAdminLink} for advanced policy and exception auditing.`,
+        `LDAP-backed access-control management is enabled. Durable access should use groups; direct users remain governed exceptions. Use ${rangerAdminLink} for deeper audit context.`,
       );
     }
 
@@ -1104,11 +1501,11 @@ data:
 
     async function refreshRoleData() {
       const [statusPayload, rolesPayload] = await Promise.all([
-        apiRequest("/api/admin/status"),
-        apiRequest("/api/admin/platform-roles"),
+        apiRequest("/api/admin/access-control/status"),
+        apiRequest("/api/admin/access-control/roles"),
       ]);
       state.adminStatus = statusPayload || {};
-      state.roles = Array.isArray(rolesPayload?.roles) ? rolesPayload.roles : [];
+      state.roles = (Array.isArray(rolesPayload?.roles) ? rolesPayload.roles : []).filter((role) => role.manageable !== false);
       if (!state.roles.some((role) => role.key === state.selectedRoleKey)) {
         state.selectedRoleKey = state.roles.length > 0 ? state.roles[0].key : null;
       }
@@ -1138,28 +1535,34 @@ data:
     async function handlePrincipalSearch(event) {
       event.preventDefault();
       const kind = event.currentTarget.dataset.kind;
+      const searchKind = kind === "exception" ? "exception" : kind;
+      const endpointKind = kind === "group" ? "group" : "user";
       const formData = new FormData(event.currentTarget);
       const query = String(formData.get("query") || "").trim();
-      state.search[kind] = { query, results: [], loading: false, error: "" };
+      state.search[searchKind] = { query, results: [], loading: false, error: "" };
 
       if (query.length < 2) {
-        state.search[kind].error = "Enter at least two characters to search Ranger-known principals.";
+        state.search[searchKind].error = "Enter at least two characters to search the directory.";
         renderRoleDetail();
         return;
       }
 
-      state.search[kind].loading = true;
+      state.search[searchKind].loading = true;
       renderRoleDetail();
       try {
-        const payload = await apiRequest(`/api/admin/principals?kind=${encodeURIComponent(kind)}&query=${encodeURIComponent(query)}`);
-        state.search[kind] = {
+        const endpoint =
+          endpointKind === "group"
+            ? `/api/admin/access-control/directory-groups?query=${encodeURIComponent(query)}`
+            : `/api/admin/access-control/directory-users?query=${encodeURIComponent(query)}`;
+        const payload = await apiRequest(endpoint);
+        state.search[searchKind] = {
           query,
           results: Array.isArray(payload?.results) ? payload.results : [],
           loading: false,
           error: "",
         };
       } catch (error) {
-        state.search[kind] = { query, results: [], loading: false, error: error.message };
+        state.search[searchKind] = { query, results: [], loading: false, error: error.message };
       }
       renderRoleDetail();
     }
@@ -1167,7 +1570,11 @@ data:
     async function mutateRoleMembership(method, roleKey, kind, name) {
       const actionLabel = method === "DELETE" ? "Removing membership..." : "Adding membership...";
       setRoleManagementMessage("info", actionLabel);
-      await apiRequest(`/api/admin/platform-roles/${encodeURIComponent(roleKey)}/members`, {
+      const endpoint =
+        kind === "group"
+          ? `/api/admin/access-control/roles/${encodeURIComponent(roleKey)}/groups`
+          : `/api/admin/access-control/roles/${encodeURIComponent(roleKey)}/users`;
+      await apiRequest(endpoint, {
         method,
         body: { kind, name },
       });
@@ -1176,20 +1583,129 @@ data:
       renderRoleManagement();
     }
 
+    async function handleExceptionSubmit(event) {
+      event.preventDefault();
+      const role = currentRole();
+      if (!role || !state.exceptionDraft.username) {
+        setRoleManagementMessage("error", "Choose an LDAP user before saving an exception.");
+        return;
+      }
+      const formData = new FormData(event.currentTarget);
+      const payload = {
+        username: state.exceptionDraft.username,
+        displayName: state.exceptionDraft.displayName,
+        email: state.exceptionDraft.email,
+        reason: String(formData.get("reason") || "").trim(),
+        approvalRef: String(formData.get("approvalRef") || "").trim(),
+        expiresAt: String(formData.get("expiresAt") || "").trim(),
+      };
+      if (!payload.reason || !payload.approvalRef || !payload.expiresAt) {
+        setRoleManagementMessage("error", "Reason, approval reference, and expiry date are required.");
+        return;
+      }
+      const isEditing = state.exceptionDraft.mode === "edit" && Boolean(state.exceptionDraft.exceptionId);
+      setRoleManagementMessage("info", isEditing ? "Updating direct-user exception..." : "Creating direct-user exception...");
+      try {
+        const endpoint = isEditing
+          ? `/api/admin/access-control/roles/${encodeURIComponent(role.key)}/exceptions/${encodeURIComponent(state.exceptionDraft.exceptionId)}`
+          : `/api/admin/access-control/roles/${encodeURIComponent(role.key)}/exceptions`;
+        await apiRequest(endpoint, {
+          method: isEditing ? "PATCH" : "POST",
+          body: payload,
+        });
+        state.exceptionDraft = emptyExceptionDraft();
+        state.search.exception = { query: "", results: [], loading: false, error: "" };
+        await refreshRoleData();
+        state.activeRoleTab = "exceptions";
+        renderRoleManagement();
+      } catch (error) {
+        renderRoleManagement();
+        setRoleManagementMessage("error", escapeHtml(error.message));
+      }
+    }
+
     async function handleRoleAction(event) {
       const action = event.currentTarget.dataset.action;
       const roleKey = event.currentTarget.dataset.roleKey;
       const kind = event.currentTarget.dataset.kind;
       const name = event.currentTarget.dataset.name;
+      const tab = event.currentTarget.dataset.tab;
+      const exceptionId = event.currentTarget.dataset.exceptionId;
+      const displayName = event.currentTarget.dataset.displayName || "";
+      const email = event.currentTarget.dataset.email || "";
 
       if (action === "select-role") {
         state.selectedRoleKey = roleKey;
+        state.activeRoleTab = "overview";
+        state.exceptionDraft = emptyExceptionDraft();
         state.search.user = { query: "", results: [], loading: false, error: "" };
+        state.search.exception = { query: "", results: [], loading: false, error: "" };
         state.search.group = { query: "", results: [], loading: false, error: "" };
         renderRoleCatalog();
         attachRoleCatalogHandlers();
         renderRoleDetail();
         return;
+      }
+
+      if (action === "select-role-tab") {
+        state.activeRoleTab = tab || "overview";
+        renderRoleDetail();
+        return;
+      }
+
+      if (action === "select-exception-user") {
+        state.exceptionDraft = {
+          mode: "create",
+          exceptionId: "",
+          username: name,
+          displayName,
+          email,
+          reason: state.exceptionDraft.reason,
+          approvalRef: state.exceptionDraft.approvalRef,
+          expiresAt: state.exceptionDraft.expiresAt,
+        };
+        state.activeRoleTab = "exceptions";
+        renderRoleDetail();
+        return;
+      }
+
+      if (action === "clear-exception-draft") {
+        state.exceptionDraft = emptyExceptionDraft();
+        renderRoleDetail();
+        return;
+      }
+
+      if (action === "edit-exception") {
+        state.exceptionDraft = {
+          mode: "edit",
+          exceptionId,
+          username: name,
+          displayName,
+          email,
+          reason: event.currentTarget.dataset.reason || "",
+          approvalRef: event.currentTarget.dataset.approvalRef || "",
+          expiresAt: event.currentTarget.dataset.expiresAt || "",
+        };
+        state.activeRoleTab = "exceptions";
+        renderRoleDetail();
+        return;
+      }
+
+      if (action === "remove-exception") {
+        try {
+          setRoleManagementMessage("info", "Removing direct-user exception...");
+          await apiRequest(`/api/admin/access-control/roles/${encodeURIComponent(roleKey)}/exceptions/${encodeURIComponent(exceptionId)}`, {
+            method: "DELETE",
+          });
+          await refreshRoleData();
+          state.activeRoleTab = "exceptions";
+          renderRoleManagement();
+          return;
+        } catch (error) {
+          renderRoleManagement();
+          setRoleManagementMessage("error", escapeHtml(error.message));
+          return;
+        }
       }
 
       try {
@@ -1204,13 +1720,22 @@ data:
 
     async function loadAdminExperience() {
       renderAdminTools(state.config, state.isAdmin);
+      if (currentPortalRoute() === "access-control" && !state.isAdmin) {
+        window.location.replace("/");
+        return;
+      }
       if (!state.isAdmin || !state.config?.admin?.roleManagementEnabled) {
         hide(roleManagementPanel);
         return;
       }
 
+      if (currentPortalRoute() !== "access-control") {
+        hide(roleManagementPanel);
+        return;
+      }
+
       show(roleManagementPanel);
-      setRoleManagementMessage("info", "Loading live Ranger role memberships...");
+      setRoleManagementMessage("info", "Loading live access-control state...");
       try {
         await refreshRoleData();
       } catch (error) {
@@ -1223,16 +1748,6 @@ data:
 
       renderRoleManagement();
       attachRoleCatalogHandlers();
-
-      if (getTargetSection() === "administration" && administration) {
-        clearTargetSection();
-        if (window.location.hash !== "#administration") {
-          window.history.replaceState(null, document.title, `${buildPortalRedirectUri()}#administration`);
-        }
-        window.setTimeout(() => {
-          administration.scrollIntoView({ behavior: "smooth", block: "start" });
-        }, 120);
-      }
     }
 
     async function bootstrap() {
@@ -1246,8 +1761,8 @@ data:
 
       state.config = await response.json();
       applyBranding(state.config);
-      if (window.location.hash === "#administration") {
-        rememberTargetSection("administration");
+      if (window.location.hash === "#administration" || currentPortalRoute() === "access-control") {
+        rememberTargetSection("access-control");
       }
 
       const keycloakModule = await import("/keycloak.js");
@@ -1319,7 +1834,15 @@ data:
           });
         }, Math.max(15, refreshIntervalSeconds) * 1000);
       }
+      if (accessControlBack) {
+        accessControlBack.addEventListener("click", () => {
+          window.location.assign("/");
+        });
+      }
       await loadAdminExperience();
+      if (currentPortalRoute() !== "access-control") {
+        showHomeRoute();
+      }
     }
 
     bootstrap().catch((error) => {
@@ -1853,6 +2376,13 @@ data:
       margin-top: 0.95rem;
     }
 
+    .access-control-header {
+      display: flex;
+      align-items: start;
+      justify-content: space-between;
+      gap: 1rem;
+    }
+
     .admin-section h4 {
       margin: 0 0 0.45rem;
       font-family: var(--font-heading);
@@ -1971,12 +2501,53 @@ data:
       gap: 1rem;
     }
 
+    .detail-stack,
+    .policy-summary-list,
+    .declared-exception-list {
+      display: grid;
+      gap: 0.9rem;
+    }
+
     .role-editor-note {
       margin-top: -0.15rem;
     }
 
     .role-metadata-row {
       gap: 0.6rem;
+    }
+
+    .role-tab-strip {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.65rem;
+    }
+
+    .tab-button {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 2.5rem;
+      padding: 0.7rem 1rem;
+      border-radius: 999px;
+      border: 1px solid rgba(18, 89, 116, 0.16);
+      background: rgba(255, 255, 255, 0.96);
+      color: var(--ink);
+      font-family: var(--font-body);
+      font-size: 0.9rem;
+      font-weight: 700;
+      cursor: pointer;
+      transition: border-color 160ms ease, background 160ms ease, transform 160ms ease;
+    }
+
+    .tab-button:hover {
+      transform: translateY(-1px);
+      border-color: rgba(18, 89, 116, 0.28);
+    }
+
+    .tab-button.is-active {
+      border-color: rgba(18, 89, 116, 0.34);
+      background: rgba(177, 222, 221, 0.32);
+      color: var(--brand-deep);
     }
 
     .role-editor-grid {
@@ -2076,6 +2647,11 @@ data:
       cursor: not-allowed;
     }
 
+    .search-input-multiline {
+      min-height: 6rem;
+      resize: vertical;
+    }
+
     .search-results {
       display: grid;
       gap: 0.55rem;
@@ -2111,11 +2687,20 @@ data:
 
     .exception-card {
       display: grid;
-      gap: 0.2rem;
-      padding: 0.75rem;
-      border-radius: 14px;
+      gap: 0.35rem;
+      padding: 0.85rem;
+      border-radius: 18px;
       border: 1px dashed rgba(214, 88, 69, 0.28);
       background: rgba(214, 88, 69, 0.05);
+    }
+
+    .policy-summary {
+      display: grid;
+      gap: 0.25rem;
+      padding: 0.85rem;
+      border-radius: 16px;
+      border: 1px solid rgba(18, 89, 116, 0.12);
+      background: rgba(255, 255, 255, 0.94);
     }
 
     @media (max-width: 920px) {
@@ -2173,14 +2758,21 @@ data:
 {{ toPrettyJson $platformHomeAdminConfig | nindent 4 }}
   admin-api.py: |
     import base64
+    import datetime
     import json
     import os
     import ssl
+    import sys
     import time
     import urllib.error
     import urllib.parse
     import urllib.request
+    import uuid
     from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+
+    from ldap3 import SUBTREE, Connection, Server, Tls
+    from ldap3.core.exceptions import LDAPBindError
+    from ldap3.utils.conv import escape_filter_chars
 
     CONFIG_PATH = "/opt/platform-home-api/admin-config.json"
     PORT = int(os.environ.get("PORT", "18080"))
@@ -2190,6 +2782,14 @@ data:
     EXPECTED_ISSUER = os.environ.get("IDENTITY_EXPECTED_ISSUER", "")
     GROUPS_CLAIM = os.environ.get("OIDC_GROUPS_CLAIM", "groups")
     ADMIN_GROUP = os.environ.get("PLATFORM_ADMIN_GROUP", "")
+    LDAP_BIND_PASSWORD = os.environ.get("LDAP_BIND_PASSWORD", "")
+    ACCESS_CONTROL_STATE_CONFIGMAP_NAME = os.environ.get("ACCESS_CONTROL_STATE_CONFIGMAP_NAME", "")
+    ACCESS_CONTROL_STATE_CONFIGMAP_KEY = os.environ.get("ACCESS_CONTROL_STATE_CONFIGMAP_KEY", "state.json")
+    POD_NAMESPACE = os.environ.get("POD_NAMESPACE", "")
+    KUBERNETES_SERVICE_HOST = os.environ.get("KUBERNETES_SERVICE_HOST", "")
+    KUBERNETES_SERVICE_PORT = os.environ.get("KUBERNETES_SERVICE_PORT", "443")
+    SERVICEACCOUNT_TOKEN_PATH = "/var/run/secrets/kubernetes.io/serviceaccount/token"
+    SERVICEACCOUNT_CA_PATH = "/var/run/secrets/kubernetes.io/serviceaccount/ca.crt"
     CACHE_TTL_SECONDS = 60
 
 
@@ -2217,10 +2817,7 @@ data:
         int(CONFIG.get("health", {}).get("refreshIntervalSeconds") or CACHE_TTL_SECONDS),
     )
     HTTPS_CONTEXT = ssl._create_unverified_context()
-    PRINCIPAL_CACHE = {
-        "user": {"expires_at": 0, "items": []},
-        "group": {"expires_at": 0, "items": []},
-    }
+    DIRECTORY_STATUS_CACHE = {"expires_at": 0, "payload": {}}
 
 
     def json_response(handler, status, payload):
@@ -2235,6 +2832,39 @@ data:
 
     def utc_timestamp():
         return time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
+
+
+    def normalize_iso8601(value):
+        raw = str(value or "").strip()
+        if not raw:
+            raise ApiError(400, "expiresAt is required.")
+        if len(raw) == 10:
+            raw = f"{raw}T23:59:59Z"
+        if raw.endswith("Z"):
+            raw = raw[:-1] + "+00:00"
+        elif "T" not in raw:
+            raw = f"{raw}T23:59:59+00:00"
+        try:
+            parsed = datetime.datetime.fromisoformat(raw)
+        except ValueError as exc:
+            raise ApiError(400, "expiresAt must be an ISO-8601 timestamp or a YYYY-MM-DD date.") from exc
+        if parsed.tzinfo is None:
+            parsed = parsed.replace(tzinfo=datetime.timezone.utc)
+        return parsed.astimezone(datetime.timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+
+
+    def iso_to_epoch(value):
+        raw = str(value or "").strip()
+        if not raw:
+            return None
+        normalized = raw[:-1] + "+00:00" if raw.endswith("Z") else raw
+        try:
+            parsed = datetime.datetime.fromisoformat(normalized)
+        except ValueError:
+            return None
+        if parsed.tzinfo is None:
+            parsed = parsed.replace(tzinfo=datetime.timezone.utc)
+        return int(parsed.astimezone(datetime.timezone.utc).timestamp())
 
 
     def read_json(handler):
@@ -2352,6 +2982,21 @@ data:
         return bool(CONFIG.get("ranger", {}).get("enabled")) and bool(RANGER_URL) and bool(RANGER_PASSWORD)
 
 
+    def ldap_config():
+        ldap = CONFIG.get("ldap") if isinstance(CONFIG.get("ldap"), dict) else {}
+        return ldap
+
+
+    def directory_enabled():
+        ldap = ldap_config()
+        return bool(
+            ldap.get("enabled")
+            and ldap.get("url")
+            and ldap.get("userBaseDn")
+            and ldap.get("groupBaseDn")
+        )
+
+
     def ranger_request(method, path, payload=None, ok=(200, 201), parse_json=True):
         if not ranger_enabled():
             raise ApiError(503, "Ranger administration is not enabled for this environment.")
@@ -2385,6 +3030,392 @@ data:
 
     def role_update_path(role_id):
         return f"/service/public/v2/api/roles/{role_id}?createNonExistUserGroup=true"
+
+
+    def attr_value(entry, name):
+        try:
+            return str(entry[name].value or "").strip()
+        except Exception:
+            return ""
+
+
+    def build_display_name(username, first_name="", last_name=""):
+        display_name = " ".join(part for part in [str(first_name or "").strip(), str(last_name or "").strip()] if part)
+        return display_name or str(username or "").strip()
+
+
+    def ldap_connection():
+        if not directory_enabled():
+            raise ApiError(503, "LDAP-backed discovery is not configured for this environment.")
+        ldap = ldap_config()
+        parsed = urllib.parse.urlparse(str(ldap.get("url", "")).strip())
+        use_ssl = parsed.scheme == "ldaps"
+        host = parsed.hostname or str(ldap.get("url", "")).strip()
+        port = parsed.port or (636 if use_ssl else 389)
+        tls = None
+        if use_ssl:
+            trusted_ca_path = str(ldap.get("trustedCaPath", "") or "").strip()
+            if ldap.get("allowInsecure", False):
+                tls = Tls(validate=ssl.CERT_NONE)
+            elif trusted_ca_path and os.path.exists(trusted_ca_path):
+                tls = Tls(validate=ssl.CERT_REQUIRED, ca_certs_file=trusted_ca_path)
+            else:
+                tls = Tls(validate=ssl.CERT_REQUIRED)
+        server = Server(host, port=port, use_ssl=use_ssl, tls=tls, get_info=None)
+        bind_dn = str(ldap.get("bindDn") or "").strip()
+        if bind_dn and LDAP_BIND_PASSWORD:
+            try:
+                return Connection(server, user=bind_dn, password=LDAP_BIND_PASSWORD, auto_bind=True)
+            except LDAPBindError:
+                print(f"LDAP bind failed for {bind_dn}; falling back to anonymous read", file=sys.stderr, flush=True)
+        return Connection(server, auto_bind=True)
+
+
+    def directory_status(force_refresh=False):
+        now = time.time()
+        if not force_refresh and DIRECTORY_STATUS_CACHE["expires_at"] > now:
+            return DIRECTORY_STATUS_CACHE["payload"]
+
+        ldap = ldap_config()
+        payload = {
+            "enabled": bool(ldap.get("enabled")),
+            "ldapReachable": False,
+            "message": "",
+        }
+        if not directory_enabled():
+            payload["message"] = "LDAP-backed directory discovery is not configured."
+            DIRECTORY_STATUS_CACHE["payload"] = payload
+            DIRECTORY_STATUS_CACHE["expires_at"] = now + CACHE_TTL_SECONDS
+            return payload
+
+        try:
+            conn = ldap_connection()
+            conn.unbind()
+            payload["ldapReachable"] = True
+            payload["message"] = "LDAP-backed discovery is available."
+        except Exception as exc:
+            payload["message"] = f"LDAP connectivity check failed: {exc}"
+
+        DIRECTORY_STATUS_CACHE["payload"] = payload
+        DIRECTORY_STATUS_CACHE["expires_at"] = now + CACHE_TTL_SECONDS
+        return payload
+
+
+    def unique_non_empty(values):
+        seen = set()
+        ordered = []
+        for value in values or []:
+            candidate = str(value or "").strip()
+            if not candidate or candidate in seen:
+                continue
+            seen.add(candidate)
+            ordered.append(candidate)
+        return ordered
+
+
+    def render_directory_filter(filter_template, replacement, fallback):
+        template = str(filter_template or "").strip()
+        if not template:
+            return fallback
+        if "{0}" in template:
+            return template.replace("{0}", replacement)
+        return template
+
+
+    def search_directory(kind, query, limit=20):
+        status = directory_status()
+        if not status.get("ldapReachable"):
+            raise ApiError(503, status.get("message") or "LDAP-backed discovery is unavailable.")
+        ldap = ldap_config()
+        escaped = escape_filter_chars(str(query or "").strip())
+        if not escaped:
+            return []
+
+        conn = ldap_connection()
+        try:
+            if kind == "group":
+                group_name_attribute = str(ldap.get("groupNameAttribute") or "cn")
+                group_filter = str(ldap.get("groupSearchFilter") or "(cn=*)")
+                ldap_filter = f"(&{group_filter}({group_name_attribute}=*{escaped}*))"
+                conn.search(
+                    ldap.get("groupBaseDn"),
+                    ldap_filter,
+                    search_scope=SUBTREE,
+                    attributes=[group_name_attribute],
+                    size_limit=limit,
+                )
+                results = []
+                seen = set()
+                for entry in conn.entries:
+                    name = attr_value(entry, group_name_attribute)
+                    if not name or name in seen:
+                        continue
+                    seen.add(name)
+                    results.append({"name": name, "displayName": name, "email": ""})
+                return sorted(results, key=lambda item: item["name"].casefold())
+
+            username_attribute = str(ldap.get("usernameAttribute") or "uid")
+            first_name_attribute = str(ldap.get("firstNameAttribute") or "givenName")
+            last_name_attribute = str(ldap.get("lastNameAttribute") or "sn")
+            email_attribute = str(ldap.get("emailAttribute") or "mail")
+            user_filter = render_directory_filter(
+                ldap.get("userSearchFilter"),
+                "*",
+                f"({username_attribute}=*)",
+            )
+            search_attributes = unique_non_empty(
+                [username_attribute, first_name_attribute, last_name_attribute, email_attribute]
+            )
+            search_terms = "".join(f"({attribute}=*{escaped}*)" for attribute in search_attributes)
+            ldap_filter = f"(&{user_filter}(|{search_terms}))"
+            conn.search(
+                ldap.get("userBaseDn"),
+                ldap_filter,
+                search_scope=SUBTREE,
+                attributes=search_attributes,
+                size_limit=limit,
+            )
+            results = []
+            seen = set()
+            for entry in conn.entries:
+                username = attr_value(entry, username_attribute)
+                if not username or username in seen:
+                    continue
+                seen.add(username)
+                first_name = attr_value(entry, first_name_attribute)
+                last_name = attr_value(entry, last_name_attribute)
+                email = attr_value(entry, email_attribute)
+                results.append(
+                    {
+                        "name": username,
+                        "displayName": build_display_name(username, first_name, last_name),
+                        "email": email,
+                    }
+                )
+            return sorted(results, key=lambda item: (item["displayName"] or item["name"]).casefold())
+        finally:
+            try:
+                conn.unbind()
+            except Exception:
+                pass
+
+
+    def lookup_directory_principal(kind, name):
+        status = directory_status()
+        if not status.get("ldapReachable"):
+            raise ApiError(503, status.get("message") or "LDAP-backed discovery is unavailable.")
+        ldap = ldap_config()
+        principal = str(name or "").strip()
+        if not principal:
+            return None
+        conn = ldap_connection()
+        try:
+            if kind == "group":
+                attribute = str(ldap.get("groupNameAttribute") or "cn")
+                base_filter = str(ldap.get("groupSearchFilter") or "(cn=*)")
+                ldap_filter = f"(&{base_filter}({attribute}={escape_filter_chars(principal)}))"
+                conn.search(
+                    ldap.get("groupBaseDn"),
+                    ldap_filter,
+                    search_scope=SUBTREE,
+                    attributes=[attribute],
+                    size_limit=1,
+                )
+                if not conn.entries:
+                    return None
+                return {"name": attr_value(conn.entries[0], attribute), "displayName": attr_value(conn.entries[0], attribute), "email": ""}
+
+            username_attribute = str(ldap.get("usernameAttribute") or "uid")
+            first_name_attribute = str(ldap.get("firstNameAttribute") or "givenName")
+            last_name_attribute = str(ldap.get("lastNameAttribute") or "sn")
+            email_attribute = str(ldap.get("emailAttribute") or "mail")
+            base_filter = render_directory_filter(
+                ldap.get("userSearchFilter"),
+                escape_filter_chars(principal),
+                f"({username_attribute}=*)",
+            )
+            ldap_filter = f"(&{base_filter}({username_attribute}={escape_filter_chars(principal)}))"
+            conn.search(
+                ldap.get("userBaseDn"),
+                ldap_filter,
+                search_scope=SUBTREE,
+                attributes=unique_non_empty(
+                    [username_attribute, first_name_attribute, last_name_attribute, email_attribute]
+                ),
+                size_limit=1,
+            )
+            if not conn.entries:
+                return None
+            entry = conn.entries[0]
+            username = attr_value(entry, username_attribute)
+            return {
+                "name": username,
+                "displayName": build_display_name(
+                    username,
+                    attr_value(entry, first_name_attribute),
+                    attr_value(entry, last_name_attribute),
+                ),
+                "email": attr_value(entry, email_attribute),
+            }
+        finally:
+            try:
+                conn.unbind()
+            except Exception:
+                pass
+
+
+    def kubernetes_api_enabled():
+        return bool(
+            ACCESS_CONTROL_STATE_CONFIGMAP_NAME
+            and POD_NAMESPACE
+            and KUBERNETES_SERVICE_HOST
+            and os.path.exists(SERVICEACCOUNT_TOKEN_PATH)
+        )
+
+
+    def kubernetes_request(method, path, payload=None, ok=(200,), parse_json=True, content_type="application/json"):
+        if not kubernetes_api_enabled():
+            raise ApiError(503, "Access-control state storage is not configured for this environment.")
+        with open(SERVICEACCOUNT_TOKEN_PATH, "r", encoding="utf-8") as handle:
+            token = handle.read().strip()
+        if not token:
+            raise ApiError(503, "The platform-home admin API service account token is unavailable.")
+        context = ssl.create_default_context(cafile=SERVICEACCOUNT_CA_PATH) if os.path.exists(SERVICEACCOUNT_CA_PATH) else ssl.create_default_context()
+        headers = {
+            "Accept": "application/json",
+            "Authorization": f"Bearer {token}",
+        }
+        body = None
+        if payload is not None:
+            body = json.dumps(payload).encode("utf-8")
+            headers["Content-Type"] = content_type
+        request = urllib.request.Request(
+            f"https://{KUBERNETES_SERVICE_HOST}:{KUBERNETES_SERVICE_PORT}{path}",
+            data=body,
+            headers=headers,
+            method=method,
+        )
+        with urllib.request.urlopen(request, timeout=30, context=context) as response:
+            raw = response.read().decode("utf-8")
+            if not parse_json:
+                return raw
+            return json.loads(raw) if raw else None
+
+
+    def default_state_document():
+        return {"version": 1, "exceptions": []}
+
+
+    def load_state_document():
+        if not kubernetes_api_enabled():
+            return default_state_document()
+        namespace = urllib.parse.quote(POD_NAMESPACE, safe="")
+        configmap_name = urllib.parse.quote(ACCESS_CONTROL_STATE_CONFIGMAP_NAME, safe="")
+        try:
+            configmap = kubernetes_request(
+                "GET",
+                f"/api/v1/namespaces/{namespace}/configmaps/{configmap_name}",
+                ok=(200,),
+            )
+        except urllib.error.HTTPError as exc:
+            if exc.code == 404:
+                return default_state_document()
+            raise ApiError(503, f"Unable to read the access-control state ConfigMap: {exc}") from exc
+        raw_state = str((configmap.get("data") or {}).get(ACCESS_CONTROL_STATE_CONFIGMAP_KEY, "") or "").strip()
+        if not raw_state:
+            return default_state_document()
+        try:
+            document = json.loads(raw_state)
+        except json.JSONDecodeError:
+            return default_state_document()
+        if not isinstance(document, dict):
+            return default_state_document()
+        exceptions = document.get("exceptions")
+        if not isinstance(exceptions, list):
+            document["exceptions"] = []
+        document.setdefault("version", 1)
+        return document
+
+
+    def save_state_document(document):
+        if not kubernetes_api_enabled():
+            raise ApiError(503, "Access-control state storage is unavailable in this environment.")
+        serialized = json.dumps(document, sort_keys=True, indent=2)
+        namespace = urllib.parse.quote(POD_NAMESPACE, safe="")
+        configmap_name = urllib.parse.quote(ACCESS_CONTROL_STATE_CONFIGMAP_NAME, safe="")
+        try:
+            current = kubernetes_request(
+                "GET",
+                f"/api/v1/namespaces/{namespace}/configmaps/{configmap_name}",
+                ok=(200,),
+            )
+            payload = {
+                "apiVersion": "v1",
+                "kind": "ConfigMap",
+                "metadata": {
+                    "name": ACCESS_CONTROL_STATE_CONFIGMAP_NAME,
+                    "namespace": POD_NAMESPACE,
+                    "resourceVersion": ((current.get("metadata") or {}).get("resourceVersion")),
+                },
+                "data": {
+                    ACCESS_CONTROL_STATE_CONFIGMAP_KEY: serialized,
+                },
+            }
+            kubernetes_request(
+                "PUT",
+                f"/api/v1/namespaces/{namespace}/configmaps/{configmap_name}",
+                payload=payload,
+                ok=(200,),
+            )
+        except urllib.error.HTTPError as exc:
+            if exc.code != 404:
+                raise ApiError(503, f"Unable to update the access-control state ConfigMap: {exc}") from exc
+            payload = {
+                "apiVersion": "v1",
+                "kind": "ConfigMap",
+                "metadata": {
+                    "name": ACCESS_CONTROL_STATE_CONFIGMAP_NAME,
+                    "namespace": POD_NAMESPACE,
+                },
+                "data": {
+                    ACCESS_CONTROL_STATE_CONFIGMAP_KEY: serialized,
+                },
+            }
+            try:
+                kubernetes_request(
+                    "POST",
+                    f"/api/v1/namespaces/{namespace}/configmaps",
+                    payload=payload,
+                    ok=(201,),
+                )
+            except urllib.error.HTTPError as inner_exc:
+                raise ApiError(503, f"Unable to create the access-control state ConfigMap: {inner_exc}") from inner_exc
+
+
+    def exception_support_enabled():
+        return kubernetes_api_enabled()
+
+
+    def active_exception(exception, now=None):
+        if not isinstance(exception, dict):
+            return False
+        if str(exception.get("status", "active") or "active").lower() != "active":
+            return False
+        expires_at = iso_to_epoch(exception.get("expiresAt"))
+        if expires_at is None:
+            return False
+        return expires_at > int(now or time.time())
+
+
+    def role_exceptions(document, role_key):
+        now = int(time.time())
+        active = []
+        for exception in document.get("exceptions", []):
+            if str(exception.get("platformRole", "")) != str(role_key):
+                continue
+            if active_exception(exception, now=now):
+                active.append(exception)
+        return sorted(active, key=lambda item: (str(item.get("displayName") or item.get("username") or "")).casefold())
 
 
     def normalize_role_members(items):
@@ -2433,88 +3464,43 @@ data:
         return None
 
 
-    def principal_name(kind, item):
-        if isinstance(item, str):
-            return item.strip()
-        if not isinstance(item, dict):
-            return ""
-        if kind == "group":
-            return str(item.get("name") or item.get("groupName") or "").strip()
-        return str(item.get("name") or item.get("userName") or "").strip()
-
-
-    def extract_page_items(page, kind):
-        if isinstance(page, list):
-            return page
-        if not isinstance(page, dict):
-            return []
-        candidate_keys = ["vXGroups", "vXUsers", "list", "items", "data", "result"]
-        for key in candidate_keys:
-            value = page.get(key)
-            if isinstance(value, list):
-                return value
-        return []
-
-
-    def list_known_principals(kind):
-        cache = PRINCIPAL_CACHE[kind]
-        now = time.time()
-        if cache["expires_at"] > now:
-            return cache["items"]
-
-        if not ranger_enabled():
-            return []
-
-        path = "/service/xusers/groups" if kind == "group" else "/service/xusers/users"
-        known = []
-        seen = set()
-        start_index = 0
-        page_size = 200
-        while True:
-            separator = "&" if "?" in path else "?"
-            page = ranger_request(
-                "GET",
-                f"{path}{separator}startIndex={start_index}&pageSize={page_size}",
-                ok=(200,),
-            )
-            items = extract_page_items(page, kind)
-            for item in items:
-                name = principal_name(kind, item)
-                if name and name not in seen:
-                    seen.add(name)
-                    known.append(name)
-            if len(items) < page_size:
-                break
-            start_index += page_size
-
-        known.sort(key=str.casefold)
-        cache["items"] = known
-        cache["expires_at"] = now + CACHE_TTL_SECONDS
-        return known
-
-
-    def principal_exists(kind, name):
-        target = str(name).strip()
-        return target in set(list_known_principals(kind))
-
-
-    def role_view(role_entry, live_role):
-        users = extract_member_names(live_role.get("users", [])) if live_role else extract_member_names(role_entry.get("users", []))
-        groups = extract_member_names(live_role.get("groups", [])) if live_role else extract_member_names(role_entry.get("directoryGroups", []))
+    def role_view(role_entry, live_role, state_document):
+        active_exceptions = role_exceptions(state_document, role_entry.get("key"))
+        declared_users = extract_member_names(role_entry.get("users", []))
+        live_users = extract_member_names(live_role.get("users", [])) if live_role else []
+        live_groups = extract_member_names(live_role.get("groups", [])) if live_role else extract_member_names(role_entry.get("directoryGroups", []))
         return {
             "key": role_entry.get("key"),
             "name": role_entry.get("name") or role_entry.get("key"),
+            "displayName": role_entry.get("displayName", ""),
+            "manageable": bool(role_entry.get("manageable", True)),
             "description": role_entry.get("description", ""),
             "nestedRoles": role_entry.get("nestedRoles", []),
             "declaredExceptionsCount": len(role_entry.get("declaredExceptions", [])),
+            "apps": role_entry.get("apps", {}),
+            "policySummaries": role_entry.get("policySummaries", []),
             "members": {
-                "users": users,
-                "groups": groups,
+                "users": sorted(set(live_users).union(declared_users)),
+                "groups": live_groups,
+            },
+            "exceptions": {
+                "declared": role_entry.get("declaredExceptions", []),
+                "active": active_exceptions,
             },
         }
 
 
+    def role_entry_for_key(role_key):
+        role_entry = ROLE_CATALOG.get(str(role_key))
+        if not role_entry:
+            raise ApiError(404, f"Platform role {role_key} is not defined in Git.")
+        if role_entry.get("manageable", True) is False:
+            raise ApiError(403, f"Platform role {role_key} is not manageable through the portal.")
+        return role_entry
+
+
     def list_platform_roles():
+        state_document = load_state_document()
         live_roles = {}
         if ranger_enabled():
             live_roles = {
@@ -2526,7 +3512,7 @@ data:
         for role_key in sorted(ROLE_CATALOG):
             role_entry = ROLE_CATALOG[role_key]
             live_role = live_roles.get(role_entry.get("name") or role_key)
-            views.append(role_view(role_entry, live_role))
+            views.append(role_view(role_entry, live_role, state_document))
         return views
 
 
@@ -2653,33 +3639,35 @@ data:
         return payload
 
 
-    def update_role_membership(role_key, kind, name, add_member):
+    def access_control_status():
+        directory = directory_status()
         membership_source = str(CONFIG.get("ranger", {}).get("membershipSource", "git") or "git").lower()
-        if membership_source != "ranger":
-            raise ApiError(409, "Live role membership edits are disabled until platformRoleMembershipSource is set to ranger.")
-        if kind == "group" and not bool(CONFIG.get("ranger", {}).get("usersyncEnabled")):
-            raise ApiError(409, "Directory-group assignment is unavailable until LDAP and Ranger usersync are enabled.")
+        usersync_enabled = bool(CONFIG.get("ranger", {}).get("usersyncEnabled"))
+        return {
+            "adminEnabled": True,
+            "rangerEnabled": bool(CONFIG.get("ranger", {}).get("enabled")),
+            "membershipSource": membership_source,
+            "usersyncEnabled": usersync_enabled,
+            "groupAssignmentEnabled": bool(usersync_enabled),
+            "userAssignmentEnabled": membership_source == "ranger" and exception_support_enabled(),
+            "exceptionSupportEnabled": exception_support_enabled(),
+            "ldapEnabled": bool(ldap_config().get("enabled")),
+            "ldapReachable": bool(directory.get("ldapReachable")),
+            "directoryMessage": directory.get("message", ""),
+            "auditUrl": CONFIG.get("ranger", {}).get("browserUrl", ""),
+        }
+
+
+    def write_role_membership(role_entry, kind, principal, add_member):
         if kind not in {"user", "group"}:
             raise ApiError(400, "kind must be either user or group.")
-
-        principal = str(name or "").strip()
-        if not principal:
-            raise ApiError(400, "name must be a non-empty user or group name.")
-        if not principal_exists(kind, principal):
-            raise ApiError(404, f"{kind.title()} {principal} is not known to Ranger.")
-
-        role_entry = ROLE_CATALOG.get(role_key)
-        if not role_entry:
-            raise ApiError(404, f"Platform role {role_key} is not defined in Git.")
-
-        existing = get_role_by_name(role_entry.get("name") or role_key)
+        existing = get_role_by_name(role_entry.get("name") or role_entry.get("key"))
         if not existing:
-            raise ApiError(404, f"Ranger role {(role_entry.get('name') or role_key)} does not exist yet.")
+            raise ApiError(404, f"Ranger role {(role_entry.get('name') or role_entry.get('key'))} does not exist yet.")
 
         users = normalize_role_members(existing.get("users", []))
         groups = normalize_role_members(existing.get("groups", []))
         roles = normalize_role_members(existing.get("roles", []))
-
         target_members = users if kind == "user" else groups
         target_map = {member["name"]: dict(member) for member in target_members}
         if add_member:
@@ -2692,7 +3680,7 @@ data:
             "guid": existing.get("guid"),
             "version": existing.get("version"),
             "createdByUser": existing.get("createdByUser"),
-            "name": existing.get("name") or role_entry.get("name") or role_key,
+            "name": existing.get("name") or role_entry.get("name") or role_entry.get("key"),
             "description": role_entry.get("description", existing.get("description", "")),
             "isEnabled": True,
             "users": normalize_role_members(target_map.values()) if kind == "user" else users,
@@ -2700,8 +3688,150 @@ data:
             "roles": roles,
         }
         ranger_request("PUT", role_update_path(existing["id"]), payload, ok=(200,))
-        refreshed = get_role_by_name(role_entry.get("name") or role_key)
-        return role_view(role_entry, refreshed)
+        refreshed = get_role_by_name(role_entry.get("name") or role_entry.get("key"))
+        return role_view(role_entry, refreshed, load_state_document())
+
+
+    def update_role_membership(role_key, kind, name, add_member):
+        membership_source = str(CONFIG.get("ranger", {}).get("membershipSource", "git") or "git").lower()
+        if membership_source != "ranger":
+            raise ApiError(409, "Live access-control edits are disabled until platformRoleMembershipSource is set to ranger.")
+        if kind == "group" and not bool(CONFIG.get("ranger", {}).get("usersyncEnabled")):
+            raise ApiError(409, "LDAP group assignment is unavailable until LDAP and Ranger usersync are enabled.")
+        principal = str(name or "").strip()
+        if not principal:
+            raise ApiError(400, "name must be a non-empty user or group name.")
+        if not lookup_directory_principal(kind, principal):
+            raise ApiError(404, f"{kind.title()} {principal} was not found in the configured LDAP directory.")
+        role_entry = role_entry_for_key(role_key)
+        return write_role_membership(role_entry, kind, principal, add_member)
+
+
+    def actor_name(profile):
+        return (
+            str(profile.get("preferred_username") or "").strip()
+            or str(profile.get("email") or "").strip()
+            or str(profile.get("sub") or "").strip()
+            or "platform-admin"
+        )
+
+
+    def create_exception(role_key, payload, profile):
+        status = access_control_status()
+        if status["membershipSource"] != "ranger":
+            raise ApiError(409, "Live access-control edits are disabled until platformRoleMembershipSource is set to ranger.")
+        if not status["exceptionSupportEnabled"]:
+            raise ApiError(503, "Direct-user exceptions are unavailable because state storage is not configured.")
+        user = lookup_directory_principal("user", payload.get("username"))
+        if not user:
+            raise ApiError(404, f"User {payload.get('username')} was not found in the configured LDAP directory.")
+        reason = str(payload.get("reason") or "").strip()
+        approval_ref = str(payload.get("approvalRef") or "").strip()
+        if not reason or not approval_ref:
+            raise ApiError(400, "reason and approvalRef are required.")
+        expires_at = normalize_iso8601(payload.get("expiresAt"))
+        role_entry = role_entry_for_key(role_key)
+        state_document = load_state_document()
+        for existing in state_document.get("exceptions", []):
+            if (
+                str(existing.get("platformRole")) == str(role_key)
+                and str(existing.get("username")) == str(user["name"])
+                and active_exception(existing)
+            ):
+                raise ApiError(409, f"User {user['name']} already has an active exception for {role_key}.")
+
+        write_role_membership(role_entry, "user", user["name"], True)
+        exception = {
+            "id": str(uuid.uuid4()),
+            "platformRole": str(role_key),
+            "username": user["name"],
+            "displayName": str(payload.get("displayName") or user.get("displayName") or user["name"]),
+            "email": str(payload.get("email") or user.get("email") or ""),
+            "reason": reason,
+            "approvalRef": approval_ref,
+            "grantedBy": actor_name(profile),
+            "createdAt": utc_timestamp(),
+            "expiresAt": expires_at,
+            "status": "active",
+        }
+        try:
+            state_document.setdefault("exceptions", []).append(exception)
+            save_state_document(state_document)
+            return exception
+        except Exception:
+            try:
+                write_role_membership(role_entry, "user", user["name"], False)
+            except Exception:
+                pass
+            raise
+
+
+    def remove_exception(role_key, exception_id, profile):
+        role_entry = role_entry_for_key(role_key)
+        state_document = load_state_document()
+        for exception in state_document.get("exceptions", []):
+            if str(exception.get("id")) != str(exception_id) or str(exception.get("platformRole")) != str(role_key):
+                continue
+            if str(exception.get("status", "active")) != "active":
+                raise ApiError(404, "That exception is no longer active.")
+            write_role_membership(role_entry, "user", exception.get("username"), False)
+            exception["status"] = "revoked"
+            exception["revokedAt"] = utc_timestamp()
+            exception["revokedBy"] = actor_name(profile)
+            save_state_document(state_document)
+            return exception
+        raise ApiError(404, "That direct-user exception was not found.")
+
+
+    def update_exception(role_key, exception_id, payload, profile):
+        status = access_control_status()
+        if status["membershipSource"] != "ranger":
+            raise ApiError(409, "Live access-control edits are disabled until platformRoleMembershipSource is set to ranger.")
+        if not status["exceptionSupportEnabled"]:
+            raise ApiError(503, "Direct-user exceptions are unavailable because state storage is not configured.")
+        reason = str(payload.get("reason") or "").strip()
+        approval_ref = str(payload.get("approvalRef") or "").strip()
+        if not reason or not approval_ref:
+            raise ApiError(400, "reason and approvalRef are required.")
+        expires_at = normalize_iso8601(payload.get("expiresAt"))
+        state_document = load_state_document()
+        for exception in state_document.get("exceptions", []):
+            if str(exception.get("id")) != str(exception_id) or str(exception.get("platformRole")) != str(role_key):
+                continue
+            if str(exception.get("status", "active")) != "active":
+                raise ApiError(404, "That exception is no longer active.")
+            exception["reason"] = reason
+            exception["approvalRef"] = approval_ref
+            exception["expiresAt"] = expires_at
+            exception["updatedAt"] = utc_timestamp()
+            exception["updatedBy"] = actor_name(profile)
+            if payload.get("displayName") is not None:
+                exception["displayName"] = str(payload.get("displayName") or exception.get("displayName") or exception.get("username") or "")
+            if payload.get("email") is not None:
+                exception["email"] = str(payload.get("email") or exception.get("email") or "")
+            save_state_document(state_document)
+            return exception
+        raise ApiError(404, "That direct-user exception was not found.")
+
+
+    def reconcile_expired_exceptions():
+        state_document = load_state_document()
+        changed = False
+        for exception in state_document.get("exceptions", []):
+            if not active_exception(exception):
+                continue
+            expires_at = iso_to_epoch(exception.get("expiresAt"))
+            if expires_at is None or expires_at > int(time.time()):
+                continue
+            role_entry = ROLE_CATALOG.get(str(exception.get("platformRole")))
+            if role_entry:
+                write_role_membership(role_entry, "user", exception.get("username"), False)
+            exception["status"] = "expired"
+            exception["revokedAt"] = utc_timestamp()
+            exception["revokedBy"] = "system:platform-home-reconciler"
+            changed = True
+        if changed:
+            save_state_document(state_document)
 
 
     class PlatformAdminHandler(BaseHTTPRequestHandler):
@@ -2736,22 +3866,18 @@ data:
 
                 authenticate(self)
 
-                if self.command == "GET" and path == "/api/admin/status":
+                if self.command == "GET" and path in {"/api/admin/status", "/api/admin/access-control/status"}:
+                    status = access_control_status()
                     json_response(
                         self,
                         200,
                         {
-                            "rangerEnabled": bool(CONFIG.get("ranger", {}).get("enabled")),
-                            "membershipSource": str(CONFIG.get("ranger", {}).get("membershipSource", "git") or "git"),
-                            "usersyncEnabled": bool(CONFIG.get("ranger", {}).get("usersyncEnabled")),
-                            "groupAssignmentEnabled": bool(CONFIG.get("ranger", {}).get("usersyncEnabled")),
-                            "userAssignmentEnabled": True,
-                            "auditUrl": CONFIG.get("ranger", {}).get("browserUrl", ""),
+                            **status,
                         },
                     )
                     return
 
-                if self.command == "GET" and path == "/api/admin/platform-roles":
+                if self.command == "GET" and path in {"/api/admin/platform-roles", "/api/admin/access-control/roles"}:
                     json_response(
                         self,
                         200,
@@ -2768,18 +3894,8 @@ data:
                     query = str((params.get("query") or [""])[0]).strip()
                     if kind not in {"user", "group"}:
                         raise ApiError(400, "kind must be either user or group.")
-                    if kind == "group" and not bool(CONFIG.get("ranger", {}).get("usersyncEnabled")):
-                        json_response(self, 200, {"kind": kind, "results": []})
-                        return
-                    results = []
-                    if query:
-                        lowered = query.casefold()
-                        results = [
-                            name
-                            for name in list_known_principals(kind)
-                            if lowered in name.casefold()
-                        ][:20]
-                    json_response(self, 200, {"kind": kind, "results": results})
+                    results = search_directory(kind, query) if query else []
+                    json_response(self, 200, {"kind": kind, "results": [item["name"] for item in results]})
                     return
 
                 if path.startswith("/api/admin/platform-roles/") and path.endswith("/members") and self.command in {"POST", "DELETE"}:
@@ -2788,13 +3904,73 @@ data:
                         raise ApiError(404, "Unknown admin API path.")
                     role_key = urllib.parse.unquote(parts[4])
                     payload = read_json(self)
-                    role = update_role_membership(
-                        role_key,
-                        str(payload.get("kind", "")).strip().lower(),
-                        payload.get("name"),
-                        add_member=self.command == "POST",
-                    )
+                    kind = str(payload.get("kind", "")).strip().lower()
+                    role = update_role_membership(role_key, kind, payload.get("name"), add_member=self.command == "POST")
                     json_response(self, 200, {"role": role})
+                    return
+
+                if self.command == "GET" and path == "/api/admin/access-control/directory-users":
+                    params = urllib.parse.parse_qs(parsed.query or "")
+                    query = str((params.get("query") or [""])[0]).strip()
+                    json_response(self, 200, {"results": search_directory("user", query) if query else []})
+                    return
+
+                if self.command == "GET" and path == "/api/admin/access-control/directory-groups":
+                    params = urllib.parse.parse_qs(parsed.query or "")
+                    query = str((params.get("query") or [""])[0]).strip()
+                    json_response(self, 200, {"results": search_directory("group", query) if query else []})
+                    return
+
+                if path.startswith("/api/admin/access-control/roles/") and path.endswith("/groups") and self.command in {"POST", "DELETE"}:
+                    parts = path.split("/")
+                    if len(parts) != 7:
+                        raise ApiError(404, "Unknown admin API path.")
+                    role_key = urllib.parse.unquote(parts[5])
+                    payload = read_json(self)
+                    role = update_role_membership(role_key, "group", payload.get("name"), add_member=self.command == "POST")
+                    json_response(self, 200, {"role": role})
+                    return
+
+                if path.startswith("/api/admin/access-control/roles/") and path.endswith("/users") and self.command in {"POST", "DELETE"}:
+                    parts = path.split("/")
+                    if len(parts) != 7:
+                        raise ApiError(404, "Unknown admin API path.")
+                    role_key = urllib.parse.unquote(parts[5])
+                    payload = read_json(self)
+                    role = update_role_membership(role_key, "user", payload.get("name"), add_member=self.command == "POST")
+                    json_response(self, 200, {"role": role})
+                    return
+
+                if path.startswith("/api/admin/access-control/roles/") and path.endswith("/exceptions") and self.command == "POST":
+                    parts = path.split("/")
+                    if len(parts) != 7:
+                        raise ApiError(404, "Unknown admin API path.")
+                    role_key = urllib.parse.unquote(parts[5])
+                    profile = authenticate(self)
+                    exception = create_exception(role_key, read_json(self), profile)
+                    json_response(self, 201, {"exception": exception})
+                    return
+
+                if path.startswith("/api/admin/access-control/roles/") and "/exceptions/" in path and self.command == "PATCH":
+                    parts = path.split("/")
+                    if len(parts) != 8:
+                        raise ApiError(404, "Unknown admin API path.")
+                    role_key = urllib.parse.unquote(parts[5])
+                    exception_id = urllib.parse.unquote(parts[7])
+                    profile = authenticate(self)
+                    exception = update_exception(role_key, exception_id, read_json(self), profile)
+                    json_response(self, 200, {"exception": exception})
+                    return
+
+                if path.startswith("/api/admin/access-control/roles/") and "/exceptions/" in path and self.command == "DELETE":
+                    parts = path.split("/")
+                    if len(parts) != 8:
+                        raise ApiError(404, "Unknown admin API path.")
+                    role_key = urllib.parse.unquote(parts[5])
+                    exception_id = urllib.parse.unquote(parts[7])
+                    profile = authenticate(self)
+                    exception = remove_exception(role_key, exception_id, profile)
+                    json_response(self, 200, {"exception": exception})
                     return
 
                 raise ApiError(404, "Unknown admin API path.")
@@ -2805,6 +3981,9 @@ data:
 
 
     if __name__ == "__main__":
+        if len(sys.argv) > 1 and sys.argv[1] == "reconcile-expired":
+            reconcile_expired_exceptions()
+            sys.exit(0)
         ThreadingHTTPServer(("0.0.0.0", PORT), PlatformAdminHandler).serve_forever()
 ---
 apiVersion: v1
@@ -2855,6 +4034,65 @@ data:
     }
 ---
 apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: {{ $serviceName }}-admin-api
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "dlh-in-a-box.labels" . | nindent 4 }}
+    app.kubernetes.io/component: platform-home
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ $accessControlStateConfigMapName }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "dlh-in-a-box.labels" . | nindent 4 }}
+    app.kubernetes.io/component: platform-home
+data:
+  state.json: |
+    {
+      "version": 1,
+      "exceptions": []
+    }
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: {{ $serviceName }}-admin-api
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "dlh-in-a-box.labels" . | nindent 4 }}
+    app.kubernetes.io/component: platform-home
+rules:
+  - apiGroups: [""]
+    resources: ["configmaps"]
+    verbs: ["create"]
+  - apiGroups: [""]
+    resources: ["configmaps"]
+    resourceNames:
+      - {{ $accessControlStateConfigMapName }}
+    verbs: ["get", "update", "patch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: {{ $serviceName }}-admin-api
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "dlh-in-a-box.labels" . | nindent 4 }}
+    app.kubernetes.io/component: platform-home
+subjects:
+  - kind: ServiceAccount
+    name: {{ $serviceName }}-admin-api
+    namespace: {{ .Release.Namespace }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: {{ $serviceName }}-admin-api
+---
+apiVersion: v1
 kind: Service
 metadata:
   name: {{ $serviceName }}
@@ -2892,13 +4130,19 @@ spec:
     metadata:
       annotations:
         checksum/platform-home-config: {{ $platformHomeChecksum | quote }}
+        rollout/platform-home-release-revision: {{ .Release.Revision | quote }}
       labels:
         app.kubernetes.io/instance: {{ .Release.Name }}
         app.kubernetes.io/name: {{ include "dlh-in-a-box.name" . }}
         app.kubernetes.io/component: platform-home
     spec:
+      serviceAccountName: {{ $serviceName }}-admin-api
       {{- with .Values.global.imagePullSecrets }}
       imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with $ldapHostAliases }}
+      hostAliases:
         {{- toYaml . | nindent 8 }}
       {{- end }}
       containers:
@@ -2933,9 +4177,11 @@ spec:
           image: "{{ .Values.platformHome.api.image.repository }}:{{ .Values.platformHome.api.image.tag }}"
           imagePullPolicy: {{ .Values.platformHome.api.image.pullPolicy }}
           command:
-            - python
-            - -u
-            - /opt/platform-home-api/admin-api.py
+            - /bin/sh
+            - -ec
+            - |
+              python -m pip install --no-cache-dir ldap3 >/tmp/platform-home-api-pip.log
+              python -u /opt/platform-home-api/admin-api.py
           env:
             - name: PORT
               value: {{ $apiPort | quote }}
@@ -2949,12 +4195,27 @@ spec:
               value: {{ default "groups" $oidc.groupsClaim | quote }}
             - name: PLATFORM_ADMIN_GROUP
               value: {{ $adminRequiredGroup | quote }}
+            - name: POD_NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
+            - name: ACCESS_CONTROL_STATE_CONFIGMAP_NAME
+              value: {{ $accessControlStateConfigMapName | quote }}
+            - name: ACCESS_CONTROL_STATE_CONFIGMAP_KEY
+              value: "state.json"
             - name: RANGER_ADMIN_PASSWORD
               valueFrom:
                 secretKeyRef:
                   name: {{ default "dlh-ranger-admin" $rangerAdmin.existingSecret }}
                   key: {{ default "rangerAdminPassword" $rangerAdmin.adminPasswordKey }}
                   optional: true
+            {{- if $ldapBindSecretName }}
+            - name: LDAP_BIND_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $ldapBindSecretName }}
+                  key: {{ $ldapBindPasswordKey }}
+            {{- end }}
           ports:
             - name: admin-api
               containerPort: {{ $apiPort }}
@@ -2975,6 +4236,11 @@ spec:
             - name: admin-api
               mountPath: /opt/platform-home-api
               readOnly: true
+            {{- if $ldapUseTrustedCa }}
+            - name: ldap-trusted-ca
+              mountPath: /opt/platform-home-api/ldap-ca
+              readOnly: true
+            {{- end }}
       volumes:
         - name: assets
           configMap:
@@ -2986,6 +4252,110 @@ spec:
         - name: nginx-config
           configMap:
             name: {{ $serviceName }}-nginx
+        {{- if $ldapUseTrustedCa }}
+        - name: ldap-trusted-ca
+          secret:
+            secretName: {{ $ldapTrustedCaSecretName }}
+            items:
+              - key: {{ $ldapTrustedCaCertKey }}
+                path: {{ $ldapTrustedCaCertKey }}
+        {{- end }}
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: {{ $serviceName }}-access-control-reconcile
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "dlh-in-a-box.labels" . | nindent 4 }}
+    app.kubernetes.io/component: platform-home
+spec:
+  schedule: "*/15 * * * *"
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 1
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      backoffLimit: 2
+      template:
+        metadata:
+          labels:
+            app.kubernetes.io/instance: {{ .Release.Name }}
+            app.kubernetes.io/name: {{ include "dlh-in-a-box.name" . }}
+            app.kubernetes.io/component: platform-home
+        spec:
+          serviceAccountName: {{ $serviceName }}-admin-api
+          restartPolicy: OnFailure
+          {{- with .Values.global.imagePullSecrets }}
+          imagePullSecrets:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          containers:
+            - name: platform-home-access-control-reconcile
+              image: "{{ .Values.platformHome.api.image.repository }}:{{ .Values.platformHome.api.image.tag }}"
+              imagePullPolicy: {{ .Values.platformHome.api.image.pullPolicy }}
+              command:
+                - /bin/sh
+                - -ec
+                - |
+                  python -m pip install --no-cache-dir ldap3 >/tmp/platform-home-api-pip.log
+                  python /opt/platform-home-api/admin-api.py reconcile-expired
+              env:
+                - name: PORT
+                  value: {{ $apiPort | quote }}
+                - name: RANGER_URL
+                  value: {{ include "dlh-in-a-box.ranger.admin.url" . | quote }}
+                - name: IDENTITY_USERINFO_URL
+                  value: {{ include "dlh-in-a-box.identity.internalUserInfoUrl" . | quote }}
+                - name: IDENTITY_EXPECTED_ISSUER
+                  value: {{ include "dlh-in-a-box.identity.issuer" . | quote }}
+                - name: OIDC_GROUPS_CLAIM
+                  value: {{ default "groups" $oidc.groupsClaim | quote }}
+                - name: PLATFORM_ADMIN_GROUP
+                  value: {{ $adminRequiredGroup | quote }}
+                - name: POD_NAMESPACE
+                  valueFrom:
+                    fieldRef:
+                      fieldPath: metadata.namespace
+                - name: ACCESS_CONTROL_STATE_CONFIGMAP_NAME
+                  value: {{ $accessControlStateConfigMapName | quote }}
+                - name: ACCESS_CONTROL_STATE_CONFIGMAP_KEY
+                  value: "state.json"
+                - name: RANGER_ADMIN_PASSWORD
+                  valueFrom:
+                    secretKeyRef:
+                      name: {{ default "dlh-ranger-admin" $rangerAdmin.existingSecret }}
+                      key: {{ default "rangerAdminPassword" $rangerAdmin.adminPasswordKey }}
+                      optional: true
+                {{- if $ldapBindSecretName }}
+                - name: LDAP_BIND_PASSWORD
+                  valueFrom:
+                    secretKeyRef:
+                      name: {{ $ldapBindSecretName }}
+                      key: {{ $ldapBindPasswordKey }}
+                {{- end }}
+              volumeMounts:
+                - name: admin-api
+                  mountPath: /opt/platform-home-api
+                  readOnly: true
+                {{- if $ldapUseTrustedCa }}
+                - name: ldap-trusted-ca
+                  mountPath: /opt/platform-home-api/ldap-ca
+                  readOnly: true
+                {{- end }}
+          volumes:
+            - name: admin-api
+              configMap:
+                name: {{ $serviceName }}-api
+                defaultMode: 0555
+            {{- if $ldapUseTrustedCa }}
+            - name: ldap-trusted-ca
+              secret:
+                secretName: {{ $ldapTrustedCaSecretName }}
+                items:
+                  - key: {{ $ldapTrustedCaCertKey }}
+                    path: {{ $ldapTrustedCaCertKey }}
+            {{- end }}
 ---
 {{- if .Values.platformHome.ingress.enabled }}
 apiVersion: networking.k8s.io/v1

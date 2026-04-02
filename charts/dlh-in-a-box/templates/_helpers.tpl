@@ -266,6 +266,10 @@ app.kubernetes.io/managed-by: {{ .Release.Service }}
 {{- printf "%s-ranger-admin" .Release.Name -}}
 {{- end -}}
 
+{{- define "dlh-in-a-box.ranger.browserProxy.serviceName" -}}
+{{- printf "%s-ranger-browser-proxy" .Release.Name -}}
+{{- end -}}
+
 {{- define "dlh-in-a-box.ranger.admin.url" -}}
 {{- printf "http://%s.%s.svc.cluster.local:6080" (include "dlh-in-a-box.ranger.admin.serviceName" .) .Release.Namespace -}}
 {{- end -}}

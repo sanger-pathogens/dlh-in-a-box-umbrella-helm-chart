@@ -7,9 +7,12 @@
 {{- $identity := .Values.global.identity | default dict -}}
 {{- $directory := get $identity "directory" | default dict -}}
 {{- $ldap := get $directory "ldap" | default dict -}}
+{{- $ldapAllowAnonymousRead := default false $ldap.allowAnonymousRead -}}
+{{- $ldapEffectiveBindDn := ternary "" (include "dlh-in-a-box.identity.directory.bindDn" .) $ldapAllowAnonymousRead -}}
 {{- $ldapTrustedCaSecretName := include "dlh-in-a-box.identity.directory.trustedCaSecretName" . -}}
 {{- $ldapTrustedCaCertKey := include "dlh-in-a-box.identity.directory.trustedCaCertKey" . -}}
 {{- $ldapTrustedCaPath := printf "/opt/ranger-automation/ldap-ca/%s" $ldapTrustedCaCertKey -}}
+{{- $ldapHostAliases := default (list) $ldap.hostAliases -}}
 {{- $rangerBootstrap := get $ranger "bootstrap" | default dict -}}
 {{- $importCatalogAcls := false -}}
 {{- if hasKey $ranger "importCatalogAcls" -}}
@@ -56,7 +59,7 @@ data:
       "ldap" (dict
         "url" (include "dlh-in-a-box.identity.directory.url" .)
         "allowInsecure" (default false $ldap.allowInsecure)
-        "bindDn" (include "dlh-in-a-box.identity.directory.bindDn" .)
+        "bindDn" $ldapEffectiveBindDn
         "trustedCaPath" (ternary $ldapTrustedCaPath "" (and (ne $ldapTrustedCaSecretName "") (not (default false $ldap.allowInsecure))))
         "userBaseDn" (include "dlh-in-a-box.identity.directory.userBaseDn" .)
         "groupBaseDn" (include "dlh-in-a-box.identity.directory.groupBaseDn" .)
@@ -74,6 +77,7 @@ data:
     import datetime
     import json
     import os
+    import re
     import time
     import urllib.error
     import urllib.parse
@@ -108,11 +112,13 @@ data:
                     return data
                 return json.loads(data) if data else None
         except urllib.error.HTTPError as exc:
+            data = exc.read().decode("utf-8")
             if exc.code in ok:
-                data = exc.read().decode("utf-8")
                 if not parse_json:
                     return data
                 return json.loads(data) if data else None
+            exc.ranger_body = data
+            print(f"Ranger API {method} {path} failed with HTTP {exc.code}: {data}")
             raise
 
 
@@ -470,6 +476,14 @@ data:
             )
 
 
+    def normalize_policy_resource(value):
+        normalized = as_resource(value)
+        normalized["values"] = sorted(str(item) for item in normalized.get("values", []))
+        normalized["isExcludes"] = bool(normalized.get("isExcludes", False))
+        normalized["isRecursive"] = bool(normalized.get("isRecursive", False))
+        return normalized
+
+
     def upsert_policy(service_name, policy):
         name = policy["name"]
         path = (
@@ -490,7 +504,32 @@ data:
             policy["guid"] = existing.get("guid")
             request("PUT", path, policy, ok=(200,))
         else:
-            request("POST", "/service/public/v2/api/policy/", policy, ok=(200, 201))
+            try:
+                request("POST", "/service/public/v2/api/policy/", policy, ok=(200, 201))
+            except urllib.error.HTTPError as exc:
+                if exc.code != 400:
+                    raise
+                detail = getattr(exc, "ranger_body", "")
+                match = re.search(r"policy-name=\[([^\]]+)\]", detail)
+                if not match:
+                    raise
+                existing_name = match.group(1).strip()
+                existing_path = (
+                    "/service/public/v2/api/service/"
+                    + urllib.parse.quote(service_name, safe="")
+                    + "/policy/"
+                    + urllib.parse.quote(existing_name, safe="")
+                )
+                existing = request("GET", existing_path, ok=(200,))
+                if not existing:
+                    raise
+                policy["id"] = existing["id"]
+                policy["guid"] = existing.get("guid")
+                update_path = (
+                    "/service/public/v2/api/policy/"
+                    + urllib.parse.quote(str(existing["id"]), safe="")
+                )
+                request("PUT", update_path, policy, ok=(200,))
 
 
     def main():
@@ -683,6 +722,7 @@ data:
     import urllib.parse
 
     from ldap3 import BASE, SUBTREE, Connection, Server, Tls
+    from ldap3.core.exceptions import LDAPBindError
 
     CONFIG_PATH = "/opt/ranger-automation/bootstrap-config.json"
     RANGER_URL = os.environ["RANGER_URL"].rstrip("/")
@@ -740,8 +780,34 @@ data:
             return ""
 
 
+    def escape_ldap_filter_value(value):
+        escaped = []
+        for char in str(value or ""):
+            if char == "\\":
+                escaped.append("\\5c")
+            elif char == "*":
+                escaped.append("\\2a")
+            elif char == "(":
+                escaped.append("\\28")
+            elif char == ")":
+                escaped.append("\\29")
+            elif char == "\x00":
+                escaped.append("\\00")
+            else:
+                escaped.append(char)
+        return "".join(escaped)
+
+
     def sync(config):
         ldap_cfg = config["ldap"]
+        managed_groups = sorted(
+            {
+                str(group_name).strip()
+                for role in (config.get("platformRoles") or {}).values()
+                for group_name in (((role.get("members") or {}).get("directoryGroups")) or [])
+                if str(group_name).strip()
+            }
+        )
         parsed = urllib.parse.urlparse(ldap_cfg["url"])
         use_ssl = parsed.scheme == "ldaps"
         host = parsed.hostname or ldap_cfg["url"]
@@ -756,13 +822,27 @@ data:
             else:
                 tls = Tls(validate=ssl.CERT_REQUIRED)
         server = Server(host, port=port, use_ssl=use_ssl, tls=tls, get_info=None)
-        conn = Connection(server, user=ldap_cfg["bindDn"], password=LDAP_BIND_PASSWORD, auto_bind=True)
+        bind_dn = str(ldap_cfg.get("bindDn") or "").strip()
+        if bind_dn and LDAP_BIND_PASSWORD:
+            try:
+                conn = Connection(server, user=bind_dn, password=LDAP_BIND_PASSWORD, auto_bind=True)
+            except LDAPBindError:
+                print(f"LDAP bind failed for {bind_dn}; falling back to anonymous read", flush=True)
+                conn = Connection(server, auto_bind=True)
+        else:
+            conn = Connection(server, auto_bind=True)
+        group_name_attribute = ldap_cfg["groupNameAttribute"]
+        group_search_filter = ldap_cfg["groupSearchFilter"]
+        if managed_groups:
+            escaped_groups = [f"({group_name_attribute}={escape_ldap_filter_value(group_name)})" for group_name in managed_groups]
+            group_search_filter = f"(|{''.join(escaped_groups)})"
+
         conn.search(
             ldap_cfg["groupBaseDn"],
-            ldap_cfg["groupSearchFilter"],
+            group_search_filter,
             search_scope=SUBTREE,
             attributes=[
-                ldap_cfg["groupNameAttribute"],
+                group_name_attribute,
                 ldap_cfg["groupSearchMemberAttribute"],
             ],
         )
@@ -771,8 +851,10 @@ data:
         users = {}
 
         for group_entry in conn.entries:
-            group_name = attr_value(group_entry, ldap_cfg["groupNameAttribute"])
+            group_name = attr_value(group_entry, group_name_attribute)
             if not group_name:
+                continue
+            if managed_groups and group_name not in managed_groups:
                 continue
             raw_members = []
             try:
@@ -963,6 +1045,10 @@ spec:
             app.kubernetes.io/component: ranger-usersync
         spec:
           restartPolicy: OnFailure
+          {{- with $ldapHostAliases }}
+          hostAliases:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
           containers:
             - name: ranger-usersync
               image: "{{ $ranger.usersync.image.repository }}:{{ $ranger.usersync.image.tag }}"

@@ -93,6 +93,26 @@ global:
           clientSecretKey: headlampClientSecret
           redirectUris: []
           webOrigins: []
+        rangerProxy:
+          enabled: false
+          clientId: ""
+          existingSecret: dlh-oidc-clients
+          clientSecretKey: rangerClientSecret
+          configCliSecretKey: KC_RANGER_CLIENT_SECRET
+          cookieExistingSecret: dlh-cloudbeaver-oauth2-proxy
+          cookieSecretKey: cookie-secret
+          redirectUrl: ""
+          redirectUris: []
+          webOrigins: []
+          allowedGroups: []
+          emailDomains:
+            - "*"
+          ingress:
+            enabled: false
+            className: ""
+            host: ""
+            tlsSecretName: ""
+            annotations: {}
         cloudbeaverProxy:
           enabled: false
           clientId: ""
@@ -156,10 +176,13 @@ global:
         bindDistinguishedName: ""
         bindExistingSecret: ""
         bindPasswordKey: bindPassword
+        allowAnonymousRead: false
         trustedCaExistingSecret: ""
         trustedCaCertKey: ca.crt
         useSystemTrustStore: false
         allowInsecure: false
+        syncGroupsToKeycloak: true
+        hostAliases: []
     groupConventions:
       appAccessPrefix: platform-app-
       rolePrefix: platform-role-
@@ -173,10 +196,10 @@ global:
       serviceName: trino
       serviceUsername: trino
       serviceAdminUsers:
-        - trino-admin
+        - admin
       serviceAdminGroups: []
       superUsers:
-        - trino-admin
+        - admin
       superGroups: []
       useRangerGroups: false
       postgresql:
@@ -222,6 +245,7 @@ global:
           pullPolicy: IfNotPresent
         policies: []
       trino:
+        enabled: false
         auditMode: log4j
   storage:
     backend: externalS3
@@ -346,6 +370,15 @@ keycloak:
             realmRoles:
             {{- range $role := $user.realmRoles }}
               - {{ $role | quote }}
+            {{- end }}
+            {{- end }}
+            {{- if $user.clientRoles }}
+            clientRoles:
+            {{- range $clientName := keys $user.clientRoles | sortAlpha }}
+              {{ $clientName | quote }}:
+              {{- range $role := (get $user.clientRoles $clientName | default (list)) }}
+                - {{ $role | quote }}
+              {{- end }}
             {{- end }}
             {{- end }}
         {{- end }}
@@ -563,6 +596,31 @@ keycloak:
               - roles
               - groups
         {{- end }}
+        {{- if .Values.global.identity.external.clients.rangerProxy.enabled }}
+          - clientId: {{ .Values.global.identity.external.clients.rangerProxy.clientId | quote }}
+            name: Ranger Proxy
+            description: OIDC client for oauth2-proxy in front of Ranger Admin
+            enabled: true
+            protocol: openid-connect
+            publicClient: false
+            standardFlowEnabled: true
+            directAccessGrantsEnabled: false
+            serviceAccountsEnabled: false
+            secret: "$(env:KC_RANGER_CLIENT_SECRET:change-me)"
+            redirectUris:
+            {{- range .Values.global.identity.external.clients.rangerProxy.redirectUris }}
+              - {{ . | quote }}
+            {{- end }}
+            webOrigins:
+            {{- range .Values.global.identity.external.clients.rangerProxy.webOrigins }}
+              - {{ . | quote }}
+            {{- end }}
+            defaultClientScopes:
+              - profile
+              - email
+              - roles
+              - groups
+        {{- end }}
         {{- if .Values.global.identity.external.clients.prefectProxy.enabled }}
           - clientId: {{ .Values.global.identity.external.clients.prefectProxy.clientId | quote }}
             name: Prefect Proxy
@@ -626,12 +684,21 @@ keycloak:
                   - "1"
                 vendor:
                   - other
+                {{- if .Values.global.identity.directory.ldap.allowAnonymousRead }}
+                bindDn:
+                  - ""
+                bindCredential:
+                  - ""
+                authType:
+                  - none
+                {{- else }}
                 bindDn:
                   - {{ include "dlh-in-a-box.identity.directory.bindDn" $ | quote }}
                 bindCredential:
                   - "$(env:LDAP_BIND_PASSWORD:change-me)"
                 authType:
                   - simple
+                {{- end }}
                 useTruststoreSpi:
                   - {{ ternary "never" "ldapsOnly" .Values.global.identity.directory.ldap.allowInsecure | quote }}
                 trustEmail:
@@ -690,6 +757,7 @@ keycloak:
                         - "true"
                       always.read.value.from.ldap:
                         - "true"
+                  {{- if .Values.global.identity.directory.ldap.syncGroupsToKeycloak }}
                   - name: groups
                     providerId: group-ldap-mapper
                     config:
@@ -719,6 +787,7 @@ keycloak:
                         - /
                       drop.non.existing.groups.during.sync:
                         - "false"
+                  {{- end }}
         {{- end }}
   postgresql:
     enabled: true
@@ -805,6 +874,19 @@ cloudbeaver:
   bootstrap:
     existingSecret: dlh-cloudbeaver-bootstrap
     initialDataKey: initial-data.conf
+    workspaceSeedExistingSecret: ""
+    workspaceDataSourcesKey: data-sources.json
+    forceWorkspaceSeed: false
+  trustedCa:
+    existingSecret: ""
+    certKey: ca.crt
+    trustStorePath: /opt/cloudbeaver/trust/cloudbeaver-trino-truststore.p12
+    trustStorePassword: changeit
+    trustStoreType: PKCS12
+    initImage:
+      repository: eclipse-temurin
+      tag: 21-jdk
+      pullPolicy: IfNotPresent
   authProxy:
     enabled: false
     userHeader: X-Forwarded-Preferred-Username
@@ -879,6 +961,8 @@ prefect-auth-proxy:
       allowed_groups = [{{- range $index, $group := .Values.global.identity.external.clients.prefectProxy.allowedGroups }}{{ if $index }}, {{ end }}{{ $group | quote }}{{- end }}]
       oidc_groups_claim = "{{ .Values.global.identity.external.oidc.groupsClaim }}"
       redirect_url = "{{ .Values.global.identity.external.clients.prefectProxy.redirectUrl }}"
+      skip_provider_button = true
+      cookie_secure = {{ hasPrefix "https://" .Values.global.identity.external.clients.prefectProxy.redirectUrl }}
       # Use a distinct oauth2-proxy cookie per app so localhost tunnel access
       # does not mix Prefect and CloudBeaver sessions on 127.0.0.1.
       cookie_name = "_oauth2_proxy_prefect"
@@ -911,10 +995,55 @@ cloudbeaver-auth-proxy:
       allowed_groups = [{{- range $index, $group := .Values.global.identity.external.clients.cloudbeaverProxy.allowedGroups }}{{ if $index }}, {{ end }}{{ $group | quote }}{{- end }}]
       oidc_groups_claim = "{{ .Values.global.identity.external.oidc.groupsClaim }}"
       redirect_url = "{{ .Values.global.identity.external.clients.cloudbeaverProxy.redirectUrl }}"
+      skip_provider_button = true
+      cookie_secure = {{ hasPrefix "https://" .Values.global.identity.external.clients.cloudbeaverProxy.redirectUrl }}
       # Use a distinct oauth2-proxy cookie per app so localhost tunnel access
       # does not mix CloudBeaver and Prefect sessions on 127.0.0.1.
       cookie_name = "_oauth2_proxy_cloudbeaver"
       upstreams = [ "http://{{ include "dlh-in-a-box.cloudbeaver.serviceName" $ }}:8978" ]
+      pass_access_token = true
+      pass_authorization_header = true
+      pass_user_headers = true
+      set_xauthrequest = true
+      reverse_proxy = true
+  service:
+    type: ClusterIP
+  ingress:
+    enabled: false
+
+ranger-auth-proxy:
+  proxyVarsAsSecrets: true
+  config:
+    clientID: '{{ .Values.global.identity.external.clients.rangerProxy.clientId }}'
+    clientSecret: |-
+      {{- $secretName := .Values.global.identity.external.clients.rangerProxy.existingSecret -}}
+      {{- $secretKey := .Values.global.identity.external.clients.rangerProxy.clientSecretKey -}}
+      {{- with (lookup "v1" "Secret" .Release.Namespace $secretName) -}}
+      {{- index .data $secretKey | b64dec -}}
+      {{- end -}}
+    cookieSecret: |-
+      {{- $secretName := .Values.global.identity.external.clients.rangerProxy.cookieExistingSecret -}}
+      {{- $secretKey := .Values.global.identity.external.clients.rangerProxy.cookieSecretKey -}}
+      {{- with (lookup "v1" "Secret" .Release.Namespace $secretName) -}}
+      {{- index .data $secretKey | b64dec -}}
+      {{- end -}}
+    configFile: |-
+      provider = "oidc"
+      oidc_issuer_url = "{{ include "dlh-in-a-box.identity.issuer" $ }}"
+      skip_oidc_discovery = true
+      login_url = "{{ include "dlh-in-a-box.identity.authorizeUrl" $ }}"
+      redeem_url = "{{ include "dlh-in-a-box.identity.internalAccessTokenUrl" $ }}"
+      oidc_jwks_url = "{{ include "dlh-in-a-box.identity.internalJwksUri" $ }}"
+      profile_url = "{{ include "dlh-in-a-box.identity.internalUserInfoUrl" $ }}"
+      scope = "{{ join " " .Values.global.identity.external.oidc.scopes }}"
+      email_domains = [{{- range $index, $domain := .Values.global.identity.external.clients.rangerProxy.emailDomains }}{{ if $index }}, {{ end }}{{ $domain | quote }}{{- end }}]
+      allowed_groups = [{{- range $index, $group := .Values.global.identity.external.clients.rangerProxy.allowedGroups }}{{ if $index }}, {{ end }}{{ $group | quote }}{{- end }}]
+      oidc_groups_claim = "{{ .Values.global.identity.external.oidc.groupsClaim }}"
+      redirect_url = "{{ .Values.global.identity.external.clients.rangerProxy.redirectUrl }}"
+      skip_provider_button = true
+      cookie_secure = {{ hasPrefix "https://" .Values.global.identity.external.clients.rangerProxy.redirectUrl }}
+      cookie_name = "_oauth2_proxy_ranger"
+      upstreams = [ "http://{{ include "dlh-in-a-box.ranger.browserProxy.serviceName" $ }}:80" ]
       pass_access_token = true
       pass_authorization_header = true
       pass_user_headers = true

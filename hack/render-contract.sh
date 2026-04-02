@@ -91,8 +91,9 @@ assert_contains "${local_manifest}" "name: dlh-ranger-admin-exception-audit"
 assert_contains "${local_manifest}" "name: dlh-platform-home"
 assert_contains "${local_manifest}" "Administration"
 assert_contains "${local_manifest}" "name: dlh-cloudbeaver"
-assert_contains "${local_manifest}" 'username: "trino-admin"'
-assert_contains "${local_manifest}" "KC_BOOTSTRAP_TRINO_ADMIN_PASSWORD"
+assert_contains "${local_manifest}" 'username: "admin"'
+assert_contains "${local_manifest}" "KC_BOOTSTRAP_ADMIN_PASSWORD"
+assert_contains "${local_manifest}" "/access-control"
 assert_not_contains "${local_manifest}" "ldap-directory"
 assert_not_contains "${local_manifest}" "access-control.name=ranger"
 assert_contains "${local_manifest}" "access-control.name=file"
@@ -125,8 +126,10 @@ assert_contains "${prod_manifest}" "https://prefect.data-platform.example.org/oa
 assert_contains "${prod_manifest}" "https://prefect.data-platform.example.org"
 assert_contains "${dev_manifest}" "http-server.authentication.type=OAUTH2,PASSWORD"
 assert_contains "${prod_manifest}" "http-server.authentication.type=OAUTH2,PASSWORD"
-assert_contains "${dev_manifest}" "access-control.name=ranger"
-assert_contains "${prod_manifest}" "access-control.name=ranger"
+assert_not_contains "${dev_manifest}" "access-control.name=ranger"
+assert_not_contains "${prod_manifest}" "access-control.name=ranger"
+assert_contains "${dev_manifest}" "access-control.name=file"
+assert_contains "${prod_manifest}" "access-control.name=file"
 assert_contains "${dev_manifest}" 'allowed_groups = [\"platform-app-prefect\", \"platform-role-platform-admin\"]'
 assert_contains "${prod_manifest}" 'allowed_groups = [\"platform-app-prefect\", \"platform-role-platform-admin\"]'
 assert_contains "${dev_manifest}" 'allowed_groups = [\"platform-app-cloudbeaver\", \"platform-role-platform-admin\"]'

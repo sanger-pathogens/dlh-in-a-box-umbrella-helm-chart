@@ -194,25 +194,23 @@ in an institution.
 The launchpad is not the security boundary. The app or Trino itself still
 enforces the real access decision.
 
-Platform administrators get three additional sections on the same signed-in
-front page:
+Platform administrators get:
 
 - grouped governance and operations links such as Ranger Admin, Keycloak Admin,
   Vault, Trino UI, Headlamp, and MinIO Console when configured
-- a live `Platform role management` console for assigning direct users and
-  LDAP or AD-synced groups to Git-defined platform roles through Ranger
-- a compatibility redirect from `/admin.html` back to the main front-page admin
-  section
+- a dedicated `/access-control` workspace for assigning LDAP-backed groups and
+  governed direct-user exceptions to Git-defined platform roles through Ranger
+- a compatibility redirect from `/admin.html` to `/access-control`
 
-The live membership editor is intentionally narrow:
+The dedicated access-control workspace is intentionally narrow:
 
 - Git remains the source of truth for role definitions, app entitlements,
   nested roles, and declared exceptions
 - Ranger becomes the writable source of truth for live role memberships when
   `global.authorization.platformRoleMembershipSource=ranger`
 - when `global.authorization.platformRoleMembershipSource=git`, the portal
-  shows the role-management surface but disables live edits so reconciliation
-  semantics remain backward-compatible
+  keeps the access-control workspace visible but disables live edits so
+  reconciliation semantics remain backward-compatible
 - when Ranger usersync is unavailable, group assignment stays disabled and the
   portal degrades honestly instead of pretending directory management is active
 

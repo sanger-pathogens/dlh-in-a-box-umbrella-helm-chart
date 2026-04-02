@@ -15,11 +15,11 @@ global:
         loginTheme: ""
         configCliEnvExistingSecret: &keycloak_config_cli_env_secret dlh-keycloak-config-cli-env
         bootstrapUsers:
-          - username: trino-admin
-            email: trino-admin@local.test
+          - username: admin
+            email: admin@local.test
             firstName: Local
             lastName: Administrator
-            passwordEnvVar: KC_BOOTSTRAP_TRINO_ADMIN_PASSWORD
+            passwordEnvVar: KC_BOOTSTRAP_ADMIN_PASSWORD
             groups:
               - platform-app-cloudbeaver
               - platform-app-datahub
@@ -27,6 +27,9 @@ global:
               - platform-app-superset
               - platform-app-trino
               - platform-role-platform-admin
+            clientRoles:
+              realm-management:
+                - realm-admin
     external:
       oidc:
         issuer: http://dlh-keycloak.data-lakehouse-local.svc.cluster.local/realms/dlh
@@ -61,6 +64,7 @@ global:
           clientId: platform-home
           redirectUris:
             - http://dlh-platform-home.data-lakehouse-local.svc.cluster.local/
+            - http://dlh-platform-home.data-lakehouse-local.svc.cluster.local/access-control
           webOrigins:
             - http://dlh-platform-home.data-lakehouse-local.svc.cluster.local
         cloudbeaverProxy:
@@ -149,13 +153,13 @@ global:
       serviceName: trino
       serviceUsername: trino
       serviceAdminUsers:
-        - trino-admin
-        - trino-admin@local.test
+        - admin
+        - admin@local.test
       serviceAdminGroups:
         - platform-role-platform-admin
       superUsers:
-        - trino-admin
-        - trino-admin@local.test
+        - admin
+        - admin@local.test
       superGroups:
         - platform-role-platform-admin
       useRangerGroups: false

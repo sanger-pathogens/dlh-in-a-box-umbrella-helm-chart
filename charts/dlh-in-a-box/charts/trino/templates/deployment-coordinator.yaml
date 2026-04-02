@@ -13,8 +13,12 @@ through environment variables.
 {{- $ldap := get $directory "ldap" | default (dict) -}}
 {{- $authorization := get .Values.global "authorization" | default (dict) -}}
 {{- $ranger := get $authorization "ranger" | default (dict) -}}
+{{- $rangerTrino := get $ranger "trino" | default (dict) -}}
 {{- $identityEnabled := and (default false $identity.enabled) (default false $trinoIdentity.enabled) -}}
-{{- $ldapEnabled := and $identityEnabled (default false $ldap.enabled) -}}
+{{- $legacyPasswordAuthRequested := contains "PASSWORD" (default "" .Values.server.config.authenticationType) -}}
+{{- $passwordAuthRequested := or (default false $trinoIdentity.passwordAuthEnabled) $legacyPasswordAuthRequested -}}
+{{- $ldapDirectoryEnabled := and $identityEnabled (default false $ldap.enabled) -}}
+{{- $ldapEnabled := and $ldapDirectoryEnabled $passwordAuthRequested -}}
 {{- $ldapAllowInsecure := default false $ldap.allowInsecure -}}
 {{- $ldapTrustedCaSecretName := include "dlh-in-a-box.identity.directory.trustedCaSecretName" . -}}
 {{- $ldapTrustedCaCertKey := include "dlh-in-a-box.identity.directory.trustedCaCertKey" . -}}
@@ -23,9 +27,7 @@ through environment variables.
 {{- $keycloakProvider := get (get $identity "provider" | default (dict)) "keycloak" | default (dict) -}}
 {{- $bootstrapUsersEnabled := gt (len (default (list) $keycloakProvider.bootstrapUsers)) 0 -}}
 {{- $bootstrapOnlyMode := and $bootstrapUsersEnabled (not $ldapEnabled) -}}
-{{- $rangerTrinoEnabled := and $rangerEnabled (not $bootstrapOnlyMode) -}}
-{{- $legacyPasswordAuthRequested := contains "PASSWORD" (default "" .Values.server.config.authenticationType) -}}
-{{- $passwordAuthRequested := or (default false $trinoIdentity.passwordAuthEnabled) $legacyPasswordAuthRequested -}}
+{{- $rangerTrinoEnabled := and $rangerEnabled (default false $rangerTrino.enabled) (not $bootstrapOnlyMode) -}}
 {{- $filePasswordAuthConfigured := or .Values.auth.passwordAuth .Values.auth.passwordAuthSecret -}}
 {{- $renderFilePasswordAuth := and $filePasswordAuthConfigured (not (and $identityEnabled $passwordAuthRequested)) -}}
 {{- $env := .Values.env | default (list) -}}
