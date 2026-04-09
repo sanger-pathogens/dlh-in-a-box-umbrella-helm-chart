@@ -165,9 +165,10 @@
                     },
                     "passwordAuthMode": {
                       "type": "string",
-                      "enum": ["ldap", "file"]
+                      "enum": ["ldap", "file", "ldap-file"]
                     },
                     "passwordAuthEnabled": { "type": "boolean" },
+                    "groupProviderEnabled": { "type": "boolean" },
                     "sharedSecretExistingSecret": { "type": "string" },
                     "sharedSecretKey": { "type": "string" }
                   },

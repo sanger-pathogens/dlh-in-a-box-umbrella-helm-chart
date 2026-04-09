@@ -16,9 +16,11 @@
 {{- $passwordAuthRequested := and $identityEnabled (default false $trinoIdentity.passwordAuthEnabled) -}}
 {{- $ldapDirectoryEnabled := and $identityEnabled (default false $ldap.enabled) -}}
 {{- $passwordAuthMode := default "ldap" $trinoIdentity.passwordAuthMode -}}
-{{- $ldapPasswordAuthEnabled := and $passwordAuthRequested (eq $passwordAuthMode "ldap") -}}
-{{- $filePasswordAuthEnabled := and $passwordAuthRequested (eq $passwordAuthMode "file") -}}
+{{- $ldapPasswordAuthEnabled := and $passwordAuthRequested (or (eq $passwordAuthMode "ldap") (eq $passwordAuthMode "ldap-file")) -}}
+{{- $filePasswordAuthEnabled := and $passwordAuthRequested (or (eq $passwordAuthMode "file") (eq $passwordAuthMode "ldap-file")) -}}
+{{- $multiPasswordAuthEnabled := and $ldapPasswordAuthEnabled $filePasswordAuthEnabled -}}
 {{- $ldapEnabled := and $ldapDirectoryEnabled $ldapPasswordAuthEnabled -}}
+{{- $ldapGroupProviderEnabled := and $ldapEnabled (default false $trinoIdentity.groupProviderEnabled) -}}
 {{- $rangerEnabled := default false $ranger.enabled -}}
 {{- $issuer := include "dlh-in-a-box.identity.issuer" . -}}
 {{- $authUrl := include "dlh-in-a-box.identity.authorizeUrl" . -}}
@@ -44,7 +46,7 @@
   {{- if not $trinoIdentity.clientId }}{{- fail "global.identity.external.clients.trino.clientId is required when Trino identity integration is enabled." }}{{- end }}
   {{- if not $trinoIdentity.existingSecret }}{{- fail "global.identity.external.clients.trino.existingSecret is required when Trino identity integration is enabled." }}{{- end }}
   {{- if not $trinoIdentity.sharedSecretExistingSecret }}{{- fail "global.identity.external.clients.trino.sharedSecretExistingSecret is required when Trino identity integration is enabled." }}{{- end }}
-  {{- if and $passwordAuthRequested (not (or $ldapPasswordAuthEnabled $filePasswordAuthEnabled)) }}{{- fail "global.identity.external.clients.trino.passwordAuthMode must be one of ldap or file when Trino PASSWORD auth is enabled." }}{{- end }}
+  {{- if and $passwordAuthRequested (not (or $ldapPasswordAuthEnabled $filePasswordAuthEnabled)) }}{{- fail "global.identity.external.clients.trino.passwordAuthMode must be one of ldap, file, or ldap-file when Trino PASSWORD auth is enabled." }}{{- end }}
   {{- if and $ldapPasswordAuthEnabled (not $ldapDirectoryEnabled) }}{{- fail "global.identity.directory.ldap.enabled must be true when Trino LDAP PASSWORD auth is enabled through the shared identity contract." }}{{- end }}
   {{- if and (not $ldapDirectoryEnabled) (not $bootstrapUsersEnabled) }}{{- fail "global.identity.directory.ldap.enabled must be true when Trino identity integration is enabled, unless you are using bundled Keycloak bootstrapUsers for a temporary OIDC-only fallback." }}{{- end }}
   {{- if and $ldapEnabled (not $ldapUrl) }}{{- fail "global.identity.directory.ldap.url is required when Trino identity integration is enabled." }}{{- end }}
@@ -137,6 +139,9 @@ data:
     {{- end }}
     {{- if $passwordAuthRequested }}
     http-server.authentication.password.user-mapping.pattern={{ default "([^@]+)" $oidc.userMappingPattern }}
+    {{- if $multiPasswordAuthEnabled }}
+    password-authenticator.config-files={{ .Values.server.config.path }}/file-authenticator.properties,{{ .Values.server.config.path }}/ldap-authenticator.properties
+    {{- end }}
     {{- end }}
     {{- else if .Values.server.config.authenticationType }}
     http-server.authentication.type={{ .Values.server.config.authenticationType }}
@@ -310,7 +315,23 @@ data:
     {{ $configValue }}
   {{- end }}
 
-  {{- if and $identityEnabled $passwordAuthRequested }}{{- if not (index .Values.coordinator.additionalConfigFiles "password-authenticator.properties") }}
+  {{- if and $identityEnabled $passwordAuthRequested $multiPasswordAuthEnabled }}
+  {{- if not (index .Values.coordinator.additionalConfigFiles "ldap-authenticator.properties") }}
+  ldap-authenticator.properties: |
+    password-authenticator.name=ldap
+    ldap.url={{ $ldapUrl }}
+    ldap.allow-insecure={{ $ldapAllowInsecure }}
+    {{- if $ldapUseTrustedCa }}
+    ldap.ssl.truststore.path={{ $ldapTrustedCaPath }}
+    {{- end }}
+    ldap.user-bind-pattern={{ $ldapUserBindPattern }}
+  {{- end }}
+  {{- if not (index .Values.coordinator.additionalConfigFiles "file-authenticator.properties") }}
+  file-authenticator.properties: |
+    password-authenticator.name=file
+    file.password-file={{ .Values.server.config.path }}/auth/password/password.db
+  {{- end }}
+  {{- else if and $identityEnabled $passwordAuthRequested }}{{- if not (index .Values.coordinator.additionalConfigFiles "password-authenticator.properties") }}
   password-authenticator.properties: |
     {{- if $ldapPasswordAuthEnabled }}
     password-authenticator.name=ldap
@@ -330,7 +351,7 @@ data:
     file.password-file={{ .Values.server.config.path }}/auth/password/password.db
   {{- end }}{{- end }}
 
-  {{- if $ldapEnabled }}{{- if not (index .Values.coordinator.additionalConfigFiles "group-provider.properties") }}
+  {{- if $ldapGroupProviderEnabled }}{{- if not (index .Values.coordinator.additionalConfigFiles "group-provider.properties") }}
   group-provider.properties: |
     group-provider.name=ldap
     group-provider.group-case=lower

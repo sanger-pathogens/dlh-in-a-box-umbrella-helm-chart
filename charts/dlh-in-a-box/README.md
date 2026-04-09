@@ -31,10 +31,12 @@ The default documented shared-environment model is:
 - `Keycloak` issues OIDC tokens.
 - `Organizational LDAP or Active Directory` supplies users and groups in every environment.
 - `Active Directory over LDAPS` supplies users and groups in production.
-- `Trino` authenticates with OIDC and optional file-based or LDAP password
-  auth. File-based Trino access rules remain the default unless
+- `Trino` authenticates with OIDC and optional file-based, LDAP, or mixed
+  LDAP-plus-file password auth. File-based Trino access rules remain the default unless
   `global.authorization.ranger.trino.enabled=true` is set for a Ranger-capable
-  Trino image.
+  Trino image. The LDAP group-provider path is opt-in through
+  `global.identity.external.clients.trino.groupProviderEnabled` because not
+  every Trino image bundles that module.
 - `Superset`, `DataHub`, and the `Prefect` proxy trust the same OIDC issuer.
 - `Ranger`, `CloudBeaver`, and `Prefect` reuse that same browser session
   through chart-managed auth proxies.

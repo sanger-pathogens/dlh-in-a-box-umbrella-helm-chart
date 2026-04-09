@@ -19,8 +19,8 @@ through environment variables.
 {{- $passwordAuthRequested := or (default false $trinoIdentity.passwordAuthEnabled) $legacyPasswordAuthRequested -}}
 {{- $passwordAuthMode := default "ldap" $trinoIdentity.passwordAuthMode -}}
 {{- $ldapDirectoryEnabled := and $identityEnabled (default false $ldap.enabled) -}}
-{{- $ldapPasswordAuthEnabled := and $identityEnabled (default false $trinoIdentity.passwordAuthEnabled) (eq $passwordAuthMode "ldap") -}}
-{{- $filePasswordAuthEnabled := and $identityEnabled (default false $trinoIdentity.passwordAuthEnabled) (eq $passwordAuthMode "file") -}}
+{{- $ldapPasswordAuthEnabled := and $identityEnabled (default false $trinoIdentity.passwordAuthEnabled) (or (eq $passwordAuthMode "ldap") (eq $passwordAuthMode "ldap-file")) -}}
+{{- $filePasswordAuthEnabled := and $identityEnabled (default false $trinoIdentity.passwordAuthEnabled) (or (eq $passwordAuthMode "file") (eq $passwordAuthMode "ldap-file")) -}}
 {{- $ldapEnabled := and $ldapDirectoryEnabled $ldapPasswordAuthEnabled -}}
 {{- $ldapAllowInsecure := default false $ldap.allowInsecure -}}
 {{- $ldapTrustedCaSecretName := include "dlh-in-a-box.identity.directory.trustedCaSecretName" . -}}
