@@ -11,6 +11,7 @@ global:
         realm: dlh
         browserHost: ""
         internalScheme: http
+        displayName: ""
         loginTheme: ""
         configCliEnvExistingSecret: dlh-keycloak-config-cli-env
         bootstrapUsers: []
@@ -34,6 +35,7 @@ global:
           clientSecretKey: trinoClientSecret
           redirectUris: []
           webOrigins: []
+          passwordAuthMode: ldap
           passwordAuthEnabled: false
           sharedSecretExistingSecret: ""
           sharedSecretKey: sharedSecret
@@ -201,6 +203,7 @@ global:
       superUsers:
         - admin
       superGroups: []
+      legacyManagedRoles: []
       useRangerGroups: false
       postgresql:
         enabled: true
@@ -300,6 +303,10 @@ keycloak:
         duplicateEmailsAllowed: false
         resetPasswordAllowed: true
         rememberMe: true
+        {{- $keycloakDisplayName := default "" .Values.global.identity.provider.keycloak.displayName }}
+        {{- if $keycloakDisplayName }}
+        displayName: {{ $keycloakDisplayName | quote }}
+        {{- end }}
         {{- $keycloakLoginTheme := default "" .Values.global.identity.provider.keycloak.loginTheme }}
         {{- if $keycloakLoginTheme }}
         loginTheme: {{ $keycloakLoginTheme | quote }}
@@ -877,6 +884,14 @@ cloudbeaver:
     workspaceSeedExistingSecret: ""
     workspaceDataSourcesKey: data-sources.json
     forceWorkspaceSeed: false
+    sharedConnectionSeed:
+      enabled: false
+      connectionIdKey: shared-connection-id
+      projectIdKey: shared-project-id
+      usernameKey: shared-connection-username
+      passwordKey: shared-connection-password
+      bootstrapUsernameKey: shared-bootstrap-username
+      bootstrapGroupsKey: shared-bootstrap-groups
   trustedCa:
     existingSecret: ""
     certKey: ca.crt
@@ -1000,9 +1015,10 @@ cloudbeaver-auth-proxy:
       # Use a distinct oauth2-proxy cookie per app so localhost tunnel access
       # does not mix CloudBeaver and Prefect sessions on 127.0.0.1.
       cookie_name = "_oauth2_proxy_cloudbeaver"
+      session_cookie_minimal = true
       upstreams = [ "http://{{ include "dlh-in-a-box.cloudbeaver.serviceName" $ }}:8978" ]
-      pass_access_token = true
-      pass_authorization_header = true
+      pass_access_token = false
+      pass_authorization_header = false
       pass_user_headers = true
       set_xauthrequest = true
       reverse_proxy = true

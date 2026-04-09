@@ -85,6 +85,7 @@
                 "realm": { "type": "string" },
                 "browserHost": { "type": "string" },
                 "internalScheme": { "type": "string" },
+                "displayName": { "type": "string" },
                 "loginTheme": { "type": "string" },
                 "configCliEnvExistingSecret": { "type": "string" },
                 "bootstrapUsers": {
@@ -161,6 +162,10 @@
                     "webOrigins": {
                       "type": "array",
                       "items": { "type": "string" }
+                    },
+                    "passwordAuthMode": {
+                      "type": "string",
+                      "enum": ["ldap", "file"]
                     },
                     "passwordAuthEnabled": { "type": "boolean" },
                     "sharedSecretExistingSecret": { "type": "string" },
@@ -1214,7 +1219,20 @@
             "initialDataKey": { "type": "string" },
             "workspaceSeedExistingSecret": { "type": "string" },
             "workspaceDataSourcesKey": { "type": "string" },
-            "forceWorkspaceSeed": { "type": "boolean" }
+            "forceWorkspaceSeed": { "type": "boolean" },
+            "sharedConnectionSeed": {
+              "type": "object",
+              "additionalProperties": true,
+              "properties": {
+                "enabled": { "type": "boolean" },
+                "connectionIdKey": { "type": "string" },
+                "projectIdKey": { "type": "string" },
+                "usernameKey": { "type": "string" },
+                "passwordKey": { "type": "string" },
+                "bootstrapUsernameKey": { "type": "string" },
+                "bootstrapGroupsKey": { "type": "string" }
+              }
+            }
           }
         },
         "trustedCa": {

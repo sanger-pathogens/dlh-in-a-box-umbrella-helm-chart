@@ -40,6 +40,7 @@ data:
         "serviceAdminGroups" ($ranger.serviceAdminGroups | default (list))
         "superUsers" ($ranger.superUsers | default (list))
         "superGroups" ($ranger.superGroups | default (list))
+        "legacyManagedRoles" ($ranger.legacyManagedRoles | default (list))
         "platformRoleMembershipSource" $platformRoleMembershipSource
         "importCatalogAcls" $importCatalogAcls
         "bootstrapPolicies" $bootstrapPolicies
@@ -174,6 +175,25 @@ data:
         return [members[name] for name in sorted(members)]
 
 
+    def role_member_names(items):
+        return normalize_names(
+            [
+                item.get("name", "")
+                if isinstance(item, dict)
+                else item
+                for item in (items or [])
+            ]
+        )
+
+
+    def should_preserve_ranger_membership(existing_items, seed_items):
+        seed_names = set(role_member_names(seed_items))
+        if not seed_names:
+            return True
+        existing_names = set(role_member_names(existing_items))
+        return seed_names.issubset(existing_names)
+
+
     def access_item(users, groups, roles, accesses):
         if not users and not groups and not roles:
             return None
@@ -270,6 +290,11 @@ data:
         return roles
 
 
+    def list_policies(service_name):
+        path = "/service/public/v2/api/policy?serviceName=" + urllib.parse.quote(service_name, safe="")
+        return request("GET", path, ok=(200,)) or []
+
+
     def exception_role_name(base_role_name, username, expires_at):
         return f"exception-{base_role_name}-{username}-{expires_at.replace('-', '')}"
 
@@ -295,6 +320,71 @@ data:
             if str(role.get("name", "")) == str(role_name):
                 return role
         return None
+
+
+    def delete_role(service_name, role_name):
+        existing = get_role(service_name, role_name)
+        if not existing:
+            return
+        path = "/service/public/v2/api/roles/" + urllib.parse.quote(str(existing["id"]), safe="")
+        request("DELETE", path, ok=(204, 404))
+
+
+    def policy_path(policy_id):
+        return "/service/public/v2/api/policy/" + urllib.parse.quote(str(policy_id), safe="")
+
+
+    def filter_role_from_policy_items(items, role_name):
+        filtered_items = []
+        removed = False
+        for item in items or []:
+            updated_item = dict(item)
+            roles = normalize_names(name for name in item.get("roles", []) if str(name) != role_name)
+            removed = removed or len(roles) != len(item.get("roles", []) or [])
+            updated_item["roles"] = roles
+            updated_item["users"] = normalize_names(item.get("users", []))
+            updated_item["groups"] = normalize_names(item.get("groups", []))
+            if updated_item["users"] or updated_item["groups"] or updated_item["roles"]:
+                filtered_items.append(updated_item)
+        return filtered_items, removed
+
+
+    def detach_role_from_policies(service_name, role_name):
+        for policy in list_policies(service_name):
+            updated_policy = dict(policy)
+            removed = False
+            for key in [
+                "policyItems",
+                "denyPolicyItems",
+                "allowExceptions",
+                "denyExceptions",
+                "dataMaskPolicyItems",
+                "rowFilterPolicyItems",
+            ]:
+                filtered_items, key_removed = filter_role_from_policy_items(policy.get(key, []), role_name)
+                updated_policy[key] = filtered_items
+                removed = removed or key_removed
+
+            if not removed:
+                continue
+
+            has_principals = any(
+                updated_policy.get(key)
+                for key in [
+                    "policyItems",
+                    "denyPolicyItems",
+                    "allowExceptions",
+                    "denyExceptions",
+                    "dataMaskPolicyItems",
+                    "rowFilterPolicyItems",
+                ]
+            )
+            if has_principals:
+                request("PUT", policy_path(policy["id"]), updated_policy, ok=(200,))
+                print(f"Detached legacy role {role_name} from Ranger policy: {policy['name']}")
+            else:
+                request("DELETE", policy_path(policy["id"]), ok=(204, 404))
+                print(f"Deleted stale Ranger policy with no remaining principals: {policy['name']}")
 
 
     def upsert_role(service_name, role, existing=None):
@@ -433,8 +523,18 @@ data:
             effective_users = role["users"]
             effective_groups = role["groups"]
             if membership_source == "ranger" and existing:
-                effective_users = existing.get("users", [])
-                effective_groups = existing.get("groups", [])
+                preserve_users = should_preserve_ranger_membership(existing.get("users", []), role["users"])
+                preserve_groups = should_preserve_ranger_membership(existing.get("groups", []), role["groups"])
+                if preserve_users:
+                    effective_users = existing.get("users", [])
+                if preserve_groups:
+                    effective_groups = existing.get("groups", [])
+                if not preserve_users or not preserve_groups:
+                    print(
+                        "Reset Ranger role membership to the seeded baseline for "
+                        f"{role['name']} because the live role no longer contained the "
+                        "required approved members."
+                    )
             upsert_role(
                 service_name,
                 {
@@ -449,6 +549,12 @@ data:
             role["effectiveUsers"] = effective_users
             role["effectiveGroups"] = effective_groups
             print(f"Reconciled Ranger role: {role['name']}")
+
+        for stale_role_name in normalize_names(config["ranger"].get("legacyManagedRoles", [])):
+            if stale_role_name in existing_roles_by_name:
+                detach_role_from_policies(service_name, stale_role_name)
+                delete_role(service_name, stale_role_name)
+                print(f"Deleted stale managed Ranger role: {stale_role_name}")
 
         exception_roles = build_exception_roles(config, base_roles)
         exception_names_by_target = {}
@@ -728,6 +834,10 @@ data:
     RANGER_URL = os.environ["RANGER_URL"].rstrip("/")
     RANGER_PASSWORD = os.environ["RANGER_ADMIN_PASSWORD"]
     LDAP_BIND_PASSWORD = os.environ["LDAP_BIND_PASSWORD"]
+    REST_CSRF_HEADER = None
+    REST_CSRF_TOKEN = None
+    REST_CSRF_METHODS_TO_IGNORE = {"GET", "OPTIONS", "HEAD", "TRACE"}
+    REST_CSRF_READY = False
 
 
     def load_config():
@@ -735,13 +845,41 @@ data:
             return json.load(handle)
 
 
-    def ranger_request(method, path, payload=None, ok=(200, 201), parse_json=True):
-        url = f"{RANGER_URL}{path}"
-        headers = {
+    def ranger_headers():
+        return {
             "Authorization": "Basic "
             + base64.b64encode(f"admin:{RANGER_PASSWORD}".encode("utf-8")).decode("ascii"),
             "Accept": "application/json",
         }
+
+
+    def ensure_csrf():
+        global REST_CSRF_HEADER, REST_CSRF_TOKEN, REST_CSRF_METHODS_TO_IGNORE, REST_CSRF_READY
+        if REST_CSRF_READY:
+            return
+        req = urllib.request.Request(
+            f"{RANGER_URL}/service/plugins/csrfconf",
+            headers=ranger_headers(),
+            method="GET",
+        )
+        with urllib.request.urlopen(req, timeout=30) as response:
+            payload = json.loads(response.read().decode("utf-8") or "{}")
+        if payload.get("ranger.rest-csrf.enabled"):
+            REST_CSRF_HEADER = str(payload.get("ranger.rest-csrf.custom-header") or "").strip()
+            REST_CSRF_TOKEN = str(payload.get("_csrfToken") or "").strip()
+            ignored = str(payload.get("ranger.rest-csrf.methods-to-ignore") or "").strip()
+            if ignored:
+                REST_CSRF_METHODS_TO_IGNORE = {method.strip().upper() for method in ignored.split(",") if method.strip()}
+        REST_CSRF_READY = True
+
+
+    def ranger_request(method, path, payload=None, ok=(200, 201), parse_json=True):
+        url = f"{RANGER_URL}{path}"
+        headers = ranger_headers()
+        if method.upper() not in REST_CSRF_METHODS_TO_IGNORE:
+            ensure_csrf()
+            if REST_CSRF_HEADER:
+                headers[REST_CSRF_HEADER] = REST_CSRF_TOKEN or '""'
         body = None
         if payload is not None:
             body = json.dumps(payload).encode("utf-8")
@@ -798,16 +936,258 @@ data:
         return "".join(escaped)
 
 
+    def normalize_names(values):
+        seen = set()
+        normalized = []
+        for value in values or []:
+            name = str(value or "").strip()
+            if not name or name in seen:
+                continue
+            seen.add(name)
+            normalized.append(name)
+        return normalized
+
+
+    def configured_platform_roles(config):
+        roles = []
+        for role_key in sorted(config.get("platformRoles", {})):
+            raw_role = config["platformRoles"][role_key] or {}
+            ranger_cfg = raw_role.get("ranger", {}) or {}
+            members = raw_role.get("members", {}) or {}
+            portal_cfg = raw_role.get("portal", {}) or {}
+            roles.append(
+                {
+                    "name": str(ranger_cfg.get("roleName") or role_key).strip(),
+                    "users": normalize_names(members.get("users", [])),
+                    "groups": normalize_names(members.get("directoryGroups", [])),
+                    "manageable": bool(portal_cfg.get("manageable", True)),
+                }
+            )
+        return roles
+
+
+    def get_role(service_name, role_name):
+        encoded_role_name = urllib.parse.quote(str(role_name or "").strip(), safe="")
+        encoded_service_name = urllib.parse.quote(str(service_name or "").strip(), safe="")
+        payload = ranger_request(
+            "GET",
+            f"/service/roles/roles/name/{encoded_role_name}?serviceName={encoded_service_name}",
+            ok=(200, 404),
+        )
+        return payload if isinstance(payload, dict) and payload.get("name") else None
+
+
+    def list_users():
+        users = []
+        start_index = 0
+        page_size = 200
+        while True:
+            payload = ranger_request(
+                "GET",
+                f"/service/xusers/users?startIndex={start_index}&pageSize={page_size}",
+                ok=(200,),
+            ) or {}
+            batch = payload.get("vXUsers", []) or []
+            if not batch:
+                break
+            users.extend(batch)
+            total_count = int(payload.get("totalCount", len(users)) or len(users))
+            if len(users) >= total_count:
+                break
+            start_index += len(batch)
+        return users
+
+
+    def build_synced_user(username, first_name="", last_name="", email_address=""):
+        username = str(username or "").strip()
+        first_name = str(first_name or "").strip() or username
+        last_name = str(last_name or "").strip() or "User"
+        email_address = str(email_address or "").strip()
+        return {
+            "name": username,
+            "firstName": first_name,
+            "lastName": last_name,
+            "emailAddress": email_address,
+            "status": 1,
+            "isVisible": 1,
+            "userSource": 1,
+            "userRoleList": ["ROLE_USER"],
+            "syncSource": "LDAP",
+        }
+
+
+    def search_user_by_dn(conn, ldap_cfg, member_dn):
+        conn.search(
+            member_dn,
+            "(objectClass=*)",
+            search_scope=BASE,
+            attributes=[
+                ldap_cfg["usernameAttribute"],
+                ldap_cfg["firstNameAttribute"],
+                ldap_cfg["lastNameAttribute"],
+                ldap_cfg["emailAttribute"],
+            ],
+        )
+        if not conn.entries:
+            return None
+        return conn.entries[0]
+
+
+    def search_user_by_username(conn, ldap_cfg, username):
+        username = str(username or "").strip()
+        if not username:
+            return None
+        username_attribute = ldap_cfg["usernameAttribute"]
+        search_filter = f"({username_attribute}={escape_ldap_filter_value(username)})"
+        conn.search(
+            ldap_cfg["userBaseDn"],
+            search_filter,
+            search_scope=SUBTREE,
+            attributes=[
+                ldap_cfg["usernameAttribute"],
+                ldap_cfg["firstNameAttribute"],
+                ldap_cfg["lastNameAttribute"],
+                ldap_cfg["emailAttribute"],
+            ],
+        )
+        if not conn.entries:
+            return None
+        return conn.entries[0]
+
+
+    def synced_user_from_entry(entry, ldap_cfg):
+        username = attr_value(entry, ldap_cfg["usernameAttribute"])
+        if not username:
+            return None, None
+        return username, build_synced_user(
+            username,
+            first_name=attr_value(entry, ldap_cfg["firstNameAttribute"]),
+            last_name=attr_value(entry, ldap_cfg["lastNameAttribute"]),
+            email_address=attr_value(entry, ldap_cfg["emailAttribute"]),
+        )
+
+
+    def direct_ldap_usernames(config, configured_roles):
+        usernames = set()
+        for role in configured_roles:
+            if not role.get("manageable", True):
+                continue
+            usernames.update(role["users"])
+
+        for exception in config.get("platformRoleExceptions", []) or []:
+            username = str((exception or {}).get("username") or "").strip()
+            if username:
+                usernames.add(username)
+
+        membership_source = str((config.get("ranger") or {}).get("platformRoleMembershipSource", "git") or "git").lower()
+        if membership_source == "ranger":
+            service_name = str((config.get("ranger") or {}).get("serviceName") or "").strip()
+            for role in configured_roles:
+                if not role.get("manageable", True):
+                    continue
+                current_role = get_role(service_name, role["name"])
+                if not current_role:
+                    continue
+                for user in current_role.get("users", []) or []:
+                    username = str((user or {}).get("name") or "").strip()
+                    if username:
+                        usernames.add(username)
+
+        usernames -= protected_usernames(config)
+        service_username = str((config.get("ranger") or {}).get("serviceUsername") or "").strip()
+        if service_username:
+            usernames.discard(service_username)
+        return usernames
+
+
+    def desired_usernames(config, configured_roles, synced_ldap_users):
+        desired = set(normalize_names(synced_ldap_users))
+
+        for role in configured_roles:
+            desired.update(role["users"])
+
+        for exception in config.get("platformRoleExceptions", []) or []:
+            username = str((exception or {}).get("username") or "").strip()
+            if username:
+                desired.add(username)
+
+        service_username = str((config.get("ranger") or {}).get("serviceUsername") or "").strip()
+        if service_username:
+            desired.add(service_username)
+
+        membership_source = str((config.get("ranger") or {}).get("platformRoleMembershipSource", "git") or "git").lower()
+        if membership_source == "ranger":
+            service_name = str((config.get("ranger") or {}).get("serviceName") or "").strip()
+            for role in configured_roles:
+                current_role = get_role(service_name, role["name"])
+                if not current_role:
+                    continue
+                for user in current_role.get("users", []) or []:
+                    username = str((user or {}).get("name") or "").strip()
+                    if username:
+                        desired.add(username)
+
+        return desired
+
+
+    def protected_usernames(config):
+        ranger_cfg = config.get("ranger") or {}
+        protected = {"admin", "rangerusersync", "rangertagsync"}
+        protected.update(normalize_names(ranger_cfg.get("serviceAdminUsers", [])))
+        protected.update(normalize_names(ranger_cfg.get("superUsers", [])))
+        return {username for username in protected if username}
+
+
+    def delete_user(user_id):
+        ranger_request(
+            "DELETE",
+            f"/service/xusers/secure/users/id/{user_id}?forceDelete=true",
+            ok=(200, 204, 404),
+            parse_json=False,
+        )
+
+
+    def prune_unexpected_users(config, configured_roles, synced_ldap_users):
+        keep_usernames = desired_usernames(config, configured_roles, synced_ldap_users)
+        protected = protected_usernames(config)
+        stale_users = []
+        for user in list_users():
+            username = str(user.get("name") or "").strip()
+            if not username:
+                continue
+            if username in protected:
+                continue
+            if int(user.get("userSource", 1) or 1) == 0:
+                continue
+            if username in keep_usernames:
+                continue
+            stale_users.append(user)
+
+        if not stale_users:
+            print("No stale Ranger users found.")
+            return
+
+        deleted = []
+        failed = []
+        for user in stale_users:
+            username = str(user.get("name") or "").strip()
+            try:
+                delete_user(user["id"])
+                deleted.append(username)
+            except urllib.error.HTTPError as exc:
+                failed.append((username, exc.code, exc.read().decode("utf-8", errors="replace")))
+
+        if deleted:
+            print("Deleted stale Ranger users: " + ", ".join(sorted(name for name in deleted if name)))
+        if failed:
+            for username, status_code, body in failed:
+                print(f"WARNING: unable to delete stale Ranger user {username}: HTTP {status_code} {body}")
+
+
     def sync(config):
         ldap_cfg = config["ldap"]
-        managed_groups = sorted(
-            {
-                str(group_name).strip()
-                for role in (config.get("platformRoles") or {}).values()
-                for group_name in (((role.get("members") or {}).get("directoryGroups")) or [])
-                if str(group_name).strip()
-            }
-        )
+        configured_roles = configured_platform_roles(config)
+        managed_groups = sorted({group_name for role in configured_roles for group_name in role["groups"]})
         parsed = urllib.parse.urlparse(ldap_cfg["url"])
         use_ssl = parsed.scheme == "ldaps"
         host = parsed.hostname or ldap_cfg["url"]
@@ -868,53 +1248,33 @@ data:
                 if not member_dn:
                     continue
                 if "=" in member_dn and "," in member_dn:
-                    conn.search(
-                        member_dn,
-                        "(objectClass=*)",
-                        search_scope=BASE,
-                        attributes=[
-                            ldap_cfg["usernameAttribute"],
-                            ldap_cfg["firstNameAttribute"],
-                            ldap_cfg["lastNameAttribute"],
-                            ldap_cfg["emailAttribute"],
-                        ],
-                    )
-                    if not conn.entries:
+                    user_entry = search_user_by_dn(conn, ldap_cfg, member_dn)
+                    if user_entry is None:
                         continue
-                    user_entry = conn.entries[0]
-                    username = attr_value(user_entry, ldap_cfg["usernameAttribute"])
-                    if not username:
+                    username, synced_user = synced_user_from_entry(user_entry, ldap_cfg)
+                    if not username or not synced_user:
                         continue
                     member_names.add(username)
-                    users[username] = {
-                        "name": username,
-                        "firstName": attr_value(user_entry, ldap_cfg["firstNameAttribute"]) or username,
-                        "lastName": attr_value(user_entry, ldap_cfg["lastNameAttribute"]) or "User",
-                        "emailAddress": attr_value(user_entry, ldap_cfg["emailAttribute"]) or "",
-                        "status": 1,
-                        "isVisible": 1,
-                        "userSource": 1,
-                        "userRoleList": ["ROLE_USER"],
-                        "syncSource": "LDAP",
-                    }
+                    users[username] = synced_user
                 else:
                     member_names.add(member_dn)
-                    users.setdefault(
-                        member_dn,
-                        {
-                            "name": member_dn,
-                            "firstName": member_dn,
-                            "lastName": "User",
-                            "emailAddress": "",
-                            "status": 1,
-                            "isVisible": 1,
-                            "userSource": 1,
-                            "userRoleList": ["ROLE_USER"],
-                            "syncSource": "LDAP",
-                        },
-                    )
+                    users.setdefault(member_dn, build_synced_user(member_dn))
 
             groups[group_name] = sorted(member_names)
+
+        direct_users = direct_ldap_usernames(config, configured_roles)
+        for username in sorted(direct_users):
+            if username in users:
+                continue
+            user_entry = search_user_by_username(conn, ldap_cfg, username)
+            if user_entry is None:
+                print(f"WARNING: approved user {username} was not found in LDAP during Ranger usersync.")
+                continue
+            synced_username, synced_user = synced_user_from_entry(user_entry, ldap_cfg)
+            if not synced_username or not synced_user:
+                print(f"WARNING: approved user {username} resolved in LDAP without a usable username attribute.")
+                continue
+            users[synced_username] = synced_user
 
         if users:
             ranger_request(
@@ -961,6 +1321,8 @@ data:
 
         if deltas:
             ranger_request("POST", "/service/xusers/ugsync/groupusers", deltas, ok=(200, 201))
+
+        prune_unexpected_users(config, configured_roles, list(users))
 
 
     def main():

@@ -430,11 +430,11 @@ data:
               <div class="brand-copy">
                 <h1 id="portal-title">{{ $brandingTitle }}</h1>
                 <p id="portal-subtitle" class="portal-subtitle">{{ $brandingSubtitle }}</p>
+                <div id="anonymous-actions" class="brand-actions">
+                  <button id="login-button" class="primary-button hero-login-button" type="button">Sign in</button>
+                </div>
               </div>
             </div>
-          </div>
-          <div id="anonymous-actions" class="hero-actions hero-actions-stack">
-            <button id="login-button" class="primary-button" type="button">Sign in</button>
           </div>
           <div id="session-bar" class="session-bar is-hidden">
             <div>
@@ -484,11 +484,7 @@ data:
             </div>
           </section>
         </main>
-        <main id="anonymous-state" class="content content-minimal">
-          <section class="panel panel-inline-status panel-signin">
-            <p class="panel-note panel-note-strong">Sign in to continue.</p>
-          </section>
-        </main>
+        <main id="anonymous-state" class="content content-minimal"></main>
       </div>
       <script src="/app.js"></script>
     </body>
@@ -1997,6 +1993,13 @@ data:
       gap: 0.45rem;
     }
 
+    .brand-actions {
+      display: flex;
+      align-items: center;
+      justify-content: flex-start;
+      margin-top: 0.45rem;
+    }
+
     .eyebrow {
       margin: 0;
       text-transform: uppercase;
@@ -2042,20 +2045,8 @@ data:
       color: var(--ink-deep);
     }
 
-    .hero-actions,
     .session-bar {
       align-self: stretch;
-    }
-
-    .hero-actions-stack {
-      display: flex;
-      align-items: stretch;
-      justify-content: flex-end;
-    }
-
-    .hero-actions-stack .primary-button,
-    .hero-actions-stack .secondary-button {
-      min-width: 11rem;
     }
 
     .session-bar {
@@ -2098,6 +2089,13 @@ data:
       color: #fff;
       background: linear-gradient(135deg, var(--brand) 0%, var(--brand-deep) 100%);
       box-shadow: 0 12px 28px rgba(18, 89, 116, 0.18);
+    }
+
+    .hero-login-button {
+      min-width: 8.5rem;
+      padding: 0.78rem 1.3rem;
+      border-radius: 1rem;
+      box-shadow: 0 10px 24px rgba(18, 89, 116, 0.16);
     }
 
     .secondary-button {
@@ -2146,20 +2144,6 @@ data:
 
     .panel-group {
       padding: 1.2rem;
-    }
-
-    .panel-inline-status {
-      max-width: 34rem;
-      background: rgba(255, 255, 255, 0.78);
-    }
-
-    .panel-signin {
-      min-height: 7rem;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      text-align: center;
-      margin-inline: auto;
     }
 
     .panel-header {
@@ -2712,11 +2696,6 @@ data:
         align-items: start;
       }
 
-      .hero-actions-stack,
-      .session-bar {
-        justify-content: stretch;
-      }
-
       .session-bar {
         display: grid;
       }
@@ -2818,6 +2797,23 @@ data:
     )
     HTTPS_CONTEXT = ssl._create_unverified_context()
     DIRECTORY_STATUS_CACHE = {"expires_at": 0, "payload": {}}
+
+
+    class PreserveRedirectHandler(urllib.request.HTTPRedirectHandler):
+        def http_error_301(self, req, fp, code, msg, headers):
+            return fp
+
+        http_error_302 = http_error_301
+        http_error_303 = http_error_301
+        http_error_307 = http_error_301
+        http_error_308 = http_error_301
+
+
+    HEALTHCHECK_OPENER = urllib.request.build_opener(
+        urllib.request.HTTPHandler(),
+        urllib.request.HTTPSHandler(context=HTTPS_CONTEXT),
+        PreserveRedirectHandler(),
+    )
 
 
     def json_response(handler, status, payload):
@@ -3593,13 +3589,8 @@ data:
         response_body = ""
         checked_at = utc_timestamp()
         try:
-            parsed_target = urllib.parse.urlparse(target_url)
-            with urllib.request.urlopen(
-                request,
-                timeout=timeout_seconds,
-                context=HTTPS_CONTEXT if parsed_target.scheme == "https" else None,
-            ) as response:
-                status_code = int(response.status)
+            with HEALTHCHECK_OPENER.open(request, timeout=timeout_seconds) as response:
+                status_code = int(getattr(response, "status", response.getcode()))
                 response_body = response.read(4096).decode("utf-8", "replace")
         except urllib.error.HTTPError as exc:
             status_code = int(exc.code)

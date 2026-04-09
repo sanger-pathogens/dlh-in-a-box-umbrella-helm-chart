@@ -31,8 +31,8 @@ The default documented shared-environment model is:
 - `Keycloak` issues OIDC tokens.
 - `Organizational LDAP or Active Directory` supplies users and groups in every environment.
 - `Active Directory over LDAPS` supplies users and groups in production.
-- `Trino` authenticates with OIDC and optional LDAP password auth. File-based
-  Trino access rules remain the default unless
+- `Trino` authenticates with OIDC and optional file-based or LDAP password
+  auth. File-based Trino access rules remain the default unless
   `global.authorization.ranger.trino.enabled=true` is set for a Ranger-capable
   Trino image.
 - `Superset`, `DataHub`, and the `Prefect` proxy trust the same OIDC issuer.
@@ -128,6 +128,9 @@ If you want a branded login experience, customize the Keycloak theme and set
 `global.identity.provider.keycloak.loginTheme`. Do not build a custom Prefect login
 page.
 
+The Keycloak login-page header text can be set separately with
+`global.identity.provider.keycloak.displayName`.
+
 ## Portal And CloudBeaver
 
 `platformHome` is the default browser entrypoint. It uses a public Keycloak
@@ -156,6 +159,11 @@ nested role topology. When
 `global.authorization.platformRoleMembershipSource=ranger`, the portal writes
 live user or group membership to Ranger so those changes survive later chart
 reconciliation.
+
+When `cloudbeaver.bootstrap.sharedConnectionSeed.enabled=true` and
+`cloudbeaver.app.adminCredentialsSaveEnabled=true`, the chart can also persist
+managed shared datasource credentials into the seeded workspace so approved
+browser users do not see a second manual Trino login prompt.
 
 ## Portal Theming And Branding
 

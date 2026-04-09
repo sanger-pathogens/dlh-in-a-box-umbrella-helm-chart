@@ -13,6 +13,14 @@
 {{- $bootstrapInitialDataKey := default "initial-data.conf" $bootstrap.initialDataKey -}}
 {{- $bootstrapAdminNameKey := default "admin-name" $bootstrap.adminNameKey -}}
 {{- $bootstrapAdminPasswordKey := default "admin-password" $bootstrap.adminPasswordKey -}}
+{{- $sharedConnectionSeed := get $bootstrap "sharedConnectionSeed" | default dict -}}
+{{- $sharedConnectionSeedEnabled := default false $sharedConnectionSeed.enabled -}}
+{{- $sharedConnectionConnectionIdKey := default "shared-connection-id" $sharedConnectionSeed.connectionIdKey -}}
+{{- $sharedConnectionProjectIdKey := default "shared-project-id" $sharedConnectionSeed.projectIdKey -}}
+{{- $sharedConnectionUsernameKey := default "shared-connection-username" $sharedConnectionSeed.usernameKey -}}
+{{- $sharedConnectionPasswordKey := default "shared-connection-password" $sharedConnectionSeed.passwordKey -}}
+{{- $sharedConnectionBootstrapUsernameKey := default "shared-bootstrap-username" $sharedConnectionSeed.bootstrapUsernameKey -}}
+{{- $sharedConnectionBootstrapGroupsKey := default "shared-bootstrap-groups" $sharedConnectionSeed.bootstrapGroupsKey -}}
 {{- $trustedCaSecret := default "" $trustedCa.existingSecret -}}
 {{- $trustedCaCertKey := default "ca.crt" $trustedCa.certKey -}}
 {{- $trustStorePath := default "/opt/cloudbeaver/trust/cloudbeaver-trino-truststore.p12" $trustedCa.trustStorePath -}}
@@ -33,7 +41,7 @@
 {{- $cloudbeaverIdentity := get $clients "cloudbeaverProxy" | default dict -}}
 {{- $cloudbeaverOrigin := first (default (list) (get $cloudbeaverIdentity "webOrigins")) -}}
 {{- $logoutUrl := default (printf "%s/oauth2/sign_out" $cloudbeaverOrigin) $authProxy.logoutUrl -}}
-{{- $cloudbeaverServerName := default "DLH CloudBeaver" $appConfig.serverName -}}
+{{- $cloudbeaverServerName := default "Data Platform CloudBeaver" $appConfig.serverName -}}
 {{- $cloudbeaverServerUrl := "" -}}
 {{- if $cloudbeaverOrigin -}}
   {{- $cloudbeaverServerUrl = printf "%s/" (trimSuffix "/" $cloudbeaverOrigin) -}}
@@ -285,6 +293,88 @@ spec:
                 secretKeyRef:
                   name: {{ $bootstrap.existingSecret }}
                   key: {{ $bootstrapAdminPasswordKey }}
+            {{- if $sharedConnectionSeedEnabled }}
+            - name: CB_SHARED_CONNECTION_ID
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $bootstrap.existingSecret }}
+                  key: {{ $sharedConnectionConnectionIdKey }}
+            - name: CB_SHARED_CONNECTION_PROJECT_ID
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $bootstrap.existingSecret }}
+                  key: {{ $sharedConnectionProjectIdKey }}
+                  optional: true
+            - name: CB_SHARED_CONNECTION_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $bootstrap.existingSecret }}
+                  key: {{ $sharedConnectionUsernameKey }}
+            - name: CB_SHARED_CONNECTION_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $bootstrap.existingSecret }}
+                  key: {{ $sharedConnectionPasswordKey }}
+            - name: CB_SHARED_BOOTSTRAP_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $bootstrap.existingSecret }}
+                  key: {{ $sharedConnectionBootstrapUsernameKey }}
+            - name: CB_SHARED_BOOTSTRAP_GROUPS
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $bootstrap.existingSecret }}
+                  key: {{ $sharedConnectionBootstrapGroupsKey }}
+                  optional: true
+            {{- end }}
+          {{- if $sharedConnectionSeedEnabled }}
+          lifecycle:
+            postStart:
+              exec:
+                command:
+                  - /bin/sh
+                  - -ec
+                  - |
+                    if [ -z "${CB_SHARED_CONNECTION_ID:-}" ] || [ -z "${CB_SHARED_CONNECTION_USERNAME:-}" ] || [ -z "${CB_SHARED_CONNECTION_PASSWORD:-}" ] || [ -z "${CB_SHARED_BOOTSTRAP_USERNAME:-}" ]; then
+                      exit 0
+                    fi
+                    project_id="${CB_SHARED_CONNECTION_PROJECT_ID:-g_GlobalConfiguration}"
+                    bootstrap_groups="${CB_SHARED_BOOTSTRAP_GROUPS:-{{ $adminTeam }},{{ $defaultUserTeam }}}"
+                    for _ in $(seq 1 90); do
+                      if curl -fsS "http://127.0.0.1:{{ $port }}/status" >/dev/null 2>&1; then
+                        break
+                      fi
+                      sleep 2
+                    done
+                    tmp_dir="$(mktemp -d)"
+                    trap 'rm -rf "$tmp_dir"' EXIT
+                    cat >"${tmp_dir}/open-session.json" <<'EOF'
+                    {"query":"mutation { openSession { valid } }"}
+                    EOF
+                    curl -fsS \
+                      -c "${tmp_dir}/cookies.txt" \
+                      -b "${tmp_dir}/cookies.txt" \
+                      -H "Content-Type: application/json" \
+                      -H "X-Forwarded-Preferred-Username: ${CB_SHARED_BOOTSTRAP_USERNAME}" \
+                      -H "X-Forwarded-Groups: ${bootstrap_groups}" \
+                      --data @"${tmp_dir}/open-session.json" \
+                      "http://127.0.0.1:{{ $port }}/api/gql" >/dev/null
+                    cat >"${tmp_dir}/init-connection.json" <<EOF
+                    {"query":"mutation Init(\$id: ID!, \$projectId: ID, \$credentials: Object) { initConnection(id: \$id, projectId: \$projectId, credentials: \$credentials, saveCredentials: true, sharedCredentials: true) { id connected authNeeded credentialsSaved sharedCredentials } }","variables":{"id":"${CB_SHARED_CONNECTION_ID}","projectId":"${project_id}","credentials":{"user":"${CB_SHARED_CONNECTION_USERNAME}","password":"${CB_SHARED_CONNECTION_PASSWORD}","userName":"${CB_SHARED_CONNECTION_USERNAME}","userPassword":"${CB_SHARED_CONNECTION_PASSWORD}"}}}
+                    EOF
+                    response="$(
+                      curl -fsS \
+                        -c "${tmp_dir}/cookies.txt" \
+                        -b "${tmp_dir}/cookies.txt" \
+                        -H "Content-Type: application/json" \
+                        -H "X-Forwarded-Preferred-Username: ${CB_SHARED_BOOTSTRAP_USERNAME}" \
+                        -H "X-Forwarded-Groups: ${bootstrap_groups}" \
+                        --data @"${tmp_dir}/init-connection.json" \
+                        "http://127.0.0.1:{{ $port }}/api/gql"
+                    )"
+                    printf '%s' "${response}" | grep -Eq '"connected":[[:space:]]*true'
+                    printf '%s' "${response}" | grep -Eq '"authNeeded":[[:space:]]*false'
+          {{- end }}
           ports:
             - name: http
               containerPort: {{ $port }}
