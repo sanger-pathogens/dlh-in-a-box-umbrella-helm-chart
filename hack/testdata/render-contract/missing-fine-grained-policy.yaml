@@ -13,8 +13,8 @@ global:
             - groups: []
               users: []
               roles:
-                - redcap-readonly-analyst
-                - redcap-site-analyst
+                - data-analyst
+                - principal-investigator
               accesses:
                 - type: select
                   isAllowed: true

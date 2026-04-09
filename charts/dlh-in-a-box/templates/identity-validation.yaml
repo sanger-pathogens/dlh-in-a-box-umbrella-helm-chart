@@ -12,6 +12,7 @@
 {{- $datahubIdentity := get $clients "datahub" | default dict -}}
 {{- $platformHomeIdentity := get $clients "platformHome" | default dict -}}
 {{- $cloudbeaverIdentity := get $clients "cloudbeaverProxy" | default dict -}}
+{{- $rangerProxyIdentity := get $clients "rangerProxy" | default dict -}}
 {{- $prefectIdentity := get $clients "prefectProxy" | default dict -}}
 {{- $authorization := $global.authorization | default dict -}}
 {{- $ranger := get $authorization "ranger" | default dict -}}
@@ -26,6 +27,9 @@
 {{- $cloudbeaverAuthProxyValues := index .Values "cloudbeaver-auth-proxy" | default dict -}}
 {{- $cloudbeaverAuthProxyConfig := get $cloudbeaverAuthProxyValues "config" | default dict -}}
 {{- $cloudbeaverAuthProxyIngress := get $cloudbeaverAuthProxyValues "ingress" | default dict -}}
+{{- $rangerProxyValues := index .Values "ranger-auth-proxy" | default dict -}}
+{{- $rangerProxyConfig := get $rangerProxyValues "config" | default dict -}}
+{{- $rangerProxyIngress := get $rangerProxyValues "ingress" | default dict -}}
 {{- $prefectProxyValues := index .Values "prefect-auth-proxy" | default dict -}}
 {{- $prefectProxyConfig := get $prefectProxyValues "config" | default dict -}}
 {{- $prefectProxyIngress := get $prefectProxyValues "ingress" | default dict -}}
@@ -105,10 +109,10 @@
 {{- if and (default false $identity.enabled) (default false $ldap.enabled) (not (include "dlh-in-a-box.identity.directory.groupBaseDn" .)) -}}
 {{- fail "global.identity.directory.ldap.groupBaseDn is required when shared identity is enabled." -}}
 {{- end -}}
-{{- if and (default false $identity.enabled) (default false $ldap.enabled) (not (include "dlh-in-a-box.identity.directory.bindDn" .)) -}}
+{{- if and (default false $identity.enabled) (default false $ldap.enabled) (not (default false $ldap.allowAnonymousRead)) (not (include "dlh-in-a-box.identity.directory.bindDn" .)) -}}
 {{- fail "global.identity.directory.ldap.bindDistinguishedName is required when shared identity is enabled." -}}
 {{- end -}}
-{{- if and (default false $identity.enabled) (default false $ldap.enabled) (not (include "dlh-in-a-box.identity.directory.bindSecretName" .)) -}}
+{{- if and (default false $identity.enabled) (default false $ldap.enabled) (not (default false $ldap.allowAnonymousRead)) (not (include "dlh-in-a-box.identity.directory.bindSecretName" .)) -}}
 {{- fail "global.identity.directory.ldap.bindExistingSecret is required when shared identity is enabled." -}}
 {{- end -}}
 {{- if and $bootstrapUsersEnabled (not (default false $ldap.enabled)) (default false $trinoIdentity.passwordAuthEnabled) -}}
@@ -123,7 +127,7 @@
 {{- if and (default false $identity.enabled) (eq $providerMode "bundledKeycloak") (ne (default "" (get $keycloakConfigCli "extraEnvVarsSecret")) $configCliEnvSecretName) -}}
 {{- fail "keycloak.keycloakConfigCli.extraEnvVarsSecret must match global.identity.provider.keycloak.configCliEnvExistingSecret." -}}
 {{- end -}}
-{{- range $clientName := list "trino" "superset" "datahub" "platformHome" "minio" "vault" "headlamp" "cloudbeaverProxy" "prefectProxy" -}}
+{{- range $clientName := list "trino" "superset" "datahub" "platformHome" "minio" "vault" "headlamp" "cloudbeaverProxy" "rangerProxy" "prefectProxy" -}}
   {{- $client := get $clients $clientName | default dict -}}
   {{- if and (eq $providerMode "bundledKeycloak") (default false (get $client "enabled")) -}}
     {{- $redirectUris := get $client "redirectUris" | default list -}}
@@ -234,6 +238,32 @@
   {{- end -}}
   {{- if ne (default "" (get $cloudbeaverIdentity "redirectUrl")) (printf "%s/oauth2/callback" $cloudbeaverOrigin) -}}
     {{- fail "global.identity.external.clients.cloudbeaverProxy.redirectUrl must match the CloudBeaver auth-proxy ingress callback URL." -}}
+  {{- end -}}
+{{- end -}}
+{{- if and (get $rangerProxyIdentity "enabled") (not (default false $ranger.enabled)) -}}
+{{- fail "global.identity.external.clients.rangerProxy.enabled requires global.authorization.ranger.enabled=true." -}}
+{{- end -}}
+{{- if and (get $rangerProxyIdentity "enabled") (eq (len (get $rangerProxyIdentity "redirectUris" | default list)) 0) -}}
+{{- fail "global.identity.external.clients.rangerProxy.redirectUris must include the oauth2-proxy callback URL." -}}
+{{- end -}}
+{{- if and (get $rangerProxyIdentity "enabled") (default "" (get $rangerProxyIdentity "redirectUrl")) -}}
+  {{- if not (has (get $rangerProxyIdentity "redirectUrl") (get $rangerProxyIdentity "redirectUris" | default list)) -}}
+    {{- fail "global.identity.external.clients.rangerProxy.redirectUrl must also be present in redirectUris." -}}
+  {{- end -}}
+{{- end -}}
+{{- if and (get $rangerProxyIdentity "enabled") (ne $environment "local") (eq (len (get $rangerProxyIdentity "allowedGroups" | default list)) 0) -}}
+{{- fail "global.identity.external.clients.rangerProxy.allowedGroups must be set in dev and prod so Ranger Admin is not exposed to every authenticated user." -}}
+{{- end -}}
+{{- if and (get $rangerProxyIdentity "enabled") (ne $environment "local") (has "*" (get $rangerProxyIdentity "allowedGroups" | default list)) -}}
+{{- fail "global.identity.external.clients.rangerProxy.allowedGroups must not contain wildcard values outside local environments." -}}
+{{- end -}}
+{{- if and (get $rangerProxyIdentity "enabled") (get $rangerProxyIngress "enabled") (gt (len (get $rangerProxyIngress "hosts" | default list)) 0) -}}
+  {{- $rangerOrigin := printf "%s://%s" (ternary "https" "http" (gt (len (get $rangerProxyIngress "tls" | default list)) 0)) (index (get $rangerProxyIngress "hosts") 0) -}}
+  {{- if not (has $rangerOrigin (get $rangerProxyIdentity "webOrigins" | default list)) -}}
+    {{- fail "global.identity.external.clients.rangerProxy.webOrigins must include the Ranger auth-proxy ingress origin." -}}
+  {{- end -}}
+  {{- if ne (default "" (get $rangerProxyIdentity "redirectUrl")) (printf "%s/oauth2/callback" $rangerOrigin) -}}
+    {{- fail "global.identity.external.clients.rangerProxy.redirectUrl must match the Ranger auth-proxy ingress callback URL." -}}
   {{- end -}}
 {{- end -}}
 {{- if and (get $prefectIdentity "enabled") (not .Values.prefect.authProxy.enabled) -}}

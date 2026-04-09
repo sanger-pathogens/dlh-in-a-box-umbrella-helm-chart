@@ -17,6 +17,9 @@ dependencies:
 - name: oauth2-proxy
   repository: https://oauth2-proxy.github.io/manifests
   version: 10.1.4
+- name: oauth2-proxy
+  repository: https://oauth2-proxy.github.io/manifests
+  version: 10.1.4
 - name: keycloak
   repository: oci://registry-1.docker.io/bitnamicharts
   version: 25.2.0
@@ -44,5 +47,5 @@ dependencies:
 - name: postgresql
   repository: https://charts.bitnami.com/bitnami
   version: 14.3.3
-digest: sha256:ca5d96b65a8a945aa411c4ab75f9cf955ec2d2906fe4c6d675a863de33276755
-generated: "2026-03-25T15:38:13.593789Z"
+digest: sha256:c0bde8f8aa71ca4966553c994a1c4cdf64d626b36d917507438134319abac29f
+generated: "2026-04-02T14:52:24.350345+01:00"

@@ -77,12 +77,16 @@ The default documented model is now:
   organizational LDAP or AD source.
 - temporary `bootstrapUsers` are allowed only for local or dev browser-flow
   validation while real directory bind details are still pending.
-- `Ranger` is the steady-state Trino authorization plane.
-- `oauth2-proxy` sits in front of Prefect and CloudBeaver so both tools can
-  reuse the central Keycloak session.
-- the umbrella chart owns the reusable portal UX, live role-management UI, and
-  health aggregation API, while downstream repos own logos, fonts, favicons,
-  color palettes, and environment-specific extra tools.
+- `Ranger` remains the live policy and role-management plane. Trino only uses
+  the Ranger plugin when `global.authorization.ranger.trino.enabled=true` is
+  paired with a Ranger-capable Trino image.
+- `oauth2-proxy` sits in front of Prefect, CloudBeaver, and Ranger so those
+  tools can reuse the central Keycloak session.
+- the umbrella chart owns the reusable portal UX, the dedicated `Access
+  Control` workspace, and the health aggregation API, while downstream repos
+  own logos, fonts, favicons, color palettes, and environment-specific extra
+  tools. The portal is the primary admin UX for routine role membership
+  changes; Ranger remains the deeper policy and audit surface.
 - `global.dataCatalogs.*.governance` is the chart-side governance contract used
   to stop unclassified or unapproved datasets from being exposed by accident.
 
@@ -95,8 +99,8 @@ escape hatch, not the main story.
   metadata.
 - Trino catalog generation and Ranger bootstrap glue.
 - Keycloak and Ranger composition for chart-managed deployments.
-- The lightweight platform launchpad, live role-management surface, health
-  aggregation API, and the chart-owned CloudBeaver deployment.
+- The lightweight platform launchpad, dedicated access-control workspace,
+  health aggregation API, and the chart-owned CloudBeaver deployment.
 - Example overlays that prove local, development, and production-shaped
   installs render cleanly.
 - Documentation for the chart API and architecture.

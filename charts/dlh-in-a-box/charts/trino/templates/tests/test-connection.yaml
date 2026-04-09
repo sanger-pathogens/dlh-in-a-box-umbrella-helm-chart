@@ -33,7 +33,7 @@ spec:
       args:
     {{- if .Values.server.config.https.enabled }}
       # port must match coordinator.additionalExposedPorts
-      - trino://{{ include "trino.fullname" . }}.{{ .Release.Namespace }}:8443?SSL=true&SSLVerification=FULL&SSLTrustStorePath=/etc/trino/certificates/tls.crt
+      - trino://{{ include "trino.fullname" . }}.{{ .Release.Namespace }}:8443?SSL=true&SSLVerification=NONE
     {{- else }}
       - trino://{{ include "trino.fullname" . }}:{{ .Values.service.port }}
     {{- end }}
@@ -49,15 +49,5 @@ spec:
         - name: TRINO_PASSWORD
           # must match test-values.yaml
           value: admin123
-    {{- end }}
-    {{- if .Values.server.config.https.enabled }}
-      volumeMounts:
-        - name: certificates
-          readOnly: true
-          mountPath: "/etc/trino/certificates"
-  volumes:
-    - name: certificates
-      secret:
-        secretName: certificates
     {{- end }}
   restartPolicy: Never

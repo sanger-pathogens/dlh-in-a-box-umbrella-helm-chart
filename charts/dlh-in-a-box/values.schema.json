@@ -85,6 +85,7 @@
                 "realm": { "type": "string" },
                 "browserHost": { "type": "string" },
                 "internalScheme": { "type": "string" },
+                "displayName": { "type": "string" },
                 "loginTheme": { "type": "string" },
                 "configCliEnvExistingSecret": { "type": "string" },
                 "bootstrapUsers": {
@@ -107,6 +108,13 @@
                       "realmRoles": {
                         "type": "array",
                         "items": { "type": "string" }
+                      },
+                      "clientRoles": {
+                        "type": "object",
+                        "additionalProperties": {
+                          "type": "array",
+                          "items": { "type": "string" }
+                        }
                       }
                     },
                     "required": ["username", "passwordEnvVar"]
@@ -154,6 +162,10 @@
                     "webOrigins": {
                       "type": "array",
                       "items": { "type": "string" }
+                    },
+                    "passwordAuthMode": {
+                      "type": "string",
+                      "enum": ["ldap", "file"]
                     },
                     "passwordAuthEnabled": { "type": "boolean" },
                     "sharedSecretExistingSecret": { "type": "string" },
@@ -371,6 +383,65 @@
                     }
                   ]
                 },
+                "rangerProxy": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "properties": {
+                    "enabled": { "type": "boolean" },
+                    "clientId": { "type": "string" },
+                    "existingSecret": { "type": "string" },
+                    "clientSecretKey": { "type": "string" },
+                    "configCliSecretKey": { "type": "string" },
+                    "cookieExistingSecret": { "type": "string" },
+                    "cookieSecretKey": { "type": "string" },
+                    "redirectUrl": { "type": "string" },
+                    "redirectUris": {
+                      "type": "array",
+                      "items": { "type": "string" }
+                    },
+                    "webOrigins": {
+                      "type": "array",
+                      "items": { "type": "string" }
+                    },
+                    "allowedGroups": {
+                      "type": "array",
+                      "items": { "type": "string" }
+                    },
+                    "emailDomains": {
+                      "type": "array",
+                      "items": { "type": "string" }
+                    },
+                    "ingress": {
+                      "type": "object",
+                      "additionalProperties": true,
+                      "properties": {
+                        "enabled": { "type": "boolean" },
+                        "className": { "type": "string" },
+                        "host": { "type": "string" },
+                        "tlsSecretName": { "type": "string" },
+                        "annotations": {
+                          "type": "object",
+                          "additionalProperties": true
+                        }
+                      }
+                    }
+                  },
+                  "allOf": [
+                    {
+                      "if": {
+                        "properties": { "enabled": { "const": true } },
+                        "required": ["enabled"]
+                      },
+                      "then": {
+                        "required": [
+                          "clientId",
+                          "existingSecret",
+                          "redirectUrl"
+                        ]
+                      }
+                    }
+                  ]
+                },
                 "cloudbeaverProxy": {
                   "type": "object",
                   "additionalProperties": true,
@@ -525,10 +596,27 @@
                 "bindDistinguishedName": { "type": "string" },
                 "bindExistingSecret": { "type": "string" },
                 "bindPasswordKey": { "type": "string" },
+                "allowAnonymousRead": { "type": "boolean" },
                 "trustedCaExistingSecret": { "type": "string" },
                 "trustedCaCertKey": { "type": "string" },
                 "useSystemTrustStore": { "type": "boolean" },
-                "allowInsecure": { "type": "boolean" }
+                "allowInsecure": { "type": "boolean" },
+                "syncGroupsToKeycloak": { "type": "boolean" },
+                "hostAliases": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                      "ip": { "type": "string" },
+                      "hostnames": {
+                        "type": "array",
+                        "items": { "type": "string" }
+                      }
+                    },
+                    "required": ["ip", "hostnames"]
+                  }
+                }
               },
               "allOf": [
                 {
@@ -537,13 +625,19 @@
                     "required": ["enabled"]
                   },
                   "then": {
-                    "required": [
-                      "url",
-                      "userBaseDn",
-                      "groupBaseDn",
-                      "bindDistinguishedName",
-                      "bindExistingSecret"
-                    ]
+                    "required": ["url", "userBaseDn", "groupBaseDn"]
+                  }
+                },
+                {
+                  "if": {
+                    "properties": {
+                      "enabled": { "const": true },
+                      "allowAnonymousRead": { "const": false }
+                    },
+                    "required": ["enabled"]
+                  },
+                  "then": {
+                    "required": ["bindDistinguishedName", "bindExistingSecret"]
                   }
                 }
               ]
@@ -660,6 +754,14 @@
                   "items": { "type": "object" }
                 }
               }
+            },
+            "trino": {
+              "type": "object",
+              "additionalProperties": true,
+              "properties": {
+                "enabled": { "type": "boolean" },
+                "auditMode": { "type": "string" }
+              }
             }
           }
         }
@@ -704,6 +806,14 @@
           "additionalProperties": true,
           "properties": {
             "roleName": { "type": "string" }
+          }
+        },
+        "portal": {
+          "type": "object",
+          "additionalProperties": true,
+          "properties": {
+            "displayName": { "type": "string" },
+            "manageable": { "type": "boolean" }
           }
         }
       }
@@ -1106,7 +1216,43 @@
           "additionalProperties": true,
           "properties": {
             "existingSecret": { "type": "string" },
-            "initialDataKey": { "type": "string" }
+            "initialDataKey": { "type": "string" },
+            "workspaceSeedExistingSecret": { "type": "string" },
+            "workspaceDataSourcesKey": { "type": "string" },
+            "forceWorkspaceSeed": { "type": "boolean" },
+            "sharedConnectionSeed": {
+              "type": "object",
+              "additionalProperties": true,
+              "properties": {
+                "enabled": { "type": "boolean" },
+                "connectionIdKey": { "type": "string" },
+                "projectIdKey": { "type": "string" },
+                "usernameKey": { "type": "string" },
+                "passwordKey": { "type": "string" },
+                "bootstrapUsernameKey": { "type": "string" },
+                "bootstrapGroupsKey": { "type": "string" }
+              }
+            }
+          }
+        },
+        "trustedCa": {
+          "type": "object",
+          "additionalProperties": true,
+          "properties": {
+            "existingSecret": { "type": "string" },
+            "certKey": { "type": "string" },
+            "trustStorePath": { "type": "string" },
+            "trustStorePassword": { "type": "string" },
+            "trustStoreType": { "type": "string" },
+            "initImage": {
+              "type": "object",
+              "additionalProperties": true,
+              "properties": {
+                "repository": { "type": "string" },
+                "tag": { "type": "string" },
+                "pullPolicy": { "type": "string" }
+              }
+            }
           }
         },
         "authProxy": {

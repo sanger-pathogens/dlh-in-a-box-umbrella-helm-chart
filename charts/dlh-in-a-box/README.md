@@ -31,17 +31,25 @@ The default documented shared-environment model is:
 - `Keycloak` issues OIDC tokens.
 - `Organizational LDAP or Active Directory` supplies users and groups in every environment.
 - `Active Directory over LDAPS` supplies users and groups in production.
-- `Trino` authenticates with OIDC and optional LDAP password auth, and
-  authorizes with `Ranger`.
+- `Trino` authenticates with OIDC and optional file-based or LDAP password
+  auth. File-based Trino access rules remain the default unless
+  `global.authorization.ranger.trino.enabled=true` is set for a Ranger-capable
+  Trino image.
 - `Superset`, `DataHub`, and the `Prefect` proxy trust the same OIDC issuer.
+- `Ranger`, `CloudBeaver`, and `Prefect` reuse that same browser session
+  through chart-managed auth proxies.
 - deployment-owned admin tools such as `MinIO Console`, standalone `Vault`,
   and `Headlamp` can reuse the same Keycloak realm through reusable OIDC
   client blocks owned by the umbrella chart.
 - `platformHome` is the default browser entrypoint, renders grouped launch
   cards, exposes health/status information, and only hides links based on
   Keycloak group claims.
-- `oauth2-proxy` protects Prefect and CloudBeaver because both tools are
-  front-door integrations around the same Keycloak session.
+- `platformHome` also exposes an admin-only `/access-control` destination for
+  LDAP-backed role assignment and governed direct-user exceptions, with Ranger
+  as the live membership backend when enabled.
+- `oauth2-proxy` protects Prefect, CloudBeaver, and the Ranger browser path
+  because all three are front-door integrations around the same Keycloak
+  session.
 
 The chart still supports an externally managed OIDC provider, but that is the
 escape hatch, not the main reference architecture.
@@ -68,7 +76,7 @@ escape hatch, not the main reference architecture.
 | `global.authorization.platformRoles` | Git-managed data-access roles that map directory groups or approved direct users into Ranger roles. |
 | `global.dataCatalogs` | Catalog definitions, access groups, and governance metadata. |
 | `global.dataCatalogs.*.governance` | Required non-local dataset classification and approval metadata. |
-| `platformHome` | Lightweight launchpad UI served by NGINX plus a small same-origin API for live role membership and health aggregation. |
+| `platformHome` | Lightweight launchpad UI served by NGINX plus a small same-origin API for health aggregation and the dedicated `/access-control` admin workspace. |
 | `cloudbeaver` and `cloudbeaver-auth-proxy` | CloudBeaver Community Edition plus its Keycloak-backed reverse-proxy front door. |
 | `prefect.authProxy` and `prefect-auth-proxy` | Prefect front-door protection with OIDC. |
 | `keycloak` | Bundled Keycloak deployment settings, including trusted CA input for LDAPS federation. |
@@ -120,6 +128,9 @@ If you want a branded login experience, customize the Keycloak theme and set
 `global.identity.provider.keycloak.loginTheme`. Do not build a custom Prefect login
 page.
 
+The Keycloak login-page header text can be set separately with
+`global.identity.provider.keycloak.displayName`.
+
 ## Portal And CloudBeaver
 
 `platformHome` is the default browser entrypoint. It uses a public Keycloak
@@ -127,19 +138,32 @@ client, reads `groups` claims in the browser, and shows only the grouped app
 cards the user should see after sign-in. Anonymous users only see the product
 branding and a sign-in action. It does not replace downstream authorization.
 
-Platform administrators also get embedded administration sections on the same
-signed-in page:
+Platform administrators also get a first-class portal administration
+experience:
 
 - grouped admin-tool launch cards
-- live platform-role membership management backed by Ranger
-- the Git-managed role catalog, with live Ranger user and group membership
-- optional links to downstream admin tools such as Ranger Admin
+- a dedicated `Access Control` route backed by the same-origin admin API
+- LDAP-backed discovery of users and groups, with Ranger as the live write
+  target for role membership
+- governed direct-user exceptions with stored metadata and expiry
+- optional links to downstream admin tools such as Ranger Admin, which reuses
+  the same browser session as the portal
+
+Portal role management and Ranger policy/bootstrap remain reusable chart
+features even when Trino itself stays on file-based access-control. Enable
+`global.authorization.ranger.trino.enabled=true` only when the Trino image also
+ships the Ranger plugin.
 
 Git remains the source of truth for role definitions, app entitlements, and
 nested role topology. When
 `global.authorization.platformRoleMembershipSource=ranger`, the portal writes
 live user or group membership to Ranger so those changes survive later chart
 reconciliation.
+
+When `cloudbeaver.bootstrap.sharedConnectionSeed.enabled=true` and
+`cloudbeaver.app.adminCredentialsSaveEnabled=true`, the chart can also persist
+managed shared datasource credentials into the seeded workspace so approved
+browser users do not see a second manual Trino login prompt.
 
 ## Portal Theming And Branding
 
@@ -255,8 +279,13 @@ and renders periodic status badges such as `Healthy`, `Degraded`, `Down`, or
 CloudBeaver is intentionally different from the browser-only apps:
 
 - browser access goes through `oauth2-proxy` and Keycloak
-- SQL execution still uses the user’s LDAP or AD username and password when
-  connecting to Trino
+- downstream repos can optionally seed a default CloudBeaver workspace and
+  datasource set through `cloudbeaver.bootstrap.workspaceSeedExistingSecret`
+- downstream repos can mount a database CA into a generated JVM trust store
+  through `cloudbeaver.trustedCa.*` when the saved datasource should verify TLS
+- the reusable chart only provides the workspace-seed contract; the actual
+  datasource definitions and any development-only stored credentials live in
+  consumer repos
 - Ranger still decides what data the resulting Trino session may read or mask
 
 ## LDAPS And Trust Material
@@ -291,7 +320,7 @@ provide the config-cli environment variables consumed during realm bootstrap.
 - Optional local/dev-only keys:
   any `passwordEnvVar` referenced by
   `global.identity.provider.keycloak.bootstrapUsers`, for example
-  `KC_BOOTSTRAP_TRINO_ADMIN_PASSWORD`
+  `KC_BOOTSTRAP_ADMIN_PASSWORD`
 
 Only include the client secret keys for the clients you actually enable, but
 the secret name itself is now part of the supported contract.

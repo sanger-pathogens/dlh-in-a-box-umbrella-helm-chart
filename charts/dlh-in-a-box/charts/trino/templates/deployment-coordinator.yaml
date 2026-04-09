@@ -13,21 +13,26 @@ through environment variables.
 {{- $ldap := get $directory "ldap" | default (dict) -}}
 {{- $authorization := get .Values.global "authorization" | default (dict) -}}
 {{- $ranger := get $authorization "ranger" | default (dict) -}}
+{{- $rangerTrino := get $ranger "trino" | default (dict) -}}
 {{- $identityEnabled := and (default false $identity.enabled) (default false $trinoIdentity.enabled) -}}
-{{- $ldapEnabled := and $identityEnabled (default false $ldap.enabled) -}}
+{{- $legacyPasswordAuthRequested := contains "PASSWORD" (default "" .Values.server.config.authenticationType) -}}
+{{- $passwordAuthRequested := or (default false $trinoIdentity.passwordAuthEnabled) $legacyPasswordAuthRequested -}}
+{{- $passwordAuthMode := default "ldap" $trinoIdentity.passwordAuthMode -}}
+{{- $ldapDirectoryEnabled := and $identityEnabled (default false $ldap.enabled) -}}
+{{- $ldapPasswordAuthEnabled := and $identityEnabled (default false $trinoIdentity.passwordAuthEnabled) (eq $passwordAuthMode "ldap") -}}
+{{- $filePasswordAuthEnabled := and $identityEnabled (default false $trinoIdentity.passwordAuthEnabled) (eq $passwordAuthMode "file") -}}
+{{- $ldapEnabled := and $ldapDirectoryEnabled $ldapPasswordAuthEnabled -}}
 {{- $ldapAllowInsecure := default false $ldap.allowInsecure -}}
 {{- $ldapTrustedCaSecretName := include "dlh-in-a-box.identity.directory.trustedCaSecretName" . -}}
 {{- $ldapTrustedCaCertKey := include "dlh-in-a-box.identity.directory.trustedCaCertKey" . -}}
-{{- $mountTrustedLdapCa := and $ldapEnabled (not $ldapAllowInsecure) $ldapTrustedCaSecretName -}}
+{{- $mountTrustedLdapCa := and $ldapDirectoryEnabled (not $ldapAllowInsecure) $ldapTrustedCaSecretName -}}
 {{- $rangerEnabled := default false $ranger.enabled -}}
 {{- $keycloakProvider := get (get $identity "provider" | default (dict)) "keycloak" | default (dict) -}}
 {{- $bootstrapUsersEnabled := gt (len (default (list) $keycloakProvider.bootstrapUsers)) 0 -}}
 {{- $bootstrapOnlyMode := and $bootstrapUsersEnabled (not $ldapEnabled) -}}
-{{- $rangerTrinoEnabled := and $rangerEnabled (not $bootstrapOnlyMode) -}}
-{{- $legacyPasswordAuthRequested := contains "PASSWORD" (default "" .Values.server.config.authenticationType) -}}
-{{- $passwordAuthRequested := or (default false $trinoIdentity.passwordAuthEnabled) $legacyPasswordAuthRequested -}}
+{{- $rangerTrinoEnabled := and $rangerEnabled (default false $rangerTrino.enabled) (not $bootstrapOnlyMode) -}}
 {{- $filePasswordAuthConfigured := or .Values.auth.passwordAuth .Values.auth.passwordAuthSecret -}}
-{{- $renderFilePasswordAuth := and $filePasswordAuthConfigured (not (and $identityEnabled $passwordAuthRequested)) -}}
+{{- $renderFilePasswordAuth := and $filePasswordAuthConfigured (or $legacyPasswordAuthRequested $filePasswordAuthEnabled (not (and $identityEnabled $passwordAuthRequested))) -}}
 {{- $env := .Values.env | default (list) -}}
 {{- $envFrom := .Values.envFrom | default (list) -}}
 apiVersion: apps/v1
@@ -172,7 +177,7 @@ spec:
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           securityContext:
             {{- toYaml .Values.containerSecurityContext | nindent 12 }}
-          {{- if or (gt (len $env) 0) $identityEnabled $ldapEnabled }}
+          {{- if or (gt (len $env) 0) $identityEnabled $ldapDirectoryEnabled }}
           env:
             {{- if gt (len $env) 0 }}
             {{- toYaml $env | nindent 12 }}
@@ -189,7 +194,7 @@ spec:
                   name: {{ $trinoIdentity.sharedSecretExistingSecret }}
                   key: {{ default "sharedSecret" $trinoIdentity.sharedSecretKey }}
             {{- end }}
-            {{- if $ldapEnabled }}
+            {{- if $ldapDirectoryEnabled }}
             - name: TRINO_LDAP_BIND_PASSWORD
               valueFrom:
                 secretKeyRef:

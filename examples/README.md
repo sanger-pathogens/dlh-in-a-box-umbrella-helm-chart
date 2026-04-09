@@ -54,7 +54,9 @@ flowchart TD
   the portal and CloudBeaver browser entry story.
 - The shared-environment examples now treat
   `global.authorization.platformRoles` as the long-lived access baseline and
-  use role-based Ranger bootstrap policies instead of raw group policies.
+  use the current `platform-admin`, `data-analyst`, and
+  `principal-investigator` role pattern with role-based Ranger bootstrap
+  policies instead of raw group policies.
 - `values-shared-auth.yaml` is the render-validated escape hatch for an
   externally managed OIDC provider.
 

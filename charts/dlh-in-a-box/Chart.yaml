@@ -76,6 +76,12 @@ dependencies:
     repository: https://oauth2-proxy.github.io/manifests
     condition: cloudbeaver.enabled,cloudbeaver.authProxy.enabled
 
+  - name: oauth2-proxy
+    alias: ranger-auth-proxy
+    version: "10.1.4"
+    repository: https://oauth2-proxy.github.io/manifests
+    condition: global.identity.external.clients.rangerProxy.enabled
+
   - name: keycloak
     version: "25.2.0"
     repository: oci://registry-1.docker.io/bitnamicharts
