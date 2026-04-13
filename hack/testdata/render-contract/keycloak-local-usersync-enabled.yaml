@@ -1,0 +1,14 @@
+global:
+  identity:
+    directory:
+      mode: keycloakLocal
+      ldap:
+        enabled: false
+    external:
+      clients:
+        trino:
+          enabled: false
+  authorization:
+    ranger:
+      usersync:
+        enabled: true

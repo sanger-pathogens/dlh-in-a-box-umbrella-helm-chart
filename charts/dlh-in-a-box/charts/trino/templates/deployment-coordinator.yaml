@@ -25,6 +25,7 @@ through environment variables.
 {{- $ldapAllowInsecure := default false $ldap.allowInsecure -}}
 {{- $ldapTrustedCaSecretName := include "dlh-in-a-box.identity.directory.trustedCaSecretName" . -}}
 {{- $ldapTrustedCaCertKey := include "dlh-in-a-box.identity.directory.trustedCaCertKey" . -}}
+{{- $ldapHostAliases := default (list) $ldap.hostAliases -}}
 {{- $mountTrustedLdapCa := and $ldapDirectoryEnabled (not $ldapAllowInsecure) $ldapTrustedCaSecretName -}}
 {{- $rangerEnabled := default false $ranger.enabled -}}
 {{- $keycloakProvider := get (get $identity "provider" | default (dict)) "keycloak" | default (dict) -}}
@@ -81,6 +82,10 @@ spec:
         {{- end }}
     spec:
       serviceAccountName: {{ include "trino.serviceAccountName" . }}
+      {{- with $ldapHostAliases }}
+      hostAliases:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
       {{- with .Values.securityContext }}
       securityContext:
         {{- toYaml . | nindent 8 }}

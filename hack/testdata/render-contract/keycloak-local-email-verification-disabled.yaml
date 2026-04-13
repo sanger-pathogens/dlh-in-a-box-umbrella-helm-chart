@@ -1,0 +1,15 @@
+global:
+  identity:
+    directory:
+      mode: keycloakLocal
+      ldap:
+        enabled: false
+    external:
+      clients:
+        trino:
+          enabled: false
+    provider:
+      keycloak:
+        registration:
+          enabled: true
+          requireEmailVerification: false

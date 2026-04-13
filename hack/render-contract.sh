@@ -4,8 +4,12 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "${ROOT_DIR}"
 
-CHART_PATH="charts/dlh-in-a-box"
-FIXTURE_DIR="hack/testdata/render-contract"
+CHART_PATH="${ROOT_DIR}/charts/dlh-in-a-box"
+FIXTURE_DIR="${ROOT_DIR}/hack/testdata/render-contract"
+LOCAL_VALUES="${ROOT_DIR}/examples/values-local-auth.yaml"
+DEV_VALUES="${ROOT_DIR}/examples/values-dev.yaml"
+PROD_VALUES="${ROOT_DIR}/examples/values-prod.yaml"
+SHARED_VALUES="${ROOT_DIR}/examples/values-shared-auth.yaml"
 
 tmp_files=()
 
@@ -16,12 +20,19 @@ cleanup() {
 }
 trap cleanup EXIT
 
-render_manifest() {
+make_tmp_file() {
   local output
   output="$(mktemp)"
   tmp_files+=("${output}")
-  helm template dlh "${CHART_PATH}" "$@" >"${output}"
   printf '%s\n' "${output}"
+}
+
+render_manifest() {
+  local output="$1"
+  shift
+  local manifest
+  manifest="$(helm template dlh "${CHART_PATH}" "$@")"
+  printf '%s' "${manifest}" >"${output}"
 }
 
 assert_contains() {
@@ -69,11 +80,16 @@ expect_fail() {
 }
 
 echo "--- Positive contract renders"
-default_manifest="$(render_manifest)"
-local_manifest="$(render_manifest -f examples/values-local-auth.yaml)"
-dev_manifest="$(render_manifest -f examples/values-dev.yaml)"
-prod_manifest="$(render_manifest -f examples/values-prod.yaml)"
-shared_manifest="$(render_manifest -f examples/values-shared-auth.yaml)"
+default_manifest="$(make_tmp_file)"
+render_manifest "${default_manifest}"
+local_manifest="$(make_tmp_file)"
+render_manifest "${local_manifest}" -f "${LOCAL_VALUES}"
+dev_manifest="$(make_tmp_file)"
+render_manifest "${dev_manifest}" -f "${DEV_VALUES}"
+prod_manifest="$(make_tmp_file)"
+render_manifest "${prod_manifest}" -f "${PROD_VALUES}"
+shared_manifest="$(make_tmp_file)"
+render_manifest "${shared_manifest}" -f "${SHARED_VALUES}"
 
 assert_not_contains "${default_manifest}" "{{"
 assert_not_contains "${local_manifest}" "{{"
@@ -91,12 +107,17 @@ assert_contains "${local_manifest}" "name: dlh-ranger-admin-exception-audit"
 assert_contains "${local_manifest}" "name: dlh-platform-home"
 assert_contains "${local_manifest}" "Administration"
 assert_contains "${local_manifest}" "name: dlh-cloudbeaver"
-assert_contains "${local_manifest}" 'username: "admin"'
-assert_contains "${local_manifest}" "KC_BOOTSTRAP_ADMIN_PASSWORD"
 assert_contains "${local_manifest}" "/access-control"
 assert_not_contains "${local_manifest}" "ldap-directory"
 assert_not_contains "${local_manifest}" "access-control.name=ranger"
 assert_contains "${local_manifest}" "access-control.name=file"
+assert_contains "${local_manifest}" "registrationAllowed: true"
+assert_contains "${local_manifest}" "verifyEmail: false"
+assert_contains "${local_manifest}" "\"accessControlEnabled\": false"
+assert_contains "${local_manifest}" "platform-app-cloudbeaver"
+assert_contains "${local_manifest}" "platform-app-prefect"
+assert_contains "${local_manifest}" "http-server.authentication.type=OAUTH2"
+assert_not_contains "${local_manifest}" "http-server.authentication.type=OAUTH2,PASSWORD"
 assert_contains "${dev_manifest}" "name: dlh-keycloak-config-cli-env"
 assert_contains "${prod_manifest}" "name: dlh-keycloak-config-cli-env"
 assert_contains "${prod_manifest}" "name: dlh-ranger-postgresql"
@@ -147,85 +168,107 @@ assert_contains "${prod_manifest}" "\"roles\": ["
 echo "--- Negative contract renders"
 expect_fail \
   "global.environment must be one of the following: \"local\", \"dev\", \"prod\"" \
-  -f examples/values-dev.yaml \
+  -f "${DEV_VALUES}" \
   -f "${FIXTURE_DIR}/missing-environment.yaml"
 
 expect_fail \
   "global.dataCatalogs.unclassified.governance is required for dev and prod environments." \
-  -f examples/values-dev.yaml \
+  -f "${DEV_VALUES}" \
   -f "${FIXTURE_DIR}/missing-governance.yaml"
 
 expect_fail \
   "global.dataCatalogs.pii_smoke is restricted-identifiable and contains direct or quasi identifiers, so authorization.ranger.bootstrapPolicies must include a masking or row-filter policy for this catalog." \
-  -f examples/values-dev.yaml \
+  -f "${DEV_VALUES}" \
   -f "${FIXTURE_DIR}/missing-fine-grained-policy.yaml"
 
 expect_fail \
   "global.identity.external.clients.prefectProxy.allowedGroups must be set in dev and prod so Prefect is not exposed to every authenticated user." \
-  -f examples/values-dev.yaml \
+  -f "${DEV_VALUES}" \
   -f "${FIXTURE_DIR}/prefect-missing-groups.yaml"
 
 expect_fail \
   "global.identity.external.clients.cloudbeaverProxy.allowedGroups must be set in dev and prod so CloudBeaver is not exposed to every authenticated user." \
-  -f examples/values-dev.yaml \
+  -f "${DEV_VALUES}" \
   -f "${FIXTURE_DIR}/cloudbeaver-missing-groups.yaml"
 
 expect_fail \
   "global.identity.external.clients.platformHome.redirectUris must be set when bundled Keycloak manages the OIDC client." \
-  -f examples/values-dev.yaml \
+  -f "${DEV_VALUES}" \
   -f "${FIXTURE_DIR}/platform-home-missing-redirect.yaml"
 
 expect_fail \
   "cloudbeaver-auth-proxy.config.existingSecret must be set when global.identity.external.clients.cloudbeaverProxy.enabled=true." \
-  -f examples/values-dev.yaml \
+  -f "${DEV_VALUES}" \
   -f "${FIXTURE_DIR}/cloudbeaver-missing-secret.yaml"
 
 expect_fail \
   "global.identity.external.clients.trino.redirectUris must not use wildcard values outside local environments." \
-  -f examples/values-prod.yaml \
+  -f "${PROD_VALUES}" \
   -f "${FIXTURE_DIR}/wildcard-redirect.yaml"
 
 expect_fail \
   "global.identity.provider.keycloak.configCliEnvExistingSecret is required when bundled Keycloak is enabled." \
-  -f examples/values-dev.yaml \
+  -f "${DEV_VALUES}" \
   -f "${FIXTURE_DIR}/missing-config-cli-secret.yaml"
 
 expect_fail \
   "global.identity.directory.ldap.url is required when Trino identity integration is enabled." \
-  -f examples/values-dev.yaml \
+  -f "${DEV_VALUES}" \
   -f "${FIXTURE_DIR}/missing-directory-url.yaml"
 
 expect_fail \
-  "global.identity.directory.ldap.enabled must be true when Trino PASSWORD auth is enabled through the shared identity contract." \
-  -f examples/values-local-auth.yaml \
+  "global.identity.directory.ldap.enabled must be true when Trino LDAP PASSWORD auth is enabled through the shared identity contract." \
+  -f "${LOCAL_VALUES}" \
+  -f "${FIXTURE_DIR}/bootstrap-users-base.yaml" \
   -f "${FIXTURE_DIR}/bootstrap-password-auth-without-ldap.yaml"
 
 expect_fail \
   "global.authorization.ranger.usersync.enabled must be false when using bundled Keycloak bootstrapUsers without an organizational LDAP connection." \
-  -f examples/values-local-auth.yaml \
+  -f "${LOCAL_VALUES}" \
+  -f "${FIXTURE_DIR}/bootstrap-users-base.yaml" \
   -f "${FIXTURE_DIR}/bootstrap-usersync-without-ldap.yaml"
 
 expect_fail \
+  "global.identity.provider.keycloak.registration.enabled must be true when global.identity.directory.mode=keycloakLocal." \
+  -f "${LOCAL_VALUES}" \
+  -f "${FIXTURE_DIR}/keycloak-local-registration-disabled.yaml"
+
+expect_fail \
+  "global.identity.external.clients.trino.passwordAuthMode must be file when global.identity.directory.mode=keycloakLocal. LDAP PASSWORD auth is not allowed in that mode." \
+  -f "${LOCAL_VALUES}" \
+  -f "${FIXTURE_DIR}/keycloak-local-trino-password-auth-enabled.yaml"
+
+expect_fail \
+  "global.authorization.ranger.usersync.enabled must be false when global.identity.directory.mode=keycloakLocal." \
+  -f "${LOCAL_VALUES}" \
+  -f "${FIXTURE_DIR}/keycloak-local-usersync-enabled.yaml"
+
+expect_fail \
+  "global.identity.directory.ldap.enabled must be false when global.identity.directory.mode=keycloakLocal." \
+  -f "${LOCAL_VALUES}" \
+  -f "${FIXTURE_DIR}/keycloak-local-ldap-enabled.yaml"
+
+expect_fail \
   "global.environment must be one of the following: \"local\", \"dev\", \"prod\"" \
-  -f examples/values-shared-auth.yaml \
+  -f "${SHARED_VALUES}" \
   -f "${FIXTURE_DIR}/missing-identity-environment.yaml"
 
 expect_fail \
   "The top-level identity block is no longer supported. Move all shared identity settings under global.identity." \
-  -f examples/values-dev.yaml \
+  -f "${DEV_VALUES}" \
   -f "${FIXTURE_DIR}/legacy-top-level-identity.yaml"
 
 expect_fail \
   "Use global.identity.external.clients.trino.passwordAuthEnabled instead of trino.server.config.authenticationType=PASSWORD when shared identity is enabled." \
-  -f examples/values-dev.yaml \
+  -f "${DEV_VALUES}" \
   -f "${FIXTURE_DIR}/legacy-trino-authentication-type.yaml"
 
 expect_fail \
   "global.authorization.platformRoles.platform-admin.apps: Additional property notARealApp is not allowed" \
-  -f examples/values-dev.yaml \
+  -f "${DEV_VALUES}" \
   -f "${FIXTURE_DIR}/invalid-platform-role-app.yaml"
 
 expect_fail \
   "global.authorization.platformRoleExceptions[0].approvalRef must be set." \
-  -f examples/values-dev.yaml \
+  -f "${DEV_VALUES}" \
   -f "${FIXTURE_DIR}/exception-missing-metadata.yaml"

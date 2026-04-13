@@ -28,7 +28,7 @@ flowchart TD
 
 | File | Primary use | Characteristics |
 | --- | --- | --- |
-| `values-local-auth.yaml` | Local render-oriented auth example | Bundled Keycloak, external LDAP placeholder settings, Ranger, portal, CloudBeaver, Prefect proxy, MinIO, Hive, Spark Operator, and local demo secrets |
+| `values-local-auth.yaml` | Local render-oriented Keycloak-local-users example | Bundled Keycloak self-registration, Keycloak-managed app groups, Ranger, portal, CloudBeaver, Prefect proxy, MinIO, Hive, Spark Operator, and local demo secrets |
 | `values-local.yaml` | Canonical kind validation path | MinIO, Hive, Prefect, Spark Operator, Vault dev mode, reduced Trino footprint |
 | `values-local-superset.yaml` | Focused local BI validation path | MinIO, Trino, and Superset with demo credentials, seeded local Trino datasource, bundled Superset PostgreSQL and Redis |
 | `values-local-layers.yaml` | Richer local topology example | Multiple catalogs, layered access patterns, self-contained object storage |
@@ -46,12 +46,16 @@ flowchart TD
 - `./hack/template.sh` renders the umbrella chart against every file in this
   directory.
 - `values-local.yaml` is the canonical local smoke-install proof point.
-- `values-local-auth.yaml` is a render-oriented auth example for the external-directory model.
+- `values-local-auth.yaml` is the render-oriented example for the
+  `keycloakLocal` identity mode.
 - `values-local-superset.yaml` is the focused local proof point for the
   optional Superset integration.
 - `values-dev.yaml` and `values-prod.yaml` are the primary shared-environment
   examples for the default Keycloak plus LDAP/AD plus Ranger model, including
   the portal and CloudBeaver browser entry story.
+- `values-local-auth.yaml` shows the first-class non-LDAP `keycloakLocal`
+  path: self-registration in Keycloak, no default app access, Ranger kept as
+  the Trino authorization plane, and OIDC/token-capable Trino clients.
 - The shared-environment examples now treat
   `global.authorization.platformRoles` as the long-lived access baseline and
   use the current `platform-admin`, `data-analyst`, and

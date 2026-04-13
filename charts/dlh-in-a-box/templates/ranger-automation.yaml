@@ -40,6 +40,7 @@ data:
         "serviceAdminGroups" ($ranger.serviceAdminGroups | default (list))
         "superUsers" ($ranger.superUsers | default (list))
         "superGroups" ($ranger.superGroups | default (list))
+        "legacyManagedUsers" ($ranger.legacyManagedUsers | default (list))
         "legacyManagedRoles" ($ranger.legacyManagedRoles | default (list))
         "platformRoleMembershipSource" $platformRoleMembershipSource
         "importCatalogAcls" $importCatalogAcls
@@ -295,6 +296,77 @@ data:
         return request("GET", path, ok=(200,)) or []
 
 
+    def list_users():
+        users = []
+        start_index = 0
+        page_size = 200
+        while True:
+            payload = request(
+                "GET",
+                f"/service/xusers/users?startIndex={start_index}&pageSize={page_size}",
+                ok=(200,),
+            ) or {}
+            batch = payload.get("vXUsers", []) or []
+            if not batch:
+                break
+            users.extend(batch)
+            total_count = int(payload.get("totalCount", len(users)) or len(users))
+            if len(users) >= total_count:
+                break
+            start_index += len(batch)
+        return users
+
+
+    def get_user(username):
+        username = str(username or "").strip()
+        if not username:
+            return None
+        for user in list_users():
+            if str(user.get("name", "")).strip() == username:
+                return user
+        return None
+
+
+    def build_external_user(username, first_name="", last_name="", email_address=""):
+        username = str(username or "").strip()
+        first_name = str(first_name or "").strip() or username
+        last_name = str(last_name or "").strip() or "User"
+        email_address = str(email_address or "").strip()
+        return {
+            "name": username,
+            "firstName": first_name,
+            "lastName": last_name,
+            "emailAddress": email_address,
+            "status": 1,
+            "isVisible": 1,
+            "userSource": 1,
+            "userRoleList": ["ROLE_USER"],
+            "syncSource": "LDAP",
+        }
+
+
+    def ensure_users_exist(usernames):
+        existing_usernames = {
+            str(user.get("name", "")).strip()
+            for user in list_users()
+            if str(user.get("name", "")).strip()
+        }
+        missing = [
+            build_external_user(username)
+            for username in normalize_names(usernames)
+            if username not in existing_usernames
+        ]
+        if not missing:
+            return
+        request(
+            "POST",
+            "/service/xusers/ugsync/users",
+            {"vXUsers": missing},
+            ok=(200, 201),
+        )
+        print("Seeded Ranger users: " + ", ".join(sorted(user["name"] for user in missing)))
+
+
     def exception_role_name(base_role_name, username, expires_at):
         return f"exception-{base_role_name}-{username}-{expires_at.replace('-', '')}"
 
@@ -505,6 +577,36 @@ data:
         return policies
 
 
+    def usernames_from_policy_items(items):
+        usernames = set()
+        for item in items or []:
+            usernames.update(normalize_names(item.get("users", [])))
+        return usernames
+
+
+    def policy_principal_usernames(config, policies):
+        usernames = set()
+        ranger_cfg = config.get("ranger", {}) or {}
+        usernames.update(normalize_names(ranger_cfg.get("serviceAdminUsers", [])))
+        usernames.update(normalize_names(ranger_cfg.get("superUsers", [])))
+        service_username = str(ranger_cfg.get("serviceUsername") or "").strip()
+        if service_username:
+            usernames.add(service_username)
+        for role in build_platform_roles(config):
+            usernames.update(role.get("users", []))
+        for policy in policies or []:
+            for key in [
+                "policyItems",
+                "denyPolicyItems",
+                "allowExceptions",
+                "denyExceptions",
+                "dataMaskPolicyItems",
+                "rowFilterPolicyItems",
+            ]:
+                usernames.update(usernames_from_policy_items(policy.get(key, [])))
+        return usernames
+
+
     def reconcile_roles(config):
         service_name = config["ranger"]["serviceName"]
         membership_source = str(config["ranger"].get("platformRoleMembershipSource", "git") or "git").lower()
@@ -582,6 +684,112 @@ data:
             )
 
 
+    def filter_user_from_role_members(items, username):
+        filtered = []
+        removed = False
+        for item in items or []:
+            name = str(item.get("name", "")).strip() if isinstance(item, dict) else str(item).strip()
+            if name == username:
+                removed = True
+                continue
+            filtered.append(item)
+        return filtered, removed
+
+
+    def detach_user_from_roles(service_name, username):
+        for role in list_roles():
+            filtered_users, removed = filter_user_from_role_members(role.get("users", []), username)
+            if not removed:
+                continue
+            payload = {
+                "id": role["id"],
+                "guid": role.get("guid"),
+                "version": role.get("version"),
+                "createdByUser": role.get("createdByUser"),
+                "name": role["name"],
+                "description": role.get("description", ""),
+                "isEnabled": bool(role.get("isEnabled", True)),
+                "users": normalize_role_members(filtered_users),
+                "groups": normalize_role_members(role.get("groups", [])),
+                "roles": normalize_role_members(role.get("roles", [])),
+            }
+            request("PUT", role_update_path(role["id"]), payload, ok=(200,))
+            print(f"Detached legacy user {username} from Ranger role: {role['name']}")
+
+
+    def filter_user_from_policy_items(items, username):
+        filtered_items = []
+        removed = False
+        for item in items or []:
+            updated_item = dict(item)
+            users = normalize_names(name for name in item.get("users", []) if str(name) != username)
+            removed = removed or len(users) != len(item.get("users", []) or [])
+            updated_item["users"] = users
+            updated_item["groups"] = normalize_names(item.get("groups", []))
+            updated_item["roles"] = normalize_names(item.get("roles", []))
+            if updated_item["users"] or updated_item["groups"] or updated_item["roles"]:
+                filtered_items.append(updated_item)
+        return filtered_items, removed
+
+
+    def detach_user_from_policies(service_name, username):
+        for policy in list_policies(service_name):
+            updated_policy = dict(policy)
+            removed = False
+            for key in [
+                "policyItems",
+                "denyPolicyItems",
+                "allowExceptions",
+                "denyExceptions",
+                "dataMaskPolicyItems",
+                "rowFilterPolicyItems",
+            ]:
+                filtered_items, key_removed = filter_user_from_policy_items(policy.get(key, []), username)
+                updated_policy[key] = filtered_items
+                removed = removed or key_removed
+
+            if not removed:
+                continue
+
+            has_principals = any(
+                updated_policy.get(key)
+                for key in [
+                    "policyItems",
+                    "denyPolicyItems",
+                    "allowExceptions",
+                    "denyExceptions",
+                    "dataMaskPolicyItems",
+                    "rowFilterPolicyItems",
+                ]
+            )
+            if has_principals:
+                request("PUT", policy_path(policy["id"]), updated_policy, ok=(200,))
+                print(f"Detached legacy user {username} from Ranger policy: {policy['name']}")
+            else:
+                request("DELETE", policy_path(policy["id"]), ok=(204, 404))
+                print(f"Deleted stale Ranger policy with no remaining principals: {policy['name']}")
+
+
+    def delete_user_by_name(username):
+        user = get_user(username)
+        if not user:
+            return
+        request(
+            "DELETE",
+            f"/service/xusers/secure/users/id/{user['id']}?forceDelete=true",
+            ok=(200, 204, 404),
+            parse_json=False,
+        )
+        print(f"Deleted stale Ranger user: {username}")
+
+
+    def purge_legacy_users(config, service_name):
+        for username in normalize_names(config["ranger"].get("legacyManagedUsers", [])):
+            detach_user_from_roles(service_name, username)
+            detach_user_from_policies(service_name, username)
+            delete_user_by_name(username)
+
+
     def normalize_policy_resource(value):
         normalized = as_resource(value)
         normalized["values"] = sorted(str(item) for item in normalized.get("values", []))
@@ -649,6 +857,9 @@ data:
         policies.extend(build_catalog_acl_policies(config))
         for raw_policy in config["ranger"].get("bootstrapPolicies", []):
             policies.append(normalize_policy(raw_policy, service_name))
+
+        ensure_users_exist(policy_principal_usernames(config, policies))
+        purge_legacy_users(config, service_name)
 
         for policy in policies:
             upsert_policy(service_name, policy)
@@ -1114,6 +1325,17 @@ data:
         service_username = str((config.get("ranger") or {}).get("serviceUsername") or "").strip()
         if service_username:
             desired.add(service_username)
+        for policy in (config.get("ranger") or {}).get("bootstrapPolicies", []) or []:
+            for key in [
+                "policyItems",
+                "denyPolicyItems",
+                "allowExceptions",
+                "denyExceptions",
+                "dataMaskPolicyItems",
+                "rowFilterPolicyItems",
+            ]:
+                for item in policy.get(key, []) or []:
+                    desired.update(normalize_names(item.get("users", [])))
 
         membership_source = str((config.get("ranger") or {}).get("platformRoleMembershipSource", "git") or "git").lower()
         if membership_source == "ranger":

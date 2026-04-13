@@ -87,6 +87,14 @@
                 "internalScheme": { "type": "string" },
                 "displayName": { "type": "string" },
                 "loginTheme": { "type": "string" },
+                "registration": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "properties": {
+                    "enabled": { "type": "boolean" },
+                    "requireEmailVerification": { "type": "boolean" }
+                  }
+                },
                 "configCliEnvExistingSecret": { "type": "string" },
                 "bootstrapUsers": {
                   "type": "array",
@@ -168,6 +176,7 @@
                       "enum": ["ldap", "file", "ldap-file"]
                     },
                     "passwordAuthEnabled": { "type": "boolean" },
+                    "ldapUserBindPattern": { "type": "string" },
                     "groupProviderEnabled": { "type": "boolean" },
                     "sharedSecretExistingSecret": { "type": "string" },
                     "sharedSecretKey": { "type": "string" }
@@ -569,7 +578,7 @@
           "properties": {
             "mode": {
               "type": "string",
-              "enum": ["externalLdap"]
+              "enum": ["externalLdap", "keycloakLocal"]
             },
             "ldap": {
               "type": "object",
@@ -707,6 +716,10 @@
               "items": { "type": "string" }
             },
             "superGroups": {
+              "type": "array",
+              "items": { "type": "string" }
+            },
+            "legacyManagedUsers": {
               "type": "array",
               "items": { "type": "string" }
             },
@@ -1022,6 +1035,10 @@
             "enabled": { "type": "boolean" },
             "className": { "type": "string" },
             "host": { "type": "string" },
+            "additionalHosts": {
+              "type": "array",
+              "items": { "type": "string" }
+            },
             "tlsSecretName": { "type": "string" },
             "annotations": {
               "type": "object",

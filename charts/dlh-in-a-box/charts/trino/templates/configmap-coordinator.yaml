@@ -7,6 +7,8 @@
 {{- $identityClients := get $externalIdentity "clients" | default (dict) -}}
 {{- $trinoIdentity := get $identityClients "trino" | default (dict) -}}
 {{- $directory := get $identity "directory" | default (dict) -}}
+{{- $directoryMode := default "externalLdap" (get $directory "mode") -}}
+{{- $keycloakLocalMode := eq $directoryMode "keycloakLocal" -}}
 {{- $ldap := get $directory "ldap" | default (dict) -}}
 {{- $authorization := get .Values.global "authorization" | default (dict) -}}
 {{- $ranger := get $authorization "ranger" | default (dict) -}}
@@ -37,7 +39,7 @@
 {{- $ldapAllowInsecure := default false $ldap.allowInsecure -}}
 {{- $ldapTrustedCaPath := printf "%s/auth/ldap/ca/%s" .Values.server.config.path $ldapTrustedCaCertKey -}}
 {{- $ldapUseTrustedCa := and $ldapEnabled (not $ldapAllowInsecure) $ldapTrustedCaSecretName -}}
-{{- $ldapUserBindPattern := default "" $ldap.userBindPattern -}}
+{{- $ldapUserBindPattern := default (default "" $ldap.userBindPattern) $trinoIdentity.ldapUserBindPattern -}}
 {{- $bootstrapUsersEnabled := gt (len (default (list) $keycloakProvider.bootstrapUsers)) 0 -}}
 {{- $bootstrapOnlyMode := and $bootstrapUsersEnabled (not $ldapEnabled) -}}
 {{- $rangerTrinoEnabled := and $rangerEnabled (default false $rangerTrino.enabled) (not $bootstrapOnlyMode) -}}
@@ -47,8 +49,8 @@
   {{- if not $trinoIdentity.existingSecret }}{{- fail "global.identity.external.clients.trino.existingSecret is required when Trino identity integration is enabled." }}{{- end }}
   {{- if not $trinoIdentity.sharedSecretExistingSecret }}{{- fail "global.identity.external.clients.trino.sharedSecretExistingSecret is required when Trino identity integration is enabled." }}{{- end }}
   {{- if and $passwordAuthRequested (not (or $ldapPasswordAuthEnabled $filePasswordAuthEnabled)) }}{{- fail "global.identity.external.clients.trino.passwordAuthMode must be one of ldap, file, or ldap-file when Trino PASSWORD auth is enabled." }}{{- end }}
+  {{- if and $keycloakLocalMode $ldapPasswordAuthEnabled }}{{- fail "global.identity.external.clients.trino.passwordAuthMode must be file when global.identity.directory.mode=keycloakLocal. LDAP PASSWORD auth is not allowed in that mode." }}{{- end }}
   {{- if and $ldapPasswordAuthEnabled (not $ldapDirectoryEnabled) }}{{- fail "global.identity.directory.ldap.enabled must be true when Trino LDAP PASSWORD auth is enabled through the shared identity contract." }}{{- end }}
-  {{- if and (not $ldapDirectoryEnabled) (not $bootstrapUsersEnabled) }}{{- fail "global.identity.directory.ldap.enabled must be true when Trino identity integration is enabled, unless you are using bundled Keycloak bootstrapUsers for a temporary OIDC-only fallback." }}{{- end }}
   {{- if and $ldapEnabled (not $ldapUrl) }}{{- fail "global.identity.directory.ldap.url is required when Trino identity integration is enabled." }}{{- end }}
   {{- if and $ldapEnabled (not $ldapUserBaseDn) }}{{- fail "global.identity.directory.ldap.userBaseDn is required when Trino identity integration is enabled." }}{{- end }}
   {{- if and $ldapEnabled (not $ldapGroupBaseDn) }}{{- fail "global.identity.directory.ldap.groupBaseDn is required when Trino identity integration is enabled." }}{{- end }}

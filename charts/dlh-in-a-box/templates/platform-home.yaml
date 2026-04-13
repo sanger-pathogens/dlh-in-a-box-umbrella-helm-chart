@@ -15,6 +15,8 @@
 {{- $global := .Values.global | default dict -}}
 {{- $identity := get $global "identity" | default dict -}}
 {{- $directory := get $identity "directory" | default dict -}}
+{{- $directoryMode := include "dlh-in-a-box.identity.directoryMode" . -}}
+{{- $keycloakLocalMode := eq $directoryMode "keycloakLocal" -}}
 {{- $ldap := get $directory "ldap" | default dict -}}
 {{- $authorization := get $global "authorization" | default dict -}}
 {{- $platformRoles := get $authorization "platformRoles" | default dict -}}
@@ -52,6 +54,7 @@
 {{- $metaThemeColor := default "#1f5f7a" (get $theme "metaThemeColor") -}}
 {{- $fontBodyFamily := default "system-ui, -apple-system, BlinkMacSystemFont, \"Segoe UI\", sans-serif" (get $themeFonts "bodyFamily") -}}
 {{- $fontHeadingFamily := default "Georgia, \"Times New Roman\", serif" (get $themeFonts "headingFamily") -}}
+{{- $accessControlNotice := "Access Control is disabled in Keycloak local-user mode. Use Keycloak Admin to grant browser app groups and Ranger Admin to grant Trino data roles." -}}
 {{- $platformRoleViews := list -}}
 {{- $appRoleGroups := dict
   "superset" (list)
@@ -143,7 +146,8 @@
   ) -}}
 {{- end -}}
 {{- $adminTools := list -}}
-{{- if and (default false $ranger.enabled) (gt (len $platformRoleViews) 0) -}}
+{{- $roleManagementEnabled := and (default false $ranger.enabled) (gt (len $platformRoleViews) 0) (not $keycloakLocalMode) -}}
+{{- if $roleManagementEnabled -}}
   {{- $toolMeta := get $itemMeta "access-control" | default dict -}}
   {{- $adminTools = append $adminTools (dict
     "id" "access-control"
@@ -334,6 +338,7 @@
     "refreshIntervalSeconds" (default 90 (get $portalHealth "refreshIntervalSeconds"))
   )
   "identity" (dict
+    "directoryMode" $directoryMode
     "groupsClaim" (default "groups" $oidc.groupsClaim)
     "keycloak" (dict
       "baseUrl" (default (include "dlh-in-a-box.keycloak.browserBaseUrl" .) .Values.platformHome.keycloakBrowserBaseUrl)
@@ -345,14 +350,18 @@
   "admin" (dict
     "requiredGroups" (list $adminRequiredGroup)
     "tools" $adminTools
-    "roleManagementEnabled" (and $ranger.enabled (gt (len $platformRoleViews) 0))
+    "roleManagementEnabled" $roleManagementEnabled
+    "accessControlEnabled" $roleManagementEnabled
+    "accessControlNotice" (ternary $accessControlNotice "" $keycloakLocalMode)
     "accessControlPath" "/access-control"
   )
 -}}
 {{- $platformHomeAdminConfig := dict
   "admin" (dict
     "requiredGroups" (list $adminRequiredGroup)
-    "roleManagementEnabled" (and $ranger.enabled (gt (len $platformRoleViews) 0))
+    "roleManagementEnabled" $roleManagementEnabled
+    "accessControlEnabled" $roleManagementEnabled
+    "accessControlNotice" (ternary $accessControlNotice "" $keycloakLocalMode)
     "accessControlPath" "/access-control"
   )
   "adminTools" $adminTools
@@ -367,6 +376,7 @@
     "browserUrl" $rangerBrowserUrl
     "usersyncEnabled" (default true $usersyncEnabled)
     "membershipSource" $platformRoleMembershipSource
+    "directoryMode" $directoryMode
   )
   "ldap" (dict
     "enabled" $ldapEnabled
@@ -444,6 +454,7 @@ data:
           </div>
         </header>
         <main id="signed-in-content" class="content is-hidden">
+          <div id="portal-notice" class="status-banner is-hidden"></div>
           <section id="launch-groups" class="group-stack"></section>
           <section id="empty-panel" class="panel is-hidden">
             <div class="panel-header">
@@ -505,11 +516,22 @@ data:
     <body>
       <script>
         try {
+          {{- if $keycloakLocalMode }}
+          window.sessionStorage.setItem("platform-home-route-notice", JSON.stringify({
+            level: "info",
+            message: {{ $accessControlNotice | quote }}
+          }));
+          {{- else }}
           window.sessionStorage.setItem("platform-home-target-section", "access-control");
+          {{- end }}
         } catch (error) {
           console.warn("Unable to persist the administration redirect target.", error);
         }
+        {{- if $keycloakLocalMode }}
+        window.location.replace("/");
+        {{- else }}
         window.location.replace("/access-control");
+        {{- end }}
       </script>
     </body>
     </html>
@@ -528,6 +550,7 @@ data:
     const adminTools = document.getElementById("admin-tools");
     const roleManagementPanel = document.getElementById("role-management-panel");
     const roleManagementStatus = document.getElementById("role-management-status");
+    const portalNotice = document.getElementById("portal-notice");
     const roleCatalog = document.getElementById("role-catalog");
     const roleDetail = document.getElementById("role-detail");
     const accessControlBack = document.getElementById("access-control-back");
@@ -538,6 +561,7 @@ data:
     const portalThemeColor = document.getElementById("portal-theme-color");
     const defaultLoginLabel = loginButton ? loginButton.textContent : "Sign in";
     const sectionStorageKey = "platform-home-target-section";
+    const routeNoticeStorageKey = "platform-home-route-notice";
     const accessControlPath = "/access-control";
 
     const state = {
@@ -656,6 +680,37 @@ data:
       }
     }
 
+    function rememberRouteNotice(level, message) {
+      if (!message) {
+        return;
+      }
+      try {
+        window.sessionStorage.setItem(routeNoticeStorageKey, JSON.stringify({ level, message }));
+      } catch (error) {
+        console.warn("Unable to persist the route notice.", error);
+      }
+    }
+
+    function consumeRouteNotice() {
+      try {
+        const raw = window.sessionStorage.getItem(routeNoticeStorageKey);
+        window.sessionStorage.removeItem(routeNoticeStorageKey);
+        if (!raw) {
+          return null;
+        }
+        const parsed = JSON.parse(raw);
+        if (!parsed || typeof parsed !== "object") {
+          return null;
+        }
+        return {
+          level: typeof parsed.level === "string" ? parsed.level : "info",
+          message: typeof parsed.message === "string" ? parsed.message : "",
+        };
+      } catch (error) {
+        return null;
+      }
+    }
+
     function clearTunnelOauthProxyCookies() {
       document.cookie
         .split(";")
@@ -708,6 +763,24 @@ data:
       hide(administration);
       show(roleManagementPanel);
       show(accessControlBack);
+    }
+
+    function setPortalNotice(level, message) {
+      if (!portalNotice) {
+        return;
+      }
+      if (!message) {
+        portalNotice.textContent = "";
+        portalNotice.className = "status-banner is-hidden";
+        return;
+      }
+      portalNotice.innerHTML = message;
+      portalNotice.className = `status-banner is-${level}`;
+      show(portalNotice);
+    }
+
+    function accessControlEnabled() {
+      return Boolean(state.config?.admin?.accessControlEnabled);
     }
 
     function renderCardIcon(item) {
@@ -819,6 +892,7 @@ data:
       hide(administration);
       hide(adminToolsPanel);
       hide(roleManagementPanel);
+      setPortalNotice("", "");
     }
 
     function setLoginPending(label = "Starting sign-in...") {
@@ -1716,6 +1790,11 @@ data:
 
     async function loadAdminExperience() {
       renderAdminTools(state.config, state.isAdmin);
+      if (!accessControlEnabled() && currentPortalRoute() === "access-control") {
+        rememberRouteNotice("info", state.config?.admin?.accessControlNotice || "Use Keycloak Admin and Ranger Admin for access management in this environment.");
+        window.location.replace("/");
+        return;
+      }
       if (currentPortalRoute() === "access-control" && !state.isAdmin) {
         window.location.replace("/");
         return;
@@ -1757,6 +1836,11 @@ data:
 
       state.config = await response.json();
       applyBranding(state.config);
+      if (currentPortalRoute() === "access-control" && !accessControlEnabled()) {
+        rememberRouteNotice("info", state.config?.admin?.accessControlNotice || "Use Keycloak Admin and Ranger Admin for access management in this environment.");
+        clearTargetSection();
+        window.history.replaceState(null, document.title, "/");
+      }
       if (window.location.hash === "#administration" || currentPortalRoute() === "access-control") {
         rememberTargetSection("access-control");
       }
@@ -1810,6 +1894,12 @@ data:
         "Authenticated user";
 
       setAuthenticatedState(displayName, state.isAdmin);
+      const routeNotice = consumeRouteNotice();
+      if (routeNotice?.message) {
+        setPortalNotice(routeNotice.level || "info", escapeHtml(routeNotice.message));
+      } else {
+        setPortalNotice("", "");
+      }
       logoutButton.addEventListener("click", () => {
         keycloak.logout({ redirectUri: `${window.location.origin}/` });
       });
@@ -2785,6 +2875,11 @@ data:
 
 
     CONFIG = load_config()
+    ACCESS_CONTROL_ENABLED = bool(CONFIG.get("admin", {}).get("accessControlEnabled", True))
+    ACCESS_CONTROL_DISABLED_MESSAGE = str(
+        CONFIG.get("admin", {}).get("accessControlNotice")
+        or "Use Keycloak Admin and Ranger Admin for access management in this environment."
+    )
     ROLE_CATALOG = {
         str(role.get("key", "")): role
         for role in CONFIG.get("roles", [])
@@ -3392,6 +3487,11 @@ data:
         return kubernetes_api_enabled()
 
 
+    def ensure_access_control_enabled():
+        if not ACCESS_CONTROL_ENABLED:
+            raise ApiError(409, ACCESS_CONTROL_DISABLED_MESSAGE)
+
+
     def active_exception(exception, now=None):
         if not isinstance(exception, dict):
             return False
@@ -3636,16 +3736,18 @@ data:
         usersync_enabled = bool(CONFIG.get("ranger", {}).get("usersyncEnabled"))
         return {
             "adminEnabled": True,
+            "accessControlEnabled": ACCESS_CONTROL_ENABLED,
             "rangerEnabled": bool(CONFIG.get("ranger", {}).get("enabled")),
             "membershipSource": membership_source,
-            "usersyncEnabled": usersync_enabled,
-            "groupAssignmentEnabled": bool(usersync_enabled),
-            "userAssignmentEnabled": membership_source == "ranger" and exception_support_enabled(),
-            "exceptionSupportEnabled": exception_support_enabled(),
+            "usersyncEnabled": usersync_enabled if ACCESS_CONTROL_ENABLED else False,
+            "groupAssignmentEnabled": bool(usersync_enabled) if ACCESS_CONTROL_ENABLED else False,
+            "userAssignmentEnabled": membership_source == "ranger" and exception_support_enabled() and ACCESS_CONTROL_ENABLED,
+            "exceptionSupportEnabled": exception_support_enabled() and ACCESS_CONTROL_ENABLED,
             "ldapEnabled": bool(ldap_config().get("enabled")),
             "ldapReachable": bool(directory.get("ldapReachable")),
-            "directoryMessage": directory.get("message", ""),
+            "directoryMessage": ACCESS_CONTROL_DISABLED_MESSAGE if not ACCESS_CONTROL_ENABLED else directory.get("message", ""),
             "auditUrl": CONFIG.get("ranger", {}).get("browserUrl", ""),
+            "notice": ACCESS_CONTROL_DISABLED_MESSAGE if not ACCESS_CONTROL_ENABLED else "",
         }
 
 
@@ -3869,6 +3971,7 @@ data:
                     return
 
                 if self.command == "GET" and path in {"/api/admin/platform-roles", "/api/admin/access-control/roles"}:
+                    ensure_access_control_enabled()
                     json_response(
                         self,
                         200,
@@ -3880,6 +3983,7 @@ data:
                     return
 
                 if self.command == "GET" and path == "/api/admin/principals":
+                    ensure_access_control_enabled()
                     params = urllib.parse.parse_qs(parsed.query or "")
                     kind = str((params.get("kind") or [""])[0]).strip().lower()
                     query = str((params.get("query") or [""])[0]).strip()
@@ -3890,6 +3994,7 @@ data:
                     return
 
                 if path.startswith("/api/admin/platform-roles/") and path.endswith("/members") and self.command in {"POST", "DELETE"}:
+                    ensure_access_control_enabled()
                     parts = path.split("/")
                     if len(parts) != 6:
                         raise ApiError(404, "Unknown admin API path.")
@@ -3901,18 +4006,21 @@ data:
                     return
 
                 if self.command == "GET" and path == "/api/admin/access-control/directory-users":
+                    ensure_access_control_enabled()
                     params = urllib.parse.parse_qs(parsed.query or "")
                     query = str((params.get("query") or [""])[0]).strip()
                     json_response(self, 200, {"results": search_directory("user", query) if query else []})
                     return
 
                 if self.command == "GET" and path == "/api/admin/access-control/directory-groups":
+                    ensure_access_control_enabled()
                     params = urllib.parse.parse_qs(parsed.query or "")
                     query = str((params.get("query") or [""])[0]).strip()
                     json_response(self, 200, {"results": search_directory("group", query) if query else []})
                     return
 
                 if path.startswith("/api/admin/access-control/roles/") and path.endswith("/groups") and self.command in {"POST", "DELETE"}:
+                    ensure_access_control_enabled()
                     parts = path.split("/")
                     if len(parts) != 7:
                         raise ApiError(404, "Unknown admin API path.")
@@ -3923,6 +4031,7 @@ data:
                     return
 
                 if path.startswith("/api/admin/access-control/roles/") and path.endswith("/users") and self.command in {"POST", "DELETE"}:
+                    ensure_access_control_enabled()
                     parts = path.split("/")
                     if len(parts) != 7:
                         raise ApiError(404, "Unknown admin API path.")
@@ -3933,6 +4042,7 @@ data:
                     return
 
                 if path.startswith("/api/admin/access-control/roles/") and path.endswith("/exceptions") and self.command == "POST":
+                    ensure_access_control_enabled()
                     parts = path.split("/")
                     if len(parts) != 7:
                         raise ApiError(404, "Unknown admin API path.")
@@ -3943,6 +4053,7 @@ data:
                     return
 
                 if path.startswith("/api/admin/access-control/roles/") and "/exceptions/" in path and self.command == "PATCH":
+                    ensure_access_control_enabled()
                     parts = path.split("/")
                     if len(parts) != 8:
                         raise ApiError(404, "Unknown admin API path.")
@@ -3954,6 +4065,7 @@ data:
                     return
 
                 if path.startswith("/api/admin/access-control/roles/") and "/exceptions/" in path and self.command == "DELETE":
+                    ensure_access_control_enabled()
                     parts = path.split("/")
                     if len(parts) != 8:
                         raise ApiError(404, "Unknown admin API path.")
@@ -4376,10 +4488,25 @@ spec:
                 name: {{ $serviceName }}
                 port:
                   number: 80
+    {{- range $extraHost := (.Values.platformHome.ingress.additionalHosts | default (list)) }}
+    - host: {{ $extraHost | quote }}
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ $serviceName }}
+                port:
+                  number: 80
+    {{- end }}
   {{- if .Values.platformHome.ingress.tlsSecretName }}
   tls:
     - hosts:
         - {{ .Values.platformHome.ingress.host | quote }}
+        {{- range $extraHost := (.Values.platformHome.ingress.additionalHosts | default (list)) }}
+        - {{ $extraHost | quote }}
+        {{- end }}
       secretName: {{ .Values.platformHome.ingress.tlsSecretName }}
   {{- end }}
 {{- end }}

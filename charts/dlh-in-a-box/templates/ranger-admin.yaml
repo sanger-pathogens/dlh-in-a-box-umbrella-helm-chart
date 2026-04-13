@@ -39,8 +39,8 @@ data:
     sqlanywhere_core_file=db/sqlanywhere/optimized/current/ranger_core_db_sqlanywhere.sql
     postgres_audit_file=db/postgres/xa_audit_db_postgres.sql
     rangerAdmin_password=${RANGER_ADMIN_PASSWORD}
-    rangerTagsync_password=rangertagsync
-    rangerUsersync_password=rangerusersync
+    rangerTagsync_password=${RANGER_TAGSYNC_PASSWORD}
+    rangerUsersync_password=${RANGER_USERSYNC_PASSWORD}
     keyadmin_password=keyadmin
     JAVA_VERSION_REQUIRED=1.8
     audit_store=db
@@ -227,6 +227,16 @@ spec:
                 secretKeyRef:
                   name: {{ $ranger.admin.existingSecret }}
                   key: {{ default "rangerAdminPassword" $ranger.admin.adminPasswordKey }}
+            - name: RANGER_USERSYNC_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $ranger.admin.existingSecret }}
+                  key: {{ default "rangerUsersyncPassword" $ranger.admin.usersyncPasswordKey }}
+            - name: RANGER_TAGSYNC_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $ranger.admin.existingSecret }}
+                  key: {{ default "rangerTagsyncPassword" $ranger.admin.tagsyncPasswordKey }}
             - name: RANGER_POLICYMGR_EXTERNAL_URL
               value: {{ include "dlh-in-a-box.ranger.admin.url" . | quote }}
           ports:

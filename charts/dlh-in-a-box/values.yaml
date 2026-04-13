@@ -13,6 +13,9 @@ global:
         internalScheme: http
         displayName: ""
         loginTheme: ""
+        registration:
+          enabled: false
+          requireEmailVerification: true
         configCliEnvExistingSecret: dlh-keycloak-config-cli-env
         bootstrapUsers: []
     external:
@@ -203,6 +206,7 @@ global:
       superUsers:
         - admin
       superGroups: []
+      legacyManagedUsers: []
       legacyManagedRoles: []
       useRangerGroups: false
       postgresql:
@@ -222,6 +226,7 @@ global:
         existingSecret: dlh-ranger-admin
         adminPasswordKey: rangerAdminPassword
         usersyncPasswordKey: rangerUsersyncPassword
+        tagsyncPasswordKey: rangerTagsyncPassword
       usersync:
         enabled: true
         image:
@@ -298,9 +303,16 @@ keycloak:
       dlh-realm.yaml: |
         realm: {{ include "dlh-in-a-box.keycloak.realm" $ }}
         enabled: true
-        registrationAllowed: false
+        {{- $keycloakRegistration := default (dict) .Values.global.identity.provider.keycloak.registration }}
+        {{- $registrationEnabled := default false (get $keycloakRegistration "enabled") }}
+        {{- $requireEmailVerification := true }}
+        {{- if hasKey $keycloakRegistration "requireEmailVerification" }}
+        {{- $requireEmailVerification = get $keycloakRegistration "requireEmailVerification" }}
+        {{- end }}
+        registrationAllowed: {{ ternary "true" "false" $registrationEnabled }}
         loginWithEmailAllowed: true
         duplicateEmailsAllowed: false
+        verifyEmail: {{ ternary "true" "false" (and $registrationEnabled $requireEmailVerification) }}
         resetPasswordAllowed: true
         rememberMe: true
         {{- $keycloakDisplayName := default "" .Values.global.identity.provider.keycloak.displayName }}
@@ -336,15 +348,19 @@ keycloak:
                   claim.name: {{ .Values.global.identity.external.oidc.groupsClaim | quote }}
                   jsonType.label: String
         {{- $bootstrapUsers := default (list) .Values.global.identity.provider.keycloak.bootstrapUsers }}
-        {{- $bootstrapGroups := dict }}
+        {{- $managedGroups := fromJsonArray (include "dlh-in-a-box.identity.keycloakManagedGroupsJson" $) }}
+        {{- $seededGroups := dict }}
+        {{- range $groupName := $managedGroups }}
+          {{- $_ := set $seededGroups (toString $groupName) true }}
+        {{- end }}
         {{- range $user := $bootstrapUsers }}
           {{- range $group := default (list) $user.groups }}
-            {{- $_ := set $bootstrapGroups (toString $group) true }}
+            {{- $_ := set $seededGroups (toString $group) true }}
           {{- end }}
         {{- end }}
-        {{- if gt (len $bootstrapGroups) 0 }}
+        {{- if gt (len $seededGroups) 0 }}
         groups:
-        {{- range $groupName := keys $bootstrapGroups | sortAlpha }}
+        {{- range $groupName := keys $seededGroups | sortAlpha }}
           - name: {{ $groupName | quote }}
         {{- end }}
         {{- end }}
@@ -828,6 +844,7 @@ platformHome:
     enabled: false
     className: ""
     host: ""
+    additionalHosts: []
     tlsSecretName: ""
     annotations: {}
   branding:
@@ -981,9 +998,11 @@ prefect-auth-proxy:
       # Use a distinct oauth2-proxy cookie per app so localhost tunnel access
       # does not mix Prefect and CloudBeaver sessions on 127.0.0.1.
       cookie_name = "_oauth2_proxy_prefect"
+      session_cookie_minimal = true
       upstreams = [ "http://prefect-server:4200" ]
-      pass_access_token = true
-      pass_authorization_header = true
+      pass_access_token = false
+      pass_authorization_header = false
+      pass_user_headers = true
       set_xauthrequest = true
       reverse_proxy = true
   service:
@@ -1059,9 +1078,11 @@ ranger-auth-proxy:
       skip_provider_button = true
       cookie_secure = {{ hasPrefix "https://" .Values.global.identity.external.clients.rangerProxy.redirectUrl }}
       cookie_name = "_oauth2_proxy_ranger"
+      cookie_csrf_per_request = true
+      session_cookie_minimal = true
       upstreams = [ "http://{{ include "dlh-in-a-box.ranger.browserProxy.serviceName" $ }}:80" ]
-      pass_access_token = true
-      pass_authorization_header = true
+      pass_access_token = false
+      pass_authorization_header = false
       pass_user_headers = true
       set_xauthrequest = true
       reverse_proxy = true

@@ -4,6 +4,8 @@
 {{- $identity := $global.identity | default dict -}}
 {{- $provider := get $identity "provider" | default dict -}}
 {{- $directory := get $identity "directory" | default dict -}}
+{{- $directoryMode := include "dlh-in-a-box.identity.directoryMode" . -}}
+{{- $keycloakLocalMode := eq $directoryMode "keycloakLocal" -}}
 {{- $ldap := get $directory "ldap" | default dict -}}
 {{- $external := get $identity "external" | default dict -}}
 {{- $clients := get $external "clients" | default dict -}}
@@ -43,6 +45,12 @@
 {{- $keycloakValues := .Values.keycloak | default dict -}}
 {{- $keycloakConfigCli := get $keycloakValues "keycloakConfigCli" | default dict -}}
 {{- $keycloakProvider := get $provider "keycloak" | default dict -}}
+{{- $keycloakRegistration := get $keycloakProvider "registration" | default dict -}}
+{{- $selfRegistrationEnabled := default false (get $keycloakRegistration "enabled") -}}
+{{- $requireEmailVerification := true -}}
+{{- if hasKey $keycloakRegistration "requireEmailVerification" -}}
+  {{- $requireEmailVerification = get $keycloakRegistration "requireEmailVerification" -}}
+{{- end -}}
 {{- $configCliEnvSecretName := default "" $keycloakProvider.configCliEnvExistingSecret -}}
 {{- $bootstrapUsers := default (list) $keycloakProvider.bootstrapUsers -}}
 {{- $bootstrapUsersEnabled := gt (len $bootstrapUsers) 0 -}}
@@ -63,6 +71,9 @@
 {{- end -}}
 {{- if and $bootstrapUsersEnabled (eq $environment "prod") -}}
 {{- fail "global.identity.provider.keycloak.bootstrapUsers is a dev/local-only fallback and must not be enabled in prod." -}}
+{{- end -}}
+{{- if and $bootstrapUsersEnabled $keycloakLocalMode -}}
+{{- fail "global.identity.provider.keycloak.bootstrapUsers must not be used with global.identity.directory.mode=keycloakLocal. That mode expects real Keycloak-managed users, not the bootstrap fallback." -}}
 {{- end -}}
 {{- range $index, $user := $bootstrapUsers -}}
   {{- if not (get $user "username") -}}
@@ -97,8 +108,23 @@
 {{- if and (default false $identity.enabled) (eq $providerMode "bundledKeycloak") (not (get $keycloakConfigCli "enabled")) -}}
 {{- fail "Bundled Keycloak requires keycloak.keycloakConfigCli.enabled=true so the realm and LDAP federation can be bootstrapped." -}}
 {{- end -}}
-{{- if and (default false $identity.enabled) (not (default false $ldap.enabled)) (not $bootstrapUsersEnabled) -}}
-{{- fail "global.identity.directory.ldap.enabled must be true when shared identity is enabled, unless you are using bundled Keycloak bootstrapUsers for a local or dev-only browser-auth fallback." -}}
+{{- if and (default false $identity.enabled) $keycloakLocalMode (ne $providerMode "bundledKeycloak") -}}
+{{- fail "global.identity.directory.mode=keycloakLocal requires global.identity.provider.mode=bundledKeycloak." -}}
+{{- end -}}
+{{- if and (default false $identity.enabled) $keycloakLocalMode (default false $ldap.enabled) -}}
+{{- fail "global.identity.directory.ldap.enabled must be false when global.identity.directory.mode=keycloakLocal." -}}
+{{- end -}}
+{{- if and (default false $identity.enabled) $keycloakLocalMode (not $selfRegistrationEnabled) -}}
+{{- fail "global.identity.provider.keycloak.registration.enabled must be true when global.identity.directory.mode=keycloakLocal." -}}
+{{- end -}}
+{{- if and (default false $identity.enabled) $keycloakLocalMode (default false $trinoIdentity.passwordAuthEnabled) (ne (default "ldap" $trinoIdentity.passwordAuthMode) "file") -}}
+{{- fail "global.identity.external.clients.trino.passwordAuthMode must be file when Trino PASSWORD auth is enabled in global.identity.directory.mode=keycloakLocal. LDAP PASSWORD auth is not allowed in that mode." -}}
+{{- end -}}
+{{- if and (default false $identity.enabled) $keycloakLocalMode (default false $ranger.enabled) (dig "usersync" "enabled" true $ranger) -}}
+{{- fail "global.authorization.ranger.usersync.enabled must be false when global.identity.directory.mode=keycloakLocal." -}}
+{{- end -}}
+{{- if and (default false $identity.enabled) (not $keycloakLocalMode) (not (default false $ldap.enabled)) (not $bootstrapUsersEnabled) -}}
+{{- fail "global.identity.directory.ldap.enabled must be true when shared identity is enabled in externalLdap mode, unless you are using bundled Keycloak bootstrapUsers for a local or dev-only browser-auth fallback." -}}
 {{- end -}}
 {{- if and (default false $identity.enabled) (default false $ldap.enabled) (not $ldapUrl) -}}
 {{- fail "global.identity.directory.ldap.url is required when shared identity is enabled." -}}

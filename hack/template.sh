@@ -1,7 +1,10 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-CHART_PATH="charts/dlh-in-a-box"
+ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+cd "${ROOT_DIR}"
+
+CHART_PATH="${ROOT_DIR}/charts/dlh-in-a-box"
 
 render() {
   local values_file="$1"

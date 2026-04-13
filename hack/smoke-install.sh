@@ -12,6 +12,47 @@ TIMEOUT="${TIMEOUT:-20m}"
 ARTIFACT_DIR="${ARTIFACT_DIR:-}"
 SKIP_DEPENDENCY_UPDATE="${SKIP_DEPENDENCY_UPDATE:-false}"
 
+transient_kube_error() {
+  local message="${1:-}"
+  [[ "${message}" == *"context deadline exceeded"* ]] \
+    || [[ "${message}" == *"the server was unable to return a response in the time allotted"* ]] \
+    || [[ "${message}" == *"Kubernetes cluster unreachable"* ]] \
+    || [[ "${message}" == *"EOF"* ]] \
+    || [[ "${message}" == *"Client.Timeout exceeded while awaiting headers"* ]]
+}
+
+run_with_retries() {
+  local attempts="$1"
+  local sleep_seconds="$2"
+  shift 2
+
+  local attempt=1
+  local output=""
+
+  while true; do
+    set +e
+    output="$("$@" 2>&1)"
+    local exit_code=$?
+    set -e
+
+    if [[ ${exit_code} -eq 0 ]]; then
+      [[ -n "${output}" ]] && printf '%s\n' "${output}"
+      return 0
+    fi
+
+    if (( attempt >= attempts )) || ! transient_kube_error "${output}"; then
+      [[ -n "${output}" ]] && printf '%s\n' "${output}" >&2
+      return "${exit_code}"
+    fi
+
+    printf 'Transient Kubernetes error on attempt %d/%d; retrying in %ss...\n' \
+      "${attempt}" "${attempts}" "${sleep_seconds}" >&2
+    [[ -n "${output}" ]] && printf '%s\n' "${output}" >&2
+    sleep "${sleep_seconds}"
+    attempt=$((attempt + 1))
+  done
+}
+
 seed_secret() {
   local name="$1"
   shift
@@ -28,6 +69,10 @@ seed_local_auth_demo_secrets() {
 
   seed_secret dlh-keycloak-admin \
     --from-literal=adminPassword=admin123
+
+  seed_secret dlh-keycloak-postgresql \
+    --from-literal=password=keycloakdb123 \
+    --from-literal=postgres-password=keycloakdbadmin123
 
   seed_secret dlh-directory-bind \
     --from-literal=bindPassword=local-directory-bind-password
@@ -53,6 +98,8 @@ seed_local_auth_demo_secrets() {
     --from-literal=cookie-secret=0123456789abcdef0123456789abcdef
 
   seed_secret dlh-cloudbeaver-bootstrap \
+    --from-literal=admin-name=cbadmin \
+    --from-literal=admin-password=cloudbeaver-admin-password \
     --from-literal=initial-data.conf='{
       adminName: "cbadmin",
       adminPassword: "cloudbeaver-admin-password",
@@ -82,7 +129,8 @@ seed_local_auth_demo_secrets() {
 
   seed_secret dlh-ranger-admin \
     --from-literal=rangerAdminPassword=admin123 \
-    --from-literal=rangerUsersyncPassword=usersync123
+    --from-literal=rangerUsersyncPassword=usersync123 \
+    --from-literal=rangerTagsyncPassword=tagsync123
 
   seed_secret dlh-ranger-postgresql \
     --from-literal=password=rangerdb123 \
@@ -145,28 +193,29 @@ if [[ "$(basename "${VALUES_FILE}")" == "values-local-auth.yaml" ]]; then
   seed_local_auth_demo_secrets
 fi
 
-helm upgrade --install "${RELEASE_NAME}" "${CHART_PATH}" \
-  -n "${NAMESPACE}" \
-  --create-namespace \
-  -f "${VALUES_FILE}" \
-  --wait \
-  --timeout "${TIMEOUT}"
+run_with_retries 3 15 \
+  helm upgrade --install "${RELEASE_NAME}" "${CHART_PATH}" \
+    -n "${NAMESPACE}" \
+    --create-namespace \
+    -f "${VALUES_FILE}" \
+    --wait \
+    --timeout "${TIMEOUT}"
 
-mapfile -t workloads < <(kubectl get deployment -n "${NAMESPACE}" -o name)
-mapfile -t jobs < <(kubectl get job -n "${NAMESPACE}" -o name)
+mapfile -t workloads < <(run_with_retries 3 5 kubectl get deployment -n "${NAMESPACE}" -o name)
+mapfile -t jobs < <(run_with_retries 3 5 kubectl get job -n "${NAMESPACE}" -o name)
 
 for workload in "${workloads[@]}"; do
-  kubectl rollout status "${workload}" -n "${NAMESPACE}" --timeout="${TIMEOUT}"
+  run_with_retries 3 10 kubectl rollout status "${workload}" -n "${NAMESPACE}" --timeout="${TIMEOUT}"
 done
 
 for job in "${jobs[@]}"; do
-  kubectl wait --for=condition=complete "${job}" -n "${NAMESPACE}" --timeout="${TIMEOUT}"
+  run_with_retries 3 10 kubectl wait --for=condition=complete "${job}" -n "${NAMESPACE}" --timeout="${TIMEOUT}"
 done
 
-mapfile -t pods < <(kubectl get pod -n "${NAMESPACE}" --field-selector=status.phase!=Succeeded,status.phase!=Failed -o name)
+mapfile -t pods < <(run_with_retries 3 5 kubectl get pod -n "${NAMESPACE}" --field-selector=status.phase!=Succeeded,status.phase!=Failed -o name)
 
 for pod in "${pods[@]}"; do
-  kubectl wait --for=condition=Ready "${pod}" -n "${NAMESPACE}" --timeout="${TIMEOUT}"
+  run_with_retries 3 10 kubectl wait --for=condition=Ready "${pod}" -n "${NAMESPACE}" --timeout="${TIMEOUT}"
 done
 
-kubectl get pods,svc -n "${NAMESPACE}"
+run_with_retries 3 5 kubectl get pods,svc -n "${NAMESPACE}"

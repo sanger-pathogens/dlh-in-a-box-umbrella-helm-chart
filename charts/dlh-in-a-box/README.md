@@ -24,9 +24,21 @@ flowchart LR
   Umbrella --> Hive[Generated Hive metastores]
 ```
 
+## Supported Identity Modes
+
+The chart now supports two first-class identity modes:
+
+- `externalLdap`: bundled Keycloak for browser SSO, institutional LDAP or AD
+  for user and group discovery, optional Trino LDAP password auth, Ranger
+  usersync, and the portal `Access Control` workspace for routine membership
+  edits.
+- `keycloakLocal`: bundled Keycloak for browser SSO and self-registration,
+  Keycloak-managed browser app groups, Ranger direct-user data-role grants, and
+  OIDC/token-capable Trino clients instead of direct password auth.
+
 ## Default Architecture
 
-The default documented shared-environment model is:
+The default documented shared-environment model remains `externalLdap`:
 
 - `Keycloak` issues OIDC tokens.
 - `Organizational LDAP or Active Directory` supplies users and groups in every environment.
@@ -36,7 +48,9 @@ The default documented shared-environment model is:
   `global.authorization.ranger.trino.enabled=true` is set for a Ranger-capable
   Trino image. The LDAP group-provider path is opt-in through
   `global.identity.external.clients.trino.groupProviderEnabled` because not
-  every Trino image bundles that module.
+  every Trino image bundles that module. If Trino needs a different LDAP bind
+  pattern from the shared directory defaults, use
+  `global.identity.external.clients.trino.ldapUserBindPattern`.
 - `Superset`, `DataHub`, and the `Prefect` proxy trust the same OIDC issuer.
 - `Ranger`, `CloudBeaver`, and `Prefect` reuse that same browser session
   through chart-managed auth proxies.
@@ -47,8 +61,9 @@ The default documented shared-environment model is:
   cards, exposes health/status information, and only hides links based on
   Keycloak group claims.
 - `platformHome` also exposes an admin-only `/access-control` destination for
-  LDAP-backed role assignment and governed direct-user exceptions, with Ranger
-  as the live membership backend when enabled.
+  LDAP-backed role assignment and governed direct-user exceptions when the
+  chart runs in `externalLdap` mode, with Ranger as the live membership
+  backend when enabled.
 - `oauth2-proxy` protects Prefect, CloudBeaver, and the Ranger browser path
   because all three are front-door integrations around the same Keycloak
   session.
@@ -73,7 +88,7 @@ escape hatch, not the main reference architecture.
 
 | Values path | Why it exists |
 | --- | --- |
-| `global.identity` | Shared identity contract. Define the issuer, clients, directory settings, and Keycloak bootstrap secret here. |
+| `global.identity` | Shared identity contract. Define the identity mode, issuer, clients, directory settings, Keycloak registration behavior, and any local bootstrap fallback here. |
 | `global.authorization` | Ranger contract and bootstrap policy surface. |
 | `global.authorization.platformRoles` | Git-managed data-access roles that map directory groups or approved direct users into Ranger roles. |
 | `global.dataCatalogs` | Catalog definitions, access groups, and governance metadata. |
@@ -144,10 +159,12 @@ Platform administrators also get a first-class portal administration
 experience:
 
 - grouped admin-tool launch cards
-- a dedicated `Access Control` route backed by the same-origin admin API
+- a dedicated `Access Control` route backed by the same-origin admin API in
+  `externalLdap` mode only
 - LDAP-backed discovery of users and groups, with Ranger as the live write
-  target for role membership
-- governed direct-user exceptions with stored metadata and expiry
+  target for role membership in `externalLdap` mode
+- governed direct-user exceptions with stored metadata and expiry in
+  `externalLdap` mode
 - optional links to downstream admin tools such as Ranger Admin, which reuses
   the same browser session as the portal
 
@@ -162,10 +179,60 @@ nested role topology. When
 live user or group membership to Ranger so those changes survive later chart
 reconciliation.
 
+In `keycloakLocal` mode the portal intentionally hides the `Access Control`
+workspace instead of exposing a half-working LDAP-oriented UI. The supported
+admin split in that mode is:
+
+- Keycloak Admin for account lifecycle and browser app groups such as
+  `platform-app-*`
+- Ranger Admin for direct-user Trino data-role membership and policy audit
+- Trino OIDC/token-capable clients for DBeaver, Python, or R access
+
+## Keycloak Local Users Mode
+
+Use `global.identity.directory.mode=keycloakLocal` when an institution wants
+bundled Keycloak to own human accounts directly instead of federating to LDAP.
+
+That mode requires:
+
+- `global.identity.provider.mode=bundledKeycloak`
+- `global.identity.provider.keycloak.registration.enabled=true`
+- `global.identity.provider.keycloak.registration.requireEmailVerification` set
+  to match whether SMTP-backed verification is actually available
+- `global.identity.directory.ldap.enabled=false`
+- `global.identity.external.clients.trino.passwordAuthEnabled=false` for human
+  users, or `true` only with `passwordAuthMode=file` when you need non-human
+  service accounts such as `superset-service` or `cloudbeaver-service`
+- `global.authorization.ranger.usersync.enabled=false`
+
+The intended user lifecycle is:
+
+1. a user self-registers in Keycloak
+2. an administrator grants browser app groups in Keycloak
+3. an administrator grants Trino data access in Ranger
+4. the user accesses browser apps via Keycloak SSO and Trino via OIDC/token
+   clients
+
 When `cloudbeaver.bootstrap.sharedConnectionSeed.enabled=true` and
 `cloudbeaver.app.adminCredentialsSaveEnabled=true`, the chart can also persist
 managed shared datasource credentials into the seeded workspace so approved
 browser users do not see a second manual Trino login prompt.
+
+In that service-account model the common Trino identities are:
+
+- `admin`: break-glass operational credential for recovery, smoke tests, or
+  emergency maintenance
+- `cloudbeaver-service`: shared CloudBeaver datasource credential
+- `superset-service`: shared Superset datasource credential
+- `trino`: Ranger service identity used in the Ranger service definition and
+  plugin download settings, not a normal human login
+
+Only services that actually open Trino sessions should get a dedicated Trino
+identity. In the current shared chart model that means CloudBeaver and
+Superset. Other browser applications such as the portal, Keycloak, Prefect, or
+DataHub should not get extra Trino passwords unless they really submit Trino
+queries, because unused service credentials make audit trails noisier rather
+than clearer.
 
 ## Portal Theming And Branding
 
@@ -195,6 +262,7 @@ The main values surface is:
 | `platformHome.theme.fonts.preloads[]` | Optional preload links for remote or hosted font assets. |
 | `platformHome.theme.fonts.fontFaces[]` | Optional `@font-face` declarations emitted by the template. |
 | `platformHome.theme.customCss` | Small deployment-specific CSS escape hatch. |
+| `platformHome.ingress.additionalHosts[]` | Optional extra ingress hostnames that should serve the same portal frontend and TLS secret as the primary `platformHome.ingress.host`. |
 
 Minimal neutral example:
 
