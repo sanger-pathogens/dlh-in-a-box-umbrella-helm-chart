@@ -12,7 +12,7 @@ first-class identity modes.
 | Mode | Human account source | Browser app access | Trino programmatic access | Ranger usersync | Portal `Access Control` |
 | --- | --- | --- | --- | --- | --- |
 | `externalLdap` | Institutional LDAP or AD through Keycloak federation | LDAP/AD-derived platform groups | OIDC plus optional LDAP password auth | Enabled | Enabled |
-| `keycloakLocal` | Bundled Keycloak local users | Keycloak-managed `platform-app-*` groups | OIDC/token-capable clients only | Disabled | Hidden |
+| `keycloakLocal` | Bundled Keycloak local users | Keycloak-managed `platform-app-*` groups | OIDC/token-capable clients for ordinary users, with an optional named bootstrap admin file-password exception | Disabled | Hidden |
 
 ## Default Model
 
@@ -161,13 +161,17 @@ In `externalLdap` mode, that mixed-auth Trino path is deliberate. Browser SSO
 does not replace the LDAP password path used by Python, R, JDBC, DBeaver, or
 CloudBeaver query sessions.
 
-In `keycloakLocal` mode, that direct password path is intentionally removed.
+In `keycloakLocal` mode, ordinary user password auth is intentionally removed.
 The supported client story becomes:
 
 - Trino Web UI through browser OIDC
 - DBeaver through Trino JDBC OAuth2 / external browser authentication
 - Python through `trino-python-client` OAuth2
 - R through a JDBC or ODBC layer that reuses the same token-based flow
+
+Some deployments may also mirror a named bootstrap admin into Trino
+file-password auth for smoke validation or recovery. That is a narrow
+operational exception, not the normal user path.
 
 ## Platform Roles And Direct-User Exceptions
 

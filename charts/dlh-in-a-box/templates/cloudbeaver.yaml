@@ -43,9 +43,11 @@
 {{- $logoutUrl := default (printf "%s/oauth2/sign_out" $cloudbeaverOrigin) $authProxy.logoutUrl -}}
 {{- $cloudbeaverServerName := default "Data Platform CloudBeaver" $appConfig.serverName -}}
 {{- $cloudbeaverServerUrl := "" -}}
+{{- $cloudbeaverSecretManagerEnabled := or (default false $sharedConnectionSeedEnabled) (default false $appConfig.secretManagerEnabled) (default false $appConfig.publicCredentialsSaveEnabled) (default false $appConfig.adminCredentialsSaveEnabled) -}}
 {{- if $cloudbeaverOrigin -}}
   {{- $cloudbeaverServerUrl = printf "%s/" (trimSuffix "/" $cloudbeaverOrigin) -}}
 {{- end -}}
+{{- $cloudbeaverForceHttps := hasPrefix "https://" $cloudbeaverServerUrl -}}
 {{- $checksums := dict
   "config" ((printf "%s\n%s\n%s\n%s" (toPrettyJson $authProxy) (toPrettyJson $appConfig) (toPrettyJson $cloudbeaverIdentity) $logoutUrl) | sha256sum)
   "bootstrap" $bootstrap.existingSecret
@@ -78,7 +80,7 @@ data:
     {
       server: {
         serverPort: {{ $port }},
-        forceHttps: false,
+        forceHttps: {{ ternary "true" "false" (or $cloudbeaverForceHttps (default false $appConfig.forceHttps)) }},
         contentRoot: "web",
         driversLocation: "drivers",
         sslConfigurationPath: "${CLOUDBEAVER_SSL_CONF_PATH:workspace/.data/ssl-config.xml}",
@@ -124,6 +126,7 @@ data:
         showReadOnlyConnectionInfo: {{ ternary "true" "false" (default true $appConfig.showReadOnlyConnectionInfo) }},
         publicCredentialsSaveEnabled: {{ ternary "true" "false" (default false $appConfig.publicCredentialsSaveEnabled) }},
         adminCredentialsSaveEnabled: {{ ternary "true" "false" (default false $appConfig.adminCredentialsSaveEnabled) }},
+        secretManagerEnabled: {{ ternary "true" "false" $cloudbeaverSecretManagerEnabled }},
         enabledAuthProviders: [
           "reverseProxy"
         ],
@@ -359,8 +362,8 @@ spec:
                       -H "X-Forwarded-Groups: ${bootstrap_groups}" \
                       --data @"${tmp_dir}/open-session.json" \
                       "http://127.0.0.1:{{ $port }}/api/gql" >/dev/null
-                    cat >"${tmp_dir}/init-connection.json" <<EOF
-                    {"query":"mutation Init(\$id: ID!, \$projectId: ID, \$credentials: Object) { initConnection(id: \$id, projectId: \$projectId, credentials: \$credentials, saveCredentials: true, sharedCredentials: true) { id connected authNeeded credentialsSaved sharedCredentials } }","variables":{"id":"${CB_SHARED_CONNECTION_ID}","projectId":"${project_id}","credentials":{"user":"${CB_SHARED_CONNECTION_USERNAME}","password":"${CB_SHARED_CONNECTION_PASSWORD}","userName":"${CB_SHARED_CONNECTION_USERNAME}","userPassword":"${CB_SHARED_CONNECTION_PASSWORD}"}}}
+                    cat >"${tmp_dir}/update-connection.json" <<EOF
+                    {"query":"mutation Update(\$config: ConnectionConfig!, \$projectId: ID) { updateConnection(config: \$config, projectId: \$projectId) { id connected authNeeded credentialsSaved saveCredentials sharedCredentials } }","variables":{"projectId":"${project_id}","config":{"connectionId":"${CB_SHARED_CONNECTION_ID}","saveCredentials":true,"sharedCredentials":true,"credentials":{"user":"${CB_SHARED_CONNECTION_USERNAME}","password":"${CB_SHARED_CONNECTION_PASSWORD}","userName":"${CB_SHARED_CONNECTION_USERNAME}","userPassword":"${CB_SHARED_CONNECTION_PASSWORD}"}}}}
                     EOF
                     response="$(
                       curl -fsS \
@@ -369,11 +372,13 @@ spec:
                         -H "Content-Type: application/json" \
                         -H "X-Forwarded-Preferred-Username: ${CB_SHARED_BOOTSTRAP_USERNAME}" \
                         -H "X-Forwarded-Groups: ${bootstrap_groups}" \
-                        --data @"${tmp_dir}/init-connection.json" \
+                        --data @"${tmp_dir}/update-connection.json" \
                         "http://127.0.0.1:{{ $port }}/api/gql"
                     )"
-                    printf '%s' "${response}" | grep -Eq '"connected":[[:space:]]*true'
+                    printf '%s' "${response}" | grep -Eq '"saveCredentials":[[:space:]]*true'
+                    printf '%s' "${response}" | grep -Eq '"credentialsSaved":[[:space:]]*true'
                     printf '%s' "${response}" | grep -Eq '"authNeeded":[[:space:]]*false'
+                    printf '%s' "${response}" | grep -Eq '"sharedCredentials":[[:space:]]*true'
           {{- end }}
           ports:
             - name: http

@@ -106,6 +106,9 @@ assert_contains "${local_manifest}" "name: dlh-ranger-admin"
 assert_contains "${local_manifest}" "name: dlh-ranger-admin-exception-audit"
 assert_contains "${local_manifest}" "name: dlh-platform-home"
 assert_contains "${local_manifest}" "Administration"
+assert_contains "${local_manifest}" 'add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;'
+assert_contains "${local_manifest}" 'add_header X-Content-Type-Options "nosniff" always;'
+assert_contains "${local_manifest}" 'add_header Referrer-Policy "strict-origin-when-cross-origin" always;'
 assert_contains "${local_manifest}" "name: dlh-cloudbeaver"
 assert_contains "${local_manifest}" "/access-control"
 assert_not_contains "${local_manifest}" "ldap-directory"
@@ -118,6 +121,8 @@ assert_contains "${local_manifest}" "platform-app-cloudbeaver"
 assert_contains "${local_manifest}" "platform-app-prefect"
 assert_contains "${local_manifest}" "http-server.authentication.type=OAUTH2"
 assert_not_contains "${local_manifest}" "http-server.authentication.type=OAUTH2,PASSWORD"
+assert_not_contains "${local_manifest}" "name: dlh-ranger-admin-usersync"
+assert_contains "${local_manifest}" "name: dlh-ranger-admin-local-user-sync"
 assert_contains "${dev_manifest}" "name: dlh-keycloak-config-cli-env"
 assert_contains "${prod_manifest}" "name: dlh-keycloak-config-cli-env"
 assert_contains "${prod_manifest}" "name: dlh-ranger-postgresql"
@@ -129,6 +134,12 @@ assert_contains "${dev_manifest}" "https://portal.dev.example.org/"
 assert_contains "${prod_manifest}" "https://portal.data-platform.example.org/"
 assert_contains "${dev_manifest}" "Administration"
 assert_contains "${prod_manifest}" "Administration"
+assert_contains "${dev_manifest}" 'add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;'
+assert_contains "${prod_manifest}" 'add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;'
+assert_contains "${dev_manifest}" 'add_header X-Content-Type-Options "nosniff" always;'
+assert_contains "${prod_manifest}" 'add_header X-Content-Type-Options "nosniff" always;'
+assert_contains "${dev_manifest}" 'add_header Referrer-Policy "strict-origin-when-cross-origin" always;'
+assert_contains "${prod_manifest}" 'add_header Referrer-Policy "strict-origin-when-cross-origin" always;'
 assert_not_contains "${dev_manifest}" "Unified access to approved platform tools"
 assert_not_contains "${prod_manifest}" "Unified access to approved platform tools"
 assert_not_contains "${dev_manifest}" "How access works"

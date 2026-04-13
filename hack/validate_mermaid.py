@@ -73,7 +73,9 @@ def validate_block(path: Path, block_index: int, block: str) -> str | None:
         tmp_path = Path(tmpdir)
         input_path = tmp_path / "diagram.mmd"
         output_path = tmp_path / "diagram.svg"
+        container_tmp_path = tmp_path / "container-tmp"
         input_path.write_text(block, encoding="utf-8")
+        container_tmp_path.mkdir(exist_ok=True)
 
         try:
             result = subprocess.run(
@@ -83,6 +85,8 @@ def validate_block(path: Path, block_index: int, block: str) -> str | None:
                     "--rm",
                     "-u",
                     f"{os.getuid()}:{os.getgid()}",
+                    "-e",
+                    "TMPDIR=/work/container-tmp",
                     "-v",
                     f"{tmpdir}:/work",
                     DEFAULT_IMAGE,

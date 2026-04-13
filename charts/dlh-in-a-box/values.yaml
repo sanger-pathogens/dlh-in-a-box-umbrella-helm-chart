@@ -235,6 +235,13 @@ global:
           pullPolicy: IfNotPresent
         schedule: "*/15 * * * *"
         syncSource: LDAP
+      localUserSync:
+        enabled: true
+        image:
+          repository: python
+          tag: 3.12-slim
+          pullPolicy: IfNotPresent
+        schedule: "*/5 * * * *"
       importCatalogAcls: false
       exceptionRoleAudit:
         enabled: true
@@ -932,6 +939,7 @@ cloudbeaver:
     showReadOnlyConnectionInfo: false
     publicCredentialsSaveEnabled: false
     adminCredentialsSaveEnabled: false
+    secretManagerEnabled: false
 
 rangerPostgresql:
   nameOverride: ranger-postgresql

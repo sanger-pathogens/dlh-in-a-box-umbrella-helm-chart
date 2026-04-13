@@ -55,7 +55,8 @@ flowchart TD
   the portal and CloudBeaver browser entry story.
 - `values-local-auth.yaml` shows the first-class non-LDAP `keycloakLocal`
   path: self-registration in Keycloak, no default app access, Ranger kept as
-  the Trino authorization plane, and OIDC/token-capable Trino clients.
+  the Trino authorization plane, and OIDC/token-capable Trino clients for
+  ordinary users.
 - The shared-environment examples now treat
   `global.authorization.platformRoles` as the long-lived access baseline and
   use the current `platform-admin`, `data-analyst`, and

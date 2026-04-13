@@ -139,6 +139,7 @@ data:
     {{- if $oidc.scopes }}
     http-server.authentication.oauth2.scopes={{ join "," $oidc.scopes }}
     {{- end }}
+    web-ui.authentication.type=oauth2
     {{- if $passwordAuthRequested }}
     http-server.authentication.password.user-mapping.pattern={{ default "([^@]+)" $oidc.userMappingPattern }}
     {{- if $multiPasswordAuthEnabled }}

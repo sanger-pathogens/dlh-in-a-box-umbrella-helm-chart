@@ -324,6 +324,14 @@
     "health" (get $tool "health" | default dict)
   ) -}}
 {{- end -}}
+{{- $portalApps := list -}}
+{{- range $app := $apps -}}
+  {{- $portalApps = append $portalApps (omit $app "health") -}}
+{{- end -}}
+{{- $portalAdminTools := list -}}
+{{- range $tool := $adminTools -}}
+  {{- $portalAdminTools = append $portalAdminTools (omit $tool "health") -}}
+{{- end -}}
 {{- $portalConfig := dict
   "branding" (dict
     "title" $brandingTitle
@@ -346,10 +354,10 @@
       "clientId" (default "" (get (get $clients "platformHome" | default dict) "clientId"))
     )
   )
-  "apps" $apps
+  "apps" $portalApps
   "admin" (dict
     "requiredGroups" (list $adminRequiredGroup)
-    "tools" $adminTools
+    "tools" $portalAdminTools
     "roleManagementEnabled" $roleManagementEnabled
     "accessControlEnabled" $roleManagementEnabled
     "accessControlNotice" (ternary $accessControlNotice "" $keycloakLocalMode)
@@ -374,7 +382,7 @@
   "ranger" (dict
     "enabled" (default false $ranger.enabled)
     "browserUrl" $rangerBrowserUrl
-    "usersyncEnabled" (default true $usersyncEnabled)
+    "usersyncEnabled" $usersyncEnabled
     "membershipSource" $platformRoleMembershipSource
     "directoryMode" $directoryMode
   )
@@ -1864,6 +1872,7 @@ data:
         onLoad: "check-sso",
         pkceMethod: "S256",
         checkLoginIframe: false,
+        redirectUri,
       });
 
       if (window.location.href !== redirectUri) {
@@ -4107,6 +4116,9 @@ data:
       # page so the portal JS can clean up stale oauth2-proxy cookies.
       client_header_buffer_size 16k;
       large_client_header_buffers 8 32k;
+      add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
+      add_header X-Content-Type-Options "nosniff" always;
+      add_header Referrer-Policy "strict-origin-when-cross-origin" always;
       root /usr/share/nginx/html;
       index index.html;
 
@@ -4117,6 +4129,12 @@ data:
       }
 
       location /api/ {
+        # nginx does not inherit add_header directives into a location once the
+        # location defines its own headers, so repeat the browser-safety
+        # headers anywhere we also set cache semantics explicitly.
+        add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
+        add_header X-Content-Type-Options "nosniff" always;
+        add_header Referrer-Policy "strict-origin-when-cross-origin" always;
         add_header Cache-Control "no-store, no-cache, max-age=0, must-revalidate" always;
         add_header Pragma "no-cache" always;
         add_header Expires "0" always;
@@ -4129,6 +4147,9 @@ data:
       }
 
       location / {
+        add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
+        add_header X-Content-Type-Options "nosniff" always;
+        add_header Referrer-Policy "strict-origin-when-cross-origin" always;
         add_header Cache-Control "no-store, no-cache, max-age=0, must-revalidate" always;
         add_header Pragma "no-cache" always;
         add_header Expires "0" always;

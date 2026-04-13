@@ -740,6 +740,14 @@
                 "syncSource": { "type": "string" }
               }
             },
+            "localUserSync": {
+              "type": "object",
+              "additionalProperties": true,
+              "properties": {
+                "enabled": { "type": "boolean" },
+                "schedule": { "type": "string" }
+              }
+            },
             "importCatalogAcls": { "type": "boolean" },
             "exceptionRoleAudit": {
               "type": "object",
@@ -1293,7 +1301,8 @@
             "supportsCustomConnections": { "type": "boolean" },
             "showReadOnlyConnectionInfo": { "type": "boolean" },
             "publicCredentialsSaveEnabled": { "type": "boolean" },
-            "adminCredentialsSaveEnabled": { "type": "boolean" }
+            "adminCredentialsSaveEnabled": { "type": "boolean" },
+            "secretManagerEnabled": { "type": "boolean" }
           }
         }
       }

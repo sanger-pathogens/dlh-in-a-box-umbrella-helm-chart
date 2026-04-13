@@ -34,7 +34,8 @@ The chart now supports two first-class identity modes:
   edits.
 - `keycloakLocal`: bundled Keycloak for browser SSO and self-registration,
   Keycloak-managed browser app groups, Ranger direct-user data-role grants, and
-  OIDC/token-capable Trino clients instead of direct password auth.
+  OIDC/token-capable Trino clients for ordinary users instead of routine direct
+  password auth.
 
 ## Default Architecture
 
@@ -186,7 +187,11 @@ admin split in that mode is:
 - Keycloak Admin for account lifecycle and browser app groups such as
   `platform-app-*`
 - Ranger Admin for direct-user Trino data-role membership and policy audit
-- Trino OIDC/token-capable clients for DBeaver, Python, or R access
+- Trino OIDC/token-capable clients for routine DBeaver, Python, or R access
+
+Deployments may also keep a named bootstrap admin in Trino file-password auth
+for smoke validation or recovery. That is an operational exception, not the
+normal user model.
 
 ## Keycloak Local Users Mode
 
@@ -213,26 +218,37 @@ The intended user lifecycle is:
 4. the user accesses browser apps via Keycloak SSO and Trino via OIDC/token
    clients
 
-When `cloudbeaver.bootstrap.sharedConnectionSeed.enabled=true` and
-`cloudbeaver.app.adminCredentialsSaveEnabled=true`, the chart can also persist
-managed shared datasource credentials into the seeded workspace so approved
-browser users do not see a second manual Trino login prompt.
+When `cloudbeaver.bootstrap.sharedConnectionSeed.enabled=true`, the chart can
+seed the shared datasource definition into the workspace. To make the shared
+Trino service credential survive beyond the bootstrap session in the
+reverse-proxy browser model, set
+`cloudbeaver.app.publicCredentialsSaveEnabled=true`. Keeping
+`cloudbeaver.app.adminCredentialsSaveEnabled=true` is still useful for local
+admin maintenance, but on its own it is not enough for reverse-proxy browser
+users. The chart now automatically enables the CloudBeaver secret manager when
+shared datasource seeding or credential persistence is enabled. You can still
+override that explicitly with `cloudbeaver.app.secretManagerEnabled`.
 
 In that service-account model the common Trino identities are:
 
-- `admin`: break-glass operational credential for recovery, smoke tests, or
-  emergency maintenance
 - `cloudbeaver-service`: shared CloudBeaver datasource credential
 - `superset-service`: shared Superset datasource credential
 - `trino`: Ranger service identity used in the Ranger service definition and
   plugin download settings, not a normal human login
 
 Only services that actually open Trino sessions should get a dedicated Trino
-identity. In the current shared chart model that means CloudBeaver and
-Superset. Other browser applications such as the portal, Keycloak, Prefect, or
-DataHub should not get extra Trino passwords unless they really submit Trino
-queries, because unused service credentials make audit trails noisier rather
-than clearer.
+identity. The `trino` identity is not meant for human access and does not open
+interactive SQL sessions; it exists so Ranger can identify the Trino service
+itself when the plugin downloads policies and reports back. Human break-glass
+access should use a deliberately named account such as `icddrb-admin`, not a
+generic `admin` credential. Some deployments may choose to mirror that
+bootstrap human admin into Trino file-password auth for smoke validation or
+recovery, but that should remain an explicit, named exception rather than the
+default human access pattern. In the current shared chart model that means
+CloudBeaver and Superset. Other browser applications such as the portal,
+Keycloak, Prefect, or DataHub should not get extra Trino passwords unless they
+really submit Trino queries, because unused service credentials make audit
+trails noisier rather than clearer.
 
 ## Portal Theming And Branding
 

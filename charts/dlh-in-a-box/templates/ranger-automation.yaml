@@ -6,6 +6,7 @@
 {{- $exceptionRoleAudit := get $ranger "exceptionRoleAudit" | default dict -}}
 {{- $identity := .Values.global.identity | default dict -}}
 {{- $directory := get $identity "directory" | default dict -}}
+{{- $keycloakLocalMode := eq (default "externalLdap" (get $directory "mode")) "keycloakLocal" -}}
 {{- $ldap := get $directory "ldap" | default dict -}}
 {{- $ldapAllowAnonymousRead := default false $ldap.allowAnonymousRead -}}
 {{- $ldapEffectiveBindDn := ternary "" (include "dlh-in-a-box.identity.directory.bindDn" .) $ldapAllowAnonymousRead -}}
@@ -14,6 +15,33 @@
 {{- $ldapTrustedCaPath := printf "/opt/ranger-automation/ldap-ca/%s" $ldapTrustedCaCertKey -}}
 {{- $ldapHostAliases := default (list) $ldap.hostAliases -}}
 {{- $rangerBootstrap := get $ranger "bootstrap" | default dict -}}
+{{- $rangerPostgresql := get $ranger "postgresql" | default dict -}}
+{{- $rangerPostgresqlHost := default (include "dlh-in-a-box.ranger.postgresql.serviceName" .) $rangerPostgresql.host -}}
+{{- $usersync := get $ranger "usersync" | default dict -}}
+{{- $usersyncImage := get $usersync "image" | default dict -}}
+{{- $localUserSync := get $ranger "localUserSync" | default dict -}}
+{{- $usersyncEnabled := true -}}
+{{- if hasKey $usersync "enabled" -}}
+  {{- $usersyncEnabled = $usersync.enabled -}}
+{{- end -}}
+{{- $localUserSyncRequested := true -}}
+{{- if hasKey $localUserSync "enabled" -}}
+  {{- $localUserSyncRequested = $localUserSync.enabled -}}
+{{- end -}}
+{{- $localUserSyncEnabled := and $keycloakLocalMode $localUserSyncRequested -}}
+{{- $localUserSyncImage := get $localUserSync "image" | default $usersyncImage -}}
+{{- $exceptionRoleAuditEnabled := true -}}
+{{- if hasKey $exceptionRoleAudit "enabled" -}}
+  {{- $exceptionRoleAuditEnabled = $exceptionRoleAudit.enabled -}}
+{{- end -}}
+{{- $exceptionRoleAuditDeleteExpired := true -}}
+{{- if hasKey $exceptionRoleAudit "deleteExpired" -}}
+  {{- $exceptionRoleAuditDeleteExpired = $exceptionRoleAudit.deleteExpired -}}
+{{- end -}}
+{{- $exceptionRoleAuditLogUndocumented := true -}}
+{{- if hasKey $exceptionRoleAudit "logUndocumented" -}}
+  {{- $exceptionRoleAuditLogUndocumented = $exceptionRoleAudit.logUndocumented -}}
+{{- end -}}
 {{- $importCatalogAcls := false -}}
 {{- if hasKey $ranger "importCatalogAcls" -}}
   {{- $importCatalogAcls = $ranger.importCatalogAcls -}}
@@ -46,12 +74,12 @@ data:
         "importCatalogAcls" $importCatalogAcls
         "bootstrapPolicies" $bootstrapPolicies
         "exceptionRoleAudit" (dict
-          "enabled" (default true $exceptionRoleAudit.enabled)
+          "enabled" $exceptionRoleAuditEnabled
           "prefix" (default "exception-" $exceptionRoleAudit.prefix)
           "schedule" (default "23 * * * *" $exceptionRoleAudit.schedule)
           "gracePeriodDays" (default 7 $exceptionRoleAudit.gracePeriodDays)
-          "deleteExpired" (default true $exceptionRoleAudit.deleteExpired)
-          "logUndocumented" (default true $exceptionRoleAudit.logUndocumented)
+          "deleteExpired" $exceptionRoleAuditDeleteExpired
+          "logUndocumented" $exceptionRoleAuditLogUndocumented
         )
       )
       "platformRoles" $platformRoles
@@ -72,6 +100,21 @@ data:
         "groupNameAttribute" (default "cn" $ldap.groupNameAttribute)
         "groupSearchFilter" (default "(cn=trino_*)" $ldap.groupSearchFilter)
         "groupSearchMemberAttribute" (default "member" $ldap.groupSearchMemberAttribute)
+      )
+      "identity" (dict
+        "directoryMode" (default "externalLdap" (get $directory "mode"))
+        "keycloak" (dict
+          "realm" (include "dlh-in-a-box.keycloak.realm" .)
+          "adminUrl" (include "dlh-in-a-box.keycloak.internalBaseUrl" .)
+          "adminUsername" (default "admin" .Values.keycloak.auth.adminUser)
+          "requireEmailVerification" (default false (dig "provider" "keycloak" "registration" "requireEmailVerification" false $identity))
+        )
+      )
+      "rangerPostgresql" (dict
+        "host" $rangerPostgresqlHost
+        "port" 5432
+        "database" (default "ranger" $rangerPostgresql.database)
+        "username" (default "rangeradmin" $rangerPostgresql.username)
       )
     | toPrettyJson | nindent 4 }}
   bootstrap.py: |
@@ -1554,6 +1597,375 @@ data:
 
     if __name__ == "__main__":
         main()
+  keycloak_local_users.py: |
+    import base64
+    import json
+    import os
+    import re
+    import secrets
+    import string
+    import sys
+    import time
+    import urllib.error
+    import urllib.parse
+    import urllib.request
+
+    import psycopg
+
+    CONFIG_PATH = "/opt/ranger-automation/bootstrap-config.json"
+    RANGER_URL = os.environ["RANGER_URL"].rstrip("/")
+    RANGER_PASSWORD = os.environ["RANGER_ADMIN_PASSWORD"]
+    KEYCLOAK_ADMIN_PASSWORD = os.environ["KEYCLOAK_ADMIN_PASSWORD"]
+    RANGER_POSTGRES_PASSWORD = os.environ["RANGER_POSTGRES_PASSWORD"]
+
+
+    def load_config():
+        with open(CONFIG_PATH, "r", encoding="utf-8") as handle:
+            return json.load(handle)
+
+
+    def wait_for_ranger():
+        deadline = time.time() + 600
+        while time.time() < deadline:
+            try:
+                ranger_request("GET", "/login.jsp", ok=(200,), parse_json=False)
+                return
+            except Exception:
+                time.sleep(5)
+        raise RuntimeError("Timed out waiting for Ranger Admin")
+
+
+    def ranger_request(method, path, payload=None, ok=(200, 201), parse_json=True):
+        url = f"{RANGER_URL}{path}"
+        headers = {
+            "Authorization": "Basic "
+            + base64.b64encode(f"admin:{RANGER_PASSWORD}".encode("utf-8")).decode("ascii"),
+            "Accept": "application/json",
+        }
+        body = None
+        if payload is not None:
+            body = json.dumps(payload).encode("utf-8")
+            headers["Content-Type"] = "application/json"
+        req = urllib.request.Request(url, data=body, headers=headers, method=method)
+        try:
+            with urllib.request.urlopen(req, timeout=30) as response:
+                data = response.read().decode("utf-8")
+                if not parse_json:
+                    return data
+                return json.loads(data) if data else None
+        except urllib.error.HTTPError as exc:
+            data = exc.read().decode("utf-8")
+            if exc.code in ok:
+                if not parse_json:
+                    return data
+                return json.loads(data) if data else None
+            exc.ranger_body = data
+            raise
+
+
+    def keycloak_token(config):
+        keycloak = config["identity"]["keycloak"]
+        params = urllib.parse.urlencode(
+            {
+                "grant_type": "password",
+                "client_id": "admin-cli",
+                "username": keycloak.get("adminUsername", "admin"),
+                "password": KEYCLOAK_ADMIN_PASSWORD,
+            }
+        ).encode("utf-8")
+        url = f"{keycloak['adminUrl'].rstrip('/')}/realms/master/protocol/openid-connect/token"
+        req = urllib.request.Request(
+            url,
+            data=params,
+            headers={"Content-Type": "application/x-www-form-urlencoded", "Accept": "application/json"},
+            method="POST",
+        )
+        with urllib.request.urlopen(req, timeout=30) as response:
+            payload = json.loads(response.read().decode("utf-8"))
+        return payload["access_token"]
+
+
+    def keycloak_request(config, token, method, path, payload=None, ok=(200, 201, 204)):
+        base_url = config["identity"]["keycloak"]["adminUrl"].rstrip("/")
+        url = f"{base_url}{path}"
+        headers = {
+            "Authorization": f"Bearer {token}",
+            "Accept": "application/json",
+        }
+        body = None
+        if payload is not None:
+            body = json.dumps(payload).encode("utf-8")
+            headers["Content-Type"] = "application/json"
+        req = urllib.request.Request(url, data=body, headers=headers, method=method)
+        try:
+            with urllib.request.urlopen(req, timeout=30) as response:
+                data = response.read().decode("utf-8")
+                return json.loads(data) if data else None
+        except urllib.error.HTTPError as exc:
+            data = exc.read().decode("utf-8")
+            if exc.code in ok:
+                return json.loads(data) if data else None
+            exc.keycloak_body = data
+            raise
+
+
+    def should_sync_user(username, email, enabled):
+        if not enabled:
+            return False
+        if username in {"admin", "trino-admin"}:
+            return False
+        if username.startswith("codex-smoke-") or username.endswith("-service"):
+            return False
+        if email.endswith(".example.invalid"):
+            return False
+        return True
+
+
+    def normalize_keycloak_user(config, token, user):
+        keycloak = config["identity"]["keycloak"]
+        if keycloak.get("requireEmailVerification", False):
+            return False, False
+
+        required_actions = [action for action in user.get("requiredActions") or [] if action != "VERIFY_EMAIL"]
+        email_verified = bool(user.get("emailVerified", False))
+        verify_email_required = "VERIFY_EMAIL" in (user.get("requiredActions") or [])
+
+        if email_verified and not verify_email_required and required_actions == (user.get("requiredActions") or []):
+            return False, False
+
+        updated = dict(user)
+        updated["emailVerified"] = True
+        updated["requiredActions"] = required_actions
+        realm = keycloak["realm"]
+        keycloak_request(
+            config,
+            token,
+            "PUT",
+            f"/admin/realms/{realm}/users/{user['id']}",
+            updated,
+        )
+
+        logged_out = False
+        try:
+            keycloak_request(
+                config,
+                token,
+                "POST",
+                f"/admin/realms/{realm}/users/{user['id']}/logout",
+                ok=(204,),
+            )
+            logged_out = True
+        except Exception as exc:
+            print(
+                f"WARNING: normalized Keycloak user {user.get('username') or user['id']} "
+                f"but failed to clear stale sessions: {exc}",
+                file=sys.stderr,
+            )
+
+        return True, logged_out
+
+
+    def ranger_user(config, username):
+        encoded = urllib.parse.quote(username)
+        payload = ranger_request("GET", f"/service/xusers/users?name={encoded}", ok=(200,)) or {}
+        users = payload.get("vXUsers") or []
+        return users[0] if users else None
+
+
+    def placeholder_password():
+        alphabet = string.ascii_letters + string.digits
+        return "Tmp" + "".join(secrets.choice(alphabet) for _ in range(14)) + "Aa1"
+
+
+    def ensure_ranger_user(username, first_name, last_name, email):
+        existing = ranger_user(None, username)
+        if existing:
+            return False
+        payload = {
+            "name": username,
+            "password": placeholder_password(),
+            "firstName": first_name or username,
+            "lastName": last_name or "User",
+            "emailAddress": email or "",
+            "userRoleList": ["ROLE_USER"],
+            "isVisible": 1,
+        }
+        created = ranger_request("POST", "/service/xusers/users", payload, ok=(200, 201)) or {}
+        if created.get("name") != username:
+            raise RuntimeError(f"Failed to create Ranger user {username}: {created}")
+        return True
+
+
+    def sync_ranger_sql(config, username, first_name, last_name, email):
+        ranger_db = config["rangerPostgresql"]
+        first_name = first_name or username
+        last_name = last_name or "User"
+        email_value = email or None
+        with psycopg.connect(
+            host=ranger_db["host"],
+            port=int(ranger_db.get("port", 5432)),
+            dbname=ranger_db["database"],
+            user=ranger_db["username"],
+            password=RANGER_POSTGRES_PASSWORD,
+        ) as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    update x_user
+                       set update_time = now(),
+                           upd_by_id = 1,
+                           descr = coalesce(nullif(descr, ''), %s),
+                           status = 1,
+                           is_visible = 1,
+                           sync_source = 'KEYCLOAK_LOCAL'
+                     where user_name = %s
+                    """,
+                    (username, username),
+                )
+
+                cur.execute("select id from x_portal_user where login_id = %s", (username,))
+                row = cur.fetchone()
+                if row:
+                    user_id = row[0]
+                    cur.execute(
+                        """
+                        update x_portal_user
+                           set update_time = now(),
+                               upd_by_id = 1,
+                               first_name = %s,
+                               last_name = %s,
+                               pub_scr_name = %s,
+                               email = coalesce(%s, email),
+                               status = 1,
+                               user_src = 1,
+                               sync_source = 'KEYCLOAK_LOCAL'
+                         where login_id = %s
+                        """,
+                        (first_name, last_name, username, email_value, username),
+                    )
+                else:
+                    cur.execute(
+                        """
+                        insert into x_portal_user (
+                            create_time,
+                            update_time,
+                            added_by_id,
+                            upd_by_id,
+                            first_name,
+                            last_name,
+                            pub_scr_name,
+                            login_id,
+                            password,
+                            email,
+                            status,
+                            user_src,
+                            sync_source,
+                            password_updated_time
+                        ) values (
+                            now(),
+                            now(),
+                            1,
+                            1,
+                            %s,
+                            %s,
+                            %s,
+                            %s,
+                            %s,
+                            %s,
+                            1,
+                            1,
+                            'KEYCLOAK_LOCAL',
+                            now()
+                        )
+                        returning id
+                        """,
+                        (first_name, last_name, username, username, placeholder_password(), email_value),
+                    )
+                    user_id = cur.fetchone()[0]
+
+                cur.execute(
+                    """
+                    insert into x_portal_user_role (
+                        create_time,
+                        update_time,
+                        added_by_id,
+                        upd_by_id,
+                        user_id,
+                        user_role,
+                        status
+                    )
+                    values (now(), now(), 1, 1, %s, 'ROLE_USER', 1)
+                    on conflict do nothing
+                    """,
+                    (user_id,),
+                )
+                cur.execute(
+                    """
+                    update x_portal_user_role
+                       set update_time = now(),
+                           upd_by_id = 1,
+                           status = 1
+                     where user_id = %s
+                       and user_role = 'ROLE_USER'
+                    """,
+                    (user_id,),
+                )
+            conn.commit()
+
+
+    def sync():
+        config = load_config()
+        if config["identity"].get("directoryMode") != "keycloakLocal":
+            print("Keycloak local-user mode is not active; skipping Ranger local-user sync.")
+            return
+
+        wait_for_ranger()
+        token = keycloak_token(config)
+        realm = config["identity"]["keycloak"]["realm"]
+        users = keycloak_request(
+            config,
+            token,
+            "GET",
+            f"/admin/realms/{realm}/users?max=1000",
+            ok=(200,),
+        ) or []
+
+        synced_count = 0
+        created_count = 0
+        normalized_count = 0
+        logged_out_count = 0
+
+        for user in users:
+            username = (user.get("username") or "").strip()
+            email = (user.get("email") or "").strip()
+            enabled = bool(user.get("enabled", True))
+            first_name = (user.get("firstName") or username or "").strip()
+            last_name = (user.get("lastName") or "User").strip()
+            if not username or not should_sync_user(username, email, enabled):
+                continue
+
+            normalized, logged_out = normalize_keycloak_user(config, token, user)
+            if normalized:
+                normalized_count += 1
+            if logged_out:
+                logged_out_count += 1
+
+            if ensure_ranger_user(username, first_name, last_name, email):
+                created_count += 1
+
+            sync_ranger_sql(config, username, first_name, last_name, email)
+            synced_count += 1
+
+        print(
+            "Ensured "
+            f"{synced_count} eligible Keycloak-local users are mirrored into Ranger "
+            f"({created_count} Ranger API users created, {normalized_count} Keycloak accounts normalized, "
+            f"{logged_out_count} stale Keycloak sessions cleared)."
+        )
+
+
+    if __name__ == "__main__":
+        sync()
 ---
 {{- if (dig "bootstrap" "enabled" true $ranger) }}
 apiVersion: batch/v1
@@ -1604,7 +2016,7 @@ spec:
             defaultMode: 0555
 ---
 {{- end }}
-{{- if (dig "usersync" "enabled" true $ranger) }}
+{{- if $usersyncEnabled }}
 apiVersion: batch/v1
 kind: CronJob
 metadata:
@@ -1635,8 +2047,8 @@ spec:
           {{- end }}
           containers:
             - name: ranger-usersync
-              image: "{{ $ranger.usersync.image.repository }}:{{ $ranger.usersync.image.tag }}"
-              imagePullPolicy: {{ $ranger.usersync.image.pullPolicy }}
+              image: "{{ $usersyncImage.repository }}:{{ $usersyncImage.tag }}"
+              imagePullPolicy: {{ $usersyncImage.pullPolicy }}
               command:
                 - /bin/sh
                 - -ec
@@ -1679,7 +2091,71 @@ spec:
                     path: {{ $ldapTrustedCaCertKey }}
             {{- end }}
 {{- end }}
-{{- if (default true $exceptionRoleAudit.enabled) }}
+{{- if $localUserSyncEnabled }}
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: {{ include "dlh-in-a-box.ranger.admin.serviceName" . }}-local-user-sync
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "dlh-in-a-box.labels" . | nindent 4 }}
+    app.kubernetes.io/component: ranger-local-user-sync
+spec:
+  schedule: {{ default "*/5 * * * *" $localUserSync.schedule | quote }}
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 1
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      backoffLimit: 3
+      template:
+        metadata:
+          labels:
+            app.kubernetes.io/instance: {{ .Release.Name }}
+            app.kubernetes.io/name: {{ include "dlh-in-a-box.name" . }}
+            app.kubernetes.io/component: ranger-local-user-sync
+        spec:
+          restartPolicy: OnFailure
+          containers:
+            - name: ranger-local-user-sync
+              image: "{{ $localUserSyncImage.repository }}:{{ $localUserSyncImage.tag }}"
+              imagePullPolicy: {{ $localUserSyncImage.pullPolicy }}
+              command:
+                - /bin/sh
+                - -ec
+                - |
+                  python -m pip install --no-cache-dir "psycopg[binary]" >/tmp/ranger-local-user-sync-pip.log
+                  python /opt/ranger-automation/keycloak_local_users.py
+              env:
+                - name: RANGER_URL
+                  value: {{ include "dlh-in-a-box.ranger.admin.url" . | quote }}
+                - name: RANGER_ADMIN_PASSWORD
+                  valueFrom:
+                    secretKeyRef:
+                      name: {{ $ranger.admin.existingSecret }}
+                      key: {{ default "rangerAdminPassword" $ranger.admin.adminPasswordKey }}
+                - name: KEYCLOAK_ADMIN_PASSWORD
+                  valueFrom:
+                    secretKeyRef:
+                      name: {{ .Values.keycloak.auth.existingSecret }}
+                      key: {{ default "adminPassword" .Values.keycloak.auth.passwordSecretKey }}
+                - name: RANGER_POSTGRES_PASSWORD
+                  valueFrom:
+                    secretKeyRef:
+                      name: {{ $rangerPostgresql.existingSecret }}
+                      key: {{ default "password" $rangerPostgresql.passwordKey }}
+              volumeMounts:
+                - name: automation
+                  mountPath: /opt/ranger-automation
+                  readOnly: true
+          volumes:
+            - name: automation
+              configMap:
+                name: {{ include "dlh-in-a-box.ranger.admin.serviceName" . }}-automation
+                defaultMode: 0555
+{{- end }}
+{{- if $exceptionRoleAuditEnabled }}
 ---
 apiVersion: batch/v1
 kind: CronJob
