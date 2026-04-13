@@ -69,7 +69,9 @@ data:
         "superUsers" ($ranger.superUsers | default (list))
         "superGroups" ($ranger.superGroups | default (list))
         "legacyManagedUsers" ($ranger.legacyManagedUsers | default (list))
+        "legacyManagedGroups" ($ranger.legacyManagedGroups | default (list))
         "legacyManagedRoles" ($ranger.legacyManagedRoles | default (list))
+        "legacyManagedPolicies" ($ranger.legacyManagedPolicies | default (list))
         "platformRoleMembershipSource" $platformRoleMembershipSource
         "importCatalogAcls" $importCatalogAcls
         "bootstrapPolicies" $bootstrapPolicies
@@ -358,6 +360,27 @@ data:
                 break
             start_index += len(batch)
         return users
+
+
+    def list_groups():
+        groups = []
+        start_index = 0
+        page_size = 200
+        while True:
+            payload = request(
+                "GET",
+                f"/service/xusers/groups?startIndex={start_index}&pageSize={page_size}",
+                ok=(200,),
+            ) or {}
+            batch = payload.get("vXGroups", []) or []
+            if not batch:
+                break
+            groups.extend(batch)
+            total_count = int(payload.get("totalCount", len(groups)) or len(groups))
+            if len(groups) >= total_count:
+                break
+            start_index += len(batch)
+        return groups
 
 
     def get_user(username):
@@ -833,6 +856,51 @@ data:
             delete_user_by_name(username)
 
 
+    def delete_group_by_name(group_name):
+        existing = None
+        for group in list_groups():
+            name = str(group.get("name", "")).strip()
+            if name == group_name:
+                existing = group
+                break
+        if not existing:
+            return
+        request(
+            "DELETE",
+            f"/service/xusers/groups/{existing['id']}",
+            ok=(200, 204, 404),
+            parse_json=False,
+        )
+        print(f"Deleted stale Ranger group: {group_name}")
+
+
+    def purge_legacy_groups(config):
+        for group_name in normalize_names(config["ranger"].get("legacyManagedGroups", [])):
+            delete_group_by_name(group_name)
+
+
+    def delete_policy_by_name(service_name, policy_name):
+        path = (
+            "/service/public/v2/api/service/"
+            + urllib.parse.quote(service_name, safe="")
+            + "/policy/"
+            + urllib.parse.quote(policy_name, safe="")
+        )
+        try:
+            existing = request("GET", path, ok=(200,))
+        except urllib.error.HTTPError as exc:
+            if exc.code == 404:
+                return
+            raise
+        request("DELETE", policy_path(existing["id"]), ok=(200, 204, 404))
+        print(f"Deleted stale Ranger policy: {policy_name}")
+
+
+    def purge_legacy_policies(config, service_name):
+        for policy_name in normalize_names(config["ranger"].get("legacyManagedPolicies", [])):
+            delete_policy_by_name(service_name, policy_name)
+
+
     def normalize_policy_resource(value):
         normalized = as_resource(value)
         normalized["values"] = sorted(str(item) for item in normalized.get("values", []))
@@ -903,6 +971,8 @@ data:
 
         ensure_users_exist(policy_principal_usernames(config, policies))
         purge_legacy_users(config, service_name)
+        purge_legacy_groups(config)
+        purge_legacy_policies(config, service_name)
 
         for policy in policies:
             upsert_policy(service_name, policy)
@@ -1765,10 +1835,36 @@ data:
         return True, logged_out
 
 
-    def ranger_user(config, username):
+    def ranger_users(username):
         encoded = urllib.parse.quote(username)
         payload = ranger_request("GET", f"/service/xusers/users?name={encoded}", ok=(200,)) or {}
         users = payload.get("vXUsers") or []
+        return sorted(users, key=lambda user: int(user.get("id") or 0))
+
+
+    def delete_ranger_user(user_id):
+        ranger_request(
+            "DELETE",
+            f"/service/xusers/secure/users/id/{user_id}?forceDelete=true",
+            ok=(200, 204, 404),
+            parse_json=False,
+        )
+
+
+    def dedupe_ranger_users(username):
+        existing = ranger_users(username)
+        if len(existing) <= 1:
+            return 0
+        deleted = 0
+        for duplicate in existing[1:]:
+            delete_ranger_user(duplicate["id"])
+            deleted += 1
+        return deleted
+
+
+    def ranger_user(config, username):
+        del config
+        users = ranger_users(username)
         return users[0] if users else None
 
 
@@ -1778,6 +1874,9 @@ data:
 
 
     def ensure_ranger_user(username, first_name, last_name, email):
+        deleted = dedupe_ranger_users(username)
+        if deleted:
+            print(f"Removed {deleted} duplicate Ranger API user rows for {username}.")
         existing = ranger_user(None, username)
         if existing:
             return False
@@ -1823,65 +1922,98 @@ data:
                     (username, username),
                 )
 
-                cur.execute("select id from x_portal_user where login_id = %s", (username,))
-                row = cur.fetchone()
-                if row:
-                    user_id = row[0]
-                    cur.execute(
-                        """
-                        update x_portal_user
-                           set update_time = now(),
-                               upd_by_id = 1,
-                               first_name = %s,
-                               last_name = %s,
-                               pub_scr_name = %s,
-                               email = coalesce(%s, email),
-                               status = 1,
-                               user_src = 1,
-                               sync_source = 'KEYCLOAK_LOCAL'
+                cur.execute(
+                    """
+                    insert into x_portal_user (
+                        create_time,
+                        update_time,
+                        added_by_id,
+                        upd_by_id,
+                        first_name,
+                        last_name,
+                        pub_scr_name,
+                        login_id,
+                        password,
+                        email,
+                        status,
+                        user_src,
+                        sync_source,
+                        password_updated_time
+                    )
+                    select
+                        now(),
+                        now(),
+                        1,
+                        1,
+                        %s,
+                        %s,
+                        %s,
+                        %s,
+                        %s,
+                        %s,
+                        1,
+                        1,
+                        'KEYCLOAK_LOCAL',
+                        now()
+                    where not exists (
+                        select 1
+                          from x_portal_user
                          where login_id = %s
-                        """,
-                        (first_name, last_name, username, email_value, username),
                     )
-                else:
+                    """,
+                    (
+                        first_name,
+                        last_name,
+                        username,
+                        username,
+                        placeholder_password(),
+                        email_value,
+                        username,
+                    ),
+                )
+
+                cur.execute(
+                    """
+                    update x_portal_user
+                       set update_time = now(),
+                           upd_by_id = 1,
+                           first_name = %s,
+                           last_name = %s,
+                           pub_scr_name = %s,
+                           email = coalesce(%s, email),
+                           status = 1,
+                           user_src = 1,
+                           sync_source = 'KEYCLOAK_LOCAL'
+                     where login_id = %s
+                    """,
+                    (first_name, last_name, username, email_value, username),
+                )
+
+                cur.execute(
+                    "select id from x_portal_user where login_id = %s order by id",
+                    (username,),
+                )
+                user_ids = [row[0] for row in cur.fetchall()]
+                if not user_ids:
+                    raise RuntimeError(f"Failed to ensure Ranger portal user {username}")
+                user_id = user_ids[0]
+                duplicate_ids = user_ids[1:]
+                if duplicate_ids:
                     cur.execute(
                         """
-                        insert into x_portal_user (
-                            create_time,
-                            update_time,
-                            added_by_id,
-                            upd_by_id,
-                            first_name,
-                            last_name,
-                            pub_scr_name,
-                            login_id,
-                            password,
-                            email,
-                            status,
-                            user_src,
-                            sync_source,
-                            password_updated_time
-                        ) values (
-                            now(),
-                            now(),
-                            1,
-                            1,
-                            %s,
-                            %s,
-                            %s,
-                            %s,
-                            %s,
-                            %s,
-                            1,
-                            1,
-                            'KEYCLOAK_LOCAL',
-                            now()
-                        )
-                        returning id
+                        update x_portal_user_role
+                           set user_id = %s,
+                               update_time = now(),
+                               upd_by_id = 1,
+                               status = 1
+                         where user_id = any(%s)
                         """,
-                        (first_name, last_name, username, username, placeholder_password(), email_value),
+                        (user_id, duplicate_ids),
                     )
-                    user_id = cur.fetchone()[0]
+                    cur.execute(
+                        "delete from x_portal_user where id = any(%s)",
+                        (duplicate_ids,),
+                    )
 
                 cur.execute(
                     """
@@ -1894,10 +2026,15 @@ data:
                         user_role,
                         status
                     )
-                    values (now(), now(), 1, 1, %s, 'ROLE_USER', 1)
-                    on conflict do nothing
+                    select now(), now(), 1, 1, %s, 'ROLE_USER', 1
+                    where not exists (
+                        select 1
+                          from x_portal_user_role
+                         where user_id = %s
+                           and user_role = 'ROLE_USER'
+                    )
                     """,
-                    (user_id,),
+                    (user_id, user_id),
                 )
                 cur.execute(
                     """
@@ -1907,6 +2044,27 @@ data:
                            status = 1
                      where user_id = %s
                        and user_role = 'ROLE_USER'
+                    """,
+                    (user_id,),
+                )
+                cur.execute(
+                    """
+                    with duplicate_roles as (
+                        select id
+                          from (
+                            select id,
+                                   row_number() over (
+                                       partition by user_id, user_role
+                                       order by id
+                                   ) as row_number
+                              from x_portal_user_role
+                             where user_id = %s
+                               and user_role = 'ROLE_USER'
+                          ) ranked
+                         where row_number > 1
+                    )
+                    delete from x_portal_user_role
+                     where id in (select id from duplicate_roles)
                     """,
                     (user_id,),
                 )
@@ -2103,6 +2261,7 @@ metadata:
     app.kubernetes.io/component: ranger-local-user-sync
 spec:
   schedule: {{ default "*/5 * * * *" $localUserSync.schedule | quote }}
+  suspend: {{ ternary "true" "false" (default false $localUserSync.suspend) }}
   concurrencyPolicy: Forbid
   successfulJobsHistoryLimit: 1
   failedJobsHistoryLimit: 3

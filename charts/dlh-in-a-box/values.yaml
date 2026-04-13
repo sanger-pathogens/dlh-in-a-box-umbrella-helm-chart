@@ -207,7 +207,9 @@ global:
         - admin
       superGroups: []
       legacyManagedUsers: []
+      legacyManagedGroups: []
       legacyManagedRoles: []
+      legacyManagedPolicies: []
       useRangerGroups: false
       postgresql:
         enabled: true
@@ -242,6 +244,7 @@ global:
           tag: 3.12-slim
           pullPolicy: IfNotPresent
         schedule: "*/5 * * * *"
+        suspend: false
       importCatalogAcls: false
       exceptionRoleAudit:
         enabled: true

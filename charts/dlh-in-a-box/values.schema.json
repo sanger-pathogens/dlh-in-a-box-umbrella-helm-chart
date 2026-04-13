@@ -723,6 +723,18 @@
               "type": "array",
               "items": { "type": "string" }
             },
+            "legacyManagedGroups": {
+              "type": "array",
+              "items": { "type": "string" }
+            },
+            "legacyManagedRoles": {
+              "type": "array",
+              "items": { "type": "string" }
+            },
+            "legacyManagedPolicies": {
+              "type": "array",
+              "items": { "type": "string" }
+            },
             "useRangerGroups": { "type": "boolean" },
             "admin": {
               "type": "object",
@@ -745,7 +757,8 @@
               "additionalProperties": true,
               "properties": {
                 "enabled": { "type": "boolean" },
-                "schedule": { "type": "string" }
+                "schedule": { "type": "string" },
+                "suspend": { "type": "boolean" }
               }
             },
             "importCatalogAcls": { "type": "boolean" },

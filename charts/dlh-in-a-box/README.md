@@ -219,15 +219,23 @@ The intended user lifecycle is:
    clients
 
 When `cloudbeaver.bootstrap.sharedConnectionSeed.enabled=true`, the chart can
-seed the shared datasource definition into the workspace. To make the shared
-Trino service credential survive beyond the bootstrap session in the
-reverse-proxy browser model, set
-`cloudbeaver.app.publicCredentialsSaveEnabled=true`. Keeping
-`cloudbeaver.app.adminCredentialsSaveEnabled=true` is still useful for local
-admin maintenance, but on its own it is not enough for reverse-proxy browser
-users. The chart now automatically enables the CloudBeaver secret manager when
-shared datasource seeding or credential persistence is enabled. You can still
-override that explicitly with `cloudbeaver.app.secretManagerEnabled`.
+seed the shared datasource definition into the workspace together with the
+pre-configured connection permissions for the CloudBeaver teams that should see
+it. In the reverse-proxy browser model, the reliable pattern is to embed the
+shared Trino service credential directly into the seeded datasource definition
+in the downstream repo, alongside the manual-mode `host`, `port`,
+catalog/database, schema, and TLS truststore properties. The chart bootstrap
+then only grants that seeded connection to the intended teams; it no longer
+needs to persist shared credentials through a transient browser session.
+Keeping `cloudbeaver.app.adminCredentialsSaveEnabled=true` is still useful for
+local admin maintenance, and you can still override
+`cloudbeaver.app.secretManagerEnabled` explicitly when needed.
+Downstream repos should seed the Trino datasource in true manual-mode form
+(`host`, `port`, catalog/database, and driver properties such as TLS
+truststore settings), not only as a raw JDBC URL, so the saved connection stays
+editable and valid in the CloudBeaver admin UI. The chart bootstrap then uses
+the reverse-proxy header identity to grant the seeded connection to those
+teams without requiring a separate local CloudBeaver login flow.
 
 In that service-account model the common Trino identities are:
 
@@ -370,8 +378,8 @@ CloudBeaver is intentionally different from the browser-only apps:
 - downstream repos can mount a database CA into a generated JVM trust store
   through `cloudbeaver.trustedCa.*` when the saved datasource should verify TLS
 - the reusable chart only provides the workspace-seed contract; the actual
-  datasource definitions and any development-only stored credentials live in
-  consumer repos
+  datasource definitions, including manual-mode host/port details and any
+  development-only stored credentials, live in consumer repos
 - Ranger still decides what data the resulting Trino session may read or mask
 
 ## LDAPS And Trust Material

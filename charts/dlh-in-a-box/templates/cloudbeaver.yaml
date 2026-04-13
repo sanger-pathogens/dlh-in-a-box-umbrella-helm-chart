@@ -43,7 +43,7 @@
 {{- $logoutUrl := default (printf "%s/oauth2/sign_out" $cloudbeaverOrigin) $authProxy.logoutUrl -}}
 {{- $cloudbeaverServerName := default "Data Platform CloudBeaver" $appConfig.serverName -}}
 {{- $cloudbeaverServerUrl := "" -}}
-{{- $cloudbeaverSecretManagerEnabled := or (default false $sharedConnectionSeedEnabled) (default false $appConfig.secretManagerEnabled) (default false $appConfig.publicCredentialsSaveEnabled) (default false $appConfig.adminCredentialsSaveEnabled) -}}
+{{- $cloudbeaverSecretManagerEnabled := or (default false $appConfig.secretManagerEnabled) (default false $appConfig.publicCredentialsSaveEnabled) (default false $appConfig.adminCredentialsSaveEnabled) -}}
 {{- if $cloudbeaverOrigin -}}
   {{- $cloudbeaverServerUrl = printf "%s/" (trimSuffix "/" $cloudbeaverOrigin) -}}
 {{- end -}}
@@ -258,12 +258,16 @@ spec:
             - |
               target_dir="/workspace/GlobalConfiguration/.dbeaver"
               target_file="${target_dir}/data-sources.json"
+              permissions_file="${target_dir}/data-sources-permissions.json"
               if [ "{{ ternary "true" "false" $forceWorkspaceSeed }}" = "true" ]; then
                 find /workspace -mindepth 1 -maxdepth 1 -exec rm -rf {} +
               fi
               mkdir -p "${target_dir}"
               if [ "{{ ternary "true" "false" $forceWorkspaceSeed }}" = "true" ] || [ ! -f "${target_file}" ]; then
                 cp "/seed/{{ $workspaceDataSourcesKey }}" "${target_file}"
+              fi
+              if [ -f "/seed/data-sources-permissions.json" ]; then
+                cp "/seed/data-sources-permissions.json" "${permissions_file}"
               fi
           volumeMounts:
             - name: workspace
@@ -308,16 +312,6 @@ spec:
                   name: {{ $bootstrap.existingSecret }}
                   key: {{ $sharedConnectionProjectIdKey }}
                   optional: true
-            - name: CB_SHARED_CONNECTION_USERNAME
-              valueFrom:
-                secretKeyRef:
-                  name: {{ $bootstrap.existingSecret }}
-                  key: {{ $sharedConnectionUsernameKey }}
-            - name: CB_SHARED_CONNECTION_PASSWORD
-              valueFrom:
-                secretKeyRef:
-                  name: {{ $bootstrap.existingSecret }}
-                  key: {{ $sharedConnectionPasswordKey }}
             - name: CB_SHARED_BOOTSTRAP_USERNAME
               valueFrom:
                 secretKeyRef:
@@ -338,7 +332,7 @@ spec:
                   - /bin/sh
                   - -ec
                   - |
-                    if [ -z "${CB_SHARED_CONNECTION_ID:-}" ] || [ -z "${CB_SHARED_CONNECTION_USERNAME:-}" ] || [ -z "${CB_SHARED_CONNECTION_PASSWORD:-}" ] || [ -z "${CB_SHARED_BOOTSTRAP_USERNAME:-}" ]; then
+                    if [ -z "${CB_SHARED_CONNECTION_ID:-}" ] || [ -z "${CB_SHARED_BOOTSTRAP_USERNAME:-}" ]; then
                       exit 0
                     fi
                     project_id="${CB_SHARED_CONNECTION_PROJECT_ID:-g_GlobalConfiguration}"
@@ -351,6 +345,25 @@ spec:
                     done
                     tmp_dir="$(mktemp -d)"
                     trap 'rm -rf "$tmp_dir"' EXIT
+                    subjects_json="["
+                    old_ifs="${IFS}"
+                    IFS=','
+                    set -- ${bootstrap_groups}
+                    IFS="${old_ifs}"
+                    for subject in "$@"; do
+                      subject="$(printf '%s' "${subject}" | tr -d '[:space:]')"
+                      if [ -z "${subject}" ]; then
+                        continue
+                      fi
+                      if [ "${subjects_json}" != "[" ]; then
+                        subjects_json="${subjects_json},"
+                      fi
+                      subjects_json="${subjects_json}\"${subject}\""
+                    done
+                    subjects_json="${subjects_json}]"
+                    if [ "${subjects_json}" = "[]" ]; then
+                      subjects_json="[\"{{ $adminTeam }}\",\"{{ $defaultUserTeam }}\"]"
+                    fi
                     cat >"${tmp_dir}/open-session.json" <<'EOF'
                     {"query":"mutation { openSession { valid } }"}
                     EOF
@@ -362,23 +375,23 @@ spec:
                       -H "X-Forwarded-Groups: ${bootstrap_groups}" \
                       --data @"${tmp_dir}/open-session.json" \
                       "http://127.0.0.1:{{ $port }}/api/gql" >/dev/null
-                    cat >"${tmp_dir}/update-connection.json" <<EOF
-                    {"query":"mutation Update(\$config: ConnectionConfig!, \$projectId: ID) { updateConnection(config: \$config, projectId: \$projectId) { id connected authNeeded credentialsSaved saveCredentials sharedCredentials } }","variables":{"projectId":"${project_id}","config":{"connectionId":"${CB_SHARED_CONNECTION_ID}","saveCredentials":true,"sharedCredentials":true,"credentials":{"user":"${CB_SHARED_CONNECTION_USERNAME}","password":"${CB_SHARED_CONNECTION_PASSWORD}","userName":"${CB_SHARED_CONNECTION_USERNAME}","userPassword":"${CB_SHARED_CONNECTION_PASSWORD}"}}}}
+                    cat >"${tmp_dir}/set-access.json" <<EOF
+                    {"query":"query SetAccess(\$projectId: ID!, \$connectionId: ID!, \$subjects: [ID!]!) { setConnectionSubjectAccess(projectId: \$projectId, connectionId: \$connectionId, subjects: \$subjects) }","variables":{"projectId":"${project_id}","connectionId":"${CB_SHARED_CONNECTION_ID}","subjects":${subjects_json}}}
                     EOF
-                    response="$(
+                    access_response="$(
                       curl -fsS \
                         -c "${tmp_dir}/cookies.txt" \
                         -b "${tmp_dir}/cookies.txt" \
                         -H "Content-Type: application/json" \
                         -H "X-Forwarded-Preferred-Username: ${CB_SHARED_BOOTSTRAP_USERNAME}" \
                         -H "X-Forwarded-Groups: ${bootstrap_groups}" \
-                        --data @"${tmp_dir}/update-connection.json" \
+                        --data @"${tmp_dir}/set-access.json" \
                         "http://127.0.0.1:{{ $port }}/api/gql"
                     )"
-                    printf '%s' "${response}" | grep -Eq '"saveCredentials":[[:space:]]*true'
-                    printf '%s' "${response}" | grep -Eq '"credentialsSaved":[[:space:]]*true'
-                    printf '%s' "${response}" | grep -Eq '"authNeeded":[[:space:]]*false'
-                    printf '%s' "${response}" | grep -Eq '"sharedCredentials":[[:space:]]*true'
+                    if ! printf '%s' "${access_response}" | grep -Eq '"setConnectionSubjectAccess":[[:space:]]*true'; then
+                      echo "WARN: CloudBeaver shared Trino bootstrap did not complete during postStart; continuing startup." >&2
+                    fi
+                    exit 0
           {{- end }}
           ports:
             - name: http
