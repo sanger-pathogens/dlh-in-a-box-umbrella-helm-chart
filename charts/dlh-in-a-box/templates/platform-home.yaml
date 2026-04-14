@@ -54,7 +54,7 @@
 {{- $metaThemeColor := default "#1f5f7a" (get $theme "metaThemeColor") -}}
 {{- $fontBodyFamily := default "system-ui, -apple-system, BlinkMacSystemFont, \"Segoe UI\", sans-serif" (get $themeFonts "bodyFamily") -}}
 {{- $fontHeadingFamily := default "Georgia, \"Times New Roman\", serif" (get $themeFonts "headingFamily") -}}
-{{- $accessControlNotice := "Access Control is disabled in Keycloak local-user mode. Use Keycloak Admin to grant browser app groups and Ranger Admin to grant Trino data roles." -}}
+{{- $accessControlNotice := "Access Control is disabled in Keycloak local-user mode. Use Keycloak Admin for standalone app-group changes; direct-user Ranger platform-role membership is projected back into the matching Keycloak role and browser app groups." -}}
 {{- $platformRoleViews := list -}}
 {{- $appRoleGroups := dict
   "superset" (list)

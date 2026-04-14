@@ -2071,6 +2071,230 @@ data:
             conn.commit()
 
 
+    def normalize_names(items):
+        return sorted({str(item).strip() for item in (items or []) if str(item).strip()})
+
+
+    def list_roles():
+        roles = []
+        start_index = 0
+        page_size = 200
+        while True:
+            page = ranger_request(
+                "GET",
+                f"/service/public/v2/api/roles?startIndex={start_index}&pageSize={page_size}",
+                ok=(200,),
+            ) or []
+            roles.extend(page)
+            if len(page) < page_size:
+                break
+            start_index += page_size
+        return roles
+
+
+    def get_role(role_name):
+        for role in list_roles():
+            if str(role.get("name", "")).strip() == str(role_name).strip():
+                return role
+        return None
+
+
+    def keycloak_group_id(config, token, group_name):
+        realm = config["identity"]["keycloak"]["realm"]
+        groups = keycloak_request(
+            config,
+            token,
+            "GET",
+            f"/admin/realms/{realm}/groups?search={urllib.parse.quote(group_name)}&max=1000",
+            ok=(200,),
+        ) or []
+
+        def walk(items):
+            for item in items or []:
+                yield item
+                yield from walk(item.get("subGroups") or [])
+
+        for group in walk(groups):
+            if str(group.get("name", "")).strip() == group_name:
+                return str(group.get("id", "")).strip()
+        return ""
+
+
+    def ensure_keycloak_group(config, token, group_name):
+        group_id = keycloak_group_id(config, token, group_name)
+        if group_id:
+            return group_id
+
+        realm = config["identity"]["keycloak"]["realm"]
+        keycloak_request(
+            config,
+            token,
+            "POST",
+            f"/admin/realms/{realm}/groups",
+            {"name": group_name},
+            ok=(201, 204),
+        )
+        group_id = keycloak_group_id(config, token, group_name)
+        if not group_id:
+            raise RuntimeError(f"Failed to ensure Keycloak group {group_name}")
+        return group_id
+
+
+    def keycloak_user_groups(config, token, user_id):
+        realm = config["identity"]["keycloak"]["realm"]
+        groups = keycloak_request(
+            config,
+            token,
+            "GET",
+            f"/admin/realms/{realm}/users/{user_id}/groups?max=1000",
+            ok=(200,),
+        ) or []
+        return {
+            str(group.get("name", "")).strip(): str(group.get("id", "")).strip()
+            for group in groups
+            if str(group.get("name", "")).strip() and str(group.get("id", "")).strip()
+        }
+
+
+    def ensure_keycloak_group_membership(config, token, user_id, group_id):
+        realm = config["identity"]["keycloak"]["realm"]
+        keycloak_request(
+            config,
+            token,
+            "PUT",
+            f"/admin/realms/{realm}/users/{user_id}/groups/{group_id}",
+            ok=(204,),
+        )
+
+
+    def remove_keycloak_group_membership(config, token, user_id, group_id):
+        realm = config["identity"]["keycloak"]["realm"]
+        keycloak_request(
+            config,
+            token,
+            "DELETE",
+            f"/admin/realms/{realm}/users/{user_id}/groups/{group_id}",
+            ok=(204,),
+        )
+
+
+    def keycloak_logout_user(config, token, user_id):
+        realm = config["identity"]["keycloak"]["realm"]
+        keycloak_request(
+            config,
+            token,
+            "POST",
+            f"/admin/realms/{realm}/users/{user_id}/logout",
+            ok=(204,),
+        )
+
+
+    def keycloak_role_projection_groups(raw_role, role_key):
+        members = (raw_role or {}).get("members") or {}
+        apps = (raw_role or {}).get("apps") or {}
+        groups = set(normalize_names(members.get("directoryGroups", [])))
+        app_group_names = {
+            "superset": "platform-app-superset",
+            "datahub": "platform-app-datahub",
+            "cloudbeaver": "platform-app-cloudbeaver",
+            "prefect": "platform-app-prefect",
+            "trinoUi": "platform-app-trino",
+        }
+        for app_key, group_name in app_group_names.items():
+            if bool(apps.get(app_key)):
+                groups.add(group_name)
+        if not groups:
+            groups.add(f"platform-role-{role_key}")
+        return sorted(groups)
+
+
+    def projected_keycloak_groups(config):
+        membership_source = str((config.get("ranger") or {}).get("platformRoleMembershipSource", "git") or "git").lower()
+        if membership_source != "ranger":
+            return {}
+
+        projected = {}
+        for role_key in sorted(config.get("platformRoles", {})):
+            raw_role = config["platformRoles"][role_key] or {}
+            ranger_role_name = str(((raw_role.get("ranger") or {}).get("roleName") or role_key)).strip()
+            if not ranger_role_name:
+                continue
+            projected_groups = keycloak_role_projection_groups(raw_role, role_key)
+            if not projected_groups:
+                continue
+            live_role = get_role(ranger_role_name) or {}
+            for member in live_role.get("users", []) or []:
+                username = str((member or {}).get("name") or "").strip()
+                if not username:
+                    continue
+                projected.setdefault(username, set()).update(projected_groups)
+
+        return {username: sorted(groups) for username, groups in projected.items()}
+
+
+    def sync_projected_keycloak_groups(config, token, user, desired_groups):
+        username = str(user.get("username") or "").strip()
+        if not username:
+            return False, False
+
+        desired = normalize_names(desired_groups)
+        existing_attributes = dict(user.get("attributes") or {})
+        previous = normalize_names(existing_attributes.get("platformProjectedGroups", []))
+        current_groups = keycloak_user_groups(config, token, user["id"])
+        changed = False
+
+        for group_name in desired:
+            group_id = ensure_keycloak_group(config, token, group_name)
+            if group_name not in current_groups:
+                ensure_keycloak_group_membership(config, token, user["id"], group_id)
+                current_groups[group_name] = group_id
+                changed = True
+
+        for group_name in previous:
+            if group_name in desired:
+                continue
+            group_id = current_groups.get(group_name) or keycloak_group_id(config, token, group_name)
+            if not group_id:
+                continue
+            remove_keycloak_group_membership(config, token, user["id"], group_id)
+            current_groups.pop(group_name, None)
+            changed = True
+
+        if previous != desired:
+            updated_user = dict(user)
+            updated_attributes = dict(existing_attributes)
+            if desired:
+                updated_attributes["platformProjectedGroups"] = desired
+                updated_attributes["platformProjectedGroupsSource"] = ["ranger-platform-roles"]
+            else:
+                updated_attributes.pop("platformProjectedGroups", None)
+                updated_attributes.pop("platformProjectedGroupsSource", None)
+            updated_user["attributes"] = updated_attributes
+            keycloak_request(
+                config,
+                token,
+                "PUT",
+                f"/admin/realms/{config['identity']['keycloak']['realm']}/users/{user['id']}",
+                updated_user,
+                ok=(204,),
+            )
+            user["attributes"] = updated_attributes
+            changed = True
+
+        logged_out = False
+        if changed:
+            try:
+                keycloak_logout_user(config, token, user["id"])
+                logged_out = True
+            except Exception as exc:
+                print(
+                    f"WARNING: projected Keycloak groups for {username} but failed to clear stale sessions: {exc}",
+                    file=sys.stderr,
+                )
+
+        return changed, logged_out
+
+
     def sync():
         config = load_config()
         if config["identity"].get("directoryMode") != "keycloakLocal":
@@ -2092,6 +2316,9 @@ data:
         created_count = 0
         normalized_count = 0
         logged_out_count = 0
+        projected_group_updates = 0
+        projected_group_logouts = 0
+        users_by_username = {}
 
         for user in users:
             username = (user.get("username") or "").strip()
@@ -2101,6 +2328,7 @@ data:
             last_name = (user.get("lastName") or "User").strip()
             if not username or not should_sync_user(username, email, enabled):
                 continue
+            users_by_username[username] = user
 
             normalized, logged_out = normalize_keycloak_user(config, token, user)
             if normalized:
@@ -2114,11 +2342,33 @@ data:
             sync_ranger_sql(config, username, first_name, last_name, email)
             synced_count += 1
 
+        projected_groups_by_user = projected_keycloak_groups(config)
+
+        for username, desired_groups in projected_groups_by_user.items():
+            user = users_by_username.get(username)
+            if not user:
+                continue
+            changed, logged_out = sync_projected_keycloak_groups(config, token, user, desired_groups)
+            if changed:
+                projected_group_updates += 1
+            if logged_out:
+                projected_group_logouts += 1
+
+        for username, user in users_by_username.items():
+            if username in projected_groups_by_user:
+                continue
+            changed, logged_out = sync_projected_keycloak_groups(config, token, user, [])
+            if changed:
+                projected_group_updates += 1
+            if logged_out:
+                projected_group_logouts += 1
+
         print(
             "Ensured "
             f"{synced_count} eligible Keycloak-local users are mirrored into Ranger "
             f"({created_count} Ranger API users created, {normalized_count} Keycloak accounts normalized, "
-            f"{logged_out_count} stale Keycloak sessions cleared)."
+            f"{logged_out_count} stale Keycloak sessions cleared, {projected_group_updates} Keycloak role/app "
+            f"group projections refreshed, {projected_group_logouts} additional projected-group logouts issued)."
         )
 
 

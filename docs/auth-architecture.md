@@ -12,7 +12,7 @@ first-class identity modes.
 | Mode | Human account source | Browser app access | Trino programmatic access | Ranger usersync | Portal `Access Control` |
 | --- | --- | --- | --- | --- | --- |
 | `externalLdap` | Institutional LDAP or AD through Keycloak federation | LDAP/AD-derived platform groups | OIDC plus optional LDAP password auth | Enabled | Enabled |
-| `keycloakLocal` | Bundled Keycloak local users | Keycloak-managed `platform-app-*` groups | OIDC/token-capable clients for ordinary users, with an optional named bootstrap admin file-password exception | Disabled | Hidden |
+| `keycloakLocal` | Bundled Keycloak local users | Ranger-driven platform roles projected into Keycloak `platform-role-*` and `platform-app-*` groups, plus optional Keycloak-only overrides | OIDC/token-capable clients for ordinary users, with an optional named bootstrap admin file-password exception | Disabled | Hidden |
 
 ## Default Model
 
@@ -78,7 +78,9 @@ In this mode:
 - Self-registration is enabled, and email verification is optional depending on
   whether SMTP is configured for the realm.
 - New users start with no browser app groups and no Ranger role membership.
-- Administrators grant browser access in Keycloak and data access in Ranger.
+- Administrators grant platform roles in Ranger; the local-user sync
+  automation projects those roles back into Keycloak browser groups when
+  `global.authorization.platformRoleMembershipSource=ranger`.
 - Trino direct password auth is intentionally disabled; clients use OIDC or
   tokens instead.
 
@@ -298,8 +300,10 @@ In `keycloakLocal` mode the portal hides that workspace entirely. That is
 intentional, not a missing feature. The supported admin workflow is:
 
 1. create or approve the user in Keycloak
-2. assign browser app groups in Keycloak
-3. assign Trino data roles in Ranger
+2. assign platform roles in Ranger
+3. apply any standalone Keycloak browser-group overrides only when they are
+   intentionally outside the Ranger role catalog
+4. assign Trino data roles in Ranger
 
 ## Browser URLs Versus In-Cluster URLs
 

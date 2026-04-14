@@ -33,9 +33,10 @@ The chart now supports two first-class identity modes:
   usersync, and the portal `Access Control` workspace for routine membership
   edits.
 - `keycloakLocal`: bundled Keycloak for browser SSO and self-registration,
-  Keycloak-managed browser app groups, Ranger direct-user data-role grants, and
-  OIDC/token-capable Trino clients for ordinary users instead of routine direct
-  password auth.
+  Ranger-driven platform-role membership projected into Keycloak
+  `platform-role-*` and `platform-app-*` groups, Ranger direct-user data-role
+  grants, and OIDC/token-capable Trino clients for ordinary users instead of
+  routine direct password auth.
 
 ## Default Architecture
 
@@ -181,12 +182,16 @@ live user or group membership to Ranger so those changes survive later chart
 reconciliation.
 
 In `keycloakLocal` mode the portal intentionally hides the `Access Control`
-workspace instead of exposing a half-working LDAP-oriented UI. The supported
+workspace instead of exposing a half-working LDAP-oriented UI. Direct-user
+membership in Ranger platform roles is projected back into the matching
+`platform-role-*` and browser `platform-app-*` Keycloak groups so browser
+entitlements stay aligned with the live Ranger role catalog. The supported
 admin split in that mode is:
 
-- Keycloak Admin for account lifecycle and browser app groups such as
-  `platform-app-*`
-- Ranger Admin for direct-user Trino data-role membership and policy audit
+- Keycloak Admin for account lifecycle and any standalone browser app-group
+  overrides such as `platform-app-*`
+- Ranger Admin for direct-user platform-role and Trino data-role membership plus
+  policy audit
 - Trino OIDC/token-capable clients for routine DBeaver, Python, or R access
 
 Deployments may also keep a named bootstrap admin in Trino file-password auth
@@ -213,9 +218,11 @@ That mode requires:
 The intended user lifecycle is:
 
 1. a user self-registers in Keycloak
-2. an administrator grants browser app groups in Keycloak
-3. an administrator grants Trino data access in Ranger
-4. the user accesses browser apps via Keycloak SSO and Trino via OIDC/token
+2. an administrator grants platform-role membership in Ranger
+3. the local-user sync automation projects those Ranger roles into the
+   matching Keycloak `platform-role-*` and `platform-app-*` groups
+4. an administrator grants Trino data access in Ranger
+5. the user accesses browser apps via Keycloak SSO and Trino via OIDC/token
    clients
 
 When `cloudbeaver.bootstrap.sharedConnectionSeed.enabled=true`, the chart can
