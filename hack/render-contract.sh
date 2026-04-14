@@ -167,8 +167,8 @@ assert_contains "${prod_manifest}" 'allowed_groups = [\"platform-app-prefect\", 
 assert_contains "${dev_manifest}" 'allowed_groups = [\"platform-app-cloudbeaver\", \"platform-role-platform-admin\"]'
 assert_contains "${prod_manifest}" 'allowed_groups = [\"platform-app-cloudbeaver\", \"platform-role-platform-admin\"]'
 assert_contains "${dev_manifest}" 'skip_oidc_discovery = true'
-assert_contains "${dev_manifest}" 'redeem_url = \"http://dlh-keycloak.data-lakehouse.svc.cluster.local/realms/dlh/protocol/openid-connect/token\"'
-assert_contains "${prod_manifest}" 'redeem_url = \"http://dlh-keycloak.data-lakehouse.svc.cluster.local/realms/dlh/protocol/openid-connect/token\"'
+assert_contains "${dev_manifest}" 'redeem_url = \"http://dlh-keycloak.default.svc.cluster.local/realms/dlh/protocol/openid-connect/token\"'
+assert_contains "${prod_manifest}" 'redeem_url = \"http://dlh-keycloak.default.svc.cluster.local/realms/dlh/protocol/openid-connect/token\"'
 assert_contains "${dev_manifest}" "\"platformRoles\": {"
 assert_contains "${dev_manifest}" "\"data-analyst\""
 assert_contains "${dev_manifest}" "\"principal-investigator\""

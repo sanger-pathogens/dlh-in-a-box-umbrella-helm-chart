@@ -235,7 +235,9 @@ Downstream repos should seed the Trino datasource in true manual-mode form
 truststore settings), not only as a raw JDBC URL, so the saved connection stays
 editable and valid in the CloudBeaver admin UI. The chart bootstrap then uses
 the reverse-proxy header identity to grant the seeded connection to those
-teams without requiring a separate local CloudBeaver login flow.
+teams without requiring a separate local CloudBeaver login flow. Downstream
+Trino access-control rules should also explicitly deny the `system` catalog to
+ordinary end users so browser clients only see the intended business catalogs.
 
 In that service-account model the common Trino identities are:
 

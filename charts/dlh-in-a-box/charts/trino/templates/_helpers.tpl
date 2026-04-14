@@ -269,7 +269,9 @@ s3.path-style-access={{ $s3.pathStyleAccess }}
 {{- $catalogs := (include "trino.dataCatalogs" . | fromYaml) | default (dict) -}}
 {
   "catalogs": [
-{{- $first := true }}
+    {"user":"admin","catalog":"system","allow":"all"},
+    {"catalog":"system","allow":"none"}
+{{- $first := false }}
 {{- range $catalogName, $catalog := $catalogs }}
   {{- $authorizedGroups := get $catalog "authorizedGroups" | default (dict) }}
   {{- $authorizedUsers := get $catalog "authorizedUsers" | default (dict) }}
