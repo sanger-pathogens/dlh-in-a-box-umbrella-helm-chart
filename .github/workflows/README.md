@@ -7,7 +7,7 @@ This directory contains the automation that validates and publishes the chart.
 | Workflow | Trigger | Purpose |
 | --- | --- | --- |
 | `helm-lint.yaml` | `push`, `pull_request` | Dependency refresh, docs checks, schema validation, lint, render, and package verification |
-| `helm-smoke-install.yaml` | `push`, `pull_request`, `workflow_dispatch` | kind-based install smoke test of the validated local overlay, with diagnostics artifact upload on failure |
+| `helm-smoke-install.yaml` | `push` to `main`, `workflow_dispatch` | kind-based install smoke test of the validated local auth overlay, with diagnostics artifact upload on failure |
 | `helm-publish.yaml` | `push` to `main`, `push` tags `v*`, `workflow_dispatch` | Version resolution, packaging, GHCR login, and OCI publication |
 
 ## Workflow lifecycle
@@ -15,7 +15,8 @@ This directory contains the automation that validates and publishes the chart.
 ```mermaid
 flowchart TD
   Push[Push or pull request] --> Lint[helm-lint workflow]
-  Push --> Smoke[helm-smoke-install workflow]
+  MainPush[Push to main] --> Smoke[helm-smoke-install workflow]
+  Manual[workflow_dispatch] --> Smoke
   Lint --> DependencyUpdate[helm dependency update]
   DependencyUpdate --> DocsChecks[directory guide and script checks]
   DocsChecks --> LicenseChecks[license and notice checks]
@@ -25,7 +26,7 @@ flowchart TD
   Kind --> Install[helm install validated local overlay]
   Install --> Diagnostics[collect diagnostics artifact on failure]
 
-  MainPush[Push to main] --> Publish[helm-publish workflow]
+  MainPush --> Publish[helm-publish workflow]
   TagPush[Push tag vX.Y.Z] --> Publish
   Publish --> ResolveVersion[resolve release or prerelease version]
   ResolveVersion --> GHCRLogin[log in to GHCR]

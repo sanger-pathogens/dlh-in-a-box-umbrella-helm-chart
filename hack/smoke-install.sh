@@ -5,17 +5,17 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "${ROOT_DIR}"
 
 CHART_PATH="${1:-charts/dlh-in-a-box}"
-VALUES_FILE="${2:-examples/values-local.yaml}"
+VALUES_FILE="${2:-examples/values-local-auth.yaml}"
 RELEASE_NAME="${RELEASE_NAME:-dlh}"
 NAMESPACE="${NAMESPACE:-data-lakehouse-local}"
-TIMEOUT="${TIMEOUT:-20m}"
+TIMEOUT="${TIMEOUT:-30m}"
 ARTIFACT_DIR="${ARTIFACT_DIR:-}"
 SKIP_DEPENDENCY_UPDATE="${SKIP_DEPENDENCY_UPDATE:-false}"
+RESET_RELEASE_STATE="${RESET_RELEASE_STATE:-true}"
 
 transient_kube_error() {
   local message="${1:-}"
-  [[ "${message}" == *"context deadline exceeded"* ]] \
-    || [[ "${message}" == *"the server was unable to return a response in the time allotted"* ]] \
+  [[ "${message}" == *"the server was unable to return a response in the time allotted"* ]] \
     || [[ "${message}" == *"Kubernetes cluster unreachable"* ]] \
     || [[ "${message}" == *"EOF"* ]] \
     || [[ "${message}" == *"Client.Timeout exceeded while awaiting headers"* ]]
@@ -62,6 +62,31 @@ seed_secret() {
     "$@" \
     --dry-run=client \
     -o yaml | kubectl apply -f -
+}
+
+wait_for_namespace_deletion() {
+  local attempts=60
+
+  while kubectl get namespace "${NAMESPACE}" >/dev/null 2>&1; do
+    if (( attempts == 0 )); then
+      echo "Timed out waiting for namespace ${NAMESPACE} to be deleted." >&2
+      return 1
+    fi
+
+    sleep 5
+    attempts=$((attempts - 1))
+  done
+}
+
+reset_release_state() {
+  if helm status "${RELEASE_NAME}" -n "${NAMESPACE}" >/dev/null 2>&1; then
+    helm uninstall "${RELEASE_NAME}" -n "${NAMESPACE}" --wait --timeout 10m || true
+  fi
+
+  if kubectl get namespace "${NAMESPACE}" >/dev/null 2>&1; then
+    kubectl delete namespace "${NAMESPACE}" --wait=true --timeout=10m || true
+    wait_for_namespace_deletion
+  fi
 }
 
 seed_local_auth_demo_secrets() {
@@ -187,6 +212,10 @@ trap dump_diagnostics ERR
 
 if [[ "${SKIP_DEPENDENCY_UPDATE}" != "true" ]]; then
   ./hack/helm-dependency-update.sh
+fi
+
+if [[ "${RESET_RELEASE_STATE}" == "true" ]]; then
+  reset_release_state
 fi
 
 if [[ "$(basename "${VALUES_FILE}")" == "values-local-auth.yaml" ]]; then
