@@ -1191,6 +1191,7 @@ superset:
       AUTH_ROLES_SYNC_AT_LOGIN = True
       AUTH_USER_REGISTRATION = True
       AUTH_USER_REGISTRATION_ROLE = "Gamma"
+      GROUPS_CLAIM = {{ .Values.global.identity.external.oidc.groupsClaim | quote }}
       AUTH_ROLES_MAPPING = {
       {{- range $role, $groups := .Values.auth.roleMappings }}
         {{- range $group := $groups }}
@@ -1237,7 +1238,7 @@ superset:
                           "first_name": claims.get("given_name", ""),
                           "last_name": claims.get("family_name", ""),
                           "email": claims.get("email", ""),
-                          "role_keys": claims.get("groups", []),
+                          "role_keys": claims.get(GROUPS_CLAIM) or claims.get("groups", []),
                       }
               return super().oauth_user_info(provider, response)
 

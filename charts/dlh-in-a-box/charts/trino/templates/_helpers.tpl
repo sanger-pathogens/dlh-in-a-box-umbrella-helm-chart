@@ -272,7 +272,7 @@ s3.path-style-access={{ $s3.pathStyleAccess }}
     {"user":"admin","catalog":"system","allow":"all"},
     {"user":"cloudbeaver-service","catalog":"system","allow":"all"},
     {"user":"superset-service","catalog":"system","allow":"all"},
-    {"catalog":"system","allow":"none"}
+    {"catalog":"system","allow":"read-only"}
 {{- $first := false }}
 {{- range $catalogName, $catalog := $catalogs }}
   {{- $authorizedGroups := get $catalog "authorizedGroups" | default (dict) }}

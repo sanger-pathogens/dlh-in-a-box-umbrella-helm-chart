@@ -43,6 +43,14 @@
 {{- $logoutUrl := default (printf "%s/oauth2/sign_out" $cloudbeaverOrigin) $authProxy.logoutUrl -}}
 {{- $cloudbeaverServerName := default "Data Platform CloudBeaver" $appConfig.serverName -}}
 {{- $cloudbeaverServerUrl := "" -}}
+{{- $supportsCustomConnections := true -}}
+{{- if hasKey $appConfig "supportsCustomConnections" -}}
+  {{- $supportsCustomConnections = get $appConfig "supportsCustomConnections" -}}
+{{- end -}}
+{{- $showReadOnlyConnectionInfo := true -}}
+{{- if hasKey $appConfig "showReadOnlyConnectionInfo" -}}
+  {{- $showReadOnlyConnectionInfo = get $appConfig "showReadOnlyConnectionInfo" -}}
+{{- end -}}
 {{- $cloudbeaverSecretManagerEnabled := or (default false $appConfig.secretManagerEnabled) (default false $appConfig.publicCredentialsSaveEnabled) (default false $appConfig.adminCredentialsSaveEnabled) -}}
 {{- if $cloudbeaverOrigin -}}
   {{- $cloudbeaverServerUrl = printf "%s/" (trimSuffix "/" $cloudbeaverOrigin) -}}
@@ -122,8 +130,8 @@ data:
       app: {
         anonymousAccessEnabled: false,
         defaultUserTeam: {{ $defaultUserTeam | quote }},
-        supportsCustomConnections: {{ ternary "true" "false" (default true $appConfig.supportsCustomConnections) }},
-        showReadOnlyConnectionInfo: {{ ternary "true" "false" (default true $appConfig.showReadOnlyConnectionInfo) }},
+        supportsCustomConnections: {{ ternary "true" "false" $supportsCustomConnections }},
+        showReadOnlyConnectionInfo: {{ ternary "true" "false" $showReadOnlyConnectionInfo }},
         publicCredentialsSaveEnabled: {{ ternary "true" "false" (default false $appConfig.publicCredentialsSaveEnabled) }},
         adminCredentialsSaveEnabled: {{ ternary "true" "false" (default false $appConfig.adminCredentialsSaveEnabled) }},
         secretManagerEnabled: {{ ternary "true" "false" $cloudbeaverSecretManagerEnabled }},
@@ -375,6 +383,23 @@ spec:
                       -H "X-Forwarded-Groups: ${bootstrap_groups}" \
                       --data @"${tmp_dir}/open-session.json" \
                       "http://127.0.0.1:{{ $port }}/api/gql" >/dev/null
+                    for subject in "$@"; do
+                      subject="$(printf '%s' "${subject}" | tr -d '[:space:]')"
+                      if [ -z "${subject}" ]; then
+                        continue
+                      fi
+                      cat >"${tmp_dir}/create-team.json" <<EOF
+                    {"query":"query CreateTeam(\$teamId: ID!, \$teamName: String, \$description: String) { createTeam(teamId: \$teamId, teamName: \$teamName, description: \$description) { teamId } }","variables":{"teamId":"${subject}","teamName":"${subject}","description":"Provisioned by CloudBeaver startup bootstrap."}}
+                    EOF
+                      curl -fsS \
+                        -c "${tmp_dir}/cookies.txt" \
+                        -b "${tmp_dir}/cookies.txt" \
+                        -H "Content-Type: application/json" \
+                        -H "X-Forwarded-Preferred-Username: ${CB_SHARED_BOOTSTRAP_USERNAME}" \
+                        -H "X-Forwarded-Groups: ${bootstrap_groups}" \
+                        --data @"${tmp_dir}/create-team.json" \
+                        "http://127.0.0.1:{{ $port }}/api/gql" >/dev/null || true
+                    done
                     cat >"${tmp_dir}/set-access.json" <<EOF
                     {"query":"query SetAccess(\$projectId: ID!, \$connectionId: ID!, \$subjects: [ID!]!) { setConnectionSubjectAccess(projectId: \$projectId, connectionId: \$connectionId, subjects: \$subjects) }","variables":{"projectId":"${project_id}","connectionId":"${CB_SHARED_CONNECTION_ID}","subjects":${subjects_json}}}
                     EOF
