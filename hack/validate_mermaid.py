@@ -17,7 +17,10 @@ FENCE_RE = re.compile(r"^```mermaid[^\n]*\n(.*?)^```[ \t]*$", re.MULTILINE | re.
 DEFAULT_IMAGE = os.environ.get("MERMAID_CLI_IMAGE", "minlag/mermaid-cli:10.9.1")
 STRICT_ENV_VALUES = {"1", "true", "yes", "on"}
 DOCKER_PROBE_TIMEOUT_SECONDS = float(os.environ.get("MERMAID_DOCKER_PROBE_TIMEOUT_SECONDS", "5"))
-MERMAID_RENDER_TIMEOUT_SECONDS = float(os.environ.get("MERMAID_RENDER_TIMEOUT_SECONDS", "30"))
+MERMAID_IMAGE_PREPARE_TIMEOUT_SECONDS = float(
+    os.environ.get("MERMAID_IMAGE_PREPARE_TIMEOUT_SECONDS", "180")
+)
+MERMAID_RENDER_TIMEOUT_SECONDS = float(os.environ.get("MERMAID_RENDER_TIMEOUT_SECONDS", "60"))
 
 
 def parse_args() -> argparse.Namespace:
@@ -66,6 +69,45 @@ def strict_mode_enabled() -> bool:
     return os.environ.get("CI", "").lower() in STRICT_ENV_VALUES or os.environ.get(
         "MERMAID_STRICT", ""
     ).lower() in STRICT_ENV_VALUES
+
+
+def ensure_mermaid_image() -> str | None:
+    try:
+        inspect = subprocess.run(
+            ["docker", "image", "inspect", DEFAULT_IMAGE],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            check=False,
+            timeout=DOCKER_PROBE_TIMEOUT_SECONDS,
+        )
+    except subprocess.TimeoutExpired:
+        return (
+            f"Timed out while checking Mermaid image {DEFAULT_IMAGE} after "
+            f"{DOCKER_PROBE_TIMEOUT_SECONDS:g}s"
+        )
+
+    if inspect.returncode == 0:
+        return None
+
+    try:
+        pull = subprocess.run(
+            ["docker", "pull", DEFAULT_IMAGE],
+            capture_output=True,
+            text=True,
+            check=False,
+            timeout=MERMAID_IMAGE_PREPARE_TIMEOUT_SECONDS,
+        )
+    except subprocess.TimeoutExpired:
+        return (
+            f"Timed out while pulling Mermaid image {DEFAULT_IMAGE} after "
+            f"{MERMAID_IMAGE_PREPARE_TIMEOUT_SECONDS:g}s"
+        )
+
+    if pull.returncode == 0:
+        return None
+
+    diagnostic = "\n".join(part.strip() for part in [pull.stdout, pull.stderr] if part.strip())
+    return f"Failed to prepare Mermaid image {DEFAULT_IMAGE}\n{diagnostic}".rstrip()
 
 
 def validate_block(path: Path, block_index: int, block: str) -> str | None:
@@ -132,6 +174,11 @@ def main() -> int:
             file=sys.stderr,
         )
         return 0
+
+    image_error = ensure_mermaid_image()
+    if image_error:
+        print(image_error, file=sys.stderr)
+        return 1
 
     files = collect_files(root, args.include, args.exclude)
     errors: list[str] = []
