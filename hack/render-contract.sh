@@ -74,6 +74,7 @@ local_manifest="$(render_manifest -f examples/values-local-auth.yaml)"
 dev_manifest="$(render_manifest -f examples/values-dev.yaml)"
 prod_manifest="$(render_manifest -f examples/values-prod.yaml)"
 shared_manifest="$(render_manifest -f examples/values-shared-auth.yaml)"
+prefect_automation_manifest="$(render_manifest -f examples/values-dev.yaml -f "${FIXTURE_DIR}/prefect-automation-enabled.yaml")"
 
 assert_not_contains "${default_manifest}" "{{"
 assert_not_contains "${local_manifest}" "{{"
@@ -137,6 +138,12 @@ assert_contains "${prod_manifest}" 'allowed_groups = [\"platform-app-cloudbeaver
 assert_contains "${dev_manifest}" 'skip_oidc_discovery = true'
 assert_contains "${dev_manifest}" 'redeem_url = \"http://dlh-keycloak.data-lakehouse.svc.cluster.local/realms/dlh/protocol/openid-connect/token\"'
 assert_contains "${prod_manifest}" 'redeem_url = \"http://dlh-keycloak.data-lakehouse.svc.cluster.local/realms/dlh/protocol/openid-connect/token\"'
+assert_contains "${prefect_automation_manifest}" 'skip_jwt_bearer_tokens = true'
+assert_contains "${prefect_automation_manifest}" 'api_routes = [ \"^/api/\" ]'
+assert_contains "${prefect_automation_manifest}" 'extra_jwt_issuers = \"https://keycloak.dev.example.org/realms/dlh=prefect-api\"'
+assert_contains "${prefect_automation_manifest}" "Prefect Automation"
+assert_contains "${prefect_automation_manifest}" "protocolMapper: oidc-audience-mapper"
+assert_contains "${prefect_automation_manifest}" "KC_PREFECT_AUTOMATION_CLIENT_SECRET"
 assert_contains "${dev_manifest}" "\"platformRoles\": {"
 assert_contains "${dev_manifest}" "\"data-analyst\""
 assert_contains "${dev_manifest}" "\"principal-investigator\""
@@ -164,6 +171,21 @@ expect_fail \
   "global.identity.external.clients.prefectProxy.allowedGroups must be set in dev and prod so Prefect is not exposed to every authenticated user." \
   -f examples/values-dev.yaml \
   -f "${FIXTURE_DIR}/prefect-missing-groups.yaml"
+
+expect_fail \
+  "global.identity.external.clients.prefectAutomation.clientId is required when machine access for Prefect is enabled." \
+  -f examples/values-dev.yaml \
+  -f "${FIXTURE_DIR}/prefect-automation-missing-client-id.yaml"
+
+expect_fail \
+  "global.identity.external.clients.prefectAutomation.enabled requires prefect.authProxy.enabled=true." \
+  -f examples/values-dev.yaml \
+  -f "${FIXTURE_DIR}/prefect-automation-authproxy-disabled.yaml"
+
+expect_fail \
+  "global.identity.external.clients.prefectAutomation.enabled requires global.identity.external.clients.prefectProxy.enabled=true." \
+  -f examples/values-dev.yaml \
+  -f "${FIXTURE_DIR}/prefect-automation-prefectproxy-disabled.yaml"
 
 expect_fail \
   "global.identity.external.clients.cloudbeaverProxy.allowedGroups must be set in dev and prod so CloudBeaver is not exposed to every authenticated user." \

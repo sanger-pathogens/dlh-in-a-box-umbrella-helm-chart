@@ -153,6 +153,14 @@ global:
             host: ""
             tlsSecretName: ""
             annotations: {}
+        prefectAutomation:
+          enabled: false
+          clientId: ""
+          configCliSecretKey: KC_PREFECT_AUTOMATION_CLIENT_SECRET
+          tokenAudience: prefect-api
+          serviceAccountsEnabled: true
+          standardFlowEnabled: false
+          directAccessGrantsEnabled: false
     directory:
       mode: externalLdap
       ldap:
@@ -653,6 +661,32 @@ keycloak:
               - roles
               - groups
         {{- end }}
+        {{- if .Values.global.identity.external.clients.prefectAutomation.enabled }}
+          - clientId: {{ .Values.global.identity.external.clients.prefectAutomation.clientId | quote }}
+            name: Prefect Automation
+            description: OIDC machine client for programmatic Prefect API access through oauth2-proxy
+            enabled: true
+            protocol: openid-connect
+            publicClient: false
+            standardFlowEnabled: {{ .Values.global.identity.external.clients.prefectAutomation.standardFlowEnabled }}
+            directAccessGrantsEnabled: {{ .Values.global.identity.external.clients.prefectAutomation.directAccessGrantsEnabled }}
+            serviceAccountsEnabled: {{ .Values.global.identity.external.clients.prefectAutomation.serviceAccountsEnabled }}
+            secret: "$(env:{{ .Values.global.identity.external.clients.prefectAutomation.configCliSecretKey }}:change-me)"
+            defaultClientScopes:
+              - profile
+              - email
+              - roles
+              - groups
+            protocolMappers:
+              - name: prefect-automation-audience
+                protocol: openid-connect
+                protocolMapper: oidc-audience-mapper
+                consentRequired: false
+                config:
+                  included.client.audience: {{ .Values.global.identity.external.clients.prefectAutomation.tokenAudience | quote }}
+                  access.token.claim: "true"
+                  id.token.claim: "false"
+        {{- end }}
         {{- if .Values.global.identity.directory.ldap.enabled }}
         components:
           org.keycloak.storage.UserStorageProvider:
@@ -986,6 +1020,11 @@ prefect-auth-proxy:
       pass_authorization_header = true
       set_xauthrequest = true
       reverse_proxy = true
+      {{- if .Values.global.identity.external.clients.prefectAutomation.enabled }}
+      skip_jwt_bearer_tokens = true
+      api_routes = [ "^/api/" ]
+      extra_jwt_issuers = "{{ include "dlh-in-a-box.identity.issuer" $ }}={{ .Values.global.identity.external.clients.prefectAutomation.tokenAudience }}"
+      {{- end }}
   service:
     type: ClusterIP
   ingress:

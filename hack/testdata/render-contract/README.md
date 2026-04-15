@@ -12,6 +12,7 @@ The negative fixtures deliberately cover:
 - missing explicit environment selection for shared identity or governed catalogs
 - wildcard OIDC client settings outside local mode
 - missing Prefect group restrictions
+- invalid Prefect machine-auth settings
 - missing CloudBeaver group restrictions
 - missing portal redirect URIs
 - missing CloudBeaver proxy secret wiring
