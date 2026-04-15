@@ -92,6 +92,15 @@ allowed_bitnamilegacy_paths=(
   "examples/values-local-superset.yaml"
 )
 
+find_bitnamilegacy_references() {
+  if command -v rg >/dev/null 2>&1; then
+    rg -n 'bitnamilegacy/' charts/dlh-in-a-box/values.yaml examples/*.yaml || true
+    return
+  fi
+
+  grep -nH 'bitnamilegacy/' charts/dlh-in-a-box/values.yaml examples/*.yaml || true
+}
+
 while IFS=: read -r path _; do
   [[ -z "${path}" ]] && continue
 
@@ -107,4 +116,4 @@ while IFS=: read -r path _; do
     echo "Unexpected bitnamilegacy image reference found in ${path}. Keep new references out of the chart until the temporary supply-chain debt is removed." >&2
     exit 1
   fi
-done < <(rg -n 'bitnamilegacy/' charts/dlh-in-a-box/values.yaml examples/*.yaml || true)
+done < <(find_bitnamilegacy_references)
