@@ -1,0 +1,7 @@
+global:
+  identity:
+    external:
+      clients:
+        prefectAutomation:
+          enabled: true
+          clientId: ""
