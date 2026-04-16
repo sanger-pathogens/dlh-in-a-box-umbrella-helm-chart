@@ -32,6 +32,7 @@ This is an engineering-facing compliance record, not formal legal advice.
 | DataHub Helm chart and bundled subcharts | `0.8.21` plus bundled `datahub-gms`, `datahub-frontend`, `datahub-mae-consumer`, `datahub-mce-consumer`, `datahub-ingestion-cron`, and `acryl-datahub-actions` subcharts | Apache-2.0 | Redistributed as an upstream chart archive | The upstream `NOTICE` file is reproduced at `charts/dlh-in-a-box/third_party/datahub/NOTICE` because the Apache-2.0 redistribution terms require readable notice reproduction when a distributed work ships with a `NOTICE` file. |
 | `datahub-prerequisites` Helm chart and bundled dependency charts | `0.2.3` plus bundled Elasticsearch, MySQL, PostgreSQL, Kafka, Neo4j, OpenSearch, Confluent Platform, and `gcloud-sqlproxy` charts as shipped by the upstream dependency | Mixed upstream licenses: primarily Apache-2.0, plus MIT for the bundled `gcloud-sqlproxy` chart | Redistributed as an upstream chart archive | Included so `dlh-in-a-box` can deploy a self-contained DataHub baseline when `datahub.enabled=true`. The bundled MIT license text for `gcloud-sqlproxy` is reproduced at `charts/dlh-in-a-box/third_party/gcloud-sqlproxy/LICENSE`. |
 | Vault Helm chart | `0.32.0` | MPL-2.0 | Redistributed as upstream dependency material in the repository and packaged chart | No local source modifications. The upstream dependency material carries `vault/LICENSE`; this repository also documents the upstream source and license below. |
+| JupyterHub Helm chart | `4.3.3` | BSD-3-Clause | Redistributed as upstream dependency material in the repository and packaged chart | No local source modifications. This optional dependency provides Keycloak-backed notebook access and token-aware single-user servers. |
 | Local Hive subchart | `0.1.0` | Apache-2.0 | Local source under `charts/dlh-in-a-box/charts/hive/` and packaged as a local subchart dependency | Covered by this repository's Apache-2.0 license. |
 
 ## Upstream license sources reviewed
@@ -53,6 +54,8 @@ This is an engineering-facing compliance record, not formal legal advice.
 - Rimusz charts license for bundled `gcloud-sqlproxy`: `https://github.com/rimusz/charts/blob/master/LICENSE`
 - Vault Helm chart: `https://github.com/hashicorp/vault-helm`
 - Vault license: `https://github.com/hashicorp/vault-helm/blob/main/LICENSE`
+- JupyterHub Helm chart: `https://github.com/jupyterhub/zero-to-jupyterhub-k8s`
+- JupyterHub license: `https://github.com/jupyterhub/zero-to-jupyterhub-k8s/blob/main/LICENSE`
 - Bitnami charts: `https://github.com/bitnami/charts`
 - Bitnami repository license page: `https://github.com/bitnami/charts/blob/main/LICENSE.md`
 

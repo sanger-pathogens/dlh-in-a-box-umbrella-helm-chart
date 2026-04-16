@@ -54,11 +54,17 @@ The default documented shared-environment model remains `externalLdap`:
   pattern from the shared directory defaults, use
   `global.identity.external.clients.trino.ldapUserBindPattern`.
 - `Superset`, `DataHub`, and the `Prefect` proxy trust the same OIDC issuer.
+- optional `JupyterHub` can trust that same OIDC issuer and forward the
+  resulting Keycloak access token into spawned notebook servers.
 - `Ranger`, `CloudBeaver`, and `Prefect` reuse that same browser session
   through chart-managed auth proxies.
 - deployment-owned admin tools such as `MinIO Console`, standalone `Vault`,
   and `Headlamp` can reuse the same Keycloak realm through reusable OIDC
   client blocks owned by the umbrella chart.
+- the portal can optionally launch Vault through a short-lived wrapped Vault
+  login token derived from the caller's current Keycloak bearer token, so the
+  admin card can land directly in Vault's native UI session without a second
+  in-app click.
 - `platformHome` is the default browser entrypoint, renders grouped launch
   cards, exposes health/status information, and only hides links based on
   Keycloak group claims.
@@ -69,6 +75,8 @@ The default documented shared-environment model remains `externalLdap`:
 - `oauth2-proxy` protects Prefect, CloudBeaver, and the Ranger browser path
   because all three are front-door integrations around the same Keycloak
   session.
+- when enabled, JupyterHub becomes another browser destination behind the same
+  realm rather than a separate identity stack.
 
 The chart still supports an externally managed OIDC provider, but that is the
 escape hatch, not the main reference architecture.
@@ -193,6 +201,8 @@ admin split in that mode is:
 - Ranger Admin for direct-user platform-role and Trino data-role membership plus
   policy audit
 - Trino OIDC/token-capable clients for routine DBeaver, Python, or R access
+- optional JupyterHub notebook servers that receive the same Keycloak-backed
+  Trino bearer token at spawn time
 
 Deployments may also keep a named bootstrap admin in Trino file-password auth
 for smoke validation or recovery. That is an operational exception, not the
@@ -224,6 +234,24 @@ The intended user lifecycle is:
 4. an administrator grants Trino data access in Ranger
 5. the user accesses browser apps via Keycloak SSO and Trino via OIDC/token
    clients
+
+The supported non-browser Trino patterns in this chart are now:
+
+- browser-capable clients such as DBeaver using the Trino OIDC/external-auth flow
+- a Keycloak direct-grant client such as `trinoDirectGrant` when an
+  institution explicitly wants Python, R, or CLI tooling to exchange the same
+  Keycloak username and password for a bearer token without opening a browser
+- notebook environments such as JupyterHub that reuse the already-issued
+  Keycloak token instead of prompting for another password inside the notebook
+
+The initial JupyterHub integration is intentionally conservative:
+
+- per-user notebook servers and storage
+- a preloaded Trino demo notebook and kernel
+- Keycloak-backed browser login plus token reuse inside the notebook
+
+Collaborative notebook sharing or team-published workspaces can be layered on
+later, but they are not part of the first chart-level contract.
 
 When `cloudbeaver.bootstrap.sharedConnectionSeed.enabled=true`, the chart can
 seed the shared datasource definition into the workspace together with the
@@ -350,7 +378,7 @@ reusable chart can render a polished launchpad without hard-coding any
 institution-specific assets.
 
 Use `platformHome.itemMeta.<id>` for chart-owned items such as `superset`,
-`datahub`, `prefect`, `cloudbeaver`, `trino`, `ranger-admin`, or
+`datahub`, `jupyterhub`, `prefect`, `cloudbeaver`, `trino`, `ranger-admin`, or
 `keycloak-admin`, and set equivalent fields directly on
 `platformHome.adminTools[]` for custom admin cards.
 
@@ -360,6 +388,8 @@ portal-linked tools, the umbrella chart now exposes reusable client blocks for:
 - `global.identity.external.clients.minio`
 - `global.identity.external.clients.vault`
 - `global.identity.external.clients.headlamp`
+- `global.identity.external.clients.jupyterhub`
+- `global.identity.external.clients.trinoDirectGrant`
 
 Supported fields are:
 
@@ -418,6 +448,7 @@ provide the config-cli environment variables consumed during realm bootstrap.
   `KC_TRINO_CLIENT_SECRET`
   `KC_SUPERSET_CLIENT_SECRET`
   `KC_DATAHUB_CLIENT_SECRET`
+  `KC_JUPYTERHUB_CLIENT_SECRET`
   `KC_CLOUDBEAVER_CLIENT_SECRET`
   `KC_PREFECT_CLIENT_SECRET`
 - Optional local/dev-only keys:
@@ -432,10 +463,10 @@ the secret name itself is now part of the supported contract.
 
 - `examples/values-dev.yaml`
   Bundled Keycloak + external LDAP/AD + Ranger development pattern with the
-  portal and CloudBeaver enabled.
+  portal, optional JupyterHub, and CloudBeaver enabled.
 - `examples/values-prod.yaml`
   Bundled Keycloak + external LDAPS + Ranger production-shaped pattern with the
-  portal and CloudBeaver enabled.
+  portal, optional JupyterHub, and CloudBeaver enabled.
 - `examples/values-shared-auth.yaml`
   External OIDC escape hatch with CloudBeaver still behind `oauth2-proxy`.
 

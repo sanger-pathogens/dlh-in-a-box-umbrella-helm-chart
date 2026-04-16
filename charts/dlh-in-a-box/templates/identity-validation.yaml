@@ -10,9 +10,11 @@
 {{- $external := get $identity "external" | default dict -}}
 {{- $clients := get $external "clients" | default dict -}}
 {{- $trinoIdentity := get $clients "trino" | default dict -}}
+{{- $trinoDirectGrantIdentity := get $clients "trinoDirectGrant" | default dict -}}
 {{- $supersetIdentity := get $clients "superset" | default dict -}}
 {{- $datahubIdentity := get $clients "datahub" | default dict -}}
 {{- $platformHomeIdentity := get $clients "platformHome" | default dict -}}
+{{- $jupyterhubIdentity := get $clients "jupyterhub" | default dict -}}
 {{- $cloudbeaverIdentity := get $clients "cloudbeaverProxy" | default dict -}}
 {{- $rangerProxyIdentity := get $clients "rangerProxy" | default dict -}}
 {{- $prefectIdentity := get $clients "prefectProxy" | default dict -}}
@@ -123,6 +125,12 @@
 {{- if and (default false $identity.enabled) $keycloakLocalMode (default false $ranger.enabled) (dig "usersync" "enabled" true $ranger) -}}
 {{- fail "global.authorization.ranger.usersync.enabled must be false when global.identity.directory.mode=keycloakLocal." -}}
 {{- end -}}
+{{- if and (default false (get $trinoDirectGrantIdentity "enabled")) (not (default false (get $trinoIdentity "enabled"))) -}}
+{{- fail "global.identity.external.clients.trinoDirectGrant.enabled requires global.identity.external.clients.trino.enabled=true." -}}
+{{- end -}}
+{{- if and (default false .Values.jupyterhub.enabled) (not (default false (get $jupyterhubIdentity "enabled"))) -}}
+{{- fail "jupyterhub.enabled requires global.identity.external.clients.jupyterhub.enabled=true so Keycloak-backed browser login can be configured." -}}
+{{- end -}}
 {{- if and (default false $identity.enabled) (not $keycloakLocalMode) (not (default false $ldap.enabled)) (not $bootstrapUsersEnabled) -}}
 {{- fail "global.identity.directory.ldap.enabled must be true when shared identity is enabled in externalLdap mode, unless you are using bundled Keycloak bootstrapUsers for a local or dev-only browser-auth fallback." -}}
 {{- end -}}
@@ -153,7 +161,7 @@
 {{- if and (default false $identity.enabled) (eq $providerMode "bundledKeycloak") (ne (default "" (get $keycloakConfigCli "extraEnvVarsSecret")) $configCliEnvSecretName) -}}
 {{- fail "keycloak.keycloakConfigCli.extraEnvVarsSecret must match global.identity.provider.keycloak.configCliEnvExistingSecret." -}}
 {{- end -}}
-{{- range $clientName := list "trino" "superset" "datahub" "platformHome" "minio" "vault" "headlamp" "cloudbeaverProxy" "rangerProxy" "prefectProxy" -}}
+{{- range $clientName := list "trino" "superset" "datahub" "platformHome" "minio" "vault" "headlamp" "jupyterhub" "cloudbeaverProxy" "rangerProxy" "prefectProxy" -}}
   {{- $client := get $clients $clientName | default dict -}}
   {{- if and (eq $providerMode "bundledKeycloak") (default false (get $client "enabled")) -}}
     {{- $redirectUris := get $client "redirectUris" | default list -}}

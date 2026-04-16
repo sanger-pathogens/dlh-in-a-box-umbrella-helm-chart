@@ -8,7 +8,7 @@
 {{- $ranger := get $authorization "ranger" | default dict -}}
 {{- $bootstrapPolicies := get $ranger "bootstrapPolicies" | default (dig "bootstrap" "policies" (list) $ranger) -}}
 {{- $importCatalogAcls := default false $ranger.importCatalogAcls -}}
-{{- $supportedPlatformApps := list "superset" "datahub" "trinoUi" "cloudbeaver" "prefect" -}}
+{{- $supportedPlatformApps := list "superset" "datahub" "trinoUi" "jupyterhub" "cloudbeaver" "prefect" -}}
 {{- $platformRoleKeys := dict -}}
 {{- $platformRoleNames := dict -}}
 
@@ -24,7 +24,7 @@
   {{- $apps := get $role "apps" | default dict -}}
   {{- range $appName, $_ := $apps -}}
     {{- if not (has $appName $supportedPlatformApps) -}}
-      {{- fail (printf "global.authorization.platformRoles.%s.apps.%s is not supported. Allowed app entitlements are superset, datahub, trinoUi, cloudbeaver, and prefect." $roleKey $appName) -}}
+      {{- fail (printf "global.authorization.platformRoles.%s.apps.%s is not supported. Allowed app entitlements are superset, datahub, trinoUi, jupyterhub, cloudbeaver, and prefect." $roleKey $appName) -}}
     {{- end -}}
   {{- end -}}
   {{- range $nestedRole := get $members "nestedRoles" | default (list) -}}

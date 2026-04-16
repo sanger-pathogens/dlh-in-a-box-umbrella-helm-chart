@@ -42,6 +42,9 @@ global:
           sharedSecretExistingSecret: dlh-trino-internal-communication
           sharedSecretKey: sharedSecret
           passwordAuthEnabled: false
+        trinoDirectGrant:
+          enabled: true
+          clientId: trino-cli
         superset:
           enabled: false
         datahub:

@@ -197,6 +197,25 @@
                     }
                   ]
                 },
+                "trinoDirectGrant": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "properties": {
+                    "enabled": { "type": "boolean" },
+                    "clientId": { "type": "string" }
+                  },
+                  "allOf": [
+                    {
+                      "if": {
+                        "properties": { "enabled": { "const": true } },
+                        "required": ["enabled"]
+                      },
+                      "then": {
+                        "required": ["clientId"]
+                      }
+                    }
+                  ]
+                },
                 "superset": {
                   "type": "object",
                   "additionalProperties": true,
@@ -448,6 +467,35 @@
                           "existingSecret",
                           "redirectUrl"
                         ]
+                      }
+                    }
+                  ]
+                },
+                "jupyterhub": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "properties": {
+                    "enabled": { "type": "boolean" },
+                    "clientId": { "type": "string" },
+                    "existingSecret": { "type": "string" },
+                    "clientSecretKey": { "type": "string" },
+                    "redirectUris": {
+                      "type": "array",
+                      "items": { "type": "string" }
+                    },
+                    "webOrigins": {
+                      "type": "array",
+                      "items": { "type": "string" }
+                    }
+                  },
+                  "allOf": [
+                    {
+                      "if": {
+                        "properties": { "enabled": { "const": true } },
+                        "required": ["enabled"]
+                      },
+                      "then": {
+                        "required": ["clientId", "existingSecret"]
                       }
                     }
                   ]
@@ -832,6 +880,7 @@
             "superset": { "type": "boolean" },
             "datahub": { "type": "boolean" },
             "trinoUi": { "type": "boolean" },
+            "jupyterhub": { "type": "boolean" },
             "cloudbeaver": { "type": "boolean" },
             "prefect": { "type": "boolean" }
           }
@@ -1210,6 +1259,14 @@
             }
           }
         }
+      }
+    },
+    "jupyterhub": {
+      "description": "Pass-through values for the optional JupyterHub dependency plus the top-level enablement flag.",
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "enabled": { "type": "boolean" }
       }
     },
     "cloudbeaver": {

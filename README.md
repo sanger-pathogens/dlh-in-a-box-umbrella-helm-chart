@@ -73,8 +73,9 @@ The default documented model is now:
 
 - `platformHome` is the browser launchpad and the default entrypoint for human users.
 - `Keycloak` is the platform OIDC provider.
-- development and production both federate Keycloak to an external
-  organizational LDAP or AD source.
+- `externalLdap` remains the default shared-environment identity mode, with
+  `keycloakLocal` available when an institution wants Keycloak to own human
+  accounts directly.
 - temporary `bootstrapUsers` are allowed only for local or dev browser-flow
   validation while real directory bind details are still pending.
 - `Ranger` remains the live policy and role-management plane. Trino only uses
@@ -82,6 +83,8 @@ The default documented model is now:
   paired with a Ranger-capable Trino image.
 - `oauth2-proxy` sits in front of Prefect, CloudBeaver, and Ranger so those
   tools can reuse the central Keycloak session.
+- `JupyterHub` is an optional analysis surface that can reuse the same
+  Keycloak realm and forward the resulting access token into notebook servers.
 - the umbrella chart owns the reusable portal UX, the dedicated `Access
   Control` workspace, and the health aggregation API, while downstream repos
   own logos, fonts, favicons, color palettes, and environment-specific extra
@@ -100,7 +103,8 @@ escape hatch, not the main story.
 - Trino catalog generation and Ranger bootstrap glue.
 - Keycloak and Ranger composition for chart-managed deployments.
 - The lightweight platform launchpad, dedicated access-control workspace,
-  health aggregation API, and the chart-owned CloudBeaver deployment.
+  health aggregation API, the chart-owned CloudBeaver deployment, and optional
+  JupyterHub integration.
 - Example overlays that prove local, development, and production-shaped
   installs render cleanly.
 - Documentation for the chart API and architecture.

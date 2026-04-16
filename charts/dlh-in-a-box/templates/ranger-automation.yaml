@@ -2196,6 +2196,7 @@ data:
         app_group_names = {
             "superset": "platform-app-superset",
             "datahub": "platform-app-datahub",
+            "jupyterhub": "platform-app-jupyterhub",
             "cloudbeaver": "platform-app-cloudbeaver",
             "prefect": "platform-app-prefect",
             "trinoUi": "platform-app-trino",

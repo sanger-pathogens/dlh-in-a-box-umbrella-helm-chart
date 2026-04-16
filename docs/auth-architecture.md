@@ -4,15 +4,15 @@ This guide explains the supported identity and access models for shared
 environments.
 
 It is written for chart consumers and maintainers who need to understand how
-Keycloak, LDAP/AD, Trino, Ranger, and Prefect fit together across the two
+Keycloak, LDAP/AD, Trino, Ranger, JupyterHub, and Prefect fit together across the two
 first-class identity modes.
 
 ## Supported Identity Modes
 
 | Mode | Human account source | Browser app access | Trino programmatic access | Ranger usersync | Portal `Access Control` |
 | --- | --- | --- | --- | --- | --- |
-| `externalLdap` | Institutional LDAP or AD through Keycloak federation | LDAP/AD-derived platform groups | OIDC plus optional LDAP password auth | Enabled | Enabled |
-| `keycloakLocal` | Bundled Keycloak local users | Ranger-driven platform roles projected into Keycloak `platform-role-*` and `platform-app-*` groups, plus optional Keycloak-only overrides | OIDC/token-capable clients for ordinary users, with an optional named bootstrap admin file-password exception | Disabled | Hidden |
+| `externalLdap` | Institutional LDAP or AD through Keycloak federation | LDAP/AD-derived platform groups | OIDC, optional direct-grant token exchange, plus optional LDAP password auth | Enabled | Enabled |
+| `keycloakLocal` | Bundled Keycloak local users | Ranger-driven platform roles projected into Keycloak `platform-role-*` and `platform-app-*` groups, plus optional Keycloak-only overrides | OIDC/token-capable clients for ordinary users, plus an optional direct-grant token client and an optional named bootstrap admin file-password exception | Disabled | Hidden |
 
 ## Default Model
 
@@ -27,6 +27,7 @@ flowchart LR
   Keycloak --> Trino[Trino]
   Keycloak --> Superset[Superset]
   Keycloak --> DataHub[DataHub]
+  Keycloak --> JupyterHub[JupyterHub]
   Keycloak --> Headlamp[Headlamp]
   Keycloak --> Vault[Vault]
   Keycloak --> MinIO[MinIO Console]
@@ -62,6 +63,7 @@ flowchart LR
   Keycloak --> Trino[Trino via OIDC]
   Keycloak --> Superset[Superset]
   Keycloak --> DataHub[DataHub]
+  Keycloak --> JupyterHub[JupyterHub]
   Keycloak --> PrefectProxy[Prefect oauth2-proxy]
   PrefectProxy --> Prefect[Prefect]
   Keycloak --> CloudBeaverProxy[CloudBeaver oauth2-proxy]
@@ -87,7 +89,7 @@ In this mode:
 ## Why Keycloak Is The Default
 
 Keycloak gives the platform one OIDC issuer across Trino, Superset, DataHub,
-and Prefect access. That means the institution does not need a separate OIDC
+JupyterHub, and Prefect access. That means the institution does not need a separate OIDC
 product just to make the platform work.
 
 If an institution already has another preferred OIDC provider, the chart can
@@ -161,7 +163,10 @@ both modes.
 
 In `externalLdap` mode, that mixed-auth Trino path is deliberate. Browser SSO
 does not replace the LDAP password path used by Python, R, JDBC, DBeaver, or
-CloudBeaver query sessions.
+CloudBeaver query sessions when an institution wants that mode, but the chart
+can also expose a Keycloak direct-grant client for tools that should exchange
+the same Keycloak username and password for a bearer token instead of opening
+another browser window.
 
 In `keycloakLocal` mode, ordinary user password auth is intentionally removed.
 The supported client story becomes:
@@ -170,6 +175,10 @@ The supported client story becomes:
 - DBeaver through Trino JDBC OAuth2 / external browser authentication
 - Python through `trino-python-client` OAuth2
 - R through a JDBC or ODBC layer that reuses the same token-based flow
+- optional direct token acquisition from Keycloak through a public client such
+  as `trinoDirectGrant`
+- optional JupyterHub notebook servers that reuse the Keycloak token from the
+  browser sign-in and hand it to notebook code as a Trino bearer token
 
 Some deployments may also mirror a named bootstrap admin into Trino
 file-password auth for smoke validation or recovery. That is a narrow
@@ -268,6 +277,12 @@ in an institution.
 
 The launchpad is not the security boundary. The app or Trino itself still
 enforces the real access decision.
+
+Vault is the one special admin-launch case: the portal can exchange the
+already-issued Keycloak bearer token for a short-lived wrapped Vault login and
+redirect the browser into Vault's native `wrapped_token` UI route. That keeps
+the user-visible experience one-click while still ending on a normal Vault UI
+session.
 
 Platform administrators get:
 

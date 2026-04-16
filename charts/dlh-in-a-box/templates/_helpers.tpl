@@ -229,6 +229,9 @@ app.kubernetes.io/managed-by: {{ .Release.Service }}
   {{- if default false (get $apps "trinoUi") -}}
     {{- $_ := set $groups (include "dlh-in-a-box.group.app" (dict "root" $ "name" "trino")) true -}}
   {{- end -}}
+  {{- if default false (get $apps "jupyterhub") -}}
+    {{- $_ := set $groups (include "dlh-in-a-box.group.app" (dict "root" $ "name" "jupyterhub")) true -}}
+  {{- end -}}
   {{- if default false (get $apps "cloudbeaver") -}}
     {{- $_ := set $groups (include "dlh-in-a-box.group.app" (dict "root" $ "name" "cloudbeaver")) true -}}
   {{- end -}}

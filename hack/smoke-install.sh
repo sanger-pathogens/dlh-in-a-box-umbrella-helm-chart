@@ -106,6 +106,7 @@ seed_local_auth_demo_secrets() {
     --from-literal=trinoClientSecret=local-trino-client-secret \
     --from-literal=supersetClientSecret=local-superset-client-secret \
     --from-literal=datahubClientSecret=local-datahub-client-secret \
+    --from-literal=jupyterhubClientSecret=local-jupyterhub-client-secret \
     --from-literal=cloudbeaverClientSecret=local-cloudbeaver-client-secret \
     --from-literal=prefectClientSecret=local-prefect-client-secret
 
@@ -149,6 +150,7 @@ seed_local_auth_demo_secrets() {
     --from-literal=KC_TRINO_CLIENT_SECRET=local-trino-client-secret \
     --from-literal=KC_SUPERSET_CLIENT_SECRET=local-superset-client-secret \
     --from-literal=KC_DATAHUB_CLIENT_SECRET=local-datahub-client-secret \
+    --from-literal=KC_JUPYTERHUB_CLIENT_SECRET=local-jupyterhub-client-secret \
     --from-literal=KC_CLOUDBEAVER_CLIENT_SECRET=local-cloudbeaver-client-secret \
     --from-literal=KC_PREFECT_CLIENT_SECRET=local-prefect-client-secret
 
