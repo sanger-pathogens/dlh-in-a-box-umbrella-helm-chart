@@ -16,7 +16,7 @@ while IFS= read -r dir; do
   missing+=("${dir#${ROOT_DIR}/}")
 done < <(
   find "${ROOT_DIR}" \
-    \( -path "${ROOT_DIR}/.git" -o -path "${ROOT_DIR}/.idea" -o -path "${ROOT_DIR}/artifacts" -o -path "${ROOT_DIR}/dist" -o -path "${ROOT_DIR}/references" \) -prune -o \
+    \( -path "${ROOT_DIR}/.git" -o -path "${ROOT_DIR}/.idea" -o -path "${ROOT_DIR}/artifacts" -o -path "${ROOT_DIR}/dist" -o -path "${ROOT_DIR}/references" -o -path "${ROOT_DIR}/__pycache__" -o -path "*/__pycache__" \) -prune -o \
     -type d -print | sort
 )
 
