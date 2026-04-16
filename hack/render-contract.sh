@@ -298,8 +298,10 @@ expect_fail \
   -f examples/values-local-auth.yaml \
   -f "${FIXTURE_DIR}/bootstrap-usersync-without-ldap.yaml"
 
-expect_fail \
+expect_fail_any \
   "global.environment must be one of the following: \"local\", \"dev\", \"prod\"" \
+  "value must be one of 'local', 'dev', 'prod'" \
+  -- \
   -f examples/values-shared-auth.yaml \
   -f "${FIXTURE_DIR}/missing-identity-environment.yaml"
 
