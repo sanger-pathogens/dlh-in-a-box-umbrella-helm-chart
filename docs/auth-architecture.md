@@ -1,12 +1,22 @@
 # Identity And Access Architecture
 
-This guide explains the default identity and access model for shared
+This guide explains the supported identity and access models for shared
 environments.
 
 It is written for chart consumers and maintainers who need to understand how
-Keycloak, LDAP/AD, Trino, Ranger, and Prefect fit together.
+Keycloak, LDAP/AD, Trino, Ranger, JupyterHub, and Prefect fit together across the two
+first-class identity modes.
+
+## Supported Identity Modes
+
+| Mode | Human account source | Browser app access | Trino programmatic access | Ranger usersync | Portal `Access Control` |
+| --- | --- | --- | --- | --- | --- |
+| `externalLdap` | Institutional LDAP or AD through Keycloak federation | LDAP/AD-derived platform groups | OIDC, optional direct-grant token exchange, plus optional LDAP password auth | Enabled | Enabled |
+| `keycloakLocal` | Bundled Keycloak local users | Ranger-driven platform roles projected into Keycloak `platform-role-*` and `platform-app-*` groups, plus optional Keycloak-only overrides | OIDC/token-capable clients for ordinary users, plus an optional direct-grant token client and an optional named bootstrap admin file-password exception | Disabled | Hidden |
 
 ## Default Model
+
+The default documented model remains `externalLdap`:
 
 ```mermaid
 flowchart LR
@@ -17,6 +27,7 @@ flowchart LR
   Keycloak --> Trino[Trino]
   Keycloak --> Superset[Superset]
   Keycloak --> DataHub[DataHub]
+  Keycloak --> JupyterHub[JupyterHub]
   Keycloak --> Headlamp[Headlamp]
   Keycloak --> Vault[Vault]
   Keycloak --> MinIO[MinIO Console]
@@ -42,10 +53,43 @@ In plain English:
 - Prefect, CloudBeaver, and Ranger are protected at the front door by
   `oauth2-proxy`.
 
+## Keycloak Local Users Model
+
+```mermaid
+flowchart LR
+  User[User] --> KeycloakSignup[Keycloak self-registration]
+  KeycloakSignup --> Keycloak[Bundled Keycloak]
+  Keycloak --> Portal[platformHome]
+  Keycloak --> Trino[Trino via OIDC]
+  Keycloak --> Superset[Superset]
+  Keycloak --> DataHub[DataHub]
+  Keycloak --> JupyterHub[JupyterHub]
+  Keycloak --> PrefectProxy[Prefect oauth2-proxy]
+  PrefectProxy --> Prefect[Prefect]
+  Keycloak --> CloudBeaverProxy[CloudBeaver oauth2-proxy]
+  CloudBeaverProxy --> CloudBeaver[CloudBeaver]
+  Keycloak --> RangerProxy[Ranger oauth2-proxy]
+  RangerProxy --> RangerBrowserProxy[Ranger browser proxy]
+  RangerBrowserProxy --> Ranger[Ranger]
+  Ranger --> Trino
+```
+
+In this mode:
+
+- Keycloak owns human accounts directly.
+- Self-registration is enabled, and email verification is optional depending on
+  whether SMTP is configured for the realm.
+- New users start with no browser app groups and no Ranger role membership.
+- Administrators grant platform roles in Ranger; the local-user sync
+  automation projects those roles back into Keycloak browser groups when
+  `global.authorization.platformRoleMembershipSource=ranger`.
+- Trino direct password auth is intentionally disabled; clients use OIDC or
+  tokens instead.
+
 ## Why Keycloak Is The Default
 
 Keycloak gives the platform one OIDC issuer across Trino, Superset, DataHub,
-and Prefect access. That means the institution does not need a separate OIDC
+JupyterHub, and Prefect access. That means the institution does not need a separate OIDC
 product just to make the platform work.
 
 If an institution already has another preferred OIDC provider, the chart can
@@ -54,12 +98,12 @@ documented architecture.
 
 ## Development Versus Production
 
-| Environment | Identity source | Group source | Notes |
+| Environment | Identity mode | Human account source | Notes |
 | --- | --- | --- | --- |
-| Development | Bundled Keycloak | External organizational LDAP/AD | Keeps development aligned with the real identity source instead of inventing an in-cluster directory |
-| Production | Bundled Keycloak | External AD/LDAP over LDAPS | Matches the institutional source of truth while keeping one platform OIDC issuer |
+| Development | `keycloakLocal` in the downstream repo today | Bundled Keycloak local users | Keeps the shared OIDC architecture intact while allowing institutions to defer LDAP integration |
+| Production | Usually `externalLdap`, optionally `keycloakLocal` | External AD/LDAP over LDAPS or bundled Keycloak local users | Both modes keep one platform OIDC issuer and the same Ranger authorization plane |
 
-Temporary bring-up exception:
+Temporary bring-up exception inside `externalLdap` mode:
 
 - in `local` or `dev`, bundled Keycloak can also seed a very small set of
   `bootstrapUsers`
@@ -104,7 +148,8 @@ flowchart TD
   Ranger --> Decision[Catalog, schema, table, column, mask, row-filter decisions]
 ```
 
-The chart now treats Ranger as the steady-state Trino authorization layer.
+The chart now treats Ranger as the steady-state Trino authorization layer in
+both modes.
 
 - `authorizedGroups` is now migration-only input. Use it only when
   `global.authorization.ranger.importCatalogAcls=true`.
@@ -116,9 +161,28 @@ The chart now treats Ranger as the steady-state Trino authorization layer.
 - When Trino uses LDAP password auth against LDAPS, the chart expects trusted
   CA material so certificate validation is real.
 
-That mixed-auth Trino path is deliberate. Browser SSO does not replace the
-LDAP password path used by Python, R, JDBC, DBeaver, or CloudBeaver query
-sessions.
+In `externalLdap` mode, that mixed-auth Trino path is deliberate. Browser SSO
+does not replace the LDAP password path used by Python, R, JDBC, DBeaver, or
+CloudBeaver query sessions when an institution wants that mode, but the chart
+can also expose a Keycloak direct-grant client for tools that should exchange
+the same Keycloak username and password for a bearer token instead of opening
+another browser window.
+
+In `keycloakLocal` mode, ordinary user password auth is intentionally removed.
+The supported client story becomes:
+
+- Trino Web UI through browser OIDC
+- DBeaver through Trino JDBC OAuth2 / external browser authentication
+- Python through `trino-python-client` OAuth2
+- R through a JDBC or ODBC layer that reuses the same token-based flow
+- optional direct token acquisition from Keycloak through a public client such
+  as `trinoDirectGrant`
+- optional JupyterHub notebook servers that reuse the Keycloak token from the
+  browser sign-in and hand it to notebook code as a Trino bearer token
+
+Some deployments may also mirror a named bootstrap admin into Trino
+file-password auth for smoke validation or recovery. That is a narrow
+operational exception, not the normal user path.
 
 ## Platform Roles And Direct-User Exceptions
 
@@ -214,13 +278,22 @@ in an institution.
 The launchpad is not the security boundary. The app or Trino itself still
 enforces the real access decision.
 
+Vault is the one special admin-launch case: the portal can exchange the
+already-issued Keycloak bearer token for a short-lived wrapped Vault login and
+redirect the browser into Vault's native `wrapped_token` UI route. That keeps
+the user-visible experience one-click while still ending on a normal Vault UI
+session.
+
 Platform administrators get:
 
 - grouped governance and operations links such as Ranger Admin, Keycloak Admin,
   Vault, Trino UI, Headlamp, and MinIO Console when configured
 - a dedicated `/access-control` workspace for assigning LDAP-backed groups and
   governed direct-user exceptions to Git-defined platform roles through Ranger
-- a compatibility redirect from `/admin.html` to `/access-control`
+  only when `externalLdap` mode is active
+- a compatibility redirect from `/admin.html` to `/access-control` only in
+  `externalLdap` mode; in `keycloakLocal` mode that legacy route redirects
+  back home with a note to use Keycloak Admin plus Ranger Admin instead
 - a Ranger Admin route that reuses the same browser session rather than
   expecting a second human login prompt
 
@@ -237,6 +310,15 @@ The dedicated access-control workspace is intentionally narrow:
   reconciliation semantics remain backward-compatible
 - when Ranger usersync is unavailable, group assignment stays disabled and the
   portal degrades honestly instead of pretending directory management is active
+
+In `keycloakLocal` mode the portal hides that workspace entirely. That is
+intentional, not a missing feature. The supported admin workflow is:
+
+1. create or approve the user in Keycloak
+2. assign platform roles in Ranger
+3. apply any standalone Keycloak browser-group overrides only when they are
+   intentionally outside the Ranger role catalog
+4. assign Trino data roles in Ranger
 
 ## Browser URLs Versus In-Cluster URLs
 

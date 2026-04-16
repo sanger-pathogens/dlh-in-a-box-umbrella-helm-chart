@@ -43,9 +43,19 @@
 {{- $logoutUrl := default (printf "%s/oauth2/sign_out" $cloudbeaverOrigin) $authProxy.logoutUrl -}}
 {{- $cloudbeaverServerName := default "Data Platform CloudBeaver" $appConfig.serverName -}}
 {{- $cloudbeaverServerUrl := "" -}}
+{{- $supportsCustomConnections := true -}}
+{{- if hasKey $appConfig "supportsCustomConnections" -}}
+  {{- $supportsCustomConnections = get $appConfig "supportsCustomConnections" -}}
+{{- end -}}
+{{- $showReadOnlyConnectionInfo := true -}}
+{{- if hasKey $appConfig "showReadOnlyConnectionInfo" -}}
+  {{- $showReadOnlyConnectionInfo = get $appConfig "showReadOnlyConnectionInfo" -}}
+{{- end -}}
+{{- $cloudbeaverSecretManagerEnabled := or (default false $appConfig.secretManagerEnabled) (default false $appConfig.publicCredentialsSaveEnabled) (default false $appConfig.adminCredentialsSaveEnabled) -}}
 {{- if $cloudbeaverOrigin -}}
   {{- $cloudbeaverServerUrl = printf "%s/" (trimSuffix "/" $cloudbeaverOrigin) -}}
 {{- end -}}
+{{- $cloudbeaverForceHttps := hasPrefix "https://" $cloudbeaverServerUrl -}}
 {{- $checksums := dict
   "config" ((printf "%s\n%s\n%s\n%s" (toPrettyJson $authProxy) (toPrettyJson $appConfig) (toPrettyJson $cloudbeaverIdentity) $logoutUrl) | sha256sum)
   "bootstrap" $bootstrap.existingSecret
@@ -78,7 +88,7 @@ data:
     {
       server: {
         serverPort: {{ $port }},
-        forceHttps: false,
+        forceHttps: {{ ternary "true" "false" (or $cloudbeaverForceHttps (default false $appConfig.forceHttps)) }},
         contentRoot: "web",
         driversLocation: "drivers",
         sslConfigurationPath: "${CLOUDBEAVER_SSL_CONF_PATH:workspace/.data/ssl-config.xml}",
@@ -120,10 +130,11 @@ data:
       app: {
         anonymousAccessEnabled: false,
         defaultUserTeam: {{ $defaultUserTeam | quote }},
-        supportsCustomConnections: {{ ternary "true" "false" (default true $appConfig.supportsCustomConnections) }},
-        showReadOnlyConnectionInfo: {{ ternary "true" "false" (default true $appConfig.showReadOnlyConnectionInfo) }},
+        supportsCustomConnections: {{ ternary "true" "false" $supportsCustomConnections }},
+        showReadOnlyConnectionInfo: {{ ternary "true" "false" $showReadOnlyConnectionInfo }},
         publicCredentialsSaveEnabled: {{ ternary "true" "false" (default false $appConfig.publicCredentialsSaveEnabled) }},
         adminCredentialsSaveEnabled: {{ ternary "true" "false" (default false $appConfig.adminCredentialsSaveEnabled) }},
+        secretManagerEnabled: {{ ternary "true" "false" $cloudbeaverSecretManagerEnabled }},
         enabledAuthProviders: [
           "reverseProxy"
         ],
@@ -255,12 +266,16 @@ spec:
             - |
               target_dir="/workspace/GlobalConfiguration/.dbeaver"
               target_file="${target_dir}/data-sources.json"
+              permissions_file="${target_dir}/data-sources-permissions.json"
               if [ "{{ ternary "true" "false" $forceWorkspaceSeed }}" = "true" ]; then
                 find /workspace -mindepth 1 -maxdepth 1 -exec rm -rf {} +
               fi
               mkdir -p "${target_dir}"
               if [ "{{ ternary "true" "false" $forceWorkspaceSeed }}" = "true" ] || [ ! -f "${target_file}" ]; then
                 cp "/seed/{{ $workspaceDataSourcesKey }}" "${target_file}"
+              fi
+              if [ -f "/seed/data-sources-permissions.json" ]; then
+                cp "/seed/data-sources-permissions.json" "${permissions_file}"
               fi
           volumeMounts:
             - name: workspace
@@ -305,16 +320,6 @@ spec:
                   name: {{ $bootstrap.existingSecret }}
                   key: {{ $sharedConnectionProjectIdKey }}
                   optional: true
-            - name: CB_SHARED_CONNECTION_USERNAME
-              valueFrom:
-                secretKeyRef:
-                  name: {{ $bootstrap.existingSecret }}
-                  key: {{ $sharedConnectionUsernameKey }}
-            - name: CB_SHARED_CONNECTION_PASSWORD
-              valueFrom:
-                secretKeyRef:
-                  name: {{ $bootstrap.existingSecret }}
-                  key: {{ $sharedConnectionPasswordKey }}
             - name: CB_SHARED_BOOTSTRAP_USERNAME
               valueFrom:
                 secretKeyRef:
@@ -335,7 +340,7 @@ spec:
                   - /bin/sh
                   - -ec
                   - |
-                    if [ -z "${CB_SHARED_CONNECTION_ID:-}" ] || [ -z "${CB_SHARED_CONNECTION_USERNAME:-}" ] || [ -z "${CB_SHARED_CONNECTION_PASSWORD:-}" ] || [ -z "${CB_SHARED_BOOTSTRAP_USERNAME:-}" ]; then
+                    if [ -z "${CB_SHARED_CONNECTION_ID:-}" ] || [ -z "${CB_SHARED_BOOTSTRAP_USERNAME:-}" ]; then
                       exit 0
                     fi
                     project_id="${CB_SHARED_CONNECTION_PROJECT_ID:-g_GlobalConfiguration}"
@@ -348,32 +353,113 @@ spec:
                     done
                     tmp_dir="$(mktemp -d)"
                     trap 'rm -rf "$tmp_dir"' EXIT
+                    subjects_json="["
+                    old_ifs="${IFS}"
+                    IFS=','
+                    set -- ${bootstrap_groups}
+                    IFS="${old_ifs}"
+                    for subject in "$@"; do
+                      subject="$(printf '%s' "${subject}" | tr -d '[:space:]')"
+                      if [ -z "${subject}" ]; then
+                        continue
+                      fi
+                      if [ "${subjects_json}" != "[" ]; then
+                        subjects_json="${subjects_json},"
+                      fi
+                      subjects_json="${subjects_json}\"${subject}\""
+                    done
+                    subjects_json="${subjects_json}]"
+                    if [ "${subjects_json}" = "[]" ]; then
+                      subjects_json="[\"{{ $adminTeam }}\",\"{{ $defaultUserTeam }}\"]"
+                    fi
                     cat >"${tmp_dir}/open-session.json" <<'EOF'
                     {"query":"mutation { openSession { valid } }"}
                     EOF
-                    curl -fsS \
-                      -c "${tmp_dir}/cookies.txt" \
-                      -b "${tmp_dir}/cookies.txt" \
-                      -H "Content-Type: application/json" \
-                      -H "X-Forwarded-Preferred-Username: ${CB_SHARED_BOOTSTRAP_USERNAME}" \
-                      -H "X-Forwarded-Groups: ${bootstrap_groups}" \
-                      --data @"${tmp_dir}/open-session.json" \
-                      "http://127.0.0.1:{{ $port }}/api/gql" >/dev/null
-                    cat >"${tmp_dir}/init-connection.json" <<EOF
-                    {"query":"mutation Init(\$id: ID!, \$projectId: ID, \$credentials: Object) { initConnection(id: \$id, projectId: \$projectId, credentials: \$credentials, saveCredentials: true, sharedCredentials: true) { id connected authNeeded credentialsSaved sharedCredentials } }","variables":{"id":"${CB_SHARED_CONNECTION_ID}","projectId":"${project_id}","credentials":{"user":"${CB_SHARED_CONNECTION_USERNAME}","password":"${CB_SHARED_CONNECTION_PASSWORD}","userName":"${CB_SHARED_CONNECTION_USERNAME}","userPassword":"${CB_SHARED_CONNECTION_PASSWORD}"}}}
+                    cat >"${tmp_dir}/connection-info.json" <<EOF
+                    {"query":"query ConnectionInfo(\$projectId: ID!, \$id: ID!) { connectionInfo(projectId: \$projectId, id: \$id) { nodePath authNeeded credentialsSaved sharedCredentials } }","variables":{"projectId":"${project_id}","id":"${CB_SHARED_CONNECTION_ID}"}}
                     EOF
-                    response="$(
-                      curl -fsS \
+                    bootstrap_complete=0
+                    for _ in $(seq 1 30); do
+                      if ! curl -fsS \
                         -c "${tmp_dir}/cookies.txt" \
                         -b "${tmp_dir}/cookies.txt" \
                         -H "Content-Type: application/json" \
                         -H "X-Forwarded-Preferred-Username: ${CB_SHARED_BOOTSTRAP_USERNAME}" \
                         -H "X-Forwarded-Groups: ${bootstrap_groups}" \
-                        --data @"${tmp_dir}/init-connection.json" \
-                        "http://127.0.0.1:{{ $port }}/api/gql"
-                    )"
-                    printf '%s' "${response}" | grep -Eq '"connected":[[:space:]]*true'
-                    printf '%s' "${response}" | grep -Eq '"authNeeded":[[:space:]]*false'
+                        --data @"${tmp_dir}/open-session.json" \
+                        "http://127.0.0.1:{{ $port }}/api/gql" >/dev/null; then
+                        sleep 2
+                        continue
+                      fi
+                      for subject in "$@"; do
+                        subject="$(printf '%s' "${subject}" | tr -d '[:space:]')"
+                        if [ -z "${subject}" ]; then
+                          continue
+                        fi
+                        cat >"${tmp_dir}/create-team.json" <<EOF
+                    {"query":"query CreateTeam(\$teamId: ID!, \$teamName: String, \$description: String) { createTeam(teamId: \$teamId, teamName: \$teamName, description: \$description) { teamId } }","variables":{"teamId":"${subject}","teamName":"${subject}","description":"Provisioned by CloudBeaver startup bootstrap."}}
+                    EOF
+                        curl -fsS \
+                          -c "${tmp_dir}/cookies.txt" \
+                          -b "${tmp_dir}/cookies.txt" \
+                          -H "Content-Type: application/json" \
+                          -H "X-Forwarded-Preferred-Username: ${CB_SHARED_BOOTSTRAP_USERNAME}" \
+                          -H "X-Forwarded-Groups: ${bootstrap_groups}" \
+                          --data @"${tmp_dir}/create-team.json" \
+                          "http://127.0.0.1:{{ $port }}/api/gql" >/dev/null || true
+                      done
+                      cat >"${tmp_dir}/set-access.json" <<EOF
+                    {"query":"query SetAccess(\$projectId: ID!, \$connectionId: ID!, \$subjects: [ID!]!) { setConnectionSubjectAccess(projectId: \$projectId, connectionId: \$connectionId, subjects: \$subjects) }","variables":{"projectId":"${project_id}","connectionId":"${CB_SHARED_CONNECTION_ID}","subjects":${subjects_json}}}
+                    EOF
+                      access_response="$(
+                        curl -fsS \
+                          -c "${tmp_dir}/cookies.txt" \
+                          -b "${tmp_dir}/cookies.txt" \
+                          -H "Content-Type: application/json" \
+                          -H "X-Forwarded-Preferred-Username: ${CB_SHARED_BOOTSTRAP_USERNAME}" \
+                          -H "X-Forwarded-Groups: ${bootstrap_groups}" \
+                          --data @"${tmp_dir}/set-access.json" \
+                          "http://127.0.0.1:{{ $port }}/api/gql" || true
+                      )"
+                      connection_info="$(
+                        curl -fsS \
+                          -c "${tmp_dir}/cookies.txt" \
+                          -b "${tmp_dir}/cookies.txt" \
+                          -H "Content-Type: application/json" \
+                          -H "X-Forwarded-Preferred-Username: ${CB_SHARED_BOOTSTRAP_USERNAME}" \
+                          -H "X-Forwarded-Groups: ${bootstrap_groups}" \
+                          --data @"${tmp_dir}/connection-info.json" \
+                          "http://127.0.0.1:{{ $port }}/api/gql" || true
+                      )"
+                      node_path="$(printf '%s' "${connection_info}" | sed -n 's/.*"nodePath":"\([^"]*\)".*/\1/p')"
+                      if [ -z "${node_path}" ]; then
+                        sleep 2
+                        continue
+                      fi
+                      cat >"${tmp_dir}/navigator.json" <<EOF
+                    {"query":"query NavNodeChildren(\$parentPath: ID!) { navNodeChildren(parentPath: \$parentPath) { name plainName nodeType hasChildren } }","variables":{"parentPath":"${node_path}"}}
+                    EOF
+                      navigator_response="$(
+                        curl -fsS \
+                          -c "${tmp_dir}/cookies.txt" \
+                          -b "${tmp_dir}/cookies.txt" \
+                          -H "Content-Type: application/json" \
+                          -H "X-Forwarded-Preferred-Username: ${CB_SHARED_BOOTSTRAP_USERNAME}" \
+                          -H "X-Forwarded-Groups: ${bootstrap_groups}" \
+                          --data @"${tmp_dir}/navigator.json" \
+                          "http://127.0.0.1:{{ $port }}/api/gql" || true
+                      )"
+                      if printf '%s' "${access_response}" | grep -Eq '"setConnectionSubjectAccess":[[:space:]]*true' \
+                        && printf '%s' "${navigator_response}" | grep -Eq '"name":"(redcap|system)"'; then
+                        bootstrap_complete=1
+                        break
+                      fi
+                      sleep 2
+                    done
+                    if [ "${bootstrap_complete}" != "1" ]; then
+                      echo "WARN: CloudBeaver shared Trino bootstrap did not complete during postStart; continuing startup." >&2
+                    fi
+                    exit 0
           {{- end }}
           ports:
             - name: http

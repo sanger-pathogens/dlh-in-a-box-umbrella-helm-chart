@@ -269,7 +269,11 @@ s3.path-style-access={{ $s3.pathStyleAccess }}
 {{- $catalogs := (include "trino.dataCatalogs" . | fromYaml) | default (dict) -}}
 {
   "catalogs": [
-{{- $first := true }}
+    {"user":"admin","catalog":"system","allow":"all"},
+    {"user":"cloudbeaver-service","catalog":"system","allow":"all"},
+    {"user":"superset-service","catalog":"system","allow":"all"},
+    {"catalog":"system","allow":"read-only"}
+{{- $first := false }}
 {{- range $catalogName, $catalog := $catalogs }}
   {{- $authorizedGroups := get $catalog "authorizedGroups" | default (dict) }}
   {{- $authorizedUsers := get $catalog "authorizedUsers" | default (dict) }}

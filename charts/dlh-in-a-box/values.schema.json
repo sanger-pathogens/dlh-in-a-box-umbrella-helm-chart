@@ -87,6 +87,14 @@
                 "internalScheme": { "type": "string" },
                 "displayName": { "type": "string" },
                 "loginTheme": { "type": "string" },
+                "registration": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "properties": {
+                    "enabled": { "type": "boolean" },
+                    "requireEmailVerification": { "type": "boolean" }
+                  }
+                },
                 "configCliEnvExistingSecret": { "type": "string" },
                 "bootstrapUsers": {
                   "type": "array",
@@ -165,9 +173,11 @@
                     },
                     "passwordAuthMode": {
                       "type": "string",
-                      "enum": ["ldap", "file"]
+                      "enum": ["ldap", "file", "ldap-file"]
                     },
                     "passwordAuthEnabled": { "type": "boolean" },
+                    "ldapUserBindPattern": { "type": "string" },
+                    "groupProviderEnabled": { "type": "boolean" },
                     "sharedSecretExistingSecret": { "type": "string" },
                     "sharedSecretKey": { "type": "string" }
                   },
@@ -183,6 +193,25 @@
                           "existingSecret",
                           "sharedSecretExistingSecret"
                         ]
+                      }
+                    }
+                  ]
+                },
+                "trinoDirectGrant": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "properties": {
+                    "enabled": { "type": "boolean" },
+                    "clientId": { "type": "string" }
+                  },
+                  "allOf": [
+                    {
+                      "if": {
+                        "properties": { "enabled": { "const": true } },
+                        "required": ["enabled"]
+                      },
+                      "then": {
+                        "required": ["clientId"]
                       }
                     }
                   ]
@@ -442,6 +471,35 @@
                     }
                   ]
                 },
+                "jupyterhub": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "properties": {
+                    "enabled": { "type": "boolean" },
+                    "clientId": { "type": "string" },
+                    "existingSecret": { "type": "string" },
+                    "clientSecretKey": { "type": "string" },
+                    "redirectUris": {
+                      "type": "array",
+                      "items": { "type": "string" }
+                    },
+                    "webOrigins": {
+                      "type": "array",
+                      "items": { "type": "string" }
+                    }
+                  },
+                  "allOf": [
+                    {
+                      "if": {
+                        "properties": { "enabled": { "const": true } },
+                        "required": ["enabled"]
+                      },
+                      "then": {
+                        "required": ["clientId", "existingSecret"]
+                      }
+                    }
+                  ]
+                },
                 "cloudbeaverProxy": {
                   "type": "object",
                   "additionalProperties": true,
@@ -612,7 +670,7 @@
           "properties": {
             "mode": {
               "type": "string",
-              "enum": ["externalLdap"]
+              "enum": ["externalLdap", "keycloakLocal"]
             },
             "ldap": {
               "type": "object",
@@ -753,6 +811,22 @@
               "type": "array",
               "items": { "type": "string" }
             },
+            "legacyManagedUsers": {
+              "type": "array",
+              "items": { "type": "string" }
+            },
+            "legacyManagedGroups": {
+              "type": "array",
+              "items": { "type": "string" }
+            },
+            "legacyManagedRoles": {
+              "type": "array",
+              "items": { "type": "string" }
+            },
+            "legacyManagedPolicies": {
+              "type": "array",
+              "items": { "type": "string" }
+            },
             "useRangerGroups": { "type": "boolean" },
             "admin": {
               "type": "object",
@@ -768,6 +842,15 @@
                 "enabled": { "type": "boolean" },
                 "schedule": { "type": "string" },
                 "syncSource": { "type": "string" }
+              }
+            },
+            "localUserSync": {
+              "type": "object",
+              "additionalProperties": true,
+              "properties": {
+                "enabled": { "type": "boolean" },
+                "schedule": { "type": "string" },
+                "suspend": { "type": "boolean" }
               }
             },
             "importCatalogAcls": { "type": "boolean" },
@@ -841,6 +924,7 @@
             "superset": { "type": "boolean" },
             "datahub": { "type": "boolean" },
             "trinoUi": { "type": "boolean" },
+            "jupyterhub": { "type": "boolean" },
             "cloudbeaver": { "type": "boolean" },
             "prefect": { "type": "boolean" }
           }
@@ -1065,6 +1149,10 @@
             "enabled": { "type": "boolean" },
             "className": { "type": "string" },
             "host": { "type": "string" },
+            "additionalHosts": {
+              "type": "array",
+              "items": { "type": "string" }
+            },
             "tlsSecretName": { "type": "string" },
             "annotations": {
               "type": "object",
@@ -1217,6 +1305,14 @@
         }
       }
     },
+    "jupyterhub": {
+      "description": "Pass-through values for the optional JupyterHub dependency plus the top-level enablement flag.",
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "enabled": { "type": "boolean" }
+      }
+    },
     "cloudbeaver": {
       "description": "Chart-owned CloudBeaver Community Edition deployment protected by oauth2-proxy.",
       "type": "object",
@@ -1319,7 +1415,8 @@
             "supportsCustomConnections": { "type": "boolean" },
             "showReadOnlyConnectionInfo": { "type": "boolean" },
             "publicCredentialsSaveEnabled": { "type": "boolean" },
-            "adminCredentialsSaveEnabled": { "type": "boolean" }
+            "adminCredentialsSaveEnabled": { "type": "boolean" },
+            "secretManagerEnabled": { "type": "boolean" }
           }
         }
       }

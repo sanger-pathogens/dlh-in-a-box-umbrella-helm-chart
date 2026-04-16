@@ -1,6 +1,6 @@
 name: helm-lint
 
-on:
+"on":
   push:
     branches:
       - main

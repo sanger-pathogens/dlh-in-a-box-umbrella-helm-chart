@@ -1,0 +1,11 @@
+global:
+  identity:
+    provider:
+      keycloak:
+        bootstrapUsers:
+          - username: admin
+            passwordEnvVar: KC_BOOTSTRAP_ADMIN_PASSWORD
+    directory:
+      mode: externalLdap
+      ldap:
+        enabled: false

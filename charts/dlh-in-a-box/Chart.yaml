@@ -25,6 +25,7 @@ sources:
   - https://github.com/acryldata/datahub-helm
   - https://github.com/hashicorp/vault-helm
   - https://github.com/dbeaver/cloudbeaver
+  - https://github.com/jupyterhub/zero-to-jupyterhub-k8s
 keywords:
   - lakehouse
   - kubernetes
@@ -36,6 +37,7 @@ keywords:
   - spark
   - datahub
   - vault
+  - jupyterhub
 maintainers:
   - name: Sanger Pathogens
     url: https://github.com/sanger-pathogens
@@ -113,6 +115,11 @@ dependencies:
     version: "0.32.0"
     repository: https://helm.releases.hashicorp.com
     condition: vault.enabled
+
+  - name: jupyterhub
+    version: "4.3.3"
+    repository: https://jupyterhub.github.io/helm-chart
+    condition: jupyterhub.enabled
 
   - name: hive
     version: "0.1.0"

@@ -39,6 +39,9 @@ global:
           sharedSecretExistingSecret: dlh-trino-internal-communication
           sharedSecretKey: sharedSecret
           passwordAuthEnabled: true
+        trinoDirectGrant:
+          enabled: true
+          clientId: trino-cli
         superset:
           enabled: false
         datahub:
@@ -48,8 +51,19 @@ global:
           clientId: platform-home
           redirectUris:
             - https://portal.data-platform.example.org/
+            - https://portal.data-platform.example.org/launch/vault
+            - https://portal.data-platform.example.org/launch/jupyterhub
           webOrigins:
             - https://portal.data-platform.example.org
+        jupyterhub:
+          enabled: true
+          clientId: jupyterhub
+          existingSecret: dlh-oidc-clients
+          clientSecretKey: jupyterhubClientSecret
+          redirectUris:
+            - https://jupyterhub.data-platform.example.org/hub/oauth_callback
+          webOrigins:
+            - https://jupyterhub.data-platform.example.org
         cloudbeaverProxy:
           enabled: true
           clientId: cloudbeaver
@@ -140,6 +154,7 @@ global:
           superset: true
           datahub: true
           trinoUi: true
+          jupyterhub: true
           cloudbeaver: true
           prefect: true
       data-analyst:
@@ -151,6 +166,7 @@ global:
           superset: true
           datahub: true
           trinoUi: false
+          jupyterhub: true
           cloudbeaver: true
           prefect: false
       principal-investigator:
@@ -162,6 +178,7 @@ global:
           superset: true
           datahub: true
           trinoUi: false
+          jupyterhub: false
           cloudbeaver: false
           prefect: false
     platformRoleExceptions: []
@@ -326,6 +343,68 @@ platformHome:
     className: nginx
     host: portal.data-platform.example.org
     tlsSecretName: prod-example-wildcard
+  launchers:
+    jupyterhub:
+      enabled: true
+      mode: redirect
+      path: /launch/jupyterhub
+      targetUrl: https://jupyterhub.data-platform.example.org/hub/oauth_login?next=%2Fhub%2F
+      requiredGroups:
+        - platform-app-jupyterhub
+        - platform-role-platform-admin
+    vault:
+      enabled: true
+      mode: vault-wrapped-token
+      path: /launch/vault
+      internalApiUrl: http://platform-vault.platform-secrets.svc.cluster.local:8200
+      targetUrl: https://vault.data-platform.example.org/ui/vault/auth
+      authMount: portal-jwt
+      role: platform-home-launch
+      wrapTtl: 5m
+      requiredGroups:
+        - platform-role-platform-admin
+
+jupyterhub:
+  enabled: true
+  ingress:
+    enabled: true
+    ingressClassName: nginx
+    hosts:
+      - jupyterhub.data-platform.example.org
+    tls:
+      - secretName: prod-example-wildcard
+        hosts:
+          - jupyterhub.data-platform.example.org
+  hub:
+    db:
+      type: sqlite-memory
+    extraEnv:
+      JUPYTERHUB_BROWSER_AUTHORIZE_URL: https://keycloak.data-platform.example.org/realms/dlh/protocol/openid-connect/auth
+      JUPYTERHUB_INTERNAL_TOKEN_URL: http://dlh-keycloak.data-lakehouse.svc.cluster.local/realms/dlh/protocol/openid-connect/token
+      JUPYTERHUB_INTERNAL_USERDATA_URL: http://dlh-keycloak.data-lakehouse.svc.cluster.local/realms/dlh/protocol/openid-connect/userinfo
+      JUPYTERHUB_OAUTH_CALLBACK_URL: https://jupyterhub.data-platform.example.org/hub/oauth_callback
+      JUPYTERHUB_CLIENT_ID: jupyterhub
+      JUPYTERHUB_CLIENT_SECRET:
+        valueFrom:
+          secretKeyRef:
+            name: dlh-oidc-clients
+            key: jupyterhubClientSecret
+      JUPYTERHUB_GROUPS_CLAIM: groups
+      JUPYTERHUB_ALLOWED_GROUP: platform-app-jupyterhub
+      JUPYTERHUB_ADMIN_GROUP: platform-role-platform-admin
+      JUPYTERHUB_USERNAME_CLAIM: preferred_username
+      JUPYTERHUB_LOGIN_SERVICE: Keycloak
+  singleuser:
+    storage:
+      type: none
+    extraEnv:
+      TRINO_HOST: trino.data-platform.example.org
+      TRINO_PORT: "443"
+      TRINO_HTTP_SCHEME: https
+      TRINO_CATALOG: redcap
+      TRINO_SCHEMA: default
+      TRINO_VERIFY_TLS: "true"
+      TRINO_DEMO_QUERY: SELECT * FROM redcap.default.platform_demo_enrollment LIMIT 10
 
 cloudbeaver:
   enabled: true

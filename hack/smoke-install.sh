@@ -11,6 +11,47 @@ NAMESPACE="${NAMESPACE:-data-lakehouse-local}"
 TIMEOUT="${TIMEOUT:-30m}"
 ARTIFACT_DIR="${ARTIFACT_DIR:-}"
 SKIP_DEPENDENCY_UPDATE="${SKIP_DEPENDENCY_UPDATE:-false}"
+RESET_RELEASE_STATE="${RESET_RELEASE_STATE:-true}"
+
+transient_kube_error() {
+  local message="${1:-}"
+  [[ "${message}" == *"the server was unable to return a response in the time allotted"* ]] \
+    || [[ "${message}" == *"Kubernetes cluster unreachable"* ]] \
+    || [[ "${message}" == *"EOF"* ]] \
+    || [[ "${message}" == *"Client.Timeout exceeded while awaiting headers"* ]]
+}
+
+run_with_retries() {
+  local attempts="$1"
+  local sleep_seconds="$2"
+  shift 2
+
+  local attempt=1
+  local output=""
+
+  while true; do
+    set +e
+    output="$("$@" 2>&1)"
+    local exit_code=$?
+    set -e
+
+    if [[ ${exit_code} -eq 0 ]]; then
+      [[ -n "${output}" ]] && printf '%s\n' "${output}"
+      return 0
+    fi
+
+    if (( attempt >= attempts )) || ! transient_kube_error "${output}"; then
+      [[ -n "${output}" ]] && printf '%s\n' "${output}" >&2
+      return "${exit_code}"
+    fi
+
+    printf 'Transient Kubernetes error on attempt %d/%d; retrying in %ss...\n' \
+      "${attempt}" "${attempts}" "${sleep_seconds}" >&2
+    [[ -n "${output}" ]] && printf '%s\n' "${output}" >&2
+    sleep "${sleep_seconds}"
+    attempt=$((attempt + 1))
+  done
+}
 
 seed_secret() {
   local name="$1"
@@ -23,11 +64,40 @@ seed_secret() {
     -o yaml | kubectl apply -f -
 }
 
+wait_for_namespace_deletion() {
+  local attempts=60
+
+  while kubectl get namespace "${NAMESPACE}" >/dev/null 2>&1; do
+    if (( attempts == 0 )); then
+      echo "Timed out waiting for namespace ${NAMESPACE} to be deleted." >&2
+      return 1
+    fi
+
+    sleep 5
+    attempts=$((attempts - 1))
+  done
+}
+
+reset_release_state() {
+  if helm status "${RELEASE_NAME}" -n "${NAMESPACE}" >/dev/null 2>&1; then
+    helm uninstall "${RELEASE_NAME}" -n "${NAMESPACE}" --wait --timeout 10m || true
+  fi
+
+  if kubectl get namespace "${NAMESPACE}" >/dev/null 2>&1; then
+    kubectl delete namespace "${NAMESPACE}" --wait=true --timeout=10m || true
+    wait_for_namespace_deletion
+  fi
+}
+
 seed_local_auth_demo_secrets() {
   kubectl create namespace "${NAMESPACE}" --dry-run=client -o yaml | kubectl apply -f -
 
   seed_secret dlh-keycloak-admin \
     --from-literal=adminPassword=admin123
+
+  seed_secret dlh-keycloak-postgresql \
+    --from-literal=password=keycloakdb123 \
+    --from-literal=postgres-password=keycloakdbadmin123
 
   seed_secret dlh-directory-bind \
     --from-literal=bindPassword=local-directory-bind-password
@@ -36,6 +106,7 @@ seed_local_auth_demo_secrets() {
     --from-literal=trinoClientSecret=local-trino-client-secret \
     --from-literal=supersetClientSecret=local-superset-client-secret \
     --from-literal=datahubClientSecret=local-datahub-client-secret \
+    --from-literal=jupyterhubClientSecret=local-jupyterhub-client-secret \
     --from-literal=cloudbeaverClientSecret=local-cloudbeaver-client-secret \
     --from-literal=prefectClientSecret=local-prefect-client-secret
 
@@ -53,6 +124,8 @@ seed_local_auth_demo_secrets() {
     --from-literal=cookie-secret=0123456789abcdef0123456789abcdef
 
   seed_secret dlh-cloudbeaver-bootstrap \
+    --from-literal=admin-name=cbadmin \
+    --from-literal=admin-password=cloudbeaver-admin-password \
     --from-literal=initial-data.conf='{
       adminName: "cbadmin",
       adminPassword: "cloudbeaver-admin-password",
@@ -77,13 +150,15 @@ seed_local_auth_demo_secrets() {
     --from-literal=KC_TRINO_CLIENT_SECRET=local-trino-client-secret \
     --from-literal=KC_SUPERSET_CLIENT_SECRET=local-superset-client-secret \
     --from-literal=KC_DATAHUB_CLIENT_SECRET=local-datahub-client-secret \
+    --from-literal=KC_JUPYTERHUB_CLIENT_SECRET=local-jupyterhub-client-secret \
     --from-literal=KC_CLOUDBEAVER_CLIENT_SECRET=local-cloudbeaver-client-secret \
     --from-literal=KC_PREFECT_CLIENT_SECRET=local-prefect-client-secret \
     --from-literal=KC_PREFECT_AUTOMATION_CLIENT_SECRET=local-prefect-automation-client-secret
 
   seed_secret dlh-ranger-admin \
     --from-literal=rangerAdminPassword=admin123 \
-    --from-literal=rangerUsersyncPassword=usersync123
+    --from-literal=rangerUsersyncPassword=usersync123 \
+    --from-literal=rangerTagsyncPassword=tagsync123
 
   seed_secret dlh-ranger-postgresql \
     --from-literal=password=rangerdb123 \
@@ -142,32 +217,37 @@ if [[ "${SKIP_DEPENDENCY_UPDATE}" != "true" ]]; then
   ./hack/helm-dependency-update.sh
 fi
 
+if [[ "${RESET_RELEASE_STATE}" == "true" ]]; then
+  reset_release_state
+fi
+
 if [[ "$(basename "${VALUES_FILE}")" == "values-local-auth.yaml" ]]; then
   seed_local_auth_demo_secrets
 fi
 
-helm upgrade --install "${RELEASE_NAME}" "${CHART_PATH}" \
-  -n "${NAMESPACE}" \
-  --create-namespace \
-  -f "${VALUES_FILE}" \
-  --wait \
-  --timeout "${TIMEOUT}"
+run_with_retries 3 15 \
+  helm upgrade --install "${RELEASE_NAME}" "${CHART_PATH}" \
+    -n "${NAMESPACE}" \
+    --create-namespace \
+    -f "${VALUES_FILE}" \
+    --wait \
+    --timeout "${TIMEOUT}"
 
-mapfile -t workloads < <(kubectl get deployment -n "${NAMESPACE}" -o name)
-mapfile -t jobs < <(kubectl get job -n "${NAMESPACE}" -o name)
+mapfile -t workloads < <(run_with_retries 3 5 kubectl get deployment -n "${NAMESPACE}" -o name)
+mapfile -t jobs < <(run_with_retries 3 5 kubectl get job -n "${NAMESPACE}" -o name)
 
 for workload in "${workloads[@]}"; do
-  kubectl rollout status "${workload}" -n "${NAMESPACE}" --timeout="${TIMEOUT}"
+  run_with_retries 3 10 kubectl rollout status "${workload}" -n "${NAMESPACE}" --timeout="${TIMEOUT}"
 done
 
 for job in "${jobs[@]}"; do
-  kubectl wait --for=condition=complete "${job}" -n "${NAMESPACE}" --timeout="${TIMEOUT}"
+  run_with_retries 3 10 kubectl wait --for=condition=complete "${job}" -n "${NAMESPACE}" --timeout="${TIMEOUT}"
 done
 
-mapfile -t pods < <(kubectl get pod -n "${NAMESPACE}" --field-selector=status.phase!=Succeeded,status.phase!=Failed -o name)
+mapfile -t pods < <(run_with_retries 3 5 kubectl get pod -n "${NAMESPACE}" --field-selector=status.phase!=Succeeded,status.phase!=Failed -o name)
 
 for pod in "${pods[@]}"; do
-  kubectl wait --for=condition=Ready "${pod}" -n "${NAMESPACE}" --timeout="${TIMEOUT}"
+  run_with_retries 3 10 kubectl wait --for=condition=Ready "${pod}" -n "${NAMESPACE}" --timeout="${TIMEOUT}"
 done
 
-kubectl get pods,svc -n "${NAMESPACE}"
+run_with_retries 3 5 kubectl get pods,svc -n "${NAMESPACE}"

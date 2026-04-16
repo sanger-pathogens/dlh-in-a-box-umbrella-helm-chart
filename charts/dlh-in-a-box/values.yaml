@@ -13,6 +13,9 @@ global:
         internalScheme: http
         displayName: ""
         loginTheme: ""
+        registration:
+          enabled: false
+          requireEmailVerification: true
         configCliEnvExistingSecret: dlh-keycloak-config-cli-env
         bootstrapUsers: []
     external:
@@ -42,6 +45,9 @@ global:
           discovery:
             enabled: true
           challengeTimeout: ""
+        trinoDirectGrant:
+          enabled: false
+          clientId: ""
         superset:
           enabled: false
           providerName: keycloak
@@ -93,6 +99,13 @@ global:
           clientId: ""
           existingSecret: dlh-oidc-clients
           clientSecretKey: headlampClientSecret
+          redirectUris: []
+          webOrigins: []
+        jupyterhub:
+          enabled: false
+          clientId: ""
+          existingSecret: dlh-oidc-clients
+          clientSecretKey: jupyterhubClientSecret
           redirectUris: []
           webOrigins: []
         rangerProxy:
@@ -215,7 +228,10 @@ global:
       superUsers:
         - admin
       superGroups: []
+      legacyManagedUsers: []
+      legacyManagedGroups: []
       legacyManagedRoles: []
+      legacyManagedPolicies: []
       useRangerGroups: false
       postgresql:
         enabled: true
@@ -234,6 +250,7 @@ global:
         existingSecret: dlh-ranger-admin
         adminPasswordKey: rangerAdminPassword
         usersyncPasswordKey: rangerUsersyncPassword
+        tagsyncPasswordKey: rangerTagsyncPassword
       usersync:
         enabled: true
         image:
@@ -242,6 +259,14 @@ global:
           pullPolicy: IfNotPresent
         schedule: "*/15 * * * *"
         syncSource: LDAP
+      localUserSync:
+        enabled: true
+        image:
+          repository: python
+          tag: 3.12-slim
+          pullPolicy: IfNotPresent
+        schedule: "*/5 * * * *"
+        suspend: false
       importCatalogAcls: false
       exceptionRoleAudit:
         enabled: true
@@ -310,9 +335,16 @@ keycloak:
       dlh-realm.yaml: |
         realm: {{ include "dlh-in-a-box.keycloak.realm" $ }}
         enabled: true
-        registrationAllowed: false
+        {{- $keycloakRegistration := default (dict) .Values.global.identity.provider.keycloak.registration }}
+        {{- $registrationEnabled := default false (get $keycloakRegistration "enabled") }}
+        {{- $requireEmailVerification := true }}
+        {{- if hasKey $keycloakRegistration "requireEmailVerification" }}
+        {{- $requireEmailVerification = get $keycloakRegistration "requireEmailVerification" }}
+        {{- end }}
+        registrationAllowed: {{ ternary "true" "false" $registrationEnabled }}
         loginWithEmailAllowed: true
         duplicateEmailsAllowed: false
+        verifyEmail: {{ ternary "true" "false" (and $registrationEnabled $requireEmailVerification) }}
         resetPasswordAllowed: true
         rememberMe: true
         {{- $keycloakDisplayName := default "" .Values.global.identity.provider.keycloak.displayName }}
@@ -348,15 +380,19 @@ keycloak:
                   claim.name: {{ .Values.global.identity.external.oidc.groupsClaim | quote }}
                   jsonType.label: String
         {{- $bootstrapUsers := default (list) .Values.global.identity.provider.keycloak.bootstrapUsers }}
-        {{- $bootstrapGroups := dict }}
+        {{- $managedGroups := fromJsonArray (include "dlh-in-a-box.identity.keycloakManagedGroupsJson" $) }}
+        {{- $seededGroups := dict }}
+        {{- range $groupName := $managedGroups }}
+          {{- $_ := set $seededGroups (toString $groupName) true }}
+        {{- end }}
         {{- range $user := $bootstrapUsers }}
           {{- range $group := default (list) $user.groups }}
-            {{- $_ := set $bootstrapGroups (toString $group) true }}
+            {{- $_ := set $seededGroups (toString $group) true }}
           {{- end }}
         {{- end }}
-        {{- if gt (len $bootstrapGroups) 0 }}
+        {{- if gt (len $seededGroups) 0 }}
         groups:
-        {{- range $groupName := keys $bootstrapGroups | sortAlpha }}
+        {{- range $groupName := keys $seededGroups | sortAlpha }}
           - name: {{ $groupName | quote }}
         {{- end }}
         {{- end }}
@@ -427,6 +463,32 @@ keycloak:
               - email
               - roles
               - groups
+        {{- end }}
+        {{- if .Values.global.identity.external.clients.trinoDirectGrant.enabled }}
+          - clientId: {{ .Values.global.identity.external.clients.trinoDirectGrant.clientId | quote }}
+            name: Trino Direct Grant
+            description: Public OIDC client for non-browser Trino workstation token grants
+            enabled: true
+            protocol: openid-connect
+            publicClient: true
+            standardFlowEnabled: false
+            directAccessGrantsEnabled: true
+            serviceAccountsEnabled: false
+            defaultClientScopes:
+              - profile
+              - email
+              - roles
+              - groups
+            protocolMappers:
+              - name: trino-audience
+                protocol: openid-connect
+                protocolMapper: oidc-audience-mapper
+                consentRequired: false
+                config:
+                  access.token.claim: "true"
+                  id.token.claim: "false"
+                  introspection.token.claim: "true"
+                  included.client.audience: {{ .Values.global.identity.external.clients.trino.clientId | quote }}
         {{- end }}
         {{- if .Values.global.identity.external.clients.superset.enabled }}
           - clientId: {{ .Values.global.identity.external.clients.superset.clientId | quote }}
@@ -589,6 +651,43 @@ keycloak:
               - email
               - roles
               - groups
+        {{- end }}
+        {{- if .Values.global.identity.external.clients.jupyterhub.enabled }}
+          - clientId: {{ .Values.global.identity.external.clients.jupyterhub.clientId | quote }}
+            name: JupyterHub
+            description: OIDC client for JupyterHub browser login and notebook token forwarding
+            enabled: true
+            protocol: openid-connect
+            publicClient: false
+            standardFlowEnabled: true
+            directAccessGrantsEnabled: false
+            serviceAccountsEnabled: false
+            secret: "$(env:KC_JUPYTERHUB_CLIENT_SECRET:change-me)"
+            redirectUris:
+            {{- range .Values.global.identity.external.clients.jupyterhub.redirectUris }}
+              - {{ . | quote }}
+            {{- end }}
+            webOrigins:
+            {{- range .Values.global.identity.external.clients.jupyterhub.webOrigins }}
+              - {{ . | quote }}
+            {{- end }}
+            defaultClientScopes:
+              - profile
+              - email
+              - roles
+              - groups
+            {{- if .Values.global.identity.external.clients.trino.enabled }}
+            protocolMappers:
+              - name: trino-audience
+                protocol: openid-connect
+                protocolMapper: oidc-audience-mapper
+                consentRequired: false
+                config:
+                  access.token.claim: "true"
+                  id.token.claim: "false"
+                  introspection.token.claim: "true"
+                  included.client.audience: {{ .Values.global.identity.external.clients.trino.clientId | quote }}
+            {{- end }}
         {{- end }}
         {{- if .Values.global.identity.external.clients.cloudbeaverProxy.enabled }}
           - clientId: {{ .Values.global.identity.external.clients.cloudbeaverProxy.clientId | quote }}
@@ -891,6 +990,7 @@ platformHome:
     enabled: false
     className: ""
     host: ""
+    additionalHosts: []
     tlsSecretName: ""
     annotations: {}
   branding:
@@ -927,6 +1027,243 @@ platformHome:
     refreshIntervalSeconds: 90
   itemMeta: {}
   adminTools: []
+  launchers: {}
+
+jupyterhub:
+  enabled: false
+  proxy:
+    service:
+      type: ClusterIP
+  hub:
+    db:
+      type: sqlite-memory
+    config:
+      JupyterHub:
+        admin_access: true
+        authenticator_class: generic-oauth
+    extraEnv:
+      JUPYTERHUB_BROWSER_AUTHORIZE_URL: ""
+      JUPYTERHUB_INTERNAL_TOKEN_URL: ""
+      JUPYTERHUB_INTERNAL_USERDATA_URL: ""
+      JUPYTERHUB_OAUTH_CALLBACK_URL: ""
+      JUPYTERHUB_CLIENT_ID: ""
+      JUPYTERHUB_CLIENT_SECRET: ""
+      JUPYTERHUB_GROUPS_CLAIM: platform_groups
+      JUPYTERHUB_ALLOWED_GROUP: platform-app-jupyterhub
+      JUPYTERHUB_ADMIN_GROUP: platform-role-platform-admin
+      JUPYTERHUB_USERNAME_CLAIM: preferred_username
+      JUPYTERHUB_LOGIN_SERVICE: Keycloak
+    extraConfig:
+      10-generic-oauth.py: |
+        import os
+        from oauthenticator.generic import GenericOAuthenticator
+
+        def _env(name, default=""):
+            return os.environ.get(name, default).strip()
+
+        def _group_list(auth_state):
+            auth_state = auth_state or {}
+            oauth_user = auth_state.get("oauth_user") or {}
+            groups_claim = _env("JUPYTERHUB_GROUPS_CLAIM", "groups")
+            groups = oauth_user.get(groups_claim) or oauth_user.get("groups") or []
+            if isinstance(groups, str):
+                groups = [groups]
+            return [group for group in groups if isinstance(group, str) and group]
+
+        c.GenericOAuthenticator.client_id = _env("JUPYTERHUB_CLIENT_ID")
+        c.GenericOAuthenticator.client_secret = _env("JUPYTERHUB_CLIENT_SECRET")
+        c.GenericOAuthenticator.authorize_url = _env("JUPYTERHUB_BROWSER_AUTHORIZE_URL")
+        c.GenericOAuthenticator.token_url = _env("JUPYTERHUB_INTERNAL_TOKEN_URL")
+        c.GenericOAuthenticator.userdata_url = _env("JUPYTERHUB_INTERNAL_USERDATA_URL")
+        c.GenericOAuthenticator.oauth_callback_url = _env("JUPYTERHUB_OAUTH_CALLBACK_URL")
+        c.GenericOAuthenticator.login_service = _env("JUPYTERHUB_LOGIN_SERVICE", "Keycloak")
+        c.GenericOAuthenticator.username_claim = _env("JUPYTERHUB_USERNAME_CLAIM", "preferred_username")
+        c.GenericOAuthenticator.scope = ["openid", "profile", "email", "groups"]
+        c.GenericOAuthenticator.manage_groups = True
+        c.GenericOAuthenticator.auth_state_groups_key = _group_list
+        c.GenericOAuthenticator.refresh_pre_spawn = True
+        c.Authenticator.enable_auth_state = True
+        c.Authenticator.auth_refresh_age = 300
+        c.GenericOAuthenticator.allow_all = False
+
+        allowed_group = _env("JUPYTERHUB_ALLOWED_GROUP")
+        if allowed_group:
+            c.GenericOAuthenticator.allowed_groups = {allowed_group}
+
+        admin_group = _env("JUPYTERHUB_ADMIN_GROUP")
+        if admin_group:
+            c.GenericOAuthenticator.admin_groups = {admin_group}
+      20-spawn-env.py: |
+        import os
+
+        def _group_list(auth_state):
+            auth_state = auth_state or {}
+            oauth_user = auth_state.get("oauth_user") or {}
+            groups_claim = os.environ.get("JUPYTERHUB_GROUPS_CLAIM", "groups")
+            groups = oauth_user.get(groups_claim) or oauth_user.get("groups") or []
+            if isinstance(groups, str):
+                groups = [groups]
+            return [group for group in groups if isinstance(group, str) and group]
+
+        async def _inject_platform_identity(spawner):
+            auth_state = await spawner.user.get_auth_state()
+            if not auth_state:
+                return
+
+            oauth_user = auth_state.get("oauth_user") or {}
+            username_claim = os.environ.get("JUPYTERHUB_USERNAME_CLAIM", "preferred_username")
+            username = oauth_user.get(username_claim) or spawner.user.name
+            access_token = auth_state.get("access_token") or ""
+            refresh_token = auth_state.get("refresh_token") or ""
+            groups = _group_list(auth_state)
+
+            spawner.environment.update(
+                {
+                    "KEYCLOAK_ACCESS_TOKEN": access_token,
+                    "KEYCLOAK_REFRESH_TOKEN": refresh_token,
+                    "KEYCLOAK_USERNAME": username,
+                    "PLATFORM_GROUPS": ",".join(sorted(groups)),
+                    "TRINO_ACCESS_TOKEN": access_token,
+                    "TRINO_USER": username,
+                }
+            )
+
+        c.Spawner.pre_spawn_hook = _inject_platform_identity
+  singleuser:
+    cmd:
+      - /bin/sh
+      - /usr/local/bin/dlh-singleuser-start.sh
+    defaultUrl: /lab/tree/examples/ICDDRB_Trino_Demo.ipynb
+    storage:
+      type: none
+      capacity: 5Gi
+    extraEnv:
+      DLH_TRINO_PYTHON_CLIENT_VERSION: "0.337.0"
+      TRINO_HOST: ""
+      TRINO_PORT: "443"
+      TRINO_HTTP_SCHEME: https
+      TRINO_CATALOG: redcap
+      TRINO_SCHEMA: default
+      TRINO_VERIFY_TLS: "true"
+      TRINO_DEMO_QUERY: SELECT * FROM redcap.default.platform_demo_enrollment LIMIT 10
+    extraFiles:
+      dlh-singleuser-start.sh:
+        mountPath: /usr/local/bin/dlh-singleuser-start.sh
+        mode: 365
+        stringData: |
+          #!/bin/sh
+          set -eu
+
+          HOME_DIR="${HOME:-/home/jovyan}"
+          EXAMPLES_DIR="${HOME_DIR}/examples"
+          NOTEBOOK_SOURCE="/etc/dlh-jupyterhub/notebooks/ICDDRB_Trino_Demo.ipynb"
+          NOTEBOOK_TARGET="${EXAMPLES_DIR}/ICDDRB_Trino_Demo.ipynb"
+          VENV_DIR="${HOME_DIR}/.cache/dlh-trino-demo/venv"
+          VERSION_MARKER="${VENV_DIR}/.trino-client-version"
+          TRINO_CLIENT_VERSION="${DLH_TRINO_PYTHON_CLIENT_VERSION:-0.337.0}"
+
+          mkdir -p "${EXAMPLES_DIR}" "$(dirname "${VENV_DIR}")"
+
+          if [ ! -x "${VENV_DIR}/bin/python" ] || [ ! -f "${VERSION_MARKER}" ] || [ "$(cat "${VERSION_MARKER}" 2>/dev/null)" != "${TRINO_CLIENT_VERSION}" ]; then
+            rm -rf "${VENV_DIR}"
+            python3 -m venv "${VENV_DIR}"
+            "${VENV_DIR}/bin/pip" install --quiet --disable-pip-version-check --upgrade pip
+            "${VENV_DIR}/bin/pip" install --quiet --disable-pip-version-check \
+              "ipykernel>=6.29.0" \
+              "pandas>=2.2.0" \
+              "requests>=2.31.0" \
+              "trino==${TRINO_CLIENT_VERSION}"
+            printf '%s' "${TRINO_CLIENT_VERSION}" > "${VERSION_MARKER}"
+          fi
+
+          "${VENV_DIR}/bin/python" -m ipykernel install --user --name dlh-trino-demo --display-name "Python 3 (Trino Demo)" >/dev/null 2>&1 || true
+
+          if [ -f "${NOTEBOOK_SOURCE}" ] && [ ! -f "${NOTEBOOK_TARGET}" ]; then
+            cp "${NOTEBOOK_SOURCE}" "${NOTEBOOK_TARGET}"
+          fi
+
+          exec jupyterhub-singleuser
+      dlh-trino-demo-notebook.ipynb:
+        mountPath: /etc/dlh-jupyterhub/notebooks/ICDDRB_Trino_Demo.ipynb
+        stringData: |
+          {
+            "cells": [
+              {
+                "cell_type": "markdown",
+                "metadata": {},
+                "source": [
+                  "# ICDDR,B Trino Demo\n",
+                  "\n",
+                  "This notebook uses the Keycloak access token from your JupyterHub sign-in to query Trino without a second password prompt.\n",
+                  "\n",
+                  "If queries later fail with an authentication error, stop and restart your Jupyter server so JupyterHub refreshes the Keycloak token before spawning a new notebook session."
+                ]
+              },
+              {
+                "cell_type": "code",
+                "execution_count": null,
+                "metadata": {},
+                "outputs": [],
+                "source": [
+                  "import os\n",
+                  "\n",
+                  "import pandas as pd\n",
+                  "import requests\n",
+                  "from trino.dbapi import connect\n",
+                  "\n",
+                  "token = os.environ.get(\"TRINO_ACCESS_TOKEN\") or os.environ.get(\"KEYCLOAK_ACCESS_TOKEN\")\n",
+                  "user = os.environ.get(\"TRINO_USER\") or os.environ.get(\"KEYCLOAK_USERNAME\") or os.environ.get(\"JUPYTERHUB_USER\")\n",
+                  "host = os.environ.get(\"TRINO_HOST\")\n",
+                  "port = int(os.environ.get(\"TRINO_PORT\", \"443\"))\n",
+                  "http_scheme = os.environ.get(\"TRINO_HTTP_SCHEME\", \"https\")\n",
+                  "catalog = os.environ.get(\"TRINO_CATALOG\", \"redcap\")\n",
+                  "schema = os.environ.get(\"TRINO_SCHEMA\", \"default\")\n",
+                  "verify_tls = os.environ.get(\"TRINO_VERIFY_TLS\", \"true\").lower() not in {\"0\", \"false\", \"no\"}\n",
+                  "query = os.environ.get(\"TRINO_DEMO_QUERY\", \"SELECT * FROM redcap.default.platform_demo_enrollment LIMIT 10\")\n",
+                  "\n",
+                  "if not token:\n",
+                  "    raise RuntimeError(\"No Trino or Keycloak access token was found in the notebook environment.\")\n",
+                  "if not user:\n",
+                  "    raise RuntimeError(\"No Trino user identity was found in the notebook environment.\")\n",
+                  "if not host:\n",
+                  "    raise RuntimeError(\"TRINO_HOST is not configured for this notebook server.\")\n",
+                  "\n",
+                  "session = requests.Session()\n",
+                  "session.headers[\"Authorization\"] = f\"Bearer {token}\"\n",
+                  "\n",
+                  "conn = connect(\n",
+                  "    host=host,\n",
+                  "    port=port,\n",
+                  "    http_scheme=http_scheme,\n",
+                  "    user=user,\n",
+                  "    catalog=catalog,\n",
+                  "    schema=schema,\n",
+                  "    verify=verify_tls,\n",
+                  "    http_session=session,\n",
+                  ")\n",
+                  "\n",
+                  "cur = conn.cursor()\n",
+                  "cur.execute(query)\n",
+                  "rows = cur.fetchall()\n",
+                  "columns = [column[0] for column in cur.description]\n",
+                  "pd.DataFrame(rows, columns=columns)\n"
+                ]
+              }
+            ],
+            "metadata": {
+              "kernelspec": {
+                "display_name": "Python 3 (Trino Demo)",
+                "language": "python",
+                "name": "dlh-trino-demo"
+              },
+              "language_info": {
+                "name": "python",
+                "version": "3.12"
+              }
+            },
+            "nbformat": 4,
+            "nbformat_minor": 5
+          }
 
 cloudbeaver:
   enabled: false
@@ -978,6 +1315,7 @@ cloudbeaver:
     showReadOnlyConnectionInfo: false
     publicCredentialsSaveEnabled: false
     adminCredentialsSaveEnabled: false
+    secretManagerEnabled: false
 
 rangerPostgresql:
   nameOverride: ranger-postgresql
@@ -1044,9 +1382,11 @@ prefect-auth-proxy:
       # Use a distinct oauth2-proxy cookie per app so localhost tunnel access
       # does not mix Prefect and CloudBeaver sessions on 127.0.0.1.
       cookie_name = "_oauth2_proxy_prefect"
+      session_cookie_minimal = true
       upstreams = [ "http://prefect-server:4200" ]
-      pass_access_token = true
-      pass_authorization_header = true
+      pass_access_token = false
+      pass_authorization_header = false
+      pass_user_headers = true
       set_xauthrequest = true
       reverse_proxy = true
       {{- if or .Values.global.identity.external.clients.prefectAutomation.enabled .Values.global.identity.external.clients.prefectDirectGrant.enabled }}
@@ -1127,9 +1467,11 @@ ranger-auth-proxy:
       skip_provider_button = true
       cookie_secure = {{ hasPrefix "https://" .Values.global.identity.external.clients.rangerProxy.redirectUrl }}
       cookie_name = "_oauth2_proxy_ranger"
+      cookie_csrf_per_request = true
+      session_cookie_minimal = true
       upstreams = [ "http://{{ include "dlh-in-a-box.ranger.browserProxy.serviceName" $ }}:80" ]
-      pass_access_token = true
-      pass_authorization_header = true
+      pass_access_token = false
+      pass_authorization_header = false
       pass_user_headers = true
       set_xauthrequest = true
       reverse_proxy = true
@@ -1227,6 +1569,7 @@ superset:
       AUTH_ROLES_SYNC_AT_LOGIN = True
       AUTH_USER_REGISTRATION = True
       AUTH_USER_REGISTRATION_ROLE = "Gamma"
+      GROUPS_CLAIM = {{ .Values.global.identity.external.oidc.groupsClaim | quote }}
       AUTH_ROLES_MAPPING = {
       {{- range $role, $groups := .Values.auth.roleMappings }}
         {{- range $group := $groups }}
@@ -1273,7 +1616,7 @@ superset:
                           "first_name": claims.get("given_name", ""),
                           "last_name": claims.get("family_name", ""),
                           "email": claims.get("email", ""),
-                          "role_keys": claims.get("groups", []),
+                          "role_keys": claims.get(GROUPS_CLAIM) or claims.get("groups", []),
                       }
               return super().oauth_user_info(provider, response)
 

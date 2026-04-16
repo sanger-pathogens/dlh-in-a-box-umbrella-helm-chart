@@ -1,4 +1,4 @@
-# Disposable local auth overlay for render-oriented smoke checks.
+# Local render-oriented Keycloak-local-users overlay.
 # These credentials are intentionally non-secret demo values and must never be
 # reused in a shared or production environment.
 global:
@@ -14,27 +14,14 @@ global:
         internalScheme: http
         loginTheme: ""
         configCliEnvExistingSecret: &keycloak_config_cli_env_secret dlh-keycloak-config-cli-env
-        bootstrapUsers:
-          - username: admin
-            email: admin@local.test
-            firstName: Local
-            lastName: Administrator
-            passwordEnvVar: KC_BOOTSTRAP_ADMIN_PASSWORD
-            groups:
-              - platform-app-cloudbeaver
-              - platform-app-datahub
-              - platform-app-prefect
-              - platform-app-superset
-              - platform-app-trino
-              - platform-role-platform-admin
-            clientRoles:
-              realm-management:
-                - realm-admin
+        registration:
+          enabled: true
+          requireEmailVerification: false
     external:
       oidc:
         issuer: http://dlh-keycloak.data-lakehouse-local.svc.cluster.local/realms/dlh
-        usernameClaim: email
-        groupsClaim: groups
+        usernameClaim: preferred_username
+        groupsClaim: platform_groups
         userMappingPattern: "([^@]+)"
         scopes:
           - openid
@@ -55,6 +42,9 @@ global:
           sharedSecretExistingSecret: dlh-trino-internal-communication
           sharedSecretKey: sharedSecret
           passwordAuthEnabled: false
+        trinoDirectGrant:
+          enabled: true
+          clientId: trino-cli
         superset:
           enabled: false
         datahub:
@@ -102,23 +92,9 @@ global:
           emailDomains:
             - "*"
     directory:
-      mode: externalLdap
+      mode: keycloakLocal
       ldap:
         enabled: false
-        usernameAttribute: uid
-        firstNameAttribute: givenName
-        lastNameAttribute: sn
-        emailAttribute: mail
-        uuidAttribute: entryUUID
-        userObjectClasses: inetOrgPerson,organizationalPerson,person
-        userSearchFilter: "(uid={0})"
-        groupNameAttribute: cn
-        membershipUserAttribute: uid
-        groupObjectClasses: groupOfNames
-        useGroupFilter: true
-        groupSearchFilter: "(cn=platform-*)"
-        groupSearchMemberAttribute: member
-        userMemberOfAttribute: memberOf
     groupConventions:
       appAccessPrefix: platform-app-
       rolePrefix: platform-role-
@@ -128,8 +104,7 @@ global:
       platform-admin:
         description: Local administrators with full browser access and broad Trino administration rights.
         members:
-          directoryGroups:
-            - platform-role-platform-admin
+          directoryGroups: []
         apps:
           superset: true
           datahub: true
@@ -139,8 +114,7 @@ global:
       default-readonly-analyst:
         description: Demo read-only users for the default catalog.
         members:
-          directoryGroups:
-            - platform-data-default-ro
+          directoryGroups: []
         apps:
           superset: true
           datahub: true
@@ -152,14 +126,8 @@ global:
       enabled: true
       serviceName: trino
       serviceUsername: trino
-      serviceAdminUsers:
-        - admin
-        - admin@local.test
       serviceAdminGroups:
         - platform-role-platform-admin
-      superUsers:
-        - admin
-        - admin@local.test
       superGroups:
         - platform-role-platform-admin
       useRangerGroups: false

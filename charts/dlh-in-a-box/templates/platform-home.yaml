@@ -3,6 +3,7 @@
 {{- $port := default 8080 .Values.platformHome.service.port -}}
 {{- $apiPort := default 18080 (dig "api" "port" 18080 .Values.platformHome) -}}
 {{- $platformHomeValues := .Values.platformHome | default dict -}}
+{{- $launchers := get $platformHomeValues "launchers" | default dict -}}
 {{- $keycloakBrowserBaseUrl := trimSuffix "/" (default "" (get $platformHomeValues "keycloakBrowserBaseUrl")) -}}
 {{- $branding := .Values.platformHome.branding | default dict -}}
 {{- $theme := get $platformHomeValues "theme" | default dict -}}
@@ -15,6 +16,8 @@
 {{- $global := .Values.global | default dict -}}
 {{- $identity := get $global "identity" | default dict -}}
 {{- $directory := get $identity "directory" | default dict -}}
+{{- $directoryMode := include "dlh-in-a-box.identity.directoryMode" . -}}
+{{- $keycloakLocalMode := eq $directoryMode "keycloakLocal" -}}
 {{- $ldap := get $directory "ldap" | default dict -}}
 {{- $authorization := get $global "authorization" | default dict -}}
 {{- $platformRoles := get $authorization "platformRoles" | default dict -}}
@@ -52,10 +55,30 @@
 {{- $metaThemeColor := default "#1f5f7a" (get $theme "metaThemeColor") -}}
 {{- $fontBodyFamily := default "system-ui, -apple-system, BlinkMacSystemFont, \"Segoe UI\", sans-serif" (get $themeFonts "bodyFamily") -}}
 {{- $fontHeadingFamily := default "Georgia, \"Times New Roman\", serif" (get $themeFonts "headingFamily") -}}
+{{- $accessControlNotice := "Access Control is disabled in Keycloak local-user mode. Use Keycloak Admin for standalone app-group changes; direct-user Ranger platform-role membership is projected back into the matching Keycloak role and browser app groups." -}}
+{{- $portalLaunchers := dict -}}
+{{- range $launcherName := keys $launchers | sortAlpha -}}
+  {{- $launcher := get $launchers $launcherName | default dict -}}
+  {{- if default false (get $launcher "enabled") -}}
+    {{- $_ := set $portalLaunchers $launcherName (dict
+      "mode" (default "redirect" (get $launcher "mode"))
+      "path" (default (printf "/launch/%s" $launcherName) (get $launcher "path"))
+      "targetUrl" (default "" (get $launcher "targetUrl"))
+      "completeUrl" (default "" (get $launcher "completeUrl"))
+      "internalApiUrl" (default "" (get $launcher "internalApiUrl"))
+      "redirectUri" (default "" (get $launcher "redirectUri"))
+      "authMount" (default "" (get $launcher "authMount"))
+      "role" (default "" (get $launcher "role"))
+      "wrapTtl" (default "" (get $launcher "wrapTtl"))
+      "requiredGroups" (default (list) (get $launcher "requiredGroups"))
+    ) -}}
+  {{- end -}}
+{{- end -}}
 {{- $platformRoleViews := list -}}
 {{- $appRoleGroups := dict
   "superset" (list)
   "datahub" (list)
+  "jupyterhub" (list)
   "cloudbeaver" (list)
   "prefect" (list)
 -}}
@@ -71,6 +94,9 @@
   {{- end -}}
   {{- if default false (get $roleApps "datahub") -}}
     {{- $_ := set $appRoleGroups "datahub" (uniq (concat (get $appRoleGroups "datahub") $directoryGroups)) -}}
+  {{- end -}}
+  {{- if default false (get $roleApps "jupyterhub") -}}
+    {{- $_ := set $appRoleGroups "jupyterhub" (uniq (concat (get $appRoleGroups "jupyterhub") $directoryGroups)) -}}
   {{- end -}}
   {{- if default false (get $roleApps "cloudbeaver") -}}
     {{- $_ := set $appRoleGroups "cloudbeaver" (uniq (concat (get $appRoleGroups "cloudbeaver") $directoryGroups)) -}}
@@ -135,6 +161,7 @@
       "superset" (default false (get $roleApps "superset"))
       "datahub" (default false (get $roleApps "datahub"))
       "trinoUi" (default false (get $roleApps "trinoUi"))
+      "jupyterhub" (default false (get $roleApps "jupyterhub"))
       "cloudbeaver" (default false (get $roleApps "cloudbeaver"))
       "prefect" (default false (get $roleApps "prefect"))
     )
@@ -143,7 +170,8 @@
   ) -}}
 {{- end -}}
 {{- $adminTools := list -}}
-{{- if and (default false $ranger.enabled) (gt (len $platformRoleViews) 0) -}}
+{{- $roleManagementEnabled := and (default false $ranger.enabled) (gt (len $platformRoleViews) 0) (not $keycloakLocalMode) -}}
+{{- if $roleManagementEnabled -}}
   {{- $toolMeta := get $itemMeta "access-control" | default dict -}}
   {{- $adminTools = append $adminTools (dict
     "id" "access-control"
@@ -261,6 +289,25 @@
     "requiredGroups" (uniq (concat (list (include "dlh-in-a-box.group.app" (dict "root" . "name" "datahub"))) (get $appRoleGroups "datahub")))
   ) -}}
 {{- end -}}
+{{- if and .Values.jupyterhub.enabled (default false (dig "jupyterhub" "enabled" false $clients)) -}}
+  {{- $appMeta := get $itemMeta "jupyterhub" | default dict -}}
+  {{- $jupyterhubOrigin := trimSuffix "/" (first (default (list) (dig "jupyterhub" "webOrigins" list $clients))) -}}
+  {{- $jupyterhubLaunch := get $portalLaunchers "jupyterhub" | default dict -}}
+  {{- $apps = append $apps (dict
+    "id" "jupyterhub"
+    "name" "JupyterHub"
+    "summary" "Interactive notebooks and shared code workspace"
+    "url" (default $jupyterhubOrigin (get $jupyterhubLaunch "path"))
+    "group" "Analysis"
+    "icon" "JH"
+    "iconText" (default "JH" (get $appMeta "iconText"))
+    "iconUrl" (default "" (get $appMeta "iconUrl"))
+    "iconAlt" (default "JupyterHub logo" (get $appMeta "iconAlt"))
+    "iconBackground" (default "" (get $appMeta "iconBackground"))
+    "health" (get $appMeta "health" | default dict)
+    "requiredGroups" (uniq (concat (list (include "dlh-in-a-box.group.app" (dict "root" . "name" "jupyterhub"))) (get $appRoleGroups "jupyterhub")))
+  ) -}}
+{{- end -}}
 {{- if default false (dig "prefectProxy" "enabled" false $clients) -}}
   {{- $prefectOrigin := trimSuffix "/" (first (default (list) (dig "prefectProxy" "webOrigins" list $clients))) -}}
   {{- $appMeta := get $itemMeta "prefect" | default dict -}}
@@ -320,6 +367,14 @@
     "health" (get $tool "health" | default dict)
   ) -}}
 {{- end -}}
+{{- $portalApps := list -}}
+{{- range $app := $apps -}}
+  {{- $portalApps = append $portalApps (omit $app "health") -}}
+{{- end -}}
+{{- $portalAdminTools := list -}}
+{{- range $tool := $adminTools -}}
+  {{- $portalAdminTools = append $portalAdminTools (omit $tool "health") -}}
+{{- end -}}
 {{- $portalConfig := dict
   "branding" (dict
     "title" $brandingTitle
@@ -334,6 +389,7 @@
     "refreshIntervalSeconds" (default 90 (get $portalHealth "refreshIntervalSeconds"))
   )
   "identity" (dict
+    "directoryMode" $directoryMode
     "groupsClaim" (default "groups" $oidc.groupsClaim)
     "keycloak" (dict
       "baseUrl" (default (include "dlh-in-a-box.keycloak.browserBaseUrl" .) .Values.platformHome.keycloakBrowserBaseUrl)
@@ -341,21 +397,26 @@
       "clientId" (default "" (get (get $clients "platformHome" | default dict) "clientId"))
     )
   )
-  "apps" $apps
+  "apps" $portalApps
   "admin" (dict
     "requiredGroups" (list $adminRequiredGroup)
-    "tools" $adminTools
-    "roleManagementEnabled" (and $ranger.enabled (gt (len $platformRoleViews) 0))
+    "tools" $portalAdminTools
+    "roleManagementEnabled" $roleManagementEnabled
+    "accessControlEnabled" $roleManagementEnabled
+    "accessControlNotice" (ternary $accessControlNotice "" $keycloakLocalMode)
     "accessControlPath" "/access-control"
   )
 -}}
 {{- $platformHomeAdminConfig := dict
   "admin" (dict
     "requiredGroups" (list $adminRequiredGroup)
-    "roleManagementEnabled" (and $ranger.enabled (gt (len $platformRoleViews) 0))
+    "roleManagementEnabled" $roleManagementEnabled
+    "accessControlEnabled" $roleManagementEnabled
+    "accessControlNotice" (ternary $accessControlNotice "" $keycloakLocalMode)
     "accessControlPath" "/access-control"
   )
   "adminTools" $adminTools
+  "launchers" $portalLaunchers
   "roles" $platformRoleViews
   "health" (dict
     "enabled" (default false (get $portalHealth "enabled"))
@@ -365,8 +426,9 @@
   "ranger" (dict
     "enabled" (default false $ranger.enabled)
     "browserUrl" $rangerBrowserUrl
-    "usersyncEnabled" (default true $usersyncEnabled)
+    "usersyncEnabled" $usersyncEnabled
     "membershipSource" $platformRoleMembershipSource
+    "directoryMode" $directoryMode
   )
   "ldap" (dict
     "enabled" $ldapEnabled
@@ -444,6 +506,7 @@ data:
           </div>
         </header>
         <main id="signed-in-content" class="content is-hidden">
+          <div id="portal-notice" class="status-banner is-hidden"></div>
           <section id="launch-groups" class="group-stack"></section>
           <section id="empty-panel" class="panel is-hidden">
             <div class="panel-header">
@@ -505,11 +568,22 @@ data:
     <body>
       <script>
         try {
+          {{- if $keycloakLocalMode }}
+          window.sessionStorage.setItem("platform-home-route-notice", JSON.stringify({
+            level: "info",
+            message: {{ $accessControlNotice | quote }}
+          }));
+          {{- else }}
           window.sessionStorage.setItem("platform-home-target-section", "access-control");
+          {{- end }}
         } catch (error) {
           console.warn("Unable to persist the administration redirect target.", error);
         }
+        {{- if $keycloakLocalMode }}
+        window.location.replace("/");
+        {{- else }}
         window.location.replace("/access-control");
+        {{- end }}
       </script>
     </body>
     </html>
@@ -528,6 +602,7 @@ data:
     const adminTools = document.getElementById("admin-tools");
     const roleManagementPanel = document.getElementById("role-management-panel");
     const roleManagementStatus = document.getElementById("role-management-status");
+    const portalNotice = document.getElementById("portal-notice");
     const roleCatalog = document.getElementById("role-catalog");
     const roleDetail = document.getElementById("role-detail");
     const accessControlBack = document.getElementById("access-control-back");
@@ -538,6 +613,7 @@ data:
     const portalThemeColor = document.getElementById("portal-theme-color");
     const defaultLoginLabel = loginButton ? loginButton.textContent : "Sign in";
     const sectionStorageKey = "platform-home-target-section";
+    const routeNoticeStorageKey = "platform-home-route-notice";
     const accessControlPath = "/access-control";
 
     const state = {
@@ -637,6 +713,16 @@ data:
       return window.location.pathname === accessControlPath ? "access-control" : "home";
     }
 
+    function currentLaunchTarget() {
+      const segments = window.location.pathname
+        .split("/")
+        .filter(Boolean);
+      if (segments.length === 2 && segments[0] === "launch") {
+        return segments[1];
+      }
+      return "";
+    }
+
     function getTargetSection() {
       if (window.location.hash === "#administration" || window.location.pathname === accessControlPath) {
         return "access-control";
@@ -653,6 +739,37 @@ data:
         window.sessionStorage.removeItem(sectionStorageKey);
       } catch (error) {
         console.warn("Unable to clear the requested portal section.", error);
+      }
+    }
+
+    function rememberRouteNotice(level, message) {
+      if (!message) {
+        return;
+      }
+      try {
+        window.sessionStorage.setItem(routeNoticeStorageKey, JSON.stringify({ level, message }));
+      } catch (error) {
+        console.warn("Unable to persist the route notice.", error);
+      }
+    }
+
+    function consumeRouteNotice() {
+      try {
+        const raw = window.sessionStorage.getItem(routeNoticeStorageKey);
+        window.sessionStorage.removeItem(routeNoticeStorageKey);
+        if (!raw) {
+          return null;
+        }
+        const parsed = JSON.parse(raw);
+        if (!parsed || typeof parsed !== "object") {
+          return null;
+        }
+        return {
+          level: typeof parsed.level === "string" ? parsed.level : "info",
+          message: typeof parsed.message === "string" ? parsed.message : "",
+        };
+      } catch (error) {
+        return null;
       }
     }
 
@@ -708,6 +825,24 @@ data:
       hide(administration);
       show(roleManagementPanel);
       show(accessControlBack);
+    }
+
+    function setPortalNotice(level, message) {
+      if (!portalNotice) {
+        return;
+      }
+      if (!message) {
+        portalNotice.textContent = "";
+        portalNotice.className = "status-banner is-hidden";
+        return;
+      }
+      portalNotice.innerHTML = message;
+      portalNotice.className = `status-banner is-${level}`;
+      show(portalNotice);
+    }
+
+    function accessControlEnabled() {
+      return Boolean(state.config?.admin?.accessControlEnabled);
     }
 
     function renderCardIcon(item) {
@@ -819,6 +954,7 @@ data:
       hide(administration);
       hide(adminToolsPanel);
       hide(roleManagementPanel);
+      setPortalNotice("", "");
     }
 
     function setLoginPending(label = "Starting sign-in...") {
@@ -1495,6 +1631,58 @@ data:
       return payload;
     }
 
+    async function launchPortalTarget(target, options = {}) {
+      if (!target) {
+        return;
+      }
+      setPortalNotice("info", `Opening ${escapeHtml(humanizeSlug(target))}...`);
+      const payload = await apiRequest(`/api/launch/${encodeURIComponent(target)}`);
+      const targetUrl = String(payload?.url || "").trim();
+      const launchMode = String(payload?.mode || "redirect").trim().toLowerCase();
+      if (!targetUrl) {
+        throw new Error(`The portal launcher for ${humanizeSlug(target)} did not return a URL.`);
+      }
+
+      if (launchMode === "popup") {
+        const completeUrl = String(payload?.completeUrl || "").trim();
+        const popup = window.open(
+          targetUrl,
+          `${target}-launcher`,
+          "popup=yes,width=720,height=860,noopener=yes",
+        );
+        if (!popup) {
+          if (!options.interactive) {
+            throw new Error(`Your browser blocked the ${humanizeSlug(target)} sign-in window. Return to the portal and open it again from the launch card.`);
+          }
+          window.location.assign(targetUrl);
+          return;
+        }
+        await new Promise((resolve, reject) => {
+          const startedAt = Date.now();
+          const timer = window.setInterval(() => {
+            if (popup.closed) {
+              window.clearInterval(timer);
+              resolve();
+              return;
+            }
+            if (Date.now() - startedAt > 120000) {
+              window.clearInterval(timer);
+              try {
+                popup.close();
+              } catch (error) {
+                console.warn("Unable to close the launcher popup after timeout.", error);
+              }
+              reject(new Error(`${humanizeSlug(target)} sign-in did not finish before the launcher timed out.`));
+            }
+          }, 1000);
+        });
+        window.location.replace(completeUrl || targetUrl);
+        return;
+      }
+
+      window.location.replace(targetUrl);
+    }
+
     async function refreshRoleData() {
       const [statusPayload, rolesPayload] = await Promise.all([
         apiRequest("/api/admin/access-control/status"),
@@ -1716,6 +1904,11 @@ data:
 
     async function loadAdminExperience() {
       renderAdminTools(state.config, state.isAdmin);
+      if (!accessControlEnabled() && currentPortalRoute() === "access-control") {
+        rememberRouteNotice("info", state.config?.admin?.accessControlNotice || "Use Keycloak Admin and Ranger Admin for access management in this environment.");
+        window.location.replace("/");
+        return;
+      }
       if (currentPortalRoute() === "access-control" && !state.isAdmin) {
         window.location.replace("/");
         return;
@@ -1757,6 +1950,11 @@ data:
 
       state.config = await response.json();
       applyBranding(state.config);
+      if (currentPortalRoute() === "access-control" && !accessControlEnabled()) {
+        rememberRouteNotice("info", state.config?.admin?.accessControlNotice || "Use Keycloak Admin and Ranger Admin for access management in this environment.");
+        clearTargetSection();
+        window.history.replaceState(null, document.title, "/");
+      }
       if (window.location.hash === "#administration" || currentPortalRoute() === "access-control") {
         rememberTargetSection("access-control");
       }
@@ -1780,6 +1978,7 @@ data:
         onLoad: "check-sso",
         pkceMethod: "S256",
         checkLoginIframe: false,
+        redirectUri,
       });
 
       if (window.location.href !== redirectUri) {
@@ -1810,8 +2009,31 @@ data:
         "Authenticated user";
 
       setAuthenticatedState(displayName, state.isAdmin);
+      const routeNotice = consumeRouteNotice();
+      if (routeNotice?.message) {
+        setPortalNotice(routeNotice.level || "info", escapeHtml(routeNotice.message));
+      } else {
+        setPortalNotice("", "");
+      }
       logoutButton.addEventListener("click", () => {
         keycloak.logout({ redirectUri: `${window.location.origin}/` });
+      });
+      document.addEventListener("click", (event) => {
+        const launchLink = event.target.closest("a.launch-button[href^='/launch/']");
+        if (!launchLink) {
+          return;
+        }
+        const launchTarget = launchLink
+          .getAttribute("href")
+          .split("/")
+          .filter(Boolean)[1] || "";
+        if (!launchTarget) {
+          return;
+        }
+        event.preventDefault();
+        launchPortalTarget(launchTarget, { interactive: true }).catch((error) => {
+          setPortalNotice("error", escapeHtml(error.message || `Unable to open ${humanizeSlug(launchTarget)}.`));
+        });
       });
 
       window.setInterval(() => {
@@ -1819,6 +2041,17 @@ data:
           keycloak.login({ redirectUri });
         });
       }, 30000);
+
+      const launchTarget = currentLaunchTarget();
+      if (launchTarget) {
+        try {
+          await launchPortalTarget(launchTarget);
+        } catch (error) {
+          rememberRouteNotice("error", error.message || `Unable to open ${humanizeSlug(launchTarget)} from the portal.`);
+          window.location.assign("/");
+        }
+        return;
+      }
 
       renderApps(state.config, state.groups);
       await refreshHealth();
@@ -2785,6 +3018,11 @@ data:
 
 
     CONFIG = load_config()
+    ACCESS_CONTROL_ENABLED = bool(CONFIG.get("admin", {}).get("accessControlEnabled", True))
+    ACCESS_CONTROL_DISABLED_MESSAGE = str(
+        CONFIG.get("admin", {}).get("accessControlNotice")
+        or "Use Keycloak Admin and Ranger Admin for access management in this environment."
+    )
     ROLE_CATALOG = {
         str(role.get("key", "")): role
         for role in CONFIG.get("roles", [])
@@ -2969,9 +3207,122 @@ data:
             raise ApiError(403, "Platform administration is limited to platform administrators.")
         merged = dict(claims)
         merged.update(profile if isinstance(profile, dict) else {})
+        merged["accessToken"] = token
         merged["groups"] = groups
         merged["is_admin"] = is_admin
         return merged
+
+
+    def launcher_catalog():
+        launchers = CONFIG.get("launchers")
+        return launchers if isinstance(launchers, dict) else {}
+
+
+    def launcher_entry(name):
+        launcher = launcher_catalog().get(str(name))
+        if not isinstance(launcher, dict):
+            raise ApiError(404, "That portal launcher is not configured.")
+        return launcher
+
+
+    def authorize_launcher(launcher, profile):
+        required_groups = normalize_groups(launcher.get("requiredGroups"))
+        groups = normalize_groups(profile.get("groups"))
+        if required_groups and not any(group in groups for group in required_groups):
+            raise ApiError(403, "You do not have access to that launcher.")
+
+
+    def launcher_request(url, payload=None, extra_headers=None):
+        headers = {"Accept": "application/json"}
+        body = None
+        if payload is not None:
+            body = json.dumps(payload).encode("utf-8")
+            headers["Content-Type"] = "application/json"
+        if isinstance(extra_headers, dict):
+            for key, value in extra_headers.items():
+                if key and value is not None:
+                    headers[str(key)] = str(value)
+        request = urllib.request.Request(url, headers=headers, data=body, method="POST" if payload is not None else "GET")
+        try:
+            if url.startswith("https://"):
+                with urllib.request.urlopen(request, timeout=30, context=HTTPS_CONTEXT) as response:
+                    raw = response.read().decode("utf-8")
+            else:
+                with urllib.request.urlopen(request, timeout=30) as response:
+                    raw = response.read().decode("utf-8")
+        except urllib.error.HTTPError as exc:
+            detail = exc.read().decode("utf-8", errors="replace")
+            raise ApiError(502, f"Launcher upstream request failed with {exc.code}: {detail[:200]}") from exc
+        except urllib.error.URLError as exc:
+            raise ApiError(502, f"Launcher upstream request failed: {exc.reason}") from exc
+        try:
+            return json.loads(raw) if raw else {}
+        except json.JSONDecodeError as exc:
+            raise ApiError(502, "Launcher upstream returned invalid JSON.") from exc
+
+
+    def resolve_launcher(name, profile):
+        launcher = launcher_entry(name)
+        authorize_launcher(launcher, profile)
+        mode = str(launcher.get("mode") or "redirect").strip().lower()
+
+        if mode == "redirect":
+            target_url = str(launcher.get("targetUrl") or "").strip()
+            if not target_url:
+                raise ApiError(500, "That portal launcher is missing its targetUrl.")
+            return {"mode": "redirect", "url": target_url}
+
+        if mode == "vault-oidc":
+            internal_api_url = str(launcher.get("internalApiUrl") or "").rstrip("/")
+            redirect_uri = str(launcher.get("redirectUri") or "").strip()
+            complete_url = str(launcher.get("completeUrl") or "").strip()
+            role = str(launcher.get("role") or "").strip()
+            if not internal_api_url or not redirect_uri:
+                raise ApiError(500, "The Vault launcher is missing its internal API URL or redirect URI.")
+            payload = {"redirect_uri": redirect_uri}
+            if role:
+                payload["role"] = role
+            response = launcher_request(f"{internal_api_url}/v1/auth/oidc/oidc/auth_url", payload)
+            auth_url = str(((response.get("data") or {}).get("auth_url")) or "").strip()
+            if not auth_url:
+                raise ApiError(502, "Vault did not return an OIDC authorization URL.")
+            return {
+                "mode": "popup",
+                "url": auth_url,
+                "completeUrl": complete_url or redirect_uri.rsplit("/ui/vault/auth/oidc/oidc/callback", 1)[0] + "/ui/",
+            }
+
+        if mode == "vault-wrapped-token":
+            internal_api_url = str(launcher.get("internalApiUrl") or "").rstrip("/")
+            target_url = str(launcher.get("targetUrl") or "").strip()
+            auth_mount = str(launcher.get("authMount") or "").strip()
+            role = str(launcher.get("role") or "").strip()
+            wrap_ttl = str(launcher.get("wrapTtl") or "").strip()
+            access_token = str(profile.get("accessToken") or "").strip()
+            if not internal_api_url or not target_url or not auth_mount or not role:
+                raise ApiError(500, "The Vault launcher is missing its internal API URL, auth mount, role, or target URL.")
+            if not access_token:
+                raise ApiError(401, "Your session is no longer valid. Please sign in again.")
+            request_headers = {}
+            if wrap_ttl:
+                request_headers["X-Vault-Wrap-TTL"] = wrap_ttl
+            response = launcher_request(
+                f"{internal_api_url}/v1/auth/{urllib.parse.quote(auth_mount, safe='')}/login",
+                {"jwt": access_token, "role": role},
+                request_headers,
+            )
+            wrap_token = str(((response.get("wrap_info") or {}).get("token")) or "").strip()
+            if not wrap_token:
+                raise ApiError(502, "Vault did not return a wrapped login token.")
+            parsed_target = urllib.parse.urlparse(target_url)
+            existing_query = urllib.parse.parse_qsl(parsed_target.query, keep_blank_values=True)
+            existing_query.append(("wrapped_token", wrap_token))
+            launched_url = urllib.parse.urlunparse(
+                parsed_target._replace(query=urllib.parse.urlencode(existing_query))
+            )
+            return {"mode": "redirect", "url": launched_url}
+
+        raise ApiError(500, f"Unsupported launcher mode: {mode}")
 
 
     def ranger_enabled():
@@ -3392,6 +3743,11 @@ data:
         return kubernetes_api_enabled()
 
 
+    def ensure_access_control_enabled():
+        if not ACCESS_CONTROL_ENABLED:
+            raise ApiError(409, ACCESS_CONTROL_DISABLED_MESSAGE)
+
+
     def active_exception(exception, now=None):
         if not isinstance(exception, dict):
             return False
@@ -3636,16 +3992,18 @@ data:
         usersync_enabled = bool(CONFIG.get("ranger", {}).get("usersyncEnabled"))
         return {
             "adminEnabled": True,
+            "accessControlEnabled": ACCESS_CONTROL_ENABLED,
             "rangerEnabled": bool(CONFIG.get("ranger", {}).get("enabled")),
             "membershipSource": membership_source,
-            "usersyncEnabled": usersync_enabled,
-            "groupAssignmentEnabled": bool(usersync_enabled),
-            "userAssignmentEnabled": membership_source == "ranger" and exception_support_enabled(),
-            "exceptionSupportEnabled": exception_support_enabled(),
+            "usersyncEnabled": usersync_enabled if ACCESS_CONTROL_ENABLED else False,
+            "groupAssignmentEnabled": bool(usersync_enabled) if ACCESS_CONTROL_ENABLED else False,
+            "userAssignmentEnabled": membership_source == "ranger" and exception_support_enabled() and ACCESS_CONTROL_ENABLED,
+            "exceptionSupportEnabled": exception_support_enabled() and ACCESS_CONTROL_ENABLED,
             "ldapEnabled": bool(ldap_config().get("enabled")),
             "ldapReachable": bool(directory.get("ldapReachable")),
-            "directoryMessage": directory.get("message", ""),
+            "directoryMessage": ACCESS_CONTROL_DISABLED_MESSAGE if not ACCESS_CONTROL_ENABLED else directory.get("message", ""),
             "auditUrl": CONFIG.get("ranger", {}).get("browserUrl", ""),
+            "notice": ACCESS_CONTROL_DISABLED_MESSAGE if not ACCESS_CONTROL_ENABLED else "",
         }
 
 
@@ -3855,6 +4213,15 @@ data:
                     json_response(self, 200, {"checkedAt": utc_timestamp(), "items": items})
                     return
 
+                if self.command == "GET" and path.startswith("/api/launch/"):
+                    profile = authenticate(self, require_admin=False)
+                    parts = path.split("/")
+                    if len(parts) != 4:
+                        raise ApiError(404, "Unknown launcher path.")
+                    launcher_name = urllib.parse.unquote(parts[3])
+                    json_response(self, 200, resolve_launcher(launcher_name, profile))
+                    return
+
                 authenticate(self)
 
                 if self.command == "GET" and path in {"/api/admin/status", "/api/admin/access-control/status"}:
@@ -3869,6 +4236,7 @@ data:
                     return
 
                 if self.command == "GET" and path in {"/api/admin/platform-roles", "/api/admin/access-control/roles"}:
+                    ensure_access_control_enabled()
                     json_response(
                         self,
                         200,
@@ -3880,6 +4248,7 @@ data:
                     return
 
                 if self.command == "GET" and path == "/api/admin/principals":
+                    ensure_access_control_enabled()
                     params = urllib.parse.parse_qs(parsed.query or "")
                     kind = str((params.get("kind") or [""])[0]).strip().lower()
                     query = str((params.get("query") or [""])[0]).strip()
@@ -3890,6 +4259,7 @@ data:
                     return
 
                 if path.startswith("/api/admin/platform-roles/") and path.endswith("/members") and self.command in {"POST", "DELETE"}:
+                    ensure_access_control_enabled()
                     parts = path.split("/")
                     if len(parts) != 6:
                         raise ApiError(404, "Unknown admin API path.")
@@ -3901,18 +4271,21 @@ data:
                     return
 
                 if self.command == "GET" and path == "/api/admin/access-control/directory-users":
+                    ensure_access_control_enabled()
                     params = urllib.parse.parse_qs(parsed.query or "")
                     query = str((params.get("query") or [""])[0]).strip()
                     json_response(self, 200, {"results": search_directory("user", query) if query else []})
                     return
 
                 if self.command == "GET" and path == "/api/admin/access-control/directory-groups":
+                    ensure_access_control_enabled()
                     params = urllib.parse.parse_qs(parsed.query or "")
                     query = str((params.get("query") or [""])[0]).strip()
                     json_response(self, 200, {"results": search_directory("group", query) if query else []})
                     return
 
                 if path.startswith("/api/admin/access-control/roles/") and path.endswith("/groups") and self.command in {"POST", "DELETE"}:
+                    ensure_access_control_enabled()
                     parts = path.split("/")
                     if len(parts) != 7:
                         raise ApiError(404, "Unknown admin API path.")
@@ -3923,6 +4296,7 @@ data:
                     return
 
                 if path.startswith("/api/admin/access-control/roles/") and path.endswith("/users") and self.command in {"POST", "DELETE"}:
+                    ensure_access_control_enabled()
                     parts = path.split("/")
                     if len(parts) != 7:
                         raise ApiError(404, "Unknown admin API path.")
@@ -3933,6 +4307,7 @@ data:
                     return
 
                 if path.startswith("/api/admin/access-control/roles/") and path.endswith("/exceptions") and self.command == "POST":
+                    ensure_access_control_enabled()
                     parts = path.split("/")
                     if len(parts) != 7:
                         raise ApiError(404, "Unknown admin API path.")
@@ -3943,6 +4318,7 @@ data:
                     return
 
                 if path.startswith("/api/admin/access-control/roles/") and "/exceptions/" in path and self.command == "PATCH":
+                    ensure_access_control_enabled()
                     parts = path.split("/")
                     if len(parts) != 8:
                         raise ApiError(404, "Unknown admin API path.")
@@ -3954,6 +4330,7 @@ data:
                     return
 
                 if path.startswith("/api/admin/access-control/roles/") and "/exceptions/" in path and self.command == "DELETE":
+                    ensure_access_control_enabled()
                     parts = path.split("/")
                     if len(parts) != 8:
                         raise ApiError(404, "Unknown admin API path.")
@@ -3995,6 +4372,9 @@ data:
       # page so the portal JS can clean up stale oauth2-proxy cookies.
       client_header_buffer_size 16k;
       large_client_header_buffers 8 32k;
+      add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
+      add_header X-Content-Type-Options "nosniff" always;
+      add_header Referrer-Policy "strict-origin-when-cross-origin" always;
       root /usr/share/nginx/html;
       index index.html;
 
@@ -4005,6 +4385,12 @@ data:
       }
 
       location /api/ {
+        # nginx does not inherit add_header directives into a location once the
+        # location defines its own headers, so repeat the browser-safety
+        # headers anywhere we also set cache semantics explicitly.
+        add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
+        add_header X-Content-Type-Options "nosniff" always;
+        add_header Referrer-Policy "strict-origin-when-cross-origin" always;
         add_header Cache-Control "no-store, no-cache, max-age=0, must-revalidate" always;
         add_header Pragma "no-cache" always;
         add_header Expires "0" always;
@@ -4017,6 +4403,9 @@ data:
       }
 
       location / {
+        add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
+        add_header X-Content-Type-Options "nosniff" always;
+        add_header Referrer-Policy "strict-origin-when-cross-origin" always;
         add_header Cache-Control "no-store, no-cache, max-age=0, must-revalidate" always;
         add_header Pragma "no-cache" always;
         add_header Expires "0" always;
@@ -4376,10 +4765,25 @@ spec:
                 name: {{ $serviceName }}
                 port:
                   number: 80
+    {{- range $extraHost := (.Values.platformHome.ingress.additionalHosts | default (list)) }}
+    - host: {{ $extraHost | quote }}
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ $serviceName }}
+                port:
+                  number: 80
+    {{- end }}
   {{- if .Values.platformHome.ingress.tlsSecretName }}
   tls:
     - hosts:
         - {{ .Values.platformHome.ingress.host | quote }}
+        {{- range $extraHost := (.Values.platformHome.ingress.additionalHosts | default (list)) }}
+        - {{ $extraHost | quote }}
+        {{- end }}
       secretName: {{ .Values.platformHome.ingress.tlsSecretName }}
   {{- end }}
 {{- end }}

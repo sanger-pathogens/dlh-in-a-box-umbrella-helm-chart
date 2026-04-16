@@ -6,6 +6,7 @@
 {{- $exceptionRoleAudit := get $ranger "exceptionRoleAudit" | default dict -}}
 {{- $identity := .Values.global.identity | default dict -}}
 {{- $directory := get $identity "directory" | default dict -}}
+{{- $keycloakLocalMode := eq (default "externalLdap" (get $directory "mode")) "keycloakLocal" -}}
 {{- $ldap := get $directory "ldap" | default dict -}}
 {{- $ldapAllowAnonymousRead := default false $ldap.allowAnonymousRead -}}
 {{- $ldapEffectiveBindDn := ternary "" (include "dlh-in-a-box.identity.directory.bindDn" .) $ldapAllowAnonymousRead -}}
@@ -14,6 +15,33 @@
 {{- $ldapTrustedCaPath := printf "/opt/ranger-automation/ldap-ca/%s" $ldapTrustedCaCertKey -}}
 {{- $ldapHostAliases := default (list) $ldap.hostAliases -}}
 {{- $rangerBootstrap := get $ranger "bootstrap" | default dict -}}
+{{- $rangerPostgresql := get $ranger "postgresql" | default dict -}}
+{{- $rangerPostgresqlHost := default (include "dlh-in-a-box.ranger.postgresql.serviceName" .) $rangerPostgresql.host -}}
+{{- $usersync := get $ranger "usersync" | default dict -}}
+{{- $usersyncImage := get $usersync "image" | default dict -}}
+{{- $localUserSync := get $ranger "localUserSync" | default dict -}}
+{{- $usersyncEnabled := true -}}
+{{- if hasKey $usersync "enabled" -}}
+  {{- $usersyncEnabled = $usersync.enabled -}}
+{{- end -}}
+{{- $localUserSyncRequested := true -}}
+{{- if hasKey $localUserSync "enabled" -}}
+  {{- $localUserSyncRequested = $localUserSync.enabled -}}
+{{- end -}}
+{{- $localUserSyncEnabled := and $keycloakLocalMode $localUserSyncRequested -}}
+{{- $localUserSyncImage := get $localUserSync "image" | default $usersyncImage -}}
+{{- $exceptionRoleAuditEnabled := true -}}
+{{- if hasKey $exceptionRoleAudit "enabled" -}}
+  {{- $exceptionRoleAuditEnabled = $exceptionRoleAudit.enabled -}}
+{{- end -}}
+{{- $exceptionRoleAuditDeleteExpired := true -}}
+{{- if hasKey $exceptionRoleAudit "deleteExpired" -}}
+  {{- $exceptionRoleAuditDeleteExpired = $exceptionRoleAudit.deleteExpired -}}
+{{- end -}}
+{{- $exceptionRoleAuditLogUndocumented := true -}}
+{{- if hasKey $exceptionRoleAudit "logUndocumented" -}}
+  {{- $exceptionRoleAuditLogUndocumented = $exceptionRoleAudit.logUndocumented -}}
+{{- end -}}
 {{- $importCatalogAcls := false -}}
 {{- if hasKey $ranger "importCatalogAcls" -}}
   {{- $importCatalogAcls = $ranger.importCatalogAcls -}}
@@ -40,17 +68,20 @@ data:
         "serviceAdminGroups" ($ranger.serviceAdminGroups | default (list))
         "superUsers" ($ranger.superUsers | default (list))
         "superGroups" ($ranger.superGroups | default (list))
+        "legacyManagedUsers" ($ranger.legacyManagedUsers | default (list))
+        "legacyManagedGroups" ($ranger.legacyManagedGroups | default (list))
         "legacyManagedRoles" ($ranger.legacyManagedRoles | default (list))
+        "legacyManagedPolicies" ($ranger.legacyManagedPolicies | default (list))
         "platformRoleMembershipSource" $platformRoleMembershipSource
         "importCatalogAcls" $importCatalogAcls
         "bootstrapPolicies" $bootstrapPolicies
         "exceptionRoleAudit" (dict
-          "enabled" (default true $exceptionRoleAudit.enabled)
+          "enabled" $exceptionRoleAuditEnabled
           "prefix" (default "exception-" $exceptionRoleAudit.prefix)
           "schedule" (default "23 * * * *" $exceptionRoleAudit.schedule)
           "gracePeriodDays" (default 7 $exceptionRoleAudit.gracePeriodDays)
-          "deleteExpired" (default true $exceptionRoleAudit.deleteExpired)
-          "logUndocumented" (default true $exceptionRoleAudit.logUndocumented)
+          "deleteExpired" $exceptionRoleAuditDeleteExpired
+          "logUndocumented" $exceptionRoleAuditLogUndocumented
         )
       )
       "platformRoles" $platformRoles
@@ -71,6 +102,21 @@ data:
         "groupNameAttribute" (default "cn" $ldap.groupNameAttribute)
         "groupSearchFilter" (default "(cn=trino_*)" $ldap.groupSearchFilter)
         "groupSearchMemberAttribute" (default "member" $ldap.groupSearchMemberAttribute)
+      )
+      "identity" (dict
+        "directoryMode" (default "externalLdap" (get $directory "mode"))
+        "keycloak" (dict
+          "realm" (include "dlh-in-a-box.keycloak.realm" .)
+          "adminUrl" (include "dlh-in-a-box.keycloak.internalBaseUrl" .)
+          "adminUsername" (default "admin" .Values.keycloak.auth.adminUser)
+          "requireEmailVerification" (default false (dig "provider" "keycloak" "registration" "requireEmailVerification" false $identity))
+        )
+      )
+      "rangerPostgresql" (dict
+        "host" $rangerPostgresqlHost
+        "port" 5432
+        "database" (default "ranger" $rangerPostgresql.database)
+        "username" (default "rangeradmin" $rangerPostgresql.username)
       )
     | toPrettyJson | nindent 4 }}
   bootstrap.py: |
@@ -295,6 +341,98 @@ data:
         return request("GET", path, ok=(200,)) or []
 
 
+    def list_users():
+        users = []
+        start_index = 0
+        page_size = 200
+        while True:
+            payload = request(
+                "GET",
+                f"/service/xusers/users?startIndex={start_index}&pageSize={page_size}",
+                ok=(200,),
+            ) or {}
+            batch = payload.get("vXUsers", []) or []
+            if not batch:
+                break
+            users.extend(batch)
+            total_count = int(payload.get("totalCount", len(users)) or len(users))
+            if len(users) >= total_count:
+                break
+            start_index += len(batch)
+        return users
+
+
+    def list_groups():
+        groups = []
+        start_index = 0
+        page_size = 200
+        while True:
+            payload = request(
+                "GET",
+                f"/service/xusers/groups?startIndex={start_index}&pageSize={page_size}",
+                ok=(200,),
+            ) or {}
+            batch = payload.get("vXGroups", []) or []
+            if not batch:
+                break
+            groups.extend(batch)
+            total_count = int(payload.get("totalCount", len(groups)) or len(groups))
+            if len(groups) >= total_count:
+                break
+            start_index += len(batch)
+        return groups
+
+
+    def get_user(username):
+        username = str(username or "").strip()
+        if not username:
+            return None
+        for user in list_users():
+            if str(user.get("name", "")).strip() == username:
+                return user
+        return None
+
+
+    def build_external_user(username, first_name="", last_name="", email_address=""):
+        username = str(username or "").strip()
+        first_name = str(first_name or "").strip() or username
+        last_name = str(last_name or "").strip() or "User"
+        email_address = str(email_address or "").strip()
+        return {
+            "name": username,
+            "firstName": first_name,
+            "lastName": last_name,
+            "emailAddress": email_address,
+            "status": 1,
+            "isVisible": 1,
+            "userSource": 1,
+            "userRoleList": ["ROLE_USER"],
+            "syncSource": "LDAP",
+        }
+
+
+    def ensure_users_exist(usernames):
+        existing_usernames = {
+            str(user.get("name", "")).strip()
+            for user in list_users()
+            if str(user.get("name", "")).strip()
+        }
+        missing = [
+            build_external_user(username)
+            for username in normalize_names(usernames)
+            if username not in existing_usernames
+        ]
+        if not missing:
+            return
+        request(
+            "POST",
+            "/service/xusers/ugsync/users",
+            {"vXUsers": missing},
+            ok=(200, 201),
+        )
+        print("Seeded Ranger users: " + ", ".join(sorted(user["name"] for user in missing)))
+
+
     def exception_role_name(base_role_name, username, expires_at):
         return f"exception-{base_role_name}-{username}-{expires_at.replace('-', '')}"
 
@@ -505,6 +643,36 @@ data:
         return policies
 
 
+    def usernames_from_policy_items(items):
+        usernames = set()
+        for item in items or []:
+            usernames.update(normalize_names(item.get("users", [])))
+        return usernames
+
+
+    def policy_principal_usernames(config, policies):
+        usernames = set()
+        ranger_cfg = config.get("ranger", {}) or {}
+        usernames.update(normalize_names(ranger_cfg.get("serviceAdminUsers", [])))
+        usernames.update(normalize_names(ranger_cfg.get("superUsers", [])))
+        service_username = str(ranger_cfg.get("serviceUsername") or "").strip()
+        if service_username:
+            usernames.add(service_username)
+        for role in build_platform_roles(config):
+            usernames.update(role.get("users", []))
+        for policy in policies or []:
+            for key in [
+                "policyItems",
+                "denyPolicyItems",
+                "allowExceptions",
+                "denyExceptions",
+                "dataMaskPolicyItems",
+                "rowFilterPolicyItems",
+            ]:
+                usernames.update(usernames_from_policy_items(policy.get(key, [])))
+        return usernames
+
+
     def reconcile_roles(config):
         service_name = config["ranger"]["serviceName"]
         membership_source = str(config["ranger"].get("platformRoleMembershipSource", "git") or "git").lower()
@@ -582,6 +750,157 @@ data:
             )
 
 
+    def filter_user_from_role_members(items, username):
+        filtered = []
+        removed = False
+        for item in items or []:
+            name = str(item.get("name", "")).strip() if isinstance(item, dict) else str(item).strip()
+            if name == username:
+                removed = True
+                continue
+            filtered.append(item)
+        return filtered, removed
+
+
+    def detach_user_from_roles(service_name, username):
+        for role in list_roles():
+            filtered_users, removed = filter_user_from_role_members(role.get("users", []), username)
+            if not removed:
+                continue
+            payload = {
+                "id": role["id"],
+                "guid": role.get("guid"),
+                "version": role.get("version"),
+                "createdByUser": role.get("createdByUser"),
+                "name": role["name"],
+                "description": role.get("description", ""),
+                "isEnabled": bool(role.get("isEnabled", True)),
+                "users": normalize_role_members(filtered_users),
+                "groups": normalize_role_members(role.get("groups", [])),
+                "roles": normalize_role_members(role.get("roles", [])),
+            }
+            request("PUT", role_update_path(role["id"]), payload, ok=(200,))
+            print(f"Detached legacy user {username} from Ranger role: {role['name']}")
+
+
+    def filter_user_from_policy_items(items, username):
+        filtered_items = []
+        removed = False
+        for item in items or []:
+            updated_item = dict(item)
+            users = normalize_names(name for name in item.get("users", []) if str(name) != username)
+            removed = removed or len(users) != len(item.get("users", []) or [])
+            updated_item["users"] = users
+            updated_item["groups"] = normalize_names(item.get("groups", []))
+            updated_item["roles"] = normalize_names(item.get("roles", []))
+            if updated_item["users"] or updated_item["groups"] or updated_item["roles"]:
+                filtered_items.append(updated_item)
+        return filtered_items, removed
+
+
+    def detach_user_from_policies(service_name, username):
+        for policy in list_policies(service_name):
+            updated_policy = dict(policy)
+            removed = False
+            for key in [
+                "policyItems",
+                "denyPolicyItems",
+                "allowExceptions",
+                "denyExceptions",
+                "dataMaskPolicyItems",
+                "rowFilterPolicyItems",
+            ]:
+                filtered_items, key_removed = filter_user_from_policy_items(policy.get(key, []), username)
+                updated_policy[key] = filtered_items
+                removed = removed or key_removed
+
+            if not removed:
+                continue
+
+            has_principals = any(
+                updated_policy.get(key)
+                for key in [
+                    "policyItems",
+                    "denyPolicyItems",
+                    "allowExceptions",
+                    "denyExceptions",
+                    "dataMaskPolicyItems",
+                    "rowFilterPolicyItems",
+                ]
+            )
+            if has_principals:
+                request("PUT", policy_path(policy["id"]), updated_policy, ok=(200,))
+                print(f"Detached legacy user {username} from Ranger policy: {policy['name']}")
+            else:
+                request("DELETE", policy_path(policy["id"]), ok=(204, 404))
+                print(f"Deleted stale Ranger policy with no remaining principals: {policy['name']}")
+
+
+    def delete_user_by_name(username):
+        user = get_user(username)
+        if not user:
+            return
+        request(
+            "DELETE",
+            f"/service/xusers/secure/users/id/{user['id']}?forceDelete=true",
+            ok=(200, 204, 404),
+            parse_json=False,
+        )
+        print(f"Deleted stale Ranger user: {username}")
+
+
+    def purge_legacy_users(config, service_name):
+        for username in normalize_names(config["ranger"].get("legacyManagedUsers", [])):
+            detach_user_from_roles(service_name, username)
+            detach_user_from_policies(service_name, username)
+            delete_user_by_name(username)
+
+
+    def delete_group_by_name(group_name):
+        existing = None
+        for group in list_groups():
+            name = str(group.get("name", "")).strip()
+            if name == group_name:
+                existing = group
+                break
+        if not existing:
+            return
+        request(
+            "DELETE",
+            f"/service/xusers/groups/{existing['id']}",
+            ok=(200, 204, 404),
+            parse_json=False,
+        )
+        print(f"Deleted stale Ranger group: {group_name}")
+
+
+    def purge_legacy_groups(config):
+        for group_name in normalize_names(config["ranger"].get("legacyManagedGroups", [])):
+            delete_group_by_name(group_name)
+
+
+    def delete_policy_by_name(service_name, policy_name):
+        path = (
+            "/service/public/v2/api/service/"
+            + urllib.parse.quote(service_name, safe="")
+            + "/policy/"
+            + urllib.parse.quote(policy_name, safe="")
+        )
+        try:
+            existing = request("GET", path, ok=(200,))
+        except urllib.error.HTTPError as exc:
+            if exc.code == 404:
+                return
+            raise
+        request("DELETE", policy_path(existing["id"]), ok=(200, 204, 404))
+        print(f"Deleted stale Ranger policy: {policy_name}")
+
+
+    def purge_legacy_policies(config, service_name):
+        for policy_name in normalize_names(config["ranger"].get("legacyManagedPolicies", [])):
+            delete_policy_by_name(service_name, policy_name)
+
+
     def normalize_policy_resource(value):
         normalized = as_resource(value)
         normalized["values"] = sorted(str(item) for item in normalized.get("values", []))
@@ -649,6 +968,11 @@ data:
         policies.extend(build_catalog_acl_policies(config))
         for raw_policy in config["ranger"].get("bootstrapPolicies", []):
             policies.append(normalize_policy(raw_policy, service_name))
+
+        ensure_users_exist(policy_principal_usernames(config, policies))
+        purge_legacy_users(config, service_name)
+        purge_legacy_groups(config)
+        purge_legacy_policies(config, service_name)
 
         for policy in policies:
             upsert_policy(service_name, policy)
@@ -1114,6 +1438,17 @@ data:
         service_username = str((config.get("ranger") or {}).get("serviceUsername") or "").strip()
         if service_username:
             desired.add(service_username)
+        for policy in (config.get("ranger") or {}).get("bootstrapPolicies", []) or []:
+            for key in [
+                "policyItems",
+                "denyPolicyItems",
+                "allowExceptions",
+                "denyExceptions",
+                "dataMaskPolicyItems",
+                "rowFilterPolicyItems",
+            ]:
+                for item in policy.get(key, []) or []:
+                    desired.update(normalize_names(item.get("users", [])))
 
         membership_source = str((config.get("ranger") or {}).get("platformRoleMembershipSource", "git") or "git").lower()
         if membership_source == "ranger":
@@ -1332,6 +1667,714 @@ data:
 
     if __name__ == "__main__":
         main()
+  keycloak_local_users.py: |
+    import base64
+    import json
+    import os
+    import re
+    import secrets
+    import string
+    import sys
+    import time
+    import urllib.error
+    import urllib.parse
+    import urllib.request
+
+    import psycopg
+
+    CONFIG_PATH = "/opt/ranger-automation/bootstrap-config.json"
+    RANGER_URL = os.environ["RANGER_URL"].rstrip("/")
+    RANGER_PASSWORD = os.environ["RANGER_ADMIN_PASSWORD"]
+    KEYCLOAK_ADMIN_PASSWORD = os.environ["KEYCLOAK_ADMIN_PASSWORD"]
+    RANGER_POSTGRES_PASSWORD = os.environ["RANGER_POSTGRES_PASSWORD"]
+
+
+    def load_config():
+        with open(CONFIG_PATH, "r", encoding="utf-8") as handle:
+            return json.load(handle)
+
+
+    def wait_for_ranger():
+        deadline = time.time() + 600
+        while time.time() < deadline:
+            try:
+                ranger_request("GET", "/login.jsp", ok=(200,), parse_json=False)
+                return
+            except Exception:
+                time.sleep(5)
+        raise RuntimeError("Timed out waiting for Ranger Admin")
+
+
+    def ranger_request(method, path, payload=None, ok=(200, 201), parse_json=True):
+        url = f"{RANGER_URL}{path}"
+        headers = {
+            "Authorization": "Basic "
+            + base64.b64encode(f"admin:{RANGER_PASSWORD}".encode("utf-8")).decode("ascii"),
+            "Accept": "application/json",
+        }
+        body = None
+        if payload is not None:
+            body = json.dumps(payload).encode("utf-8")
+            headers["Content-Type"] = "application/json"
+        req = urllib.request.Request(url, data=body, headers=headers, method=method)
+        try:
+            with urllib.request.urlopen(req, timeout=30) as response:
+                data = response.read().decode("utf-8")
+                if not parse_json:
+                    return data
+                return json.loads(data) if data else None
+        except urllib.error.HTTPError as exc:
+            data = exc.read().decode("utf-8")
+            if exc.code in ok:
+                if not parse_json:
+                    return data
+                return json.loads(data) if data else None
+            exc.ranger_body = data
+            raise
+
+
+    def keycloak_token(config):
+        keycloak = config["identity"]["keycloak"]
+        params = urllib.parse.urlencode(
+            {
+                "grant_type": "password",
+                "client_id": "admin-cli",
+                "username": keycloak.get("adminUsername", "admin"),
+                "password": KEYCLOAK_ADMIN_PASSWORD,
+            }
+        ).encode("utf-8")
+        url = f"{keycloak['adminUrl'].rstrip('/')}/realms/master/protocol/openid-connect/token"
+        req = urllib.request.Request(
+            url,
+            data=params,
+            headers={"Content-Type": "application/x-www-form-urlencoded", "Accept": "application/json"},
+            method="POST",
+        )
+        with urllib.request.urlopen(req, timeout=30) as response:
+            payload = json.loads(response.read().decode("utf-8"))
+        return payload["access_token"]
+
+
+    def keycloak_request(config, token, method, path, payload=None, ok=(200, 201, 204)):
+        base_url = config["identity"]["keycloak"]["adminUrl"].rstrip("/")
+        url = f"{base_url}{path}"
+        headers = {
+            "Authorization": f"Bearer {token}",
+            "Accept": "application/json",
+        }
+        body = None
+        if payload is not None:
+            body = json.dumps(payload).encode("utf-8")
+            headers["Content-Type"] = "application/json"
+        req = urllib.request.Request(url, data=body, headers=headers, method=method)
+        try:
+            with urllib.request.urlopen(req, timeout=30) as response:
+                data = response.read().decode("utf-8")
+                return json.loads(data) if data else None
+        except urllib.error.HTTPError as exc:
+            data = exc.read().decode("utf-8")
+            if exc.code in ok:
+                return json.loads(data) if data else None
+            exc.keycloak_body = data
+            raise
+
+
+    def should_sync_user(username, email, enabled):
+        if not enabled:
+            return False
+        if username in {"admin", "trino-admin"}:
+            return False
+        if username.startswith("codex-smoke-") or username.endswith("-service"):
+            return False
+        if email.endswith(".example.invalid"):
+            return False
+        return True
+
+
+    def normalize_keycloak_user(config, token, user):
+        keycloak = config["identity"]["keycloak"]
+        if keycloak.get("requireEmailVerification", False):
+            return False, False
+
+        required_actions = [action for action in user.get("requiredActions") or [] if action != "VERIFY_EMAIL"]
+        email_verified = bool(user.get("emailVerified", False))
+        verify_email_required = "VERIFY_EMAIL" in (user.get("requiredActions") or [])
+
+        if email_verified and not verify_email_required and required_actions == (user.get("requiredActions") or []):
+            return False, False
+
+        updated = dict(user)
+        updated["emailVerified"] = True
+        updated["requiredActions"] = required_actions
+        realm = keycloak["realm"]
+        keycloak_request(
+            config,
+            token,
+            "PUT",
+            f"/admin/realms/{realm}/users/{user['id']}",
+            updated,
+        )
+
+        logged_out = False
+        try:
+            keycloak_request(
+                config,
+                token,
+                "POST",
+                f"/admin/realms/{realm}/users/{user['id']}/logout",
+                ok=(204,),
+            )
+            logged_out = True
+        except Exception as exc:
+            print(
+                f"WARNING: normalized Keycloak user {user.get('username') or user['id']} "
+                f"but failed to clear stale sessions: {exc}",
+                file=sys.stderr,
+            )
+
+        return True, logged_out
+
+
+    def ranger_users(username):
+        encoded = urllib.parse.quote(username)
+        payload = ranger_request("GET", f"/service/xusers/users?name={encoded}", ok=(200,)) or {}
+        users = payload.get("vXUsers") or []
+        return sorted(users, key=lambda user: int(user.get("id") or 0))
+
+
+    def delete_ranger_user(user_id):
+        ranger_request(
+            "DELETE",
+            f"/service/xusers/secure/users/id/{user_id}?forceDelete=true",
+            ok=(200, 204, 404),
+            parse_json=False,
+        )
+
+
+    def dedupe_ranger_users(username):
+        existing = ranger_users(username)
+        if len(existing) <= 1:
+            return 0
+        deleted = 0
+        for duplicate in existing[1:]:
+            delete_ranger_user(duplicate["id"])
+            deleted += 1
+        return deleted
+
+
+    def ranger_user(config, username):
+        del config
+        users = ranger_users(username)
+        return users[0] if users else None
+
+
+    def placeholder_password():
+        alphabet = string.ascii_letters + string.digits
+        return "Tmp" + "".join(secrets.choice(alphabet) for _ in range(14)) + "Aa1"
+
+
+    def ensure_ranger_user(username, first_name, last_name, email):
+        deleted = dedupe_ranger_users(username)
+        if deleted:
+            print(f"Removed {deleted} duplicate Ranger API user rows for {username}.")
+        existing = ranger_user(None, username)
+        if existing:
+            return False
+        payload = {
+            "name": username,
+            "password": placeholder_password(),
+            "firstName": first_name or username,
+            "lastName": last_name or "User",
+            "emailAddress": email or "",
+            "userRoleList": ["ROLE_USER"],
+            "isVisible": 1,
+        }
+        created = ranger_request("POST", "/service/xusers/users", payload, ok=(200, 201)) or {}
+        if created.get("name") != username:
+            raise RuntimeError(f"Failed to create Ranger user {username}: {created}")
+        return True
+
+
+    def sync_ranger_sql(config, username, first_name, last_name, email):
+        ranger_db = config["rangerPostgresql"]
+        first_name = first_name or username
+        last_name = last_name or "User"
+        email_value = email or None
+        with psycopg.connect(
+            host=ranger_db["host"],
+            port=int(ranger_db.get("port", 5432)),
+            dbname=ranger_db["database"],
+            user=ranger_db["username"],
+            password=RANGER_POSTGRES_PASSWORD,
+        ) as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    update x_user
+                       set update_time = now(),
+                           upd_by_id = 1,
+                           descr = coalesce(nullif(descr, ''), %s),
+                           status = 1,
+                           is_visible = 1,
+                           sync_source = 'KEYCLOAK_LOCAL'
+                     where user_name = %s
+                    """,
+                    (username, username),
+                )
+
+                cur.execute(
+                    """
+                    insert into x_portal_user (
+                        create_time,
+                        update_time,
+                        added_by_id,
+                        upd_by_id,
+                        first_name,
+                        last_name,
+                        pub_scr_name,
+                        login_id,
+                        password,
+                        email,
+                        status,
+                        user_src,
+                        sync_source,
+                        password_updated_time
+                    )
+                    select
+                        now(),
+                        now(),
+                        1,
+                        1,
+                        %s,
+                        %s,
+                        %s,
+                        %s,
+                        %s,
+                        %s,
+                        1,
+                        1,
+                        'KEYCLOAK_LOCAL',
+                        now()
+                    where not exists (
+                        select 1
+                          from x_portal_user
+                         where login_id = %s
+                    )
+                    """,
+                    (
+                        first_name,
+                        last_name,
+                        username,
+                        username,
+                        placeholder_password(),
+                        email_value,
+                        username,
+                    ),
+                )
+
+                cur.execute(
+                    """
+                    update x_portal_user
+                       set update_time = now(),
+                           upd_by_id = 1,
+                           first_name = %s,
+                           last_name = %s,
+                           pub_scr_name = %s,
+                           email = coalesce(%s, email),
+                           status = 1,
+                           user_src = 1,
+                           sync_source = 'KEYCLOAK_LOCAL'
+                     where login_id = %s
+                    """,
+                    (first_name, last_name, username, email_value, username),
+                )
+
+                cur.execute(
+                    "select id from x_portal_user where login_id = %s order by id",
+                    (username,),
+                )
+                user_ids = [row[0] for row in cur.fetchall()]
+                if not user_ids:
+                    raise RuntimeError(f"Failed to ensure Ranger portal user {username}")
+                user_id = user_ids[0]
+                duplicate_ids = user_ids[1:]
+                if duplicate_ids:
+                    cur.execute(
+                        """
+                        update x_portal_user_role
+                           set user_id = %s,
+                               update_time = now(),
+                               upd_by_id = 1,
+                               status = 1
+                         where user_id = any(%s)
+                        """,
+                        (user_id, duplicate_ids),
+                    )
+                    cur.execute(
+                        "delete from x_portal_user where id = any(%s)",
+                        (duplicate_ids,),
+                    )
+
+                cur.execute(
+                    """
+                    insert into x_portal_user_role (
+                        create_time,
+                        update_time,
+                        added_by_id,
+                        upd_by_id,
+                        user_id,
+                        user_role,
+                        status
+                    )
+                    select now(), now(), 1, 1, %s, 'ROLE_USER', 1
+                    where not exists (
+                        select 1
+                          from x_portal_user_role
+                         where user_id = %s
+                           and user_role = 'ROLE_USER'
+                    )
+                    """,
+                    (user_id, user_id),
+                )
+                cur.execute(
+                    """
+                    update x_portal_user_role
+                       set update_time = now(),
+                           upd_by_id = 1,
+                           status = 1
+                     where user_id = %s
+                       and user_role = 'ROLE_USER'
+                    """,
+                    (user_id,),
+                )
+                cur.execute(
+                    """
+                    with duplicate_roles as (
+                        select id
+                          from (
+                            select id,
+                                   row_number() over (
+                                       partition by user_id, user_role
+                                       order by id
+                                   ) as row_number
+                              from x_portal_user_role
+                             where user_id = %s
+                               and user_role = 'ROLE_USER'
+                          ) ranked
+                         where row_number > 1
+                    )
+                    delete from x_portal_user_role
+                     where id in (select id from duplicate_roles)
+                    """,
+                    (user_id,),
+                )
+            conn.commit()
+
+
+    def normalize_names(items):
+        return sorted({str(item).strip() for item in (items or []) if str(item).strip()})
+
+
+    def list_roles():
+        roles = []
+        start_index = 0
+        page_size = 200
+        while True:
+            page = ranger_request(
+                "GET",
+                f"/service/public/v2/api/roles?startIndex={start_index}&pageSize={page_size}",
+                ok=(200,),
+            ) or []
+            roles.extend(page)
+            if len(page) < page_size:
+                break
+            start_index += page_size
+        return roles
+
+
+    def get_role(role_name):
+        for role in list_roles():
+            if str(role.get("name", "")).strip() == str(role_name).strip():
+                return role
+        return None
+
+
+    def keycloak_group_id(config, token, group_name):
+        realm = config["identity"]["keycloak"]["realm"]
+        groups = keycloak_request(
+            config,
+            token,
+            "GET",
+            f"/admin/realms/{realm}/groups?search={urllib.parse.quote(group_name)}&max=1000",
+            ok=(200,),
+        ) or []
+
+        def walk(items):
+            for item in items or []:
+                yield item
+                yield from walk(item.get("subGroups") or [])
+
+        for group in walk(groups):
+            if str(group.get("name", "")).strip() == group_name:
+                return str(group.get("id", "")).strip()
+        return ""
+
+
+    def ensure_keycloak_group(config, token, group_name):
+        group_id = keycloak_group_id(config, token, group_name)
+        if group_id:
+            return group_id
+
+        realm = config["identity"]["keycloak"]["realm"]
+        keycloak_request(
+            config,
+            token,
+            "POST",
+            f"/admin/realms/{realm}/groups",
+            {"name": group_name},
+            ok=(201, 204),
+        )
+        group_id = keycloak_group_id(config, token, group_name)
+        if not group_id:
+            raise RuntimeError(f"Failed to ensure Keycloak group {group_name}")
+        return group_id
+
+
+    def keycloak_user_groups(config, token, user_id):
+        realm = config["identity"]["keycloak"]["realm"]
+        groups = keycloak_request(
+            config,
+            token,
+            "GET",
+            f"/admin/realms/{realm}/users/{user_id}/groups?max=1000",
+            ok=(200,),
+        ) or []
+        return {
+            str(group.get("name", "")).strip(): str(group.get("id", "")).strip()
+            for group in groups
+            if str(group.get("name", "")).strip() and str(group.get("id", "")).strip()
+        }
+
+
+    def ensure_keycloak_group_membership(config, token, user_id, group_id):
+        realm = config["identity"]["keycloak"]["realm"]
+        keycloak_request(
+            config,
+            token,
+            "PUT",
+            f"/admin/realms/{realm}/users/{user_id}/groups/{group_id}",
+            ok=(204,),
+        )
+
+
+    def remove_keycloak_group_membership(config, token, user_id, group_id):
+        realm = config["identity"]["keycloak"]["realm"]
+        keycloak_request(
+            config,
+            token,
+            "DELETE",
+            f"/admin/realms/{realm}/users/{user_id}/groups/{group_id}",
+            ok=(204,),
+        )
+
+
+    def keycloak_logout_user(config, token, user_id):
+        realm = config["identity"]["keycloak"]["realm"]
+        keycloak_request(
+            config,
+            token,
+            "POST",
+            f"/admin/realms/{realm}/users/{user_id}/logout",
+            ok=(204,),
+        )
+
+
+    def keycloak_role_projection_groups(raw_role, role_key):
+        members = (raw_role or {}).get("members") or {}
+        apps = (raw_role or {}).get("apps") or {}
+        groups = set(normalize_names(members.get("directoryGroups", [])))
+        app_group_names = {
+            "superset": "platform-app-superset",
+            "datahub": "platform-app-datahub",
+            "jupyterhub": "platform-app-jupyterhub",
+            "cloudbeaver": "platform-app-cloudbeaver",
+            "prefect": "platform-app-prefect",
+            "trinoUi": "platform-app-trino",
+        }
+        for app_key, group_name in app_group_names.items():
+            if bool(apps.get(app_key)):
+                groups.add(group_name)
+        if not groups:
+            groups.add(f"platform-role-{role_key}")
+        return sorted(groups)
+
+
+    def projected_keycloak_groups(config):
+        membership_source = str((config.get("ranger") or {}).get("platformRoleMembershipSource", "git") or "git").lower()
+        if membership_source != "ranger":
+            return {}
+
+        projected = {}
+        for role_key in sorted(config.get("platformRoles", {})):
+            raw_role = config["platformRoles"][role_key] or {}
+            ranger_role_name = str(((raw_role.get("ranger") or {}).get("roleName") or role_key)).strip()
+            if not ranger_role_name:
+                continue
+            projected_groups = keycloak_role_projection_groups(raw_role, role_key)
+            if not projected_groups:
+                continue
+            live_role = get_role(ranger_role_name) or {}
+            for member in live_role.get("users", []) or []:
+                username = str((member or {}).get("name") or "").strip()
+                if not username:
+                    continue
+                projected.setdefault(username, set()).update(projected_groups)
+
+        return {username: sorted(groups) for username, groups in projected.items()}
+
+
+    def sync_projected_keycloak_groups(config, token, user, desired_groups):
+        username = str(user.get("username") or "").strip()
+        if not username:
+            return False, False
+
+        desired = normalize_names(desired_groups)
+        existing_attributes = dict(user.get("attributes") or {})
+        previous = normalize_names(existing_attributes.get("platformProjectedGroups", []))
+        current_groups = keycloak_user_groups(config, token, user["id"])
+        changed = False
+
+        for group_name in desired:
+            group_id = ensure_keycloak_group(config, token, group_name)
+            if group_name not in current_groups:
+                ensure_keycloak_group_membership(config, token, user["id"], group_id)
+                current_groups[group_name] = group_id
+                changed = True
+
+        for group_name in previous:
+            if group_name in desired:
+                continue
+            group_id = current_groups.get(group_name) or keycloak_group_id(config, token, group_name)
+            if not group_id:
+                continue
+            remove_keycloak_group_membership(config, token, user["id"], group_id)
+            current_groups.pop(group_name, None)
+            changed = True
+
+        if previous != desired:
+            updated_user = dict(user)
+            updated_attributes = dict(existing_attributes)
+            if desired:
+                updated_attributes["platformProjectedGroups"] = desired
+                updated_attributes["platformProjectedGroupsSource"] = ["ranger-platform-roles"]
+            else:
+                updated_attributes.pop("platformProjectedGroups", None)
+                updated_attributes.pop("platformProjectedGroupsSource", None)
+            updated_user["attributes"] = updated_attributes
+            keycloak_request(
+                config,
+                token,
+                "PUT",
+                f"/admin/realms/{config['identity']['keycloak']['realm']}/users/{user['id']}",
+                updated_user,
+                ok=(204,),
+            )
+            user["attributes"] = updated_attributes
+            changed = True
+
+        logged_out = False
+        if changed:
+            try:
+                keycloak_logout_user(config, token, user["id"])
+                logged_out = True
+            except Exception as exc:
+                print(
+                    f"WARNING: projected Keycloak groups for {username} but failed to clear stale sessions: {exc}",
+                    file=sys.stderr,
+                )
+
+        return changed, logged_out
+
+
+    def sync():
+        config = load_config()
+        if config["identity"].get("directoryMode") != "keycloakLocal":
+            print("Keycloak local-user mode is not active; skipping Ranger local-user sync.")
+            return
+
+        wait_for_ranger()
+        token = keycloak_token(config)
+        realm = config["identity"]["keycloak"]["realm"]
+        users = keycloak_request(
+            config,
+            token,
+            "GET",
+            f"/admin/realms/{realm}/users?max=1000",
+            ok=(200,),
+        ) or []
+
+        synced_count = 0
+        created_count = 0
+        normalized_count = 0
+        logged_out_count = 0
+        projected_group_updates = 0
+        projected_group_logouts = 0
+        users_by_username = {}
+
+        for user in users:
+            username = (user.get("username") or "").strip()
+            email = (user.get("email") or "").strip()
+            enabled = bool(user.get("enabled", True))
+            first_name = (user.get("firstName") or username or "").strip()
+            last_name = (user.get("lastName") or "User").strip()
+            if not username or not should_sync_user(username, email, enabled):
+                continue
+            users_by_username[username] = user
+
+            normalized, logged_out = normalize_keycloak_user(config, token, user)
+            if normalized:
+                normalized_count += 1
+            if logged_out:
+                logged_out_count += 1
+
+            if ensure_ranger_user(username, first_name, last_name, email):
+                created_count += 1
+
+            sync_ranger_sql(config, username, first_name, last_name, email)
+            synced_count += 1
+
+        projected_groups_by_user = projected_keycloak_groups(config)
+
+        for username, desired_groups in projected_groups_by_user.items():
+            user = users_by_username.get(username)
+            if not user:
+                continue
+            changed, logged_out = sync_projected_keycloak_groups(config, token, user, desired_groups)
+            if changed:
+                projected_group_updates += 1
+            if logged_out:
+                projected_group_logouts += 1
+
+        for username, user in users_by_username.items():
+            if username in projected_groups_by_user:
+                continue
+            changed, logged_out = sync_projected_keycloak_groups(config, token, user, [])
+            if changed:
+                projected_group_updates += 1
+            if logged_out:
+                projected_group_logouts += 1
+
+        print(
+            "Ensured "
+            f"{synced_count} eligible Keycloak-local users are mirrored into Ranger "
+            f"({created_count} Ranger API users created, {normalized_count} Keycloak accounts normalized, "
+            f"{logged_out_count} stale Keycloak sessions cleared, {projected_group_updates} Keycloak role/app "
+            f"group projections refreshed, {projected_group_logouts} additional projected-group logouts issued)."
+        )
+
+
+    if __name__ == "__main__":
+        sync()
 ---
 {{- if (dig "bootstrap" "enabled" true $ranger) }}
 apiVersion: batch/v1
@@ -1382,7 +2425,7 @@ spec:
             defaultMode: 0555
 ---
 {{- end }}
-{{- if (dig "usersync" "enabled" true $ranger) }}
+{{- if $usersyncEnabled }}
 apiVersion: batch/v1
 kind: CronJob
 metadata:
@@ -1413,8 +2456,8 @@ spec:
           {{- end }}
           containers:
             - name: ranger-usersync
-              image: "{{ $ranger.usersync.image.repository }}:{{ $ranger.usersync.image.tag }}"
-              imagePullPolicy: {{ $ranger.usersync.image.pullPolicy }}
+              image: "{{ $usersyncImage.repository }}:{{ $usersyncImage.tag }}"
+              imagePullPolicy: {{ $usersyncImage.pullPolicy }}
               command:
                 - /bin/sh
                 - -ec
@@ -1457,7 +2500,72 @@ spec:
                     path: {{ $ldapTrustedCaCertKey }}
             {{- end }}
 {{- end }}
-{{- if (default true $exceptionRoleAudit.enabled) }}
+{{- if $localUserSyncEnabled }}
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: {{ include "dlh-in-a-box.ranger.admin.serviceName" . }}-local-user-sync
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "dlh-in-a-box.labels" . | nindent 4 }}
+    app.kubernetes.io/component: ranger-local-user-sync
+spec:
+  schedule: {{ default "*/5 * * * *" $localUserSync.schedule | quote }}
+  suspend: {{ ternary "true" "false" (default false $localUserSync.suspend) }}
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 1
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      backoffLimit: 3
+      template:
+        metadata:
+          labels:
+            app.kubernetes.io/instance: {{ .Release.Name }}
+            app.kubernetes.io/name: {{ include "dlh-in-a-box.name" . }}
+            app.kubernetes.io/component: ranger-local-user-sync
+        spec:
+          restartPolicy: OnFailure
+          containers:
+            - name: ranger-local-user-sync
+              image: "{{ $localUserSyncImage.repository }}:{{ $localUserSyncImage.tag }}"
+              imagePullPolicy: {{ $localUserSyncImage.pullPolicy }}
+              command:
+                - /bin/sh
+                - -ec
+                - |
+                  python -m pip install --no-cache-dir "psycopg[binary]" >/tmp/ranger-local-user-sync-pip.log
+                  python /opt/ranger-automation/keycloak_local_users.py
+              env:
+                - name: RANGER_URL
+                  value: {{ include "dlh-in-a-box.ranger.admin.url" . | quote }}
+                - name: RANGER_ADMIN_PASSWORD
+                  valueFrom:
+                    secretKeyRef:
+                      name: {{ $ranger.admin.existingSecret }}
+                      key: {{ default "rangerAdminPassword" $ranger.admin.adminPasswordKey }}
+                - name: KEYCLOAK_ADMIN_PASSWORD
+                  valueFrom:
+                    secretKeyRef:
+                      name: {{ .Values.keycloak.auth.existingSecret }}
+                      key: {{ default "adminPassword" .Values.keycloak.auth.passwordSecretKey }}
+                - name: RANGER_POSTGRES_PASSWORD
+                  valueFrom:
+                    secretKeyRef:
+                      name: {{ $rangerPostgresql.existingSecret }}
+                      key: {{ default "password" $rangerPostgresql.passwordKey }}
+              volumeMounts:
+                - name: automation
+                  mountPath: /opt/ranger-automation
+                  readOnly: true
+          volumes:
+            - name: automation
+              configMap:
+                name: {{ include "dlh-in-a-box.ranger.admin.serviceName" . }}-automation
+                defaultMode: 0555
+{{- end }}
+{{- if $exceptionRoleAuditEnabled }}
 ---
 apiVersion: batch/v1
 kind: CronJob

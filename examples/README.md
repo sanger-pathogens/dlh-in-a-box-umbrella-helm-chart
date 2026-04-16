@@ -28,13 +28,13 @@ flowchart TD
 
 | File | Primary use | Characteristics |
 | --- | --- | --- |
-| `values-local-auth.yaml` | Local render-oriented auth example | Bundled Keycloak, external LDAP placeholder settings, Ranger, portal, CloudBeaver, Prefect proxy, MinIO, Hive, Spark Operator, and local demo secrets |
+| `values-local-auth.yaml` | Local render-oriented Keycloak-local-users example | Bundled Keycloak self-registration, Keycloak-managed app groups, Ranger, portal, CloudBeaver, Prefect proxy, a direct-grant Trino client for non-browser tools, MinIO, Hive, Spark Operator, and local demo secrets |
 | `values-local.yaml` | Canonical kind validation path | MinIO, Hive, Prefect, Spark Operator, Vault dev mode, reduced Trino footprint |
 | `values-local-superset.yaml` | Focused local BI validation path | MinIO, Trino, and Superset with demo credentials, seeded local Trino datasource, bundled Superset PostgreSQL and Redis |
 | `values-local-layers.yaml` | Richer local topology example | Multiple catalogs, layered access patterns, self-contained object storage |
-| `values-dev.yaml` | Shared development baseline | Bundled Keycloak, external organizational LDAP/AD, Ranger, portal, CloudBeaver, and Prefect proxy |
+| `values-dev.yaml` | Shared development baseline | Bundled Keycloak, external organizational LDAP/AD, Ranger, portal, optional JupyterHub, CloudBeaver, Prefect proxy, and a direct-grant Trino client |
 | `values-shared-auth.yaml` | Shared external-identity escape hatch | Externally managed OIDC plus LDAP/AD scaffold |
-| `values-prod.yaml` | Minimal production-shaped baseline | Bundled Keycloak, external LDAPS, Ranger, portal, CloudBeaver, and Prefect proxy |
+| `values-prod.yaml` | Minimal production-shaped baseline | Bundled Keycloak, external LDAPS, Ranger, portal, optional JupyterHub, CloudBeaver, Prefect proxy, and a direct-grant Trino client |
 | `values-prod-layers.yaml` | Layered production example | Multiple catalogs and production-style access patterns |
 | `values-external-s3.yaml` | Simplest external object-storage baseline | External S3 enabled and MinIO disabled |
 | `values-minio.yaml` | Isolated MinIO scenario | Enables only the in-cluster object-store path |
@@ -46,17 +46,26 @@ flowchart TD
 - `./hack/template.sh` renders the umbrella chart against every file in this
   directory.
 - `values-local.yaml` is the canonical local smoke-install proof point.
-- `values-local-auth.yaml` is a render-oriented auth example for the external-directory model.
+- `values-local-auth.yaml` is the render-oriented example for the
+  `keycloakLocal` identity mode.
 - `values-local-superset.yaml` is the focused local proof point for the
   optional Superset integration.
 - `values-dev.yaml` and `values-prod.yaml` are the primary shared-environment
   examples for the default Keycloak plus LDAP/AD plus Ranger model, including
   the portal and CloudBeaver browser entry story.
+- `values-local-auth.yaml` shows the first-class non-LDAP `keycloakLocal`
+  path: self-registration in Keycloak, no default app access, Ranger kept as
+  the Trino authorization plane, and OIDC/token-capable Trino clients for
+  ordinary users, including an example public direct-grant client for
+  workstation token requests.
 - The shared-environment examples now treat
   `global.authorization.platformRoles` as the long-lived access baseline and
   use the current `platform-admin`, `data-analyst`, and
   `principal-investigator` role pattern with role-based Ranger bootstrap
   policies instead of raw group policies.
+- `values-dev.yaml` and `values-prod.yaml` now also show the optional
+  JupyterHub component wired into the same Keycloak realm, with access limited
+  to platform admins and data analysts in the example role map.
 - `values-shared-auth.yaml` is the render-validated escape hatch for an
   externally managed OIDC provider.
 

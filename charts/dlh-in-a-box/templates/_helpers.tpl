@@ -206,6 +206,46 @@ app.kubernetes.io/managed-by: {{ .Release.Service }}
 {{- printf "%s%s" (default "platform-role-" $conventions.rolePrefix) $name -}}
 {{- end -}}
 
+{{- define "dlh-in-a-box.identity.directoryMode" -}}
+{{- $identity := .Values.global.identity | default dict -}}
+{{- $directory := get $identity "directory" | default dict -}}
+{{- default "externalLdap" $directory.mode -}}
+{{- end -}}
+
+{{- define "dlh-in-a-box.identity.keycloakManagedGroupsJson" -}}
+{{- $authorization := .Values.global.authorization | default dict -}}
+{{- $platformRoles := get $authorization "platformRoles" | default dict -}}
+{{- $groups := dict -}}
+{{- range $roleKey := keys $platformRoles | sortAlpha -}}
+  {{- $role := get $platformRoles $roleKey | default dict -}}
+  {{- $apps := get $role "apps" | default dict -}}
+  {{- $_ := set $groups (include "dlh-in-a-box.group.role" (dict "root" $ "name" $roleKey)) true -}}
+  {{- if default false (get $apps "superset") -}}
+    {{- $_ := set $groups (include "dlh-in-a-box.group.app" (dict "root" $ "name" "superset")) true -}}
+  {{- end -}}
+  {{- if default false (get $apps "datahub") -}}
+    {{- $_ := set $groups (include "dlh-in-a-box.group.app" (dict "root" $ "name" "datahub")) true -}}
+  {{- end -}}
+  {{- if default false (get $apps "trinoUi") -}}
+    {{- $_ := set $groups (include "dlh-in-a-box.group.app" (dict "root" $ "name" "trino")) true -}}
+  {{- end -}}
+  {{- if default false (get $apps "jupyterhub") -}}
+    {{- $_ := set $groups (include "dlh-in-a-box.group.app" (dict "root" $ "name" "jupyterhub")) true -}}
+  {{- end -}}
+  {{- if default false (get $apps "cloudbeaver") -}}
+    {{- $_ := set $groups (include "dlh-in-a-box.group.app" (dict "root" $ "name" "cloudbeaver")) true -}}
+  {{- end -}}
+  {{- if default false (get $apps "prefect") -}}
+    {{- $_ := set $groups (include "dlh-in-a-box.group.app" (dict "root" $ "name" "prefect")) true -}}
+  {{- end -}}
+{{- end -}}
+{{- $values := list -}}
+{{- range $groupName := keys $groups | sortAlpha -}}
+  {{- $values = append $values $groupName -}}
+{{- end -}}
+{{- $values | toJson -}}
+{{- end -}}
+
 {{- define "dlh-in-a-box.identity.directory.url" -}}
 {{- $identity := .Values.global.identity | default dict -}}
 {{- $directory := get $identity "directory" | default dict -}}
