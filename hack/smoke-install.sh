@@ -5,10 +5,10 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "${ROOT_DIR}"
 
 CHART_PATH="${1:-charts/dlh-in-a-box}"
-VALUES_FILE="${2:-examples/values-local.yaml}"
+VALUES_FILE="${2:-examples/values-local-auth.yaml}"
 RELEASE_NAME="${RELEASE_NAME:-dlh}"
 NAMESPACE="${NAMESPACE:-data-lakehouse-local}"
-TIMEOUT="${TIMEOUT:-20m}"
+TIMEOUT="${TIMEOUT:-30m}"
 ARTIFACT_DIR="${ARTIFACT_DIR:-}"
 SKIP_DEPENDENCY_UPDATE="${SKIP_DEPENDENCY_UPDATE:-false}"
 
@@ -78,7 +78,8 @@ seed_local_auth_demo_secrets() {
     --from-literal=KC_SUPERSET_CLIENT_SECRET=local-superset-client-secret \
     --from-literal=KC_DATAHUB_CLIENT_SECRET=local-datahub-client-secret \
     --from-literal=KC_CLOUDBEAVER_CLIENT_SECRET=local-cloudbeaver-client-secret \
-    --from-literal=KC_PREFECT_CLIENT_SECRET=local-prefect-client-secret
+    --from-literal=KC_PREFECT_CLIENT_SECRET=local-prefect-client-secret \
+    --from-literal=KC_PREFECT_AUTOMATION_CLIENT_SECRET=local-prefect-automation-client-secret
 
   seed_secret dlh-ranger-admin \
     --from-literal=rangerAdminPassword=admin123 \

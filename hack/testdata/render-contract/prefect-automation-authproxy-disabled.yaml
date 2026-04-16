@@ -1,0 +1,13 @@
+prefect:
+  authProxy:
+    enabled: false
+
+global:
+  identity:
+    external:
+      clients:
+        prefectProxy:
+          enabled: false
+        prefectAutomation:
+          enabled: true
+          clientId: prefect-automation

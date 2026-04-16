@@ -557,6 +557,50 @@
                       }
                     }
                   ]
+                },
+                "prefectAutomation": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "properties": {
+                    "enabled": { "type": "boolean" },
+                    "clientId": { "type": "string" },
+                    "configCliSecretKey": { "type": "string" },
+                    "tokenAudience": { "type": "string" },
+                    "serviceAccountsEnabled": { "type": "boolean" },
+                    "standardFlowEnabled": { "type": "boolean" },
+                    "directAccessGrantsEnabled": { "type": "boolean" }
+                  },
+                  "allOf": [
+                    {
+                      "if": {
+                        "properties": { "enabled": { "const": true } },
+                        "required": ["enabled"]
+                      },
+                      "then": {
+                        "required": ["clientId", "tokenAudience"]
+                      }
+                    }
+                  ]
+                },
+                "prefectDirectGrant": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "properties": {
+                    "enabled": { "type": "boolean" },
+                    "clientId": { "type": "string" },
+                    "tokenAudience": { "type": "string" }
+                  },
+                  "allOf": [
+                    {
+                      "if": {
+                        "properties": { "enabled": { "const": true } },
+                        "required": ["enabled"]
+                      },
+                      "then": {
+                        "required": ["clientId", "tokenAudience"]
+                      }
+                    }
+                  ]
                 }
               }
             }

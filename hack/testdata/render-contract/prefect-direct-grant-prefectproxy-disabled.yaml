@@ -1,0 +1,10 @@
+global:
+  identity:
+    external:
+      clients:
+        prefectProxy:
+          enabled: false
+        prefectDirectGrant:
+          enabled: true
+          clientId: prefect-cli
+          tokenAudience: prefect-api

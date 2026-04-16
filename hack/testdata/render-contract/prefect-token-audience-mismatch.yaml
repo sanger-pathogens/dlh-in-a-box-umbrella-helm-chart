@@ -1,0 +1,16 @@
+global:
+  identity:
+    external:
+      clients:
+        prefectAutomation:
+          enabled: true
+          clientId: prefect-automation
+          configCliSecretKey: KC_PREFECT_AUTOMATION_CLIENT_SECRET
+          tokenAudience: prefect-api
+          serviceAccountsEnabled: true
+          standardFlowEnabled: false
+          directAccessGrantsEnabled: false
+        prefectDirectGrant:
+          enabled: true
+          clientId: prefect-cli
+          tokenAudience: some-other-audience
