@@ -1,13 +1,10 @@
-prefect:
-  authProxy:
-    enabled: false
-
 global:
   identity:
     external:
       clients:
         prefectProxy:
           enabled: false
-        prefectAutomation:
+        prefectDirectGrant:
           enabled: true
-          clientId: prefect-automation
+          clientId: prefect-cli
+          tokenAudience: prefect-api

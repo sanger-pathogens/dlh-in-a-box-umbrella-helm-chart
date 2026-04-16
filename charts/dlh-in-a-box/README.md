@@ -141,6 +141,12 @@ other applications. In bundled Keycloak mode, provide the machine-client
 secret through
 `global.identity.external.clients.prefectAutomation.configCliSecretKey`.
 
+For developer workstations that should exchange the same Keycloak username and
+password for a bearer token without a popup browser flow, enable
+`global.identity.external.clients.prefectDirectGrant.enabled=true`. That
+client is public, uses direct grants, and should share the same Prefect API
+audience as the machine client when both are enabled.
+
 ## Portal And CloudBeaver
 
 `platformHome` is the default browser entrypoint. It uses a public Keycloak
@@ -330,6 +336,8 @@ provide the config-cli environment variables consumed during realm bootstrap.
   when `global.identity.external.clients.prefectAutomation.enabled=true`, also
   include `KC_PREFECT_AUTOMATION_CLIENT_SECRET` (or the custom
   `configCliSecretKey` value)
+- `prefectDirectGrant` does not need a client secret because it is a public
+  direct-grant client
 - Optional local/dev-only keys:
   any `passwordEnvVar` referenced by
   `global.identity.provider.keycloak.bootstrapUsers`, for example

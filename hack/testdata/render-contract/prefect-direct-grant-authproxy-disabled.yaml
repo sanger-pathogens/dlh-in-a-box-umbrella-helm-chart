@@ -8,6 +8,7 @@ global:
       clients:
         prefectProxy:
           enabled: false
-        prefectAutomation:
+        prefectDirectGrant:
           enabled: true
-          clientId: prefect-automation
+          clientId: prefect-cli
+          tokenAudience: prefect-api

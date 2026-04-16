@@ -89,6 +89,14 @@ global:
             - platform-role-platform-admin
           emailDomains:
             - "*"
+        prefectAutomation:
+          enabled: false
+          clientId: prefect-automation
+          tokenAudience: prefect-api
+        prefectDirectGrant:
+          enabled: false
+          clientId: prefect-cli
+          tokenAudience: prefect-api
     directory:
       mode: externalLdap
       ldap:

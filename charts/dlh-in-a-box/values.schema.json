@@ -581,6 +581,26 @@
                       }
                     }
                   ]
+                },
+                "prefectDirectGrant": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "properties": {
+                    "enabled": { "type": "boolean" },
+                    "clientId": { "type": "string" },
+                    "tokenAudience": { "type": "string" }
+                  },
+                  "allOf": [
+                    {
+                      "if": {
+                        "properties": { "enabled": { "const": true } },
+                        "required": ["enabled"]
+                      },
+                      "then": {
+                        "required": ["clientId", "tokenAudience"]
+                      }
+                    }
+                  ]
                 }
               }
             }

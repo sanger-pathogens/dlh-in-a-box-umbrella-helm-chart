@@ -161,6 +161,10 @@ global:
           serviceAccountsEnabled: true
           standardFlowEnabled: false
           directAccessGrantsEnabled: false
+        prefectDirectGrant:
+          enabled: false
+          clientId: ""
+          tokenAudience: prefect-api
     directory:
       mode: externalLdap
       ldap:
@@ -687,6 +691,31 @@ keycloak:
                   access.token.claim: "true"
                   id.token.claim: "false"
         {{- end }}
+        {{- if .Values.global.identity.external.clients.prefectDirectGrant.enabled }}
+          - clientId: {{ .Values.global.identity.external.clients.prefectDirectGrant.clientId | quote }}
+            name: Prefect Direct Grant
+            description: Public OIDC client for developer Prefect API access without a browser popup
+            enabled: true
+            protocol: openid-connect
+            publicClient: true
+            standardFlowEnabled: false
+            directAccessGrantsEnabled: true
+            serviceAccountsEnabled: false
+            defaultClientScopes:
+              - profile
+              - email
+              - roles
+              - groups
+            protocolMappers:
+              - name: prefect-direct-grant-audience
+                protocol: openid-connect
+                protocolMapper: oidc-audience-mapper
+                consentRequired: false
+                config:
+                  included.client.audience: {{ .Values.global.identity.external.clients.prefectDirectGrant.tokenAudience | quote }}
+                  access.token.claim: "true"
+                  id.token.claim: "false"
+        {{- end }}
         {{- if .Values.global.identity.directory.ldap.enabled }}
         components:
           org.keycloak.storage.UserStorageProvider:
@@ -1020,10 +1049,10 @@ prefect-auth-proxy:
       pass_authorization_header = true
       set_xauthrequest = true
       reverse_proxy = true
-      {{- if .Values.global.identity.external.clients.prefectAutomation.enabled }}
+      {{- if or .Values.global.identity.external.clients.prefectAutomation.enabled .Values.global.identity.external.clients.prefectDirectGrant.enabled }}
       skip_jwt_bearer_tokens = true
       api_routes = [ "^/api/" ]
-      extra_jwt_issuers = "{{ include "dlh-in-a-box.identity.issuer" $ }}={{ .Values.global.identity.external.clients.prefectAutomation.tokenAudience }}"
+      extra_jwt_issuers = "{{ include "dlh-in-a-box.identity.issuer" $ }}={{ ternary .Values.global.identity.external.clients.prefectAutomation.tokenAudience .Values.global.identity.external.clients.prefectDirectGrant.tokenAudience .Values.global.identity.external.clients.prefectAutomation.enabled }}"
       {{- end }}
   service:
     type: ClusterIP
