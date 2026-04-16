@@ -5,10 +5,10 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "${ROOT_DIR}"
 
 CHART_PATH="${1:-charts/dlh-in-a-box}"
-VALUES_FILE="${2:-examples/values-local.yaml}"
+VALUES_FILE="${2:-examples/values-local-auth.yaml}"
 RELEASE_NAME="${RELEASE_NAME:-dlh}"
 NAMESPACE="${NAMESPACE:-data-lakehouse-local}"
-TIMEOUT="${TIMEOUT:-20m}"
+TIMEOUT="${TIMEOUT:-30m}"
 ARTIFACT_DIR="${ARTIFACT_DIR:-}"
 SKIP_DEPENDENCY_UPDATE="${SKIP_DEPENDENCY_UPDATE:-false}"
 

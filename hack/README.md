@@ -30,7 +30,7 @@ flowchart LR
 | `lint.sh` | Run docs, script, schema, license, security, and Helm lint checks against every example overlay |
 | `template.sh` | Render the chart against every example overlay or a supplied subset |
 | `package.sh` | Package the chart, optionally overriding chart and app versions |
-| `smoke-install.sh` | Install the validated local auth overlay into a cluster, seed demo auth secrets, wait for workloads, and collect diagnostics on failure |
+| `smoke-install.sh` | Manually install the validated local auth overlay into a cluster, seed demo auth secrets, wait for workloads, and collect diagnostics on failure |
 
 ## Typical maintainer sequence
 

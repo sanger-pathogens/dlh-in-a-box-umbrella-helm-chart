@@ -143,7 +143,9 @@ The main validation commands are:
 ```
 
 `./hack/lint.sh` now validates chart structure, docs guardrails, the values
-schema, security checks, and every example overlay.
+schema, security checks, and every example overlay. `./hack/smoke-install.sh`
+remains available as a maintainer-triggered manual check rather than a routine
+pull-request gate.
 
 ## Reference Map
 

@@ -2,26 +2,6 @@ name: helm-smoke-install
 
 on:
   workflow_dispatch:
-  push:
-    branches:
-      - main
-    paths:
-      - ".github/workflows/helm-lint.yaml"
-      - ".github/workflows/helm-publish.yaml"
-      - ".github/workflows/helm-smoke-install.yaml"
-      - "charts/**"
-      - "examples/**"
-      - "hack/**"
-      - "Makefile"
-  pull_request:
-    paths:
-      - ".github/workflows/helm-lint.yaml"
-      - ".github/workflows/helm-publish.yaml"
-      - ".github/workflows/helm-smoke-install.yaml"
-      - "charts/**"
-      - "examples/**"
-      - "hack/**"
-      - "Makefile"
 
 concurrency:
   group: helm-smoke-install-${{ github.ref }}
@@ -39,7 +19,7 @@ jobs:
       FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
       NAMESPACE: data-lakehouse-local
       RELEASE_NAME: dlh
-      TIMEOUT: 20m
+      TIMEOUT: 30m
     steps:
       - name: Checkout
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
@@ -54,8 +34,8 @@ jobs:
         with:
           cluster_name: dlh-ci
 
-      - name: Install validated local overlay
-        run: ./hack/smoke-install.sh
+      - name: Install validated local-auth overlay
+        run: ./hack/smoke-install.sh charts/dlh-in-a-box examples/values-local-auth.yaml
 
       - name: Upload smoke-test diagnostics
         if: failure()

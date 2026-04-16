@@ -7,7 +7,7 @@ This directory contains the automation that validates and publishes the chart.
 | Workflow | Trigger | Purpose |
 | --- | --- | --- |
 | `helm-lint.yaml` | `push` to `main`, `pull_request` | Dependency refresh, docs checks, schema validation, lint, render, and package verification |
-| `helm-smoke-install.yaml` | `push` to `main`, `pull_request`, `workflow_dispatch` | kind-based install smoke test of the validated local overlay, with diagnostics artifact upload on failure |
+| `helm-smoke-install.yaml` | `workflow_dispatch` | Manual kind-based install smoke test of the validated local-auth overlay, with diagnostics artifact upload on failure |
 | `helm-publish.yaml` | `push` to `main`, `push` tags `v*`, `workflow_dispatch` | Version resolution, packaging, GHCR login, and OCI publication |
 
 ## Workflow lifecycle
@@ -15,17 +15,16 @@ This directory contains the automation that validates and publishes the chart.
 ```mermaid
 flowchart TD
   MainPush[Push to main] --> Lint[helm-lint workflow]
-  MainPush --> Smoke[helm-smoke-install workflow]
   MainPush --> Publish[helm-publish workflow]
   PullRequest[Pull request] --> Lint
-  PullRequest --> Smoke
   Lint --> DependencyUpdate[helm dependency update]
   DependencyUpdate --> DocsChecks[directory guide and script checks]
   DocsChecks --> LicenseChecks[license and notice checks]
   LicenseChecks --> Render[helm template]
   Render --> Package[helm package]
+  ManualRun[Manual workflow_dispatch] --> Smoke[helm-smoke-install workflow]
   Smoke --> Kind[create disposable kind cluster]
-  Kind --> Install[helm install validated local overlay]
+  Kind --> Install[helm install validated local-auth overlay]
   Install --> Diagnostics[collect diagnostics artifact on failure]
 
   TagPush[Push tag vX.Y.Z] --> Publish
@@ -43,8 +42,9 @@ flowchart TD
   not match `charts/dlh-in-a-box/Chart.yaml`
 - GHCR authentication uses `GITHUB_TOKEN` by default, with optional `GHCR_TOKEN`
   and `GHCR_USERNAME` overrides if organization policy requires them
-- smoke-install failures upload `kubectl` and `helm` diagnostics as a workflow
-  artifact for triage
+- smoke-install stays available as a maintainer-triggered manual check, and
+  failures upload `kubectl` and `helm` diagnostics as a workflow artifact for
+  triage
 
 ## Operational expectations
 

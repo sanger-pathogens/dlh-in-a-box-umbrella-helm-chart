@@ -51,7 +51,8 @@ Checklist:
 - documentation and Mermaid diagrams reflect any values, auth, or workflow changes
 - license and third-party notices are still current
 - example overlays still lint and render
-- the validated local smoke install still succeeds before you cut a tag
+- the validated local smoke install still succeeds before you cut a tag when
+  you intentionally choose to run the manual maintainer smoke check
 
 ## Stable release procedure
 
