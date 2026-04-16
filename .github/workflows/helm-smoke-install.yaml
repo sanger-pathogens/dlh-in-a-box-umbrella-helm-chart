@@ -1,18 +1,7 @@
 name: helm-smoke-install
 
-"on":
+on:
   workflow_dispatch:
-  push:
-    branches:
-      - main
-    paths:
-      - ".github/workflows/helm-lint.yaml"
-      - ".github/workflows/helm-publish.yaml"
-      - ".github/workflows/helm-smoke-install.yaml"
-      - "charts/**"
-      - "examples/**"
-      - "hack/**"
-      - "Makefile"
 
 concurrency:
   group: helm-smoke-install-${{ github.ref }}
@@ -23,7 +12,7 @@ permissions:
 
 jobs:
   kind-install:
-    timeout-minutes: 45
+    timeout-minutes: 35
     runs-on: ubuntu-latest
     env:
       ARTIFACT_DIR: artifacts/kind-smoke-install
@@ -38,19 +27,21 @@ jobs:
           persist-credentials: false
 
       - name: Setup Helm
-        uses: azure/setup-helm@1a275c3b69536ee54be43f2070a358922e12c8d4 # v4.3.1
+        uses: azure/setup-helm@dda3372f752e03dde6b3237bc9431cdc2f7a02a2 # v5.0.0
+        with:
+          version: v3.12.0
 
       - name: Create kind cluster
         uses: helm/kind-action@ef37e7f390d99f746eb8b610417061a60e82a6cc # v1.14.0
         with:
           cluster_name: dlh-ci
 
-      - name: Install validated local overlay
+      - name: Install validated local-auth overlay
         run: ./hack/smoke-install.sh charts/dlh-in-a-box examples/values-local-auth.yaml
 
       - name: Upload smoke-test diagnostics
         if: failure()
-        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: kind-smoke-install-diagnostics
           path: artifacts/kind-smoke-install

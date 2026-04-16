@@ -17,10 +17,10 @@ FENCE_RE = re.compile(r"^```mermaid[^\n]*\n(.*?)^```[ \t]*$", re.MULTILINE | re.
 DEFAULT_IMAGE = os.environ.get("MERMAID_CLI_IMAGE", "minlag/mermaid-cli:10.9.1")
 STRICT_ENV_VALUES = {"1", "true", "yes", "on"}
 DOCKER_PROBE_TIMEOUT_SECONDS = float(os.environ.get("MERMAID_DOCKER_PROBE_TIMEOUT_SECONDS", "5"))
-MERMAID_IMAGE_PREPARE_TIMEOUT_SECONDS = float(
-    os.environ.get("MERMAID_IMAGE_PREPARE_TIMEOUT_SECONDS", "180")
+MERMAID_IMAGE_PULL_TIMEOUT_SECONDS = float(
+    os.environ.get("MERMAID_IMAGE_PULL_TIMEOUT_SECONDS", "180")
 )
-MERMAID_RENDER_TIMEOUT_SECONDS = float(os.environ.get("MERMAID_RENDER_TIMEOUT_SECONDS", "60"))
+MERMAID_RENDER_TIMEOUT_SECONDS = float(os.environ.get("MERMAID_RENDER_TIMEOUT_SECONDS", "90"))
 
 
 def parse_args() -> argparse.Namespace:
@@ -65,49 +65,50 @@ def docker_available() -> bool:
     return result.returncode == 0
 
 
-def strict_mode_enabled() -> bool:
-    return os.environ.get("CI", "").lower() in STRICT_ENV_VALUES or os.environ.get(
-        "MERMAID_STRICT", ""
-    ).lower() in STRICT_ENV_VALUES
-
-
-def ensure_mermaid_image() -> str | None:
+def ensure_mermaid_image_available() -> str | None:
     try:
-        inspect = subprocess.run(
+        inspect_result = subprocess.run(
             ["docker", "image", "inspect", DEFAULT_IMAGE],
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,
             check=False,
             timeout=DOCKER_PROBE_TIMEOUT_SECONDS,
         )
+    except FileNotFoundError:
+        return "Docker is not installed."
     except subprocess.TimeoutExpired:
-        return (
-            f"Timed out while checking Mermaid image {DEFAULT_IMAGE} after "
-            f"{DOCKER_PROBE_TIMEOUT_SECONDS:g}s"
-        )
+        return f"Docker image inspection timed out after {DOCKER_PROBE_TIMEOUT_SECONDS:g}s."
 
-    if inspect.returncode == 0:
+    if inspect_result.returncode == 0:
         return None
 
     try:
-        pull = subprocess.run(
+        pull_result = subprocess.run(
             ["docker", "pull", DEFAULT_IMAGE],
             capture_output=True,
             text=True,
             check=False,
-            timeout=MERMAID_IMAGE_PREPARE_TIMEOUT_SECONDS,
+            timeout=MERMAID_IMAGE_PULL_TIMEOUT_SECONDS,
         )
     except subprocess.TimeoutExpired:
         return (
             f"Timed out while pulling Mermaid image {DEFAULT_IMAGE} after "
-            f"{MERMAID_IMAGE_PREPARE_TIMEOUT_SECONDS:g}s"
+            f"{MERMAID_IMAGE_PULL_TIMEOUT_SECONDS:g}s."
         )
 
-    if pull.returncode == 0:
+    if pull_result.returncode == 0:
         return None
 
-    diagnostic = "\n".join(part.strip() for part in [pull.stdout, pull.stderr] if part.strip())
-    return f"Failed to prepare Mermaid image {DEFAULT_IMAGE}\n{diagnostic}".rstrip()
+    diagnostic = "\n".join(
+        part.strip() for part in [pull_result.stdout, pull_result.stderr] if part.strip()
+    )
+    return f"Failed to pull Mermaid image {DEFAULT_IMAGE}\n{diagnostic}".rstrip()
+
+
+def strict_mode_enabled() -> bool:
+    return os.environ.get("CI", "").lower() in STRICT_ENV_VALUES or os.environ.get(
+        "MERMAID_STRICT", ""
+    ).lower() in STRICT_ENV_VALUES
 
 
 def validate_block(path: Path, block_index: int, block: str) -> str | None:
@@ -115,9 +116,7 @@ def validate_block(path: Path, block_index: int, block: str) -> str | None:
         tmp_path = Path(tmpdir)
         input_path = tmp_path / "diagram.mmd"
         output_path = tmp_path / "diagram.svg"
-        container_tmp_path = tmp_path / "container-tmp"
         input_path.write_text(block, encoding="utf-8")
-        container_tmp_path.mkdir(exist_ok=True)
 
         try:
             result = subprocess.run(
@@ -127,8 +126,6 @@ def validate_block(path: Path, block_index: int, block: str) -> str | None:
                     "--rm",
                     "-u",
                     f"{os.getuid()}:{os.getgid()}",
-                    "-e",
-                    "TMPDIR=/work/container-tmp",
                     "-v",
                     f"{tmpdir}:/work",
                     DEFAULT_IMAGE,
@@ -175,13 +172,13 @@ def main() -> int:
         )
         return 0
 
-    image_error = ensure_mermaid_image()
+    files = collect_files(root, args.include, args.exclude)
+    errors: list[str] = []
+
+    image_error = ensure_mermaid_image_available()
     if image_error:
         print(image_error, file=sys.stderr)
         return 1
-
-    files = collect_files(root, args.include, args.exclude)
-    errors: list[str] = []
 
     for path in files:
         content = path.read_text(encoding="utf-8")

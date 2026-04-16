@@ -18,6 +18,8 @@
 {{- $cloudbeaverIdentity := get $clients "cloudbeaverProxy" | default dict -}}
 {{- $rangerProxyIdentity := get $clients "rangerProxy" | default dict -}}
 {{- $prefectIdentity := get $clients "prefectProxy" | default dict -}}
+{{- $prefectAutomationIdentity := get $clients "prefectAutomation" | default dict -}}
+{{- $prefectDirectGrantIdentity := get $clients "prefectDirectGrant" | default dict -}}
 {{- $authorization := $global.authorization | default dict -}}
 {{- $ranger := get $authorization "ranger" | default dict -}}
 {{- $datahubValues := .Values.datahub | default dict -}}
@@ -337,6 +339,51 @@
   {{- if ne (default "" (get $prefectIdentity "redirectUrl")) (printf "%s/oauth2/callback" $prefectOrigin) -}}
     {{- fail "global.identity.external.clients.prefectProxy.redirectUrl must match the Prefect auth-proxy ingress callback URL." -}}
   {{- end -}}
+{{- end -}}
+{{- if and (get $prefectAutomationIdentity "enabled") (not (default false $identity.enabled)) -}}
+{{- fail "global.identity.external.clients.prefectAutomation.enabled requires global.identity.enabled=true." -}}
+{{- end -}}
+{{- if and (get $prefectAutomationIdentity "enabled") (not .Values.prefect.authProxy.enabled) -}}
+{{- fail "global.identity.external.clients.prefectAutomation.enabled requires prefect.authProxy.enabled=true." -}}
+{{- end -}}
+{{- if and (get $prefectAutomationIdentity "enabled") (not (get $prefectIdentity "enabled")) -}}
+{{- fail "global.identity.external.clients.prefectAutomation.enabled requires global.identity.external.clients.prefectProxy.enabled=true." -}}
+{{- end -}}
+{{- if and (get $prefectAutomationIdentity "enabled") (not (default "" (get $prefectAutomationIdentity "clientId"))) -}}
+{{- fail "global.identity.external.clients.prefectAutomation.clientId is required when machine access for Prefect is enabled." -}}
+{{- end -}}
+{{- if and (get $prefectAutomationIdentity "enabled") (not (default "" (get $prefectAutomationIdentity "tokenAudience"))) -}}
+{{- fail "global.identity.external.clients.prefectAutomation.tokenAudience is required when machine access for Prefect is enabled." -}}
+{{- end -}}
+{{- if and (get $prefectAutomationIdentity "enabled") (eq $providerMode "bundledKeycloak") (not (default "" (get $prefectAutomationIdentity "configCliSecretKey"))) -}}
+{{- fail "global.identity.external.clients.prefectAutomation.configCliSecretKey is required when bundled Keycloak manages the Prefect automation client." -}}
+{{- end -}}
+{{- if and (get $prefectAutomationIdentity "enabled") (eq $providerMode "bundledKeycloak") (not (default false (get $prefectAutomationIdentity "serviceAccountsEnabled"))) -}}
+{{- fail "global.identity.external.clients.prefectAutomation.serviceAccountsEnabled must be true when machine access for Prefect is enabled." -}}
+{{- end -}}
+{{- if and (get $prefectAutomationIdentity "enabled") (eq $providerMode "bundledKeycloak") (get $prefectAutomationIdentity "standardFlowEnabled") -}}
+{{- fail "global.identity.external.clients.prefectAutomation.standardFlowEnabled must be false when machine access for Prefect is enabled." -}}
+{{- end -}}
+{{- if and (get $prefectAutomationIdentity "enabled") (eq $providerMode "bundledKeycloak") (get $prefectAutomationIdentity "directAccessGrantsEnabled") -}}
+{{- fail "global.identity.external.clients.prefectAutomation.directAccessGrantsEnabled must be false when machine access for Prefect is enabled." -}}
+{{- end -}}
+{{- if and (get $prefectDirectGrantIdentity "enabled") (not (default false $identity.enabled)) -}}
+{{- fail "global.identity.external.clients.prefectDirectGrant.enabled requires global.identity.enabled=true." -}}
+{{- end -}}
+{{- if and (get $prefectDirectGrantIdentity "enabled") (not .Values.prefect.authProxy.enabled) -}}
+{{- fail "global.identity.external.clients.prefectDirectGrant.enabled requires prefect.authProxy.enabled=true." -}}
+{{- end -}}
+{{- if and (get $prefectDirectGrantIdentity "enabled") (not (get $prefectIdentity "enabled")) -}}
+{{- fail "global.identity.external.clients.prefectDirectGrant.enabled requires global.identity.external.clients.prefectProxy.enabled=true." -}}
+{{- end -}}
+{{- if and (get $prefectDirectGrantIdentity "enabled") (not (default "" (get $prefectDirectGrantIdentity "clientId"))) -}}
+{{- fail "global.identity.external.clients.prefectDirectGrant.clientId is required when developer access for Prefect is enabled." -}}
+{{- end -}}
+{{- if and (get $prefectDirectGrantIdentity "enabled") (not (default "" (get $prefectDirectGrantIdentity "tokenAudience"))) -}}
+{{- fail "global.identity.external.clients.prefectDirectGrant.tokenAudience is required when developer access for Prefect is enabled." -}}
+{{- end -}}
+{{- if and (get $prefectAutomationIdentity "enabled") (get $prefectDirectGrantIdentity "enabled") (ne (get $prefectAutomationIdentity "tokenAudience") (get $prefectDirectGrantIdentity "tokenAudience")) -}}
+{{- fail "global.identity.external.clients.prefectAutomation.tokenAudience must match global.identity.external.clients.prefectDirectGrant.tokenAudience when both Prefect bearer-token clients are enabled." -}}
 {{- end -}}
 {{- if and (default false $ldap.enabled) $ldapUsesLdaps (not (default false $ldap.allowInsecure)) (not $trustedCaSecretName) (not $ldapUsesSystemTrustStore) -}}
 {{- fail "When using LDAPS with allowInsecure=false, set either global.identity.directory.ldap.trustedCaExistingSecret or global.identity.directory.ldap.useSystemTrustStore=true so Trino and Ranger can validate the directory certificate chain." -}}

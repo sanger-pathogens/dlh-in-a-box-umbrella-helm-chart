@@ -152,7 +152,8 @@ seed_local_auth_demo_secrets() {
     --from-literal=KC_DATAHUB_CLIENT_SECRET=local-datahub-client-secret \
     --from-literal=KC_JUPYTERHUB_CLIENT_SECRET=local-jupyterhub-client-secret \
     --from-literal=KC_CLOUDBEAVER_CLIENT_SECRET=local-cloudbeaver-client-secret \
-    --from-literal=KC_PREFECT_CLIENT_SECRET=local-prefect-client-secret
+    --from-literal=KC_PREFECT_CLIENT_SECRET=local-prefect-client-secret \
+    --from-literal=KC_PREFECT_AUTOMATION_CLIENT_SECRET=local-prefect-automation-client-secret
 
   seed_secret dlh-ranger-admin \
     --from-literal=rangerAdminPassword=admin123 \

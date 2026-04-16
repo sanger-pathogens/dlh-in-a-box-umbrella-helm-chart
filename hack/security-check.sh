@@ -4,6 +4,17 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "${ROOT_DIR}"
 
+search_with_fallback() {
+  local pattern="${1:?pattern required}"
+  shift
+
+  if command -v rg >/dev/null 2>&1; then
+    rg -n "${pattern}" "$@" || true
+  else
+    grep -RInE "${pattern}" "$@" || true
+  fi
+}
+
 if grep -Eq '^kind: ConfigMap$' charts/dlh-in-a-box/charts/trino/templates/configmap-catalog.yaml; then
   echo "Trino catalog template must not render as a ConfigMap because it carries object-store credentials." >&2
   exit 1
@@ -92,15 +103,6 @@ allowed_bitnamilegacy_paths=(
   "examples/values-local-superset.yaml"
 )
 
-find_bitnamilegacy_references() {
-  if command -v rg >/dev/null 2>&1; then
-    rg -n 'bitnamilegacy/' charts/dlh-in-a-box/values.yaml examples/*.yaml || true
-    return
-  fi
-
-  grep -nH 'bitnamilegacy/' charts/dlh-in-a-box/values.yaml examples/*.yaml || true
-}
-
 while IFS=: read -r path _; do
   [[ -z "${path}" ]] && continue
 
@@ -116,4 +118,4 @@ while IFS=: read -r path _; do
     echo "Unexpected bitnamilegacy image reference found in ${path}. Keep new references out of the chart until the temporary supply-chain debt is removed." >&2
     exit 1
   fi
-done < <(find_bitnamilegacy_references)
+done < <(search_with_fallback 'bitnamilegacy/' charts/dlh-in-a-box/values.yaml examples/*.yaml)

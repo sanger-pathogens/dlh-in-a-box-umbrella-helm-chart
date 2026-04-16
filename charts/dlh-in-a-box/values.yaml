@@ -166,6 +166,18 @@ global:
             host: ""
             tlsSecretName: ""
             annotations: {}
+        prefectAutomation:
+          enabled: false
+          clientId: ""
+          configCliSecretKey: KC_PREFECT_AUTOMATION_CLIENT_SECRET
+          tokenAudience: prefect-api
+          serviceAccountsEnabled: true
+          standardFlowEnabled: false
+          directAccessGrantsEnabled: false
+        prefectDirectGrant:
+          enabled: false
+          clientId: ""
+          tokenAudience: prefect-api
     directory:
       mode: externalLdap
       ldap:
@@ -752,6 +764,57 @@ keycloak:
               - roles
               - groups
         {{- end }}
+        {{- if .Values.global.identity.external.clients.prefectAutomation.enabled }}
+          - clientId: {{ .Values.global.identity.external.clients.prefectAutomation.clientId | quote }}
+            name: Prefect Automation
+            description: OIDC machine client for programmatic Prefect API access through oauth2-proxy
+            enabled: true
+            protocol: openid-connect
+            publicClient: false
+            standardFlowEnabled: {{ .Values.global.identity.external.clients.prefectAutomation.standardFlowEnabled }}
+            directAccessGrantsEnabled: {{ .Values.global.identity.external.clients.prefectAutomation.directAccessGrantsEnabled }}
+            serviceAccountsEnabled: {{ .Values.global.identity.external.clients.prefectAutomation.serviceAccountsEnabled }}
+            secret: "$(env:{{ .Values.global.identity.external.clients.prefectAutomation.configCliSecretKey }}:change-me)"
+            defaultClientScopes:
+              - profile
+              - email
+              - roles
+              - groups
+            protocolMappers:
+              - name: prefect-automation-audience
+                protocol: openid-connect
+                protocolMapper: oidc-audience-mapper
+                consentRequired: false
+                config:
+                  included.client.audience: {{ .Values.global.identity.external.clients.prefectAutomation.tokenAudience | quote }}
+                  access.token.claim: "true"
+                  id.token.claim: "false"
+        {{- end }}
+        {{- if .Values.global.identity.external.clients.prefectDirectGrant.enabled }}
+          - clientId: {{ .Values.global.identity.external.clients.prefectDirectGrant.clientId | quote }}
+            name: Prefect Direct Grant
+            description: Public OIDC client for developer Prefect API access without a browser popup
+            enabled: true
+            protocol: openid-connect
+            publicClient: true
+            standardFlowEnabled: false
+            directAccessGrantsEnabled: true
+            serviceAccountsEnabled: false
+            defaultClientScopes:
+              - profile
+              - email
+              - roles
+              - groups
+            protocolMappers:
+              - name: prefect-direct-grant-audience
+                protocol: openid-connect
+                protocolMapper: oidc-audience-mapper
+                consentRequired: false
+                config:
+                  included.client.audience: {{ .Values.global.identity.external.clients.prefectDirectGrant.tokenAudience | quote }}
+                  access.token.claim: "true"
+                  id.token.claim: "false"
+        {{- end }}
         {{- if .Values.global.identity.directory.ldap.enabled }}
         components:
           org.keycloak.storage.UserStorageProvider:
@@ -1326,6 +1389,11 @@ prefect-auth-proxy:
       pass_user_headers = true
       set_xauthrequest = true
       reverse_proxy = true
+      {{- if or .Values.global.identity.external.clients.prefectAutomation.enabled .Values.global.identity.external.clients.prefectDirectGrant.enabled }}
+      skip_jwt_bearer_tokens = true
+      api_routes = [ "^/api/" ]
+      extra_jwt_issuers = "{{ include "dlh-in-a-box.identity.issuer" $ }}={{ ternary .Values.global.identity.external.clients.prefectAutomation.tokenAudience .Values.global.identity.external.clients.prefectDirectGrant.tokenAudience .Values.global.identity.external.clients.prefectAutomation.enabled }}"
+      {{- end }}
   service:
     type: ClusterIP
   ingress:

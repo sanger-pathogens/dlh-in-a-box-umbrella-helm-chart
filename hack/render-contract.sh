@@ -79,6 +79,45 @@ expect_fail() {
   fi
 }
 
+expect_fail_any() {
+  local output
+  output="$(mktemp)"
+  tmp_files+=("${output}")
+
+  local expected_matches=()
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --)
+        shift
+        break
+        ;;
+      *)
+        expected_matches+=("$1")
+        shift
+        ;;
+    esac
+  done
+
+  if helm template dlh "${CHART_PATH}" "$@" >"${output}" 2>&1; then
+    echo "Expected helm template to fail, but it succeeded: $*" >&2
+    exit 1
+  fi
+
+  local expected=""
+  for expected in "${expected_matches[@]}"; do
+    if grep -Fq -- "${expected}" "${output}"; then
+      return 0
+    fi
+  done
+
+  echo "Expected helm template failure to include one of:" >&2
+  printf '  - %s\n' "${expected_matches[@]}" >&2
+  echo "--- Actual output ---" >&2
+  cat "${output}" >&2
+  echo "---------------------" >&2
+  exit 1
+}
+
 echo "--- Positive contract renders"
 default_manifest="$(make_tmp_file)"
 render_manifest "${default_manifest}"
@@ -90,6 +129,10 @@ prod_manifest="$(make_tmp_file)"
 render_manifest "${prod_manifest}" -f "${PROD_VALUES}"
 shared_manifest="$(make_tmp_file)"
 render_manifest "${shared_manifest}" -f "${SHARED_VALUES}"
+prefect_automation_manifest="$(make_tmp_file)"
+render_manifest "${prefect_automation_manifest}" -f "${DEV_VALUES}" -f "${FIXTURE_DIR}/prefect-automation-enabled.yaml"
+prefect_direct_grant_manifest="$(make_tmp_file)"
+render_manifest "${prefect_direct_grant_manifest}" -f "${DEV_VALUES}" -f "${FIXTURE_DIR}/prefect-direct-grant-enabled.yaml"
 
 assert_not_contains "${default_manifest}" "{{"
 assert_not_contains "${local_manifest}" "{{"
@@ -182,12 +225,27 @@ assert_contains "${prod_manifest}" 'allowed_groups = [\"platform-app-prefect\", 
 assert_contains "${dev_manifest}" 'allowed_groups = [\"platform-app-cloudbeaver\", \"platform-role-platform-admin\"]'
 assert_contains "${prod_manifest}" 'allowed_groups = [\"platform-app-cloudbeaver\", \"platform-role-platform-admin\"]'
 assert_contains "${dev_manifest}" 'skip_oidc_discovery = true'
-assert_contains "${dev_manifest}" 'redeem_url = \"'
-assert_contains "${prod_manifest}" 'redeem_url = \"'
+assert_contains "${dev_manifest}" 'redeem_url = \"http://dlh-keycloak.'
+assert_contains "${dev_manifest}" '/realms/dlh/protocol/openid-connect/token\"'
+assert_contains "${prod_manifest}" 'redeem_url = \"http://dlh-keycloak.'
+assert_contains "${prod_manifest}" '/realms/dlh/protocol/openid-connect/token\"'
 assert_contains "${dev_manifest}" 'http-server.authentication.oauth2.token-url='
 assert_contains "${prod_manifest}" 'http-server.authentication.oauth2.token-url='
 assert_contains "${dev_manifest}" 'protocol/openid-connect/token'
 assert_contains "${prod_manifest}" 'protocol/openid-connect/token'
+assert_contains "${prefect_automation_manifest}" 'skip_jwt_bearer_tokens = true'
+assert_contains "${prefect_automation_manifest}" 'api_routes = [ \"^/api/\" ]'
+assert_contains "${prefect_automation_manifest}" 'extra_jwt_issuers = \"https://keycloak.dev.example.org/realms/dlh=prefect-api\"'
+assert_contains "${prefect_automation_manifest}" "Prefect Automation"
+assert_contains "${prefect_automation_manifest}" "protocolMapper: oidc-audience-mapper"
+assert_contains "${prefect_automation_manifest}" "KC_PREFECT_AUTOMATION_CLIENT_SECRET"
+assert_contains "${prefect_direct_grant_manifest}" 'skip_jwt_bearer_tokens = true'
+assert_contains "${prefect_direct_grant_manifest}" 'api_routes = [ \"^/api/\" ]'
+assert_contains "${prefect_direct_grant_manifest}" 'extra_jwt_issuers = \"https://keycloak.dev.example.org/realms/dlh=prefect-api\"'
+assert_contains "${prefect_direct_grant_manifest}" "Prefect Direct Grant"
+assert_contains "${prefect_direct_grant_manifest}" "directAccessGrantsEnabled: true"
+assert_contains "${prefect_direct_grant_manifest}" "protocolMapper: oidc-audience-mapper"
+assert_not_contains "${prefect_direct_grant_manifest}" "KC_PREFECT_AUTOMATION_CLIENT_SECRET"
 assert_contains "${dev_manifest}" "\"platformRoles\": {"
 assert_contains "${dev_manifest}" "\"data-analyst\""
 assert_contains "${dev_manifest}" "\"principal-investigator\""
@@ -198,8 +256,10 @@ assert_contains "${dev_manifest}" "\"user\":\"cloudbeaver-service\",\"catalog\":
 assert_contains "${dev_manifest}" "\"user\":\"superset-service\",\"catalog\":\"system\",\"allow\":\"all\""
 
 echo "--- Negative contract renders"
-expect_fail \
+expect_fail_any \
   "global.environment must be one of the following: \"local\", \"dev\", \"prod\"" \
+  "value must be one of 'local', 'dev', 'prod'" \
+  -- \
   -f "${DEV_VALUES}" \
   -f "${FIXTURE_DIR}/missing-environment.yaml"
 
@@ -217,6 +277,41 @@ expect_fail \
   "global.identity.external.clients.prefectProxy.allowedGroups must be set in dev and prod so Prefect is not exposed to every authenticated user." \
   -f "${DEV_VALUES}" \
   -f "${FIXTURE_DIR}/prefect-missing-groups.yaml"
+
+expect_fail \
+  "global.identity.external.clients.prefectAutomation.clientId is required when machine access for Prefect is enabled." \
+  -f examples/values-dev.yaml \
+  -f "${FIXTURE_DIR}/prefect-automation-missing-client-id.yaml"
+
+expect_fail \
+  "global.identity.external.clients.prefectAutomation.enabled requires prefect.authProxy.enabled=true." \
+  -f examples/values-dev.yaml \
+  -f "${FIXTURE_DIR}/prefect-automation-authproxy-disabled.yaml"
+
+expect_fail \
+  "global.identity.external.clients.prefectAutomation.enabled requires global.identity.external.clients.prefectProxy.enabled=true." \
+  -f examples/values-dev.yaml \
+  -f "${FIXTURE_DIR}/prefect-automation-prefectproxy-disabled.yaml"
+
+expect_fail \
+  "global.identity.external.clients.prefectDirectGrant.clientId is required when developer access for Prefect is enabled." \
+  -f examples/values-dev.yaml \
+  -f "${FIXTURE_DIR}/prefect-direct-grant-missing-client-id.yaml"
+
+expect_fail \
+  "global.identity.external.clients.prefectDirectGrant.enabled requires prefect.authProxy.enabled=true." \
+  -f examples/values-dev.yaml \
+  -f "${FIXTURE_DIR}/prefect-direct-grant-authproxy-disabled.yaml"
+
+expect_fail \
+  "global.identity.external.clients.prefectDirectGrant.enabled requires global.identity.external.clients.prefectProxy.enabled=true." \
+  -f examples/values-dev.yaml \
+  -f "${FIXTURE_DIR}/prefect-direct-grant-prefectproxy-disabled.yaml"
+
+expect_fail \
+  "global.identity.external.clients.prefectAutomation.tokenAudience must match global.identity.external.clients.prefectDirectGrant.tokenAudience when both Prefect bearer-token clients are enabled." \
+  -f examples/values-dev.yaml \
+  -f "${FIXTURE_DIR}/prefect-token-audience-mismatch.yaml"
 
 expect_fail \
   "global.identity.external.clients.cloudbeaverProxy.allowedGroups must be set in dev and prod so CloudBeaver is not exposed to every authenticated user." \
@@ -280,8 +375,10 @@ expect_fail \
   -f "${LOCAL_VALUES}" \
   -f "${FIXTURE_DIR}/keycloak-local-ldap-enabled.yaml"
 
-expect_fail \
+expect_fail_any \
   "global.environment must be one of the following: \"local\", \"dev\", \"prod\"" \
+  "value must be one of 'local', 'dev', 'prod'" \
+  -- \
   -f "${SHARED_VALUES}" \
   -f "${FIXTURE_DIR}/missing-identity-environment.yaml"
 
@@ -295,8 +392,10 @@ expect_fail \
   -f "${DEV_VALUES}" \
   -f "${FIXTURE_DIR}/legacy-trino-authentication-type.yaml"
 
-expect_fail \
+expect_fail_any \
   "global.authorization.platformRoles.platform-admin.apps: Additional property notARealApp is not allowed" \
+  "additional properties 'notARealApp' not allowed" \
+  -- \
   -f "${DEV_VALUES}" \
   -f "${FIXTURE_DIR}/invalid-platform-role-app.yaml"
 
