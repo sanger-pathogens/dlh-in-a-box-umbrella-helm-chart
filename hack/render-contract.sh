@@ -315,8 +315,10 @@ expect_fail \
   -f examples/values-dev.yaml \
   -f "${FIXTURE_DIR}/legacy-trino-authentication-type.yaml"
 
-expect_fail \
+expect_fail_any \
   "global.authorization.platformRoles.platform-admin.apps: Additional property notARealApp is not allowed" \
+  "additional properties 'notARealApp' not allowed" \
+  -- \
   -f examples/values-dev.yaml \
   -f "${FIXTURE_DIR}/invalid-platform-role-app.yaml"
 
