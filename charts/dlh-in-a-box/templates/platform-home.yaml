@@ -64,6 +64,7 @@
       "mode" (default "redirect" (get $launcher "mode"))
       "path" (default (printf "/launch/%s" $launcherName) (get $launcher "path"))
       "targetUrl" (default "" (get $launcher "targetUrl"))
+      "openInNewTab" (default false (get $launcher "openInNewTab"))
       "completeUrl" (default "" (get $launcher "completeUrl"))
       "internalApiUrl" (default "" (get $launcher "internalApiUrl"))
       "redirectUri" (default "" (get $launcher "redirectUri"))
@@ -298,6 +299,7 @@
     "name" "JupyterHub"
     "summary" "Interactive notebooks and shared code workspace"
     "url" (default $jupyterhubOrigin (get $jupyterhubLaunch "path"))
+    "openInNewTab" (default false (get $jupyterhubLaunch "openInNewTab"))
     "group" "Analysis"
     "icon" "JH"
     "iconText" (default "JH" (get $appMeta "iconText"))
@@ -911,6 +913,8 @@ data:
     }
 
     function renderLaunchCard(item) {
+      const openInNewTab = Boolean(item.openInNewTab);
+      const newTabAttrs = openInNewTab ? ' target="_blank" rel="noreferrer noopener" data-open-in-new-tab="true"' : "";
       return `
         <article class="launch-card">
           <div class="launch-card-header">
@@ -921,7 +925,7 @@ data:
             </div>
           </div>
           ${renderHealthStatus(item)}
-          <a class="primary-button launch-button" href="${escapeHtml(item.url)}">Open</a>
+          <a class="primary-button launch-button" href="${escapeHtml(item.url)}"${newTabAttrs}>Open</a>
         </article>
       `;
     }
@@ -1635,6 +1639,7 @@ data:
       if (!target) {
         return;
       }
+      const openInNewTab = Boolean(options.newTab);
       setPortalNotice("info", `Opening ${escapeHtml(humanizeSlug(target))}...`);
       const payload = await apiRequest(`/api/launch/${encodeURIComponent(target)}`);
       const targetUrl = String(payload?.url || "").trim();
@@ -1677,6 +1682,14 @@ data:
           }, 1000);
         });
         window.location.replace(completeUrl || targetUrl);
+        return;
+      }
+
+      if (openInNewTab) {
+        const newTab = window.open(targetUrl, "_blank", "noopener,noreferrer");
+        if (!newTab) {
+          throw new Error(`Your browser blocked the ${humanizeSlug(target)} tab. Allow pop-ups for the portal and try again.`);
+        }
         return;
       }
 
@@ -2027,11 +2040,12 @@ data:
           .getAttribute("href")
           .split("/")
           .filter(Boolean)[1] || "";
+        const openInNewTab = launchLink.dataset.openInNewTab === "true";
         if (!launchTarget) {
           return;
         }
         event.preventDefault();
-        launchPortalTarget(launchTarget, { interactive: true }).catch((error) => {
+        launchPortalTarget(launchTarget, { interactive: true, newTab: openInNewTab }).catch((error) => {
           setPortalNotice("error", escapeHtml(error.message || `Unable to open ${humanizeSlug(launchTarget)}.`));
         });
       });
