@@ -3,170 +3,162 @@
 [![Helm Lint](https://github.com/sanger-pathogens/dlh-in-a-box-umbrella-helm-chart/actions/workflows/helm-lint.yaml/badge.svg)](https://github.com/sanger-pathogens/dlh-in-a-box-umbrella-helm-chart/actions/workflows/helm-lint.yaml)
 [![Helm Publish](https://github.com/sanger-pathogens/dlh-in-a-box-umbrella-helm-chart/actions/workflows/helm-publish.yaml/badge.svg)](https://github.com/sanger-pathogens/dlh-in-a-box-umbrella-helm-chart/actions/workflows/helm-publish.yaml)
 
-This repository is the source of truth for the `dlh-in-a-box` chart itself.
-It owns the chart API, the small amount of umbrella-only composition logic
-around upstream components, the example overlays used for validation, and the
-release automation that publishes the OCI package.
+This repository contains a Helm chart called `dlh-in-a-box`.
 
-It does not own environment-specific infrastructure, live cluster operations,
-institution-specific secret material, or organization-specific portal branding.
-Those live in the downstream infra repository.
+If you do not know Helm yet, the simple version is:
+
+- Helm is a way to install apps on Kubernetes
+- Kubernetes is the system that runs containers in a cluster
+- a Helm chart is a reusable install package
+
+So this repository is basically a reusable install package for a data platform.
+
+That platform can include tools such as:
+
+- Trino for running SQL queries
+- Hive Metastore for table metadata
+- Keycloak for login
+- Ranger for access rules
+- Prefect for workflows
+- CloudBeaver for browser-based SQL
+- DataHub for metadata
+- JupyterHub for notebooks
+- Vault for secrets
+- MinIO for object storage
+
+You do not need every one of those tools turned on. The chart lets you enable
+the parts you need.
 
 ## Start Here
 
-Choose the path that matches what you are trying to do:
-
-- New chart consumer:
-  [`charts/dlh-in-a-box/README.md`](charts/dlh-in-a-box/README.md)
-- Need the fastest install/evaluation path:
-  [`docs/quickstart.md`](docs/quickstart.md)
-- Need the default identity and access model:
-  [`docs/auth-architecture.md`](docs/auth-architecture.md)
-- Need the data-governance and Ranger model:
-  [`docs/data-governance.md`](docs/data-governance.md)
-- Need terminology explained first:
-  [`docs/glossary.md`](docs/glossary.md)
-- Need example values:
-  [`examples/README.md`](examples/README.md)
-- Need maintainer and release tasks:
-  [`hack/README.md`](hack/README.md),
-  [`docs/release-playbook.md`](docs/release-playbook.md)
+- If you want the simplest explanation of the chart:
+  [charts/dlh-in-a-box/README.md](charts/dlh-in-a-box/README.md)
+- If you want the fastest way to try it locally:
+  [docs/quickstart.md](docs/quickstart.md)
+- If you do not know the terms used in the docs:
+  [docs/glossary.md](docs/glossary.md)
+- If you need to understand login and access:
+  [docs/auth-architecture.md](docs/auth-architecture.md)
+- If you need to understand the data approval rules:
+  [docs/data-governance.md](docs/data-governance.md)
+- If you want example values files:
+  [examples/README.md](examples/README.md)
+- If you maintain this repository:
+  [hack/README.md](hack/README.md),
+  [docs/release-playbook.md](docs/release-playbook.md),
+  [CONTRIBUTING.md](CONTRIBUTING.md)
 
 ## Repository Mental Model
 
 ```mermaid
 flowchart LR
-  subgraph ThisRepo[This repository]
-    API[Chart API and values schema]
-    Glue[Umbrella-only templates and helpers]
-    Examples[Validation overlays]
-    Release[Lint, package, publish automation]
-  end
+  Repo[This repo] --> Chart[Install package]
+  Repo --> Examples[Example config files]
+  Repo --> Docs[Documentation]
+  Repo --> Scripts[Validation scripts]
 
-  subgraph Upstream[Mostly upstream components]
-    Trino[Trino]
-    Superset[Superset]
-    Prefect[Prefect]
-    Keycloak[Keycloak]
-    DataHub[DataHub]
-    Spark[Spark Operator]
-    Vault[Vault]
-  end
-
-  subgraph Downstream[Consumer repository]
-    Infra[Environment overlays]
-    Secrets[Vault and Kubernetes secrets]
-    Cluster[Real cluster deployment]
-  end
-
-  API --> Glue --> Upstream
-  Examples --> Glue
-  Release --> Downstream
-  Downstream --> Cluster
-  Secrets --> Cluster
+  Chart --> Package[Published chart package]
+  Package --> User[Chart user]
+  Examples --> User
+  Docs --> User
 ```
+
+The shortest way to think about the repository is:
+
+- `charts/dlh-in-a-box/`
+  the actual chart you install
+- `examples/`
+  example config files you can copy from
+- `docs/`
+  explanation and background
+- `hack/`
+  helper scripts used by maintainers and CI
 
 ## Default Platform Model
 
-The default documented model is now:
+If you are brand new, this is the easiest mental model:
 
-- `platformHome` is the browser launchpad and the default entrypoint for human users.
-- `Keycloak` is the platform OIDC provider.
-- `externalLdap` remains the default shared-environment identity mode, with
-  `keycloakLocal` available when an institution wants Keycloak to own human
-  accounts directly.
-- temporary `bootstrapUsers` are allowed only for local or dev browser-flow
-  validation while real directory bind details are still pending.
-- `Ranger` remains the live policy and role-management plane. Trino only uses
-  the Ranger plugin when `global.authorization.ranger.trino.enabled=true` is
-  paired with a Ranger-capable Trino image.
-- `oauth2-proxy` sits in front of Prefect, CloudBeaver, and Ranger so those
-  tools can reuse the central Keycloak session.
-- `JupyterHub` is an optional analysis surface that can reuse the same
-  Keycloak realm and forward the resulting access token into notebook servers.
-- the umbrella chart owns the reusable portal UX, the dedicated `Access
-  Control` workspace, and the health aggregation API, while downstream repos
-  own logos, fonts, favicons, color palettes, and environment-specific extra
-  tools. The portal is the primary admin UX for routine role membership
-  changes; Ranger remains the deeper policy and audit surface.
-- `global.dataCatalogs.*.governance` is the chart-side governance contract used
-  to stop unclassified or unapproved datasets from being exposed by accident.
+- users sign in through `Keycloak`
+- shared development and production examples use an external company or lab
+  directory for users and groups
+- `platformHome` is the optional home page people land on in the browser
+- `Prefect` and `CloudBeaver` sit behind a login proxy so they reuse the same
+  browser sign-in
+- `Ranger` stores access rules and role information
+- `Trino` is the SQL engine that users query
 
-The older `external OIDC + LDAP/AD` path still exists, but it is now the
-escape hatch, not the main story.
+There is also a simpler local auth mode where Keycloak stores users itself.
+That is what the local auth example uses.
 
 ## What This Repo Owns
 
-- The chart values contract, including identity, authorization, and governance
-  metadata.
-- Trino catalog generation and Ranger bootstrap glue.
-- Keycloak and Ranger composition for chart-managed deployments.
-- The lightweight platform launchpad, dedicated access-control workspace,
-  health aggregation API, the chart-owned CloudBeaver deployment, and optional
-  JupyterHub integration.
-- Example overlays that prove local, development, and production-shaped
-  installs render cleanly.
-- Documentation for the chart API and architecture.
+- the chart itself
+- the default values and schema
+- the chart-specific templates that tie multiple tools together
+- the example config files
+- the chart documentation
+- the validation, packaging, and publish scripts
 
 ## What This Repo Does Not Own
 
-- Real production secrets.
-- Institution-specific LDAP/AD endpoint values and trust material.
-- Institution-specific portal branding, such as logos, fonts, colors, favicons,
-  and extra organization-owned admin tools.
-- Bastion workflows, kubeconfigs, Vault operations, or cluster access.
-- Dataset approval decisions, PI sign-off, DCC/DRC process, or IRB process.
-
-The platform can enforce approved access. It does not replace institutional
-governance.
-
-## Documentation Philosophy
-
-The docs in this repository follow four rules:
-
-1. Route first, explain second.
-2. Define terms before assuming them.
-3. Keep primary docs separate from vendored or reference-only material.
-4. Be explicit about what the chart enforces versus what operators must do
-   outside Helm.
-
-Vendored upstream READMEs under `charts/dlh-in-a-box/charts/` are reference
-material, not the primary onboarding path.
+- your production secrets
+- your cluster setup
+- your DNS and TLS certificates
+- your organization’s branding
+- your local infrastructure repository
+- your human approval process for who should get access to what
 
 ## Validation Model
 
-The main validation commands are:
+These are the main repo checks:
 
 ```bash
 ./hack/helm-dependency-update.sh
+SKIP_MERMAID_CHECK=1 ./hack/docs-check.sh
 ./hack/lint.sh
 ./hack/template.sh
 ./hack/package.sh
 ./hack/smoke-install.sh
 ```
 
-`./hack/lint.sh` now validates chart structure, docs guardrails, the values
-schema, security checks, and every example overlay. `./hack/smoke-install.sh`
-remains available as a maintainer-triggered manual check rather than a routine
-pull-request gate.
+What those mean in simple terms:
+
+- `docs-check.sh`
+  checks links, headings, and doc rules
+- `lint.sh`
+  checks the chart and the example config files
+- `template.sh`
+  makes sure the chart can render into Kubernetes YAML
+- `package.sh`
+  builds the chart package
+- `smoke-install.sh`
+  does a real local install of the auth-enabled example
+
+Full Mermaid diagram checking needs Docker. If Docker is not running locally,
+`SKIP_MERMAID_CHECK=1` is the deliberate way to skip that one part.
 
 ## Reference Map
 
-- Chart source:
-  [`charts/dlh-in-a-box/README.md`](charts/dlh-in-a-box/README.md)
-- Long-form docs:
-  [`docs/README.md`](docs/README.md)
-- Example overlays:
-  [`examples/README.md`](examples/README.md)
-- Maintainer scripts:
-  [`hack/README.md`](hack/README.md)
-- Contribution and support:
-  [`CONTRIBUTING.md`](CONTRIBUTING.md),
-  [`SUPPORT.md`](SUPPORT.md),
-  [`SECURITY.md`](SECURITY.md),
-  [`CODE_OF_CONDUCT.md`](CODE_OF_CONDUCT.md)
+- chart guide:
+  [charts/dlh-in-a-box/README.md](charts/dlh-in-a-box/README.md)
+- long-form docs:
+  [docs/README.md](docs/README.md)
+- example config files:
+  [examples/README.md](examples/README.md)
+- maintainer scripts:
+  [hack/README.md](hack/README.md)
+- release and workflow docs:
+  [docs/release-playbook.md](docs/release-playbook.md),
+  [.github/workflows/README.md](.github/workflows/README.md)
+- repo support docs:
+  [CONTRIBUTING.md](CONTRIBUTING.md),
+  [SUPPORT.md](SUPPORT.md),
+  [SECURITY.md](SECURITY.md),
+  [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md)
 
 ## License
 
-Apache-2.0 applies to the umbrella chart itself. Third-party notices are listed
-in [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md).
+The chart code in this repository uses the Apache-2.0 license.
+
+Some bundled third-party chart material uses its own licenses. That is listed
+in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).

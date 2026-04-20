@@ -1,37 +1,43 @@
-# First Five Minutes
+# Quickstart
 
-This guide is for someone who has just discovered `dlh-in-a-box` and wants to
-get from zero to a working deployment path quickly.
+This guide answers one question:
+
+What should I run next?
 
 ## Choose your path
 
 ```mermaid
 flowchart TD
-  Start[Start here]
-  Start --> Local[Validate locally]
-  Start --> SharedIdentity[Plan shared identity]
-  Start --> Consume[Consume from another repo]
-  Start --> Inspect[Inspect the published chart]
+  Start[Start here] --> Learn[Read first]
+  Start --> Local[Simple local install]
+  Start --> Smoke[Auth-enabled local test]
+  Start --> Published[Use the published chart]
 
-  Local --> Kind[kind plus examples/values-local-auth.yaml]
-  SharedIdentity --> AuthGuide[docs/auth-architecture.md<br/>plus examples/values-shared-auth.yaml]
-  Consume --> Dependency[Add as a Helm dependency]
-  Inspect --> Show[helm show chart or helm show readme]
+  Learn --> Readme[README]
+  Local --> LocalYaml[values-local.yaml]
+  Smoke --> LocalAuth[values-local-auth.yaml]
+  Published --> OCI[GHCR package]
 ```
 
-## 1. Inspect the published chart
+## 1. Read first if you are new
 
-```bash
-helm show chart oci://ghcr.io/sanger-pathogens/charts/dlh-in-a-box --version <chart-version>
-helm show readme oci://ghcr.io/sanger-pathogens/charts/dlh-in-a-box --version <chart-version>
-```
+If you do not already know what this repo is, read these first:
 
-Use this when you want to confirm the published metadata, dependencies, and
-consumer-facing README before you install anything.
+1. [../README.md](../README.md)
+2. [../charts/dlh-in-a-box/README.md](../charts/dlh-in-a-box/README.md)
+3. [glossary.md](glossary.md)
 
-## 2. Deploy the validated local example
+## 2. Run the simplest local install
 
-From the repository root:
+Use `examples/values-local.yaml` if you want the easiest local install.
+
+Why this is the easiest one:
+
+- it needs fewer moving parts
+- it does not need pre-created demo Secrets
+- it is the best first install if you just want to see the chart work
+
+Run this from the repository root:
 
 ```bash
 ./hack/helm-dependency-update.sh
@@ -39,38 +45,78 @@ From the repository root:
 helm upgrade --install dlh charts/dlh-in-a-box \
   -n data-lakehouse-local \
   --create-namespace \
-  -f examples/values-local-auth.yaml
+  -f examples/values-local.yaml
 ```
 
-Then inspect the result:
+Then check what was created:
 
 ```bash
 kubectl get all -n data-lakehouse-local
 ```
 
-Useful port-forwards:
+Useful local access commands:
+
+```bash
+kubectl port-forward -n data-lakehouse-local svc/dlh-trino 8080:8080
+kubectl port-forward -n data-lakehouse-local svc/prefect-server 4200:4200
+kubectl port-forward -n data-lakehouse-local svc/dlh-minio 9001:9001
+kubectl port-forward -n data-lakehouse-local svc/dlh-vault 8200:8200
+```
+
+## 3. Run the auth-enabled local test
+
+Use `examples/values-local-auth.yaml` if you want to test the login-related
+parts too.
+
+That example turns on more pieces, such as:
+
+- Keycloak for login
+- Ranger for roles and access
+- platformHome for the browser home page
+- CloudBeaver and Prefect behind auth proxies
+
+Important:
+
+- this example expects demo Kubernetes Secrets to exist first
+- `make smoke-install` creates those demo Secrets for you
+- a plain `helm upgrade --install ... -f examples/values-local-auth.yaml`
+  will fail if you did not create the Secrets yourself
+
+So the normal way to run it is:
+
+```bash
+make smoke-install
+```
+
+Or:
+
+```bash
+./hack/smoke-install.sh charts/dlh-in-a-box examples/values-local-auth.yaml
+```
+
+Useful local access commands after that install:
 
 ```bash
 kubectl port-forward -n data-lakehouse-local svc/dlh-platform-home 8110:80
 kubectl port-forward -n data-lakehouse-local svc/dlh-prefect-auth-proxy 4200:80
 kubectl port-forward -n data-lakehouse-local svc/dlh-cloudbeaver-auth-proxy 8978:80
 kubectl port-forward -n data-lakehouse-local svc/dlh-keycloak 8081:80
-kubectl port-forward -n data-lakehouse-local svc/dlh-minio 9001:9001
 kubectl port-forward -n data-lakehouse-local svc/dlh-ranger-admin 6080:6080
 kubectl port-forward -n data-lakehouse-local svc/dlh-trino 8443:8443
-kubectl port-forward -n data-lakehouse-local svc/dlh-vault 8200:8200
 ```
 
-If you are maintaining the chart itself rather than just evaluating it, the
-closest local mirror of CI is:
+## 4. Use the published chart
+
+If you do not want to work from the repo source, you can inspect the published
+chart package:
 
 ```bash
-make smoke-install
+helm show chart oci://ghcr.io/sanger-pathogens/charts/dlh-in-a-box --version <chart-version>
+helm show readme oci://ghcr.io/sanger-pathogens/charts/dlh-in-a-box --version <chart-version>
 ```
 
-## 3. Consume the chart from another repository
-
-In the consumer repository `Chart.yaml`:
+If another repository wants to use this chart as a dependency, its
+`Chart.yaml` will look like this:
 
 ```yaml
 dependencies:
@@ -79,36 +125,13 @@ dependencies:
     repository: oci://ghcr.io/sanger-pathogens/charts
 ```
 
-In the consumer workflow:
+## 5. What to read next
 
-```yaml
-permissions:
-  contents: read
-  packages: read
-
-steps:
-  - uses: actions/checkout@v4
-  - uses: azure/setup-helm@v4
-  - name: Log in to GHCR
-    run: |
-      printf '%s' "${{ secrets.GITHUB_TOKEN }}" | \
-        helm registry login ghcr.io -u "${{ github.actor }}" --password-stdin
-  - name: Build chart dependencies
-    run: helm dependency build
-```
-
-If the consumer repository cannot read the package yet, add it under GitHub
-package settings `Manage Actions access`.
-
-## 4. Know where to go next
-
-- chart API and values surface:
+- want to understand the chart:
   [../charts/dlh-in-a-box/README.md](../charts/dlh-in-a-box/README.md)
-- shared identity and access model:
-  [auth-architecture.md](auth-architecture.md)
-- overlay selection:
+- want example config files:
   [../examples/README.md](../examples/README.md)
-- support expectations:
-  [../SUPPORT.md](../SUPPORT.md)
-- release and publication flow:
-  [release-playbook.md](release-playbook.md)
+- want to understand login and access:
+  [auth-architecture.md](auth-architecture.md)
+- want to understand data approval rules:
+  [data-governance.md](data-governance.md)

@@ -1,7 +1,7 @@
 # DataHub Notice Provenance
 
 This directory contains the upstream DataHub `NOTICE` file reproduced for
-Apache-2.0 redistribution hygiene.
+Apache-2.0 redistribution compliance.
 
 ## Contents
 
@@ -12,4 +12,4 @@ Apache-2.0 redistribution hygiene.
 ## Maintainer note
 
 If the DataHub dependency version changes, re-check the upstream `NOTICE` file
-and update this copy if the upstream text has changed.
+and update this copy if the upstream text changed.

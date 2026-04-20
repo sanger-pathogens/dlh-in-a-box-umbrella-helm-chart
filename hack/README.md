@@ -1,20 +1,23 @@
 # Maintainer Scripts
 
-This directory contains the repeatable local scripts used for dependency
-refresh, validation, packaging, and release preparation.
+This directory contains the repeatable local scripts used to validate, render,
+package, and smoke-test the chart.
+
+They are meant to mirror CI and release expectations, not invent a separate
+maintainer-only workflow.
 
 ## Script flow
 
 ```mermaid
 flowchart LR
-  Update[helm-dependency-update.sh] --> Lint[lint.sh]
-  Docs[docs-check.sh] --> Lint
-  Security[security-check.sh] --> Lint
-  Contract[render-contract.sh] --> Lint
+  Deps[helm-dependency-update.sh] --> Docs[docs-check.sh]
+  Docs --> Security[security-check.sh]
+  Security --> Contract[render-contract.sh]
+  Contract --> Lint[lint.sh]
   Lint --> Render[template.sh]
   Render --> Package[package.sh]
   Package --> Smoke[smoke-install.sh]
-  Lint --> Publish[GitHub publish workflow]
+  Lint --> Publish[GitHub workflows]
   Package --> Publish
 ```
 
@@ -22,20 +25,21 @@ flowchart LR
 
 | Script | Purpose |
 | --- | --- |
-| `docs-check.sh` | Verify guide-file coverage, local markdown links, required doc sections, and deprecated wording drift in primary docs |
-| `helm-dependency-update.sh` | Refresh `Chart.lock` and packaged dependencies |
+| `docs-check.sh` | Verify guide coverage, local links, required headings, wording guardrails, and Mermaid diagrams |
+| `helm-dependency-update.sh` | Refresh `Chart.lock` and packaged dependency archives |
 | `license-check.sh` | Verify required notice files and local vendor modification markers |
-| `render-contract.sh` | Assert supported positive renders and intentional negative validation failures for auth, governance, and Prefect proxy settings |
-| `security-check.sh` | Guard against secret-bearing ConfigMaps, mutable workflow action refs, and inline credentials in non-local example overlays |
-| `lint.sh` | Run docs, script, schema, license, security, and Helm lint checks against every example overlay |
-| `template.sh` | Render the chart against every example overlay or a supplied subset |
-| `package.sh` | Package the chart, optionally overriding chart and app versions |
-| `smoke-install.sh` | Manually install the validated local auth overlay into a cluster, seed demo auth secrets, wait for workloads, and collect diagnostics on failure |
+| `render-contract.sh` | Prove supported positive renders and expected negative validation failures |
+| `security-check.sh` | Guard against inline credentials, mutable workflow refs, and secret-bearing ConfigMaps |
+| `lint.sh` | Run docs, license, security, render-contract, schema, and Helm lint checks |
+| `template.sh` | Render the chart against all tracked example overlays or a supplied subset |
+| `package.sh` | Package the chart into `dist/`, with optional version overrides |
+| `smoke-install.sh` | Seed demo Secrets, install `examples/values-local-auth.yaml`, wait for readiness, and collect diagnostics on failure |
 
 ## Typical maintainer sequence
 
 ```bash
 ./hack/helm-dependency-update.sh
+SKIP_MERMAID_CHECK=1 ./hack/docs-check.sh
 ./hack/render-contract.sh
 ./hack/lint.sh
 ./hack/template.sh
@@ -43,10 +47,23 @@ flowchart LR
 ./hack/smoke-install.sh
 ```
 
-Equivalent convenience targets are also available through `make` at the
-repository root.
+Equivalent convenience targets are available through `make` at the repository
+root.
+
+## Docker note
+
+`docs-check.sh` uses Docker-backed Mermaid rendering for full local diagram
+validation. If Docker is not available locally, use
+`SKIP_MERMAID_CHECK=1 ./hack/docs-check.sh` as the deliberate bypass. CI still
+runs the full check in an environment where Docker is available.
 
 ## Maintainer note
 
-Keep these scripts aligned with GitHub Actions. They are meant to be the local
-mirror of what CI and publication automation expect, not a separate workflow.
+Keep these scripts aligned with:
+
+- the example overlays in `examples/`
+- the documentation in `README.md` and `docs/`
+- the workflows in `.github/workflows/`
+
+If those three views drift apart, new users and maintainers get different
+answers from the same repository.

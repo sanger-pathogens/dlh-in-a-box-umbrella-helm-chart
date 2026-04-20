@@ -1,10 +1,8 @@
-# Documentation
+# Documentation Guide
 
-This directory holds the long-form documentation for the chart repository.
+This folder contains the longer explanations.
 
-Use it when the chart README has already told you where to start, but you now
-need the deeper explanation behind the values contract or the default platform
-model.
+Use it when the quick explanation in the root README is not enough.
 
 ## Read In This Order
 
@@ -20,17 +18,16 @@ model.
 
 | File | Purpose |
 | --- | --- |
-| `quickstart.md` | Fastest route from inspection to install |
-| `glossary.md` | Definitions for the terms used across the chart docs |
-| `auth-architecture.md` | Default Keycloak, LDAP/AD, Ranger, and Prefect access model |
-| `data-governance.md` | Governance metadata contract and policy-compliance boundary |
-| `release-playbook.md` | Maintainer-oriented release and publication workflow |
-| `assets/` | Static images and branding assets used by the repo |
+| `quickstart.md` | What to run next |
+| `glossary.md` | What the words mean |
+| `auth-architecture.md` | How login and access work |
+| `data-governance.md` | What approval and data-safety rules the chart checks |
+| `release-playbook.md` | How maintainers validate and publish releases |
+| `assets/` | Images used by the docs and chart metadata |
 
 ## Documentation Rules
 
-- Primary docs explain the default path first.
-- Escape hatches are documented, but not presented as the main story.
-- Vendored upstream docs are reference-only.
-- The docs say clearly when Helm enforces something and when a human approval
-  process is still required.
+- explain the simple version first
+- do not assume the reader already knows the tools
+- say clearly what the chart does and what humans still have to do
+- treat vendored upstream docs as reference material, not the starting point
