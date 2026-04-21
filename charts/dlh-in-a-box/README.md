@@ -2,61 +2,64 @@
 
 This is the main guide for the chart itself.
 
-If you only read one file before trying to use the chart, read this one.
+Audience: people who want to understand what the chart deploys and how to pick
+the right install path.
+
+What you will learn: what the chart can deploy, which identity modes it
+supports, which values areas matter most, and when to use each example
+overlay.
+
+Read next: [../../docs/quickstart.md](../../docs/quickstart.md) for the
+simplest first install, or [../../examples/README.md](../../examples/README.md)
+if you are choosing between overlays.
 
 ## What This Chart Does
 
-This chart installs a group of data-platform tools together.
+This chart installs a group of data-platform tools together as one Helm
+release.
 
-You can think of it as one install package that can turn on some or all of
-these:
+Use it when you want one chart to wire the platform pieces together instead of
+installing each tool by hand.
 
-- Trino for SQL queries
-- Hive Metastore for table metadata
-- Keycloak for login
-- Ranger for access rules
-- Prefect for workflows
-- CloudBeaver for browser SQL
-- DataHub for metadata
-- JupyterHub for notebooks
-- Vault for secrets
-- MinIO for object storage
+Common components in this chart:
 
-```mermaid
-flowchart LR
-  Values[Your values file] --> Chart[dlh-in-a-box chart]
-  Chart --> Trino[Trino]
-  Chart --> Hive[Hive]
-  Chart --> Keycloak[Keycloak optional]
-  Chart --> Ranger[Ranger optional]
-  Chart --> Portal[platformHome optional]
-  Chart --> Prefect[Prefect optional]
-  Chart --> CloudBeaver[CloudBeaver optional]
-  Chart --> DataHub[DataHub optional]
-  Chart --> JupyterHub[JupyterHub optional]
-```
+| Component | Plain meaning |
+| --- | --- |
+| `Trino` | The SQL engine people query. |
+| `Hive Metastore` | The place where table metadata is stored. |
+| `Keycloak` | The login system used by the shared examples. |
+| `Ranger` | The system that stores access rules. |
+| `Prefect` | The workflow UI and worker components. |
+| `CloudBeaver` | A browser-based SQL tool. |
+| `DataHub` | An optional metadata catalog. |
+| `JupyterHub` | An optional notebook service. |
+| `MinIO` | Object storage for local and simple installs. |
+| `Vault` | Optional secrets tooling. |
 
-You do not need every component turned on.
+You can enable only the pieces you need.
 
 ## Supported Identity Modes
 
-There are two main ways to handle users:
+There are two main ways this chart can handle users:
 
 | Mode | Simple meaning |
 | --- | --- |
-| `externalLdap` | Keycloak handles login, but users and groups come from LDAP or Active Directory |
-| `keycloakLocal` | Keycloak stores the users itself |
+| `externalLdap` | Keycloak handles browser login, but users and groups come from LDAP or Active Directory. This is the shared-environment model used by the dev and prod examples. |
+| `keycloakLocal` | Keycloak stores users itself. This is the self-contained local auth model used by `values-local-auth.yaml`. |
 
 ## Default Architecture
 
 The shared development and production examples in this repository use this
 general model:
 
-- Keycloak handles browser login
-- users and groups come from LDAP or Active Directory
-- Ranger stores access rules and role information
-- `platformHome` is the optional browser home page
-- Prefect and CloudBeaver sit behind auth proxies
+- Keycloak handles browser login.
+- LDAP or Active Directory supplies users and groups.
+- Ranger stores access rules.
+- `platformHome` is the optional landing page people see in the browser.
+- Prefect and CloudBeaver sit behind browser auth proxies.
+- Trino is the main SQL engine.
+
+The auth-enabled local example uses the simpler `keycloakLocal` mode instead.
 
 One important detail:
 
@@ -65,32 +68,30 @@ enabled elsewhere in the chart. Trino only switches to that plugin when
 `global.authorization.ranger.trino.enabled=true` and the Trino image supports
 that plugin.
 
-The auth-enabled local example uses the simpler `keycloakLocal` mode instead.
-
 ## Start With These Docs
 
-- repo overview:
-  [../../README.md](../../README.md)
-- quickstart:
+- brand new to the repo:
+  [../../docs/prerequisites.md](../../docs/prerequisites.md)
+- want the simplest install first:
   [../../docs/quickstart.md](../../docs/quickstart.md)
-- glossary:
-  [../../docs/glossary.md](../../docs/glossary.md)
-- auth guide:
-  [../../docs/auth-architecture.md](../../docs/auth-architecture.md)
-- data governance guide:
-  [../../docs/data-governance.md](../../docs/data-governance.md)
-- example values files:
+- want help choosing an example overlay:
   [../../examples/README.md](../../examples/README.md)
+- want the access model:
+  [../../docs/auth-architecture.md](../../docs/auth-architecture.md)
+- want the governed data rules:
+  [../../docs/data-governance.md](../../docs/data-governance.md)
+- want an optional word list:
+  [../../docs/glossary.md](../../docs/glossary.md)
 
 ## Choose An Install Path
 
-| Path | Use this when |
-| --- | --- |
-| `examples/values-local.yaml` | You want the easiest local install |
-| `make smoke-install` with `examples/values-local-auth.yaml` | You want the local auth-enabled test install |
-| `examples/values-dev.yaml` | You want the main shared development example |
-| `examples/values-prod.yaml` | You want the main production-shaped example |
-| `examples/values-shared-auth.yaml` | You use an external OIDC provider instead of bundled Keycloak |
+| Path | Plain-English label | Use this when |
+| --- | --- | --- |
+| `examples/values-local.yaml` | Simplest local install | You want the easiest manual first install. |
+| `make smoke-install` with `examples/values-local-auth.yaml` | Auth-enabled smoke test | You want a local path that also exercises login, browser proxies, and Ranger. |
+| `examples/values-dev.yaml` | Shared development example | You want the main LDAP-backed development baseline. |
+| `examples/values-prod.yaml` | Production-shaped example | You want the main LDAP-backed production baseline. |
+| `examples/values-shared-auth.yaml` | Shared environment with external OIDC provider | You already have an external OIDC provider and do not want bundled Keycloak. |
 
 ## Values You Will Touch Most Often
 
@@ -105,24 +106,26 @@ If you are new, these are the main values areas to know:
 | `cloudbeaver` | CloudBeaver settings |
 | `prefect` | Prefect settings |
 | `jupyterhub` | JupyterHub settings |
-| `keycloak` | Keycloak deployment settings |
+| `keycloak` | Bundled Keycloak deployment settings |
 
 ## Governance And Policy
 
-For non-local datasets, the chart expects extra metadata that explains what the
-data is and why it is allowed on the platform.
+For shared development and production environments, the chart expects extra
+metadata for non-local datasets.
 
-In simple terms, the chart wants to know:
+In simple terms, it wants to know:
 
 - what kind of data this is
 - how sensitive it is
 - whether it contains identifying information
 - who owns it
-- what approval record allows it to be used
+- who looks after it
+- which approval record allows it to be used
 
-The chart can check that this information exists.
+The chart can check that those fields exist and that the access rules are not
+obviously unsafe.
 
-The chart cannot decide whether your organization should approve the dataset in
+The chart cannot decide whether your organization should approve a dataset in
 the first place.
 
 ## Platform Roles And Exceptions
@@ -156,6 +159,8 @@ For CloudBeaver, remember:
 - browser sign-in goes through the auth proxy
 - the saved datasource can be pre-created by admins
 - that datasource may use a shared service account
+- the chart does not assume every CloudBeaver user types an LDAP password into
+  Trino directly
 
 For Prefect, the recommended pattern is to keep the auth proxy in front of it.
 
@@ -210,7 +215,7 @@ Main values:
 - `global.identity.directory.ldap.trustedCaExistingSecret`
 - `keycloak.trustedCertsExistingSecret`
 
-## Keycloak Client Secret Contract
+## Keycloak Client Secret Settings
 
 When Keycloak creates OIDC clients, it reads secret values from one Kubernetes
 Secret.
@@ -226,9 +231,9 @@ Default name:
 ## Example Overlays
 
 - `examples/values-local.yaml`
-  simplest local install
+  simplest manual local install
 - `examples/values-local-auth.yaml`
-  local install with login and access pieces turned on
+  auth-enabled smoke path that expects demo Secrets
 - `examples/values-dev.yaml`
   shared development example
 - `examples/values-prod.yaml`
@@ -254,3 +259,7 @@ SKIP_MERMAID_CHECK=1 ./hack/docs-check.sh
 ./hack/package.sh
 make smoke-install
 ```
+
+`make smoke-install` is the normal way to exercise
+`examples/values-local-auth.yaml`, because the smoke script seeds the demo
+Secrets that overlay expects.

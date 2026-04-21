@@ -1,33 +1,52 @@
 # Documentation Guide
 
-This folder contains the longer explanations.
+This folder holds the longer explanations that sit behind the main README.
 
-Use it when the quick explanation in the root README is not enough.
+Audience: people who need more than the short repo overview.
 
-## Read In This Order
+What you will learn: where to go next based on your role and question.
 
-1. [../README.md](../README.md)
-2. [../charts/dlh-in-a-box/README.md](../charts/dlh-in-a-box/README.md)
-3. [quickstart.md](quickstart.md)
-4. [glossary.md](glossary.md)
-5. [auth-architecture.md](auth-architecture.md)
-6. [data-governance.md](data-governance.md)
-7. [release-playbook.md](release-playbook.md)
+Read next: pick one track below and follow only that next page first.
 
-## What Lives Here
+## I Am New Here
 
-| File | Purpose |
-| --- | --- |
-| `quickstart.md` | What to run next |
-| `glossary.md` | What the words mean |
-| `auth-architecture.md` | How login and access work |
-| `data-governance.md` | What approval and data-safety rules the chart checks |
-| `release-playbook.md` | How maintainers validate and publish releases |
-| `assets/` | Images used by the docs and chart metadata |
+Start with [prerequisites.md](prerequisites.md).
+
+That page explains the basic words, the tools you need, and what this
+repository does not do for you.
+
+## I Want To Install This
+
+Start with [quickstart.md](quickstart.md).
+
+That page walks through the simplest manual local install first. After that,
+use [../examples/README.md](../examples/README.md) if you need a different
+overlay.
+
+## I Maintain This Repo
+
+Start with [contributor-map.md](contributor-map.md).
+
+That page explains where changes belong. After that, use
+[../CONTRIBUTING.md](../CONTRIBUTING.md),
+[../hack/README.md](../hack/README.md), and
+[release-playbook.md](release-playbook.md).
+
+## Optional Reference Pages
+
+- [glossary.md](glossary.md)
+  for unfamiliar words
+- [auth-architecture.md](auth-architecture.md)
+  for login and access details
+- [data-governance.md](data-governance.md)
+  for governed data rules
+- [assets/README.md](assets/README.md)
+  for documentation images and chart icon notes
 
 ## Documentation Rules
 
 - explain the simple version first
-- do not assume the reader already knows the tools
-- say clearly what the chart does and what humans still have to do
+- define basic words before using them
+- give one recommended next step per page
+- say clearly what the chart checks and what people still need to do
 - treat vendored upstream docs as reference material, not the starting point

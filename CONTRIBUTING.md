@@ -3,11 +3,21 @@
 Thanks for contributing to `dlh-in-a-box`.
 
 This repository is intentionally focused on one job: maintaining and publishing
-the reusable umbrella chart. Please keep changes aligned with that scope.
+the reusable umbrella chart.
+
+Audience: mainly repository collaborators who change the chart, examples, docs,
+or release flow.
+
+What you will learn: the local validation path, when to run the smoke install,
+and how contribution rights work in this repository.
+
+Read next: [docs/contributor-map.md](docs/contributor-map.md) for the repo
+layout, or [SUPPORT.md](SUPPORT.md) if you are a chart consumer looking for
+help rather than a collaborator preparing a change.
 
 ## Local workflow
 
-Before opening a pull request, run the standard local checks:
+Before opening a pull request, run the standard CI-aligned local checks:
 
 ```bash
 ./hack/helm-dependency-update.sh
@@ -59,6 +69,18 @@ default `LOCAL_VALUES` points at `examples/values-local-auth.yaml`. Override
 `LOCAL_VALUES=examples/values-local.yaml` for the simple self-contained path,
 or pre-create the auth demo Secrets yourself before using the auth overlay.
 
+## What Counts As A Complete Change
+
+Good changes in this repo usually keep these four views aligned:
+
+- chart behavior
+- example overlays
+- user-facing docs
+- local validation and workflow docs
+
+If you change one of those and skip the others, the repository starts giving
+different answers to different readers.
+
 ## Dependency updates
 
 - Keep upstream services upstream wherever possible.
@@ -79,7 +101,7 @@ or pre-create the auth demo Secrets yourself before using the auth overlay.
 - Keep [README.md](README.md) focused on repository context, architecture, and
   navigation.
 - Keep [charts/dlh-in-a-box/README.md](charts/dlh-in-a-box/README.md) focused
-  on the chart contract and consumer usage.
+  on chart usage and chart-facing behavior.
 - Keep [`examples/`](examples/README.md) readable enough to serve as living
   examples, not just test fixtures.
 - Every maintained directory should have a local guide file. Use `README.md`
@@ -100,10 +122,12 @@ or pre-create the auth demo Secrets yourself before using the auth overlay.
 
 ## Contribution model
 
-- This repository may be publicly visible, but pull requests are limited to
-  repository collaborators.
+- This repository may be publicly visible, but pull requests are mainly limited
+  to repository collaborators.
 - External users should not assume that public visibility implies open
   contribution rights.
+- If you are not a collaborator, the best starting point is usually
+  [SUPPORT.md](SUPPORT.md) or the repository issue templates.
 - Review routing and stewardship live in `.github/CODEOWNERS`.
 - Public issue intake is handled through `.github/ISSUE_TEMPLATE/`.
 

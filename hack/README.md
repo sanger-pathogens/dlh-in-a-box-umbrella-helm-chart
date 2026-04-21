@@ -6,6 +6,16 @@ package, and smoke-test the chart.
 They are meant to mirror CI and release expectations, not invent a separate
 maintainer-only workflow.
 
+Audience: repository collaborators who need the local validation and smoke
+install tools.
+
+What you will learn: which script does what, which sequence matches CI, and
+when the auth-enabled smoke path is the right extra check.
+
+Read next: [../CONTRIBUTING.md](../CONTRIBUTING.md) for the overall workflow,
+or [../docs/release-playbook.md](../docs/release-playbook.md) for release
+steps.
+
 ## Script flow
 
 ```mermaid
@@ -49,6 +59,10 @@ SKIP_MERMAID_CHECK=1 ./hack/docs-check.sh
 
 Equivalent convenience targets are available through `make` at the repository
 root.
+
+Use `./hack/smoke-install.sh` when you need the auth-enabled smoke path. That
+script is the supported way to install `examples/values-local-auth.yaml`
+because it seeds the demo Secrets that overlay expects.
 
 ## Docker note
 

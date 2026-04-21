@@ -3,50 +3,48 @@
 [![Helm Lint](https://github.com/sanger-pathogens/dlh-in-a-box-umbrella-helm-chart/actions/workflows/helm-lint.yaml/badge.svg)](https://github.com/sanger-pathogens/dlh-in-a-box-umbrella-helm-chart/actions/workflows/helm-lint.yaml)
 [![Helm Publish](https://github.com/sanger-pathogens/dlh-in-a-box-umbrella-helm-chart/actions/workflows/helm-publish.yaml/badge.svg)](https://github.com/sanger-pathogens/dlh-in-a-box-umbrella-helm-chart/actions/workflows/helm-publish.yaml)
 
-This repository contains a Helm chart called `dlh-in-a-box`.
+This repository publishes a Helm chart called `dlh-in-a-box`.
 
-If you do not know Helm yet, the simple version is:
+In plain language:
 
-- Helm is a way to install apps on Kubernetes
-- Kubernetes is the system that runs containers in a cluster
-- a Helm chart is a reusable install package
+- Kubernetes is the system that runs apps in a cluster
+- Helm is a tool for installing apps on Kubernetes
+- a Helm chart is the install package Helm uses
 
-So this repository is basically a reusable install package for a data platform.
+So this repository is an install package for a small data platform.
 
-That platform can include tools such as:
+That platform can include a SQL engine, login system, workflow UI, browser SQL
+tool, metadata tools, object storage, and a few other optional pieces. You do
+not need to know those tools yet to start using this repository.
 
-- Trino for running SQL queries
-- Hive Metastore for table metadata
-- Keycloak for login
-- Ranger for access rules
-- Prefect for workflows
-- CloudBeaver for browser-based SQL
-- DataHub for metadata
-- JupyterHub for notebooks
-- Vault for secrets
-- MinIO for object storage
+Audience: people who want to understand or deploy the chart, plus internal
+collaborators who maintain it.
 
-You do not need every one of those tools turned on. The chart lets you enable
-the parts you need.
+What you will learn: what this repository is, what it deploys, what it does
+not do for you, and where to start.
+
+Read next: [docs/prerequisites.md](docs/prerequisites.md) if you are brand
+new, or [docs/quickstart.md](docs/quickstart.md) if you already have a
+Kubernetes cluster and want the simplest local install.
 
 ## Start Here
 
-- If you want the simplest explanation of the chart:
-  [charts/dlh-in-a-box/README.md](charts/dlh-in-a-box/README.md)
-- If you want the fastest way to try it locally:
-  [docs/quickstart.md](docs/quickstart.md)
-- If you do not know the terms used in the docs:
-  [docs/glossary.md](docs/glossary.md)
-- If you need to understand login and access:
-  [docs/auth-architecture.md](docs/auth-architecture.md)
-- If you need to understand the data approval rules:
-  [docs/data-governance.md](docs/data-governance.md)
-- If you want example values files:
-  [examples/README.md](examples/README.md)
-- If you maintain this repository:
-  [hack/README.md](hack/README.md),
-  [docs/release-playbook.md](docs/release-playbook.md),
-  [CONTRIBUTING.md](CONTRIBUTING.md)
+- I am new here:
+  start with [docs/prerequisites.md](docs/prerequisites.md), then follow
+  [docs/quickstart.md](docs/quickstart.md).
+- I want to understand the chart before I install it:
+  read [charts/dlh-in-a-box/README.md](charts/dlh-in-a-box/README.md).
+- I want help choosing an example values file:
+  read [examples/README.md](examples/README.md).
+- I want to understand login and access:
+  read [docs/auth-architecture.md](docs/auth-architecture.md).
+- I want to understand the data approval rules:
+  read [docs/data-governance.md](docs/data-governance.md).
+- I maintain this repository:
+  start with [docs/contributor-map.md](docs/contributor-map.md), then use
+  [CONTRIBUTING.md](CONTRIBUTING.md) and [hack/README.md](hack/README.md).
+- I hit an unfamiliar word:
+  use the optional reference page at [docs/glossary.md](docs/glossary.md).
 
 ## Repository Mental Model
 
@@ -63,41 +61,45 @@ flowchart LR
   Docs --> User
 ```
 
-The shortest way to think about the repository is:
+The shortest way to think about the repository is this:
 
 - `charts/dlh-in-a-box/`
-  the actual chart you install
+  the actual chart Helm installs
 - `examples/`
-  example config files you can copy from
+  example values files you can start from
 - `docs/`
-  explanation and background
+  plain-English explanation
 - `hack/`
-  helper scripts used by maintainers and CI
+  local validation and smoke-install scripts
+
+This repository is not your cluster, your real secrets store, your DNS setup,
+or your environment-specific infrastructure repository.
 
 ## Default Platform Model
 
-If you are brand new, this is the easiest mental model:
+If you are brand new, this is the easiest mental model for the shared
+development and production examples:
 
-- users sign in through `Keycloak`
-- shared development and production examples use an external company or lab
-  directory for users and groups
-- `platformHome` is the optional home page people land on in the browser
-- `Prefect` and `CloudBeaver` sit behind a login proxy so they reuse the same
-  browser sign-in
-- `Ranger` stores access rules and role information
-- `Trino` is the SQL engine that users query
+- people sign in through `Keycloak`
+- the shared examples read users and groups from an external LDAP or Active
+  Directory service
+- `platformHome` is an optional browser landing page
+- `Prefect` and `CloudBeaver` sit behind a browser login proxy so people do
+  not sign in separately to each tool
+- `Ranger` stores access rules
+- `Trino` is the SQL engine people query
 
-There is also a simpler local auth mode where Keycloak stores users itself.
-That is what the local auth example uses.
+There is also a simpler local-only auth mode where Keycloak stores users
+itself. That is the mode used by `examples/values-local-auth.yaml`.
 
 ## What This Repo Owns
 
 - the chart itself
 - the default values and schema
-- the chart-specific templates that tie multiple tools together
-- the example config files
+- the chart templates that wire multiple tools together
+- the example values files
 - the chart documentation
-- the validation, packaging, and publish scripts
+- the local validation, packaging, and publish scripts
 
 ## What This Repo Does Not Own
 
@@ -110,7 +112,7 @@ That is what the local auth example uses.
 
 ## Validation Model
 
-These are the main repo checks:
+These are the main local checks:
 
 ```bash
 ./hack/helm-dependency-update.sh
@@ -121,7 +123,7 @@ SKIP_MERMAID_CHECK=1 ./hack/docs-check.sh
 ./hack/smoke-install.sh
 ```
 
-What those mean in simple terms:
+What they mean in simple terms:
 
 - `docs-check.sh`
   checks links, headings, and doc rules
@@ -132,26 +134,29 @@ What those mean in simple terms:
 - `package.sh`
   builds the chart package
 - `smoke-install.sh`
-  does a real local install of the auth-enabled example
+  does a real local install of the auth-enabled smoke path
 
 Full Mermaid diagram checking needs Docker. If Docker is not running locally,
 `SKIP_MERMAID_CHECK=1` is the deliberate way to skip that one part.
 
 ## Reference Map
 
+- newcomer path:
+  [docs/prerequisites.md](docs/prerequisites.md),
+  [docs/quickstart.md](docs/quickstart.md)
 - chart guide:
   [charts/dlh-in-a-box/README.md](charts/dlh-in-a-box/README.md)
-- long-form docs:
-  [docs/README.md](docs/README.md)
-- example config files:
+- examples chooser:
   [examples/README.md](examples/README.md)
-- maintainer scripts:
-  [hack/README.md](hack/README.md)
-- release and workflow docs:
+- deeper reference docs:
+  [docs/README.md](docs/README.md)
+- collaborator docs:
+  [docs/contributor-map.md](docs/contributor-map.md),
+  [CONTRIBUTING.md](CONTRIBUTING.md),
+  [hack/README.md](hack/README.md),
   [docs/release-playbook.md](docs/release-playbook.md),
   [.github/workflows/README.md](.github/workflows/README.md)
-- repo support docs:
-  [CONTRIBUTING.md](CONTRIBUTING.md),
+- support and policy docs:
   [SUPPORT.md](SUPPORT.md),
   [SECURITY.md](SECURITY.md),
   [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md)

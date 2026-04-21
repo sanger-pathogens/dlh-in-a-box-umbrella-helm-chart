@@ -5,6 +5,16 @@ This guide explains one simple idea:
 the chart can block unsafe or incomplete data setup, but it does not replace
 your human approval process.
 
+Audience: readers who need to understand the required governed-data fields and
+how those fields relate to access rules.
+
+What you will learn: where the chart draws the line, which fields are required
+for shared environments, and what those fields do and do not change at
+runtime.
+
+Read next: [auth-architecture.md](auth-architecture.md) for the access model,
+or [../examples/README.md](../examples/README.md) for working examples.
+
 ## The Boundary
 
 ```mermaid
@@ -14,6 +24,10 @@ flowchart LR
   Validation --> Ranger[Ranger rules]
   Ranger --> Trino[Trino access]
 ```
+
+This governance model is organization-specific. It is the model enforced by
+this chart and its example overlays. It is not a universal open-source data
+governance standard.
 
 What the chart can do:
 
@@ -26,6 +40,9 @@ What the chart cannot do:
 - replace ethics review, governance review, PI approval, or legal approval
 
 ## Governance Metadata Contract
+
+This heading uses the word "contract" because the chart validates the shape.
+In practice, treat it as a required fields list.
 
 For a non-local dataset, the chart expects a `governance` block like this:
 
@@ -48,14 +65,22 @@ global:
         retentionNotes: Retain according to the approved study retention schedule.
 ```
 
-In plain language, this block says:
+Required fields in plain language:
 
-- what kind of data this is
-- how sensitive it is
-- whether it contains identifying information
-- who owns it
-- who looks after it
-- which approval record allows it to be here
+| Field | Plain meaning |
+| --- | --- |
+| `dataType` | What kind of data this is. |
+| `classification` | How sensitive the data is. |
+| `containsDirectIdentifiers` | Whether the data directly identifies a person. |
+| `containsQuasiIdentifiers` | Whether the data could help re-identify a person when combined with other information. |
+| `consentBasis` | Why the data may be used. |
+| `irbStatus` | Whether the approval process is complete. |
+| `sharingStatus` | Whether the data may be shared and at what level. |
+| `ownerPi` | Who is accountable for the dataset. |
+| `dataSteward` | Who looks after the dataset day to day. |
+| `sourceSystem` | Where the data came from. |
+| `approvalReference` | The record that says the dataset is allowed on the platform. |
+| `retentionNotes` | Notes about how long the data should be kept. |
 
 ## How The Chart Interprets Classification
 
@@ -65,6 +90,19 @@ In plain language, this block says:
 | `restricted-deidentified` | Sensitive data without direct identifiers; explicit policy coverage is still required |
 | `internal-deidentified` | Internal-only data; explicit policy coverage is still required |
 | `public` | Public data; the identifier flags must still make sense |
+
+## Resulting Behavior
+
+This table shows the end-to-end effect of the main governance inputs:
+
+| Input | What the chart checks | Effect in Ranger | Effect in Trino | Effect in DataHub |
+| --- | --- | --- | --- | --- |
+| Missing `governance` block in `dev` or `prod` | Install fails | No policies are applied because rendering stops | No catalog access is created because rendering stops | Nothing is pushed automatically |
+| Invalid field combinations such as `sharingStatus=public` with non-public `classification` | Install fails | No policies are applied because rendering stops | No catalog access is created because rendering stops | Nothing is pushed automatically |
+| Sensitive classifications with wildcard access or no explicit allowlist | Install fails | The chart refuses broad policy coverage for sensitive data | No access rules are produced for that catalog because rendering stops | Nothing is pushed automatically |
+| `restricted-identifiable` with identifier flags but no masking or row filter policy | Install fails | Requires an explicit fine-grained Ranger policy | Trino access is blocked at install time until that policy exists | Nothing is pushed automatically |
+| Valid `authorizedGroups` and/or explicit `bootstrapPolicies` | Ranger automation can create or import catalog rules | Catalog access rules are created or imported | Trino can use those rules only when the Ranger plugin path is enabled; otherwise Trino continues to use its configured rule path | Nothing is copied automatically from the governance block |
+| Metadata fields such as `ownerPi`, `dataSteward`, and `approvalReference` | Presence is checked in shared environments | No direct runtime policy change by themselves | No direct runtime query change by themselves | The chart does not automatically map them into DataHub |
 
 ## Ranger Mapping
 
@@ -90,7 +128,8 @@ In this repo, DataHub is for metadata and discovery.
 Ranger is the thing used for SQL access rules.
 
 The chart does not automatically copy the governance block into DataHub for
-you.
+you. If you want matching metadata in DataHub, you still need to model that in
+your wider platform setup.
 
 ## New Data Source Rule
 

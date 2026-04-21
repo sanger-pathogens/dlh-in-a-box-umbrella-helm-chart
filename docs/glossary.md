@@ -2,16 +2,30 @@
 
 This page explains the words used in the docs in the simplest way possible.
 
+Audience: readers who hit an unfamiliar word and do not want to guess.
+
+What you will learn: the basic words used across the README, quickstart,
+examples, and chart guide.
+
+Read next: go back to the page you were reading, or start with
+[prerequisites.md](prerequisites.md).
+
 ## Core Platform Terms
 
 - `Kubernetes`
   The system that runs containers in a cluster.
+- `cluster`
+  The Kubernetes environment where your apps run.
+- `namespace`
+  A folder-like space inside a Kubernetes cluster.
 - `Helm`
   A tool used to install apps on Kubernetes.
 - `Helm chart`
   A reusable install package for Kubernetes.
 - `Umbrella chart`
   One chart that installs several other tools together.
+- `values file`
+  A YAML file that tells the chart what to install and how to configure it.
 - `Consumer repository`
   Another repository that uses this chart and adds environment-specific config.
 - `Example overlay`

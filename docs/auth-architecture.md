@@ -2,12 +2,15 @@
 
 This guide explains how login and access work in the chart.
 
-You do not need to know every tool already. The simple version is:
+Audience: readers who need to understand sign-in, group mapping, browser app
+access, and Trino access.
 
-- Keycloak handles login
-- a directory can supply users and groups
-- Ranger stores access rules
-- Trino is the SQL engine those rules protect
+What you will learn: the default shared-environment access model, the local
+auth model, what happens in Trino and browser apps, and what the chart checks
+for you.
+
+Read next: [../examples/README.md](../examples/README.md) for the overlay map,
+or [data-governance.md](data-governance.md) for governed data rules.
 
 ## Supported Identity Modes
 
@@ -15,36 +18,33 @@ There are two main ways the chart can handle users:
 
 | Mode | Simple meaning |
 | --- | --- |
-| `externalLdap` | Users sign in through Keycloak, but the real user list and groups come from LDAP or Active Directory |
-| `keycloakLocal` | Keycloak stores the users itself |
+| `externalLdap` | Users sign in through Keycloak, but the real user list and groups come from LDAP or Active Directory. This is the shared dev and prod model in this repository. |
+| `keycloakLocal` | Keycloak stores users itself. This is the local auth model used by `examples/values-local-auth.yaml`. |
 
 ## Default Model
 
 The shared development and production examples in this repository use
 `externalLdap`.
 
-```mermaid
-flowchart LR
-  User[User in browser] --> Portal[platformHome optional]
-  Portal --> Keycloak[Keycloak login]
-  LDAP[LDAP or Active Directory] --> Keycloak
-  LDAP --> RangerUsersync[Ranger usersync]
-  Keycloak --> Trino[Trino]
-  Keycloak --> PrefectProxy[Prefect auth proxy]
-  Keycloak --> CloudBeaverProxy[CloudBeaver auth proxy]
-  RangerUsersync --> Ranger[Ranger]
-  PrefectProxy --> Prefect[Prefect]
-  CloudBeaverProxy --> CloudBeaver[CloudBeaver]
-  Ranger --> Trino
-```
-
 What that means in plain language:
 
-- the user signs in once through Keycloak
-- the user’s groups usually come from LDAP or Active Directory
-- Ranger stores the access rules
-- Trino is the main data-query tool those rules affect
-- browser tools such as Prefect and CloudBeaver can reuse the same sign-in
+1. A person opens a browser app such as `platformHome`, Prefect, CloudBeaver,
+   or the Trino UI.
+2. The browser sends that person to Keycloak to sign in.
+3. In shared environments, Keycloak and Ranger usersync read users and groups
+   from LDAP or Active Directory.
+4. The browser app decides whether the signed-in person may open it.
+5. Trino decides whether the signed-in person may query a catalog, schema, or
+   table.
+
+Use this table as the simple reference:
+
+| Workload | Authentication source | Authorization source | What the operator must supply |
+| --- | --- | --- | --- |
+| `platformHome` | Browser login through Keycloak | App group membership and platform role mapping | Keycloak client settings and the right groups or roles |
+| `Prefect` | `oauth2-proxy` in front of Prefect, backed by Keycloak | `oauth2-proxy` allowed groups | Prefect proxy client settings and the groups allowed to reach the UI |
+| `CloudBeaver` | `oauth2-proxy` in front of CloudBeaver, backed by Keycloak | `oauth2-proxy` allowed groups for the UI, plus any seeded datasource rules behind it | CloudBeaver proxy client settings and, if desired, a seeded datasource secret |
+| `Trino` | OIDC for browser and token flows, plus optional LDAP password auth in `externalLdap` mode | Generated Trino rules by default, or Ranger plugin rules only when `global.authorization.ranger.trino.enabled=true` and the image supports the plugin | Trino client settings, user or group alignment, and any Ranger Trino plugin support |
 
 ## Keycloak Local Users Model
 
@@ -71,7 +71,7 @@ Here is how the example files in this repository map to login modes:
 | `examples/values-local-auth.yaml` | Local auth test | `keycloakLocal` |
 | `examples/values-dev.yaml` | Shared dev example | `externalLdap` |
 | `examples/values-prod.yaml` | Shared prod-shaped example | `externalLdap` |
-| `examples/values-shared-auth.yaml` | Shared example with external OIDC provider | `externalLdap` plus external OIDC provider |
+| `examples/values-shared-auth.yaml` | Shared example with external OIDC provider | `externalLdap` plus an external OIDC provider |
 
 ## Username And Group Alignment
 
@@ -92,34 +92,26 @@ If those names do not line up, login can work but access can still be wrong.
 
 Trino is the tool that actually runs SQL queries.
 
-There are three different questions around Trino access:
+Keep these three questions separate:
 
-- who is this user?
-- what groups or roles does this user have?
-- what data is this user allowed to read or change?
+- who is the user
+- what groups or roles does the user have
+- what data may that user read or change
 
 In this chart:
 
-- shared dev and prod examples currently use generated file-based rules inside
-  Trino
-- Ranger can also be used inside Trino, but only if
-  `global.authorization.ranger.trino.enabled=true` and the Trino image has the
-  Ranger plugin built in
+- shared dev and prod examples use generated Trino rules by default
+- Ranger only drives Trino when
+  `global.authorization.ranger.trino.enabled=true` and the Trino image
+  supports the Ranger plugin
 - long-lived access should normally be modeled through
   `global.authorization.platformRoles`
 
-In `externalLdap` mode, users can reach Trino through:
+In `externalLdap` mode, Trino can be reached through browser login, token-based
+clients, and optional LDAP password auth when that path is enabled.
 
-- browser login
-- token-based clients
-- optional LDAP password auth if it is turned on
-
-In `keycloakLocal` mode, the normal user path is token-based:
-
-- browser login
-- token-capable desktop or code clients
-- optional direct-grant token exchange
-- optional JupyterHub notebooks reusing the Keycloak token
+In `keycloakLocal` mode, the normal user path is token-based rather than LDAP
+password-based.
 
 ## Platform Roles And Direct-User Exceptions
 
@@ -150,8 +142,8 @@ CloudBeaver needs one extra note:
 - browser login goes through the auth proxy and Keycloak
 - the saved database connection can be pre-seeded by admins
 - that saved connection might use a shared service account
-- the chart does not assume every CloudBeaver user types an LDAP password
-  directly into Trino
+- the chart does not assume every CloudBeaver user types an LDAP password into
+  Trino directly
 
 ## Prefect
 
@@ -172,6 +164,9 @@ The chart often needs two kinds of URLs:
 - an internal cluster URL that one service uses to talk to another service
 
 Those are not always the same thing.
+
+If those two URLs are mixed up, login callbacks and service-to-service calls
+can break in confusing ways.
 
 ## LDAPS Trust Material
 

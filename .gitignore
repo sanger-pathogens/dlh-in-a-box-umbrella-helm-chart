@@ -14,3 +14,6 @@ dist/
 # Local reference repositories (not part of the packaged chart)
 reference/
 references/
+
+# Internal working notes and private review documents
+docs/Internal/

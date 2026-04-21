@@ -3,6 +3,15 @@
 This guide describes how to validate, package, and publish `dlh-in-a-box`
 reliably.
 
+Audience: repository collaborators preparing a prerelease or stable release.
+
+What you will learn: which local checks to run, how prereleases and stable
+releases differ, and how the publish workflow is triggered.
+
+Read next: [../hack/README.md](../hack/README.md) for the local scripts, or
+[../.github/workflows/README.md](../.github/workflows/README.md) for the CI
+view.
+
 ## Release flow
 
 ```mermaid
@@ -24,7 +33,7 @@ flowchart LR
 
 ## Before you publish
 
-Run the standard local checks:
+Run the standard CI-aligned local checks:
 
 ```bash
 make deps

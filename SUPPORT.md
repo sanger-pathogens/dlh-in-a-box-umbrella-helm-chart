@@ -5,11 +5,19 @@ This repository publishes and documents the `dlh-in-a-box` Helm chart.
 Support is focused on helping people understand, validate, and consume that
 chart.
 
+Audience: chart consumers, operators, and public readers who need help.
+
+What you will learn: what kinds of questions fit this repository, what details
+to include when asking for help, and where the collaborator boundary is.
+
+Read next: [README.md](README.md) for the repo overview, or
+[docs/quickstart.md](docs/quickstart.md) for the simplest first install.
+
 ## What support is a good fit for
 
 - chart installation and upgrade questions
 - example overlay usage
-- values-contract questions
+- values-surface questions
 - GHCR consumption from downstream repositories
 - local validation, including the difference between manual local install and
   the auth-enabled smoke path

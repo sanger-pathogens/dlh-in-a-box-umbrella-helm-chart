@@ -5,6 +5,16 @@ This directory contains the automation that validates and publishes the chart.
 Use the local scripts under [`../../hack/README.md`](../../hack/README.md) when
 you want the same logic outside GitHub Actions.
 
+Audience: collaborators who need to understand how CI maps to the local
+maintainer workflow.
+
+What you will learn: which workflow runs when, how it relates to the local
+scripts, and which workflow covers the auth-enabled smoke path.
+
+Read next: [../../hack/README.md](../../hack/README.md) for the local script
+equivalents, or [../../docs/release-playbook.md](../../docs/release-playbook.md)
+for release-specific steps.
+
 ## Workflow inventory
 
 | Workflow | Trigger | Purpose |

@@ -2,39 +2,44 @@
 
 This folder contains example values files.
 
-If you are new, think of them as example config files you can learn from or
-start from.
+If you are new, think of an overlay as an example config file you can learn
+from or start from.
+
+Audience: people choosing a starting values file.
+
+What you will learn: which overlay is the easiest first path, which ones are
+for shared environments, and which files are special-case examples.
+
+Read next: [../docs/quickstart.md](../docs/quickstart.md) for the recommended
+first install, or [../docs/auth-architecture.md](../docs/auth-architecture.md)
+if you are choosing an auth model.
 
 ## Overlay selection
 
-```mermaid
-flowchart TD
-  Start[Choose a file] --> Local[Simple local install]
-  Start --> Smoke[Local auth test]
-  Start --> Shared[Shared environment]
-  Start --> Prod[Production-shaped example]
+Choose the first matching row:
 
-  Local --> LocalBase[values-local.yaml]
-  Smoke --> LocalAuth[values-local-auth.yaml]
-  Shared --> Dev[values-dev.yaml]
-  Shared --> SharedAuth[values-shared-auth.yaml]
-  Prod --> ProdBase[values-prod.yaml]
-```
+| Plain-English label | File | Use this when |
+| --- | --- | --- |
+| Simplest local install | `values-local.yaml` | You want the easiest manual first install. |
+| Auth-enabled smoke test | `values-local-auth.yaml` | You want a local path that also exercises login and access pieces. |
+| Shared development example | `values-dev.yaml` | You want the main LDAP-backed dev baseline. |
+| Production-shaped example | `values-prod.yaml` | You want the main LDAP-backed production baseline. |
+| Shared environment with external OIDC provider | `values-shared-auth.yaml` | You already have an external OIDC provider and do not want bundled Keycloak. |
 
 ## Overlay inventory
 
-| File | What it is for |
-| --- | --- |
-| `values-local.yaml` | The easiest local install |
-| `values-local-auth.yaml` | Local install with login and access pieces turned on |
-| `values-local-superset.yaml` | Local install focused on Superset |
-| `values-local-layers.yaml` | Local install with a richer example layout |
-| `values-dev.yaml` | Main shared development example |
-| `values-prod.yaml` | Main production-shaped example |
-| `values-prod-layers.yaml` | Production-shaped example with extra layering |
-| `values-shared-auth.yaml` | Shared example using an external OIDC provider |
-| `values-external-s3.yaml` | Example using external S3 |
-| `values-minio.yaml` | Example focused on MinIO |
+| File | Plain-English label | What it is for |
+| --- | --- | --- |
+| `values-local.yaml` | Simplest local install | The recommended first manual install. |
+| `values-local-auth.yaml` | Auth-enabled smoke test | Local install with Keycloak, Ranger, browser proxies, and seeded demo secrets. |
+| `values-local-superset.yaml` | Local Superset example | Local install focused on Superset. |
+| `values-local-layers.yaml` | Richer local layout | Local install that shows more layering and structure. |
+| `values-dev.yaml` | Shared development example | Main shared development baseline. |
+| `values-prod.yaml` | Production-shaped example | Main shared production baseline. |
+| `values-prod-layers.yaml` | Layered production example | Production-shaped example with more layering. |
+| `values-shared-auth.yaml` | Shared environment with external OIDC provider | Shared example that expects an external OIDC provider. |
+| `values-external-s3.yaml` | External S3 example | Example that points at external object storage. |
+| `values-minio.yaml` | MinIO-focused example | Example focused on MinIO setup. |
 
 ## Validation expectations
 
@@ -47,7 +52,7 @@ Important difference between the two main local examples:
 - `values-local.yaml`
   is the easiest manual local install
 - `values-local-auth.yaml`
-  is the auth-enabled local test and is normally run through
+  is the auth-enabled smoke path and is normally run through
   `make smoke-install` because that script creates the demo Secrets it needs
 
 ## Shared-Environment Expectations
@@ -66,8 +71,6 @@ They expect real environment-specific things such as:
 
 For non-local datasets, the examples should include a `governance` block under
 `global.dataCatalogs.<catalog>.governance`.
-
-That is part of the chart contract.
 
 ## Security note
 

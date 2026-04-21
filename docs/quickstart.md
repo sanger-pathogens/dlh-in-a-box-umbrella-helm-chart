@@ -1,137 +1,142 @@
 # Quickstart
 
-This guide answers one question:
+This page is the one true happy-path tutorial for a first local install.
 
-What should I run next?
+Audience: someone who wants the simplest possible first success.
 
-## Choose your path
+What you will learn: how to install the chart locally with
+`examples/values-local.yaml`, how to tell whether it worked, and what to try
+next.
 
-```mermaid
-flowchart TD
-  Start[Start here] --> Learn[Read first]
-  Start --> Local[Simple local install]
-  Start --> Smoke[Auth-enabled local test]
-  Start --> Published[Use the published chart]
+Read next: [../examples/README.md](../examples/README.md) if you need a
+different overlay after this tutorial.
 
-  Learn --> Readme[README]
-  Local --> LocalYaml[values-local.yaml]
-  Smoke --> LocalAuth[values-local-auth.yaml]
-  Published --> OCI[GHCR package]
-```
+## 1. Before You Start
 
-## 1. Read first if you are new
+Read [prerequisites.md](prerequisites.md) first.
 
-If you do not already know what this repo is, read these first:
+This quickstart assumes:
 
-1. [../README.md](../README.md)
-2. [../charts/dlh-in-a-box/README.md](../charts/dlh-in-a-box/README.md)
-3. [glossary.md](glossary.md)
+- `kubectl` works against a real Kubernetes cluster
+- `helm` is installed
+- you are running commands from the repository root
 
-## 2. Run the simplest local install
+## 2. Install The Chart Dependencies
 
-Use `examples/values-local.yaml` if you want the easiest local install.
-
-Why this is the easiest one:
-
-- it needs fewer moving parts
-- it does not need pre-created demo Secrets
-- it is the best first install if you just want to see the chart work
-
-Run this from the repository root:
+Run:
 
 ```bash
 ./hack/helm-dependency-update.sh
-./hack/lint.sh
+```
+
+This downloads the packaged chart dependencies that the umbrella chart needs.
+
+## 3. Install The Simplest Local Overlay
+
+Run:
+
+```bash
 helm upgrade --install dlh charts/dlh-in-a-box \
   -n data-lakehouse-local \
   --create-namespace \
   -f examples/values-local.yaml
 ```
 
-Then check what was created:
+Why this is the recommended first path:
+
+- it is the simplest tracked example
+- it does not rely on pre-seeded demo Secrets
+- it is the easiest way to prove the chart can install in your cluster
+
+## 4. Check That It Worked
+
+Run:
 
 ```bash
-kubectl get all -n data-lakehouse-local
+kubectl get pods -n data-lakehouse-local
+kubectl get svc -n data-lakehouse-local
 ```
 
-Useful local access commands:
+What success looks like:
+
+- most pods are `Running`
+- one-off setup jobs may be `Completed`
+- services such as `dlh-trino`, `prefect-server`, `dlh-minio`, and
+  `dlh-vault` exist in the namespace
+
+If the namespace is empty or many pods are stuck in `Pending`, the install did
+not complete successfully.
+
+## 5. Open A Few Local Endpoints
+
+Run each port-forward command in its own terminal.
+
+Trino UI:
 
 ```bash
 kubectl port-forward -n data-lakehouse-local svc/dlh-trino 8080:8080
-kubectl port-forward -n data-lakehouse-local svc/prefect-server 4200:4200
-kubectl port-forward -n data-lakehouse-local svc/dlh-minio 9001:9001
-kubectl port-forward -n data-lakehouse-local svc/dlh-vault 8200:8200
 ```
 
-## 3. Run the auth-enabled local test
+Then open `http://localhost:8080/ui/`.
 
-Use `examples/values-local-auth.yaml` if you want to test the login-related
-parts too.
+Prefect UI:
 
-That example turns on more pieces, such as:
+```bash
+kubectl port-forward -n data-lakehouse-local svc/prefect-server 4200:4200
+```
 
-- Keycloak for login
-- Ranger for roles and access
-- platformHome for the browser home page
-- CloudBeaver and Prefect behind auth proxies
+Then open `http://localhost:4200`.
 
-Important:
+MinIO console:
 
-- this example expects demo Kubernetes Secrets to exist first
-- `make smoke-install` creates those demo Secrets for you
-- a plain `helm upgrade --install ... -f examples/values-local-auth.yaml`
-  will fail if you did not create the Secrets yourself
+```bash
+kubectl port-forward -n data-lakehouse-local svc/dlh-minio 9001:9001
+```
 
-So the normal way to run it is:
+Then open `http://localhost:9001`.
+
+The tracked local overlay uses the demo MinIO credentials from
+[`../examples/values-local.yaml`](../examples/values-local.yaml):
+
+- username: `minioadmin`
+- password: `minioadmin123`
+
+## 6. Clean Up When You Are Done
+
+Run:
+
+```bash
+helm uninstall dlh -n data-lakehouse-local
+kubectl delete namespace data-lakehouse-local
+```
+
+## 7. If You Need The Auth-Enabled Path Next
+
+Do not use `examples/values-local-auth.yaml` as your first manual install.
+
+That overlay expects demo Kubernetes Secrets to exist first. The normal way to
+run it is:
 
 ```bash
 make smoke-install
 ```
 
-Or:
+Or, in script form:
 
 ```bash
 ./hack/smoke-install.sh charts/dlh-in-a-box examples/values-local-auth.yaml
 ```
 
-Useful local access commands after that install:
+Use that path when you want to exercise login, browser proxies, Ranger, and
+other auth-related pieces.
 
-```bash
-kubectl port-forward -n data-lakehouse-local svc/dlh-platform-home 8110:80
-kubectl port-forward -n data-lakehouse-local svc/dlh-prefect-auth-proxy 4200:80
-kubectl port-forward -n data-lakehouse-local svc/dlh-cloudbeaver-auth-proxy 8978:80
-kubectl port-forward -n data-lakehouse-local svc/dlh-keycloak 8081:80
-kubectl port-forward -n data-lakehouse-local svc/dlh-ranger-admin 6080:6080
-kubectl port-forward -n data-lakehouse-local svc/dlh-trino 8443:8443
-```
+## 8. What To Read Next
 
-## 4. Use the published chart
-
-If you do not want to work from the repo source, you can inspect the published
-chart package:
-
-```bash
-helm show chart oci://ghcr.io/sanger-pathogens/charts/dlh-in-a-box --version <chart-version>
-helm show readme oci://ghcr.io/sanger-pathogens/charts/dlh-in-a-box --version <chart-version>
-```
-
-If another repository wants to use this chart as a dependency, its
-`Chart.yaml` will look like this:
-
-```yaml
-dependencies:
-  - name: dlh-in-a-box
-    version: <chart-version>
-    repository: oci://ghcr.io/sanger-pathogens/charts
-```
-
-## 5. What to read next
-
-- want to understand the chart:
-  [../charts/dlh-in-a-box/README.md](../charts/dlh-in-a-box/README.md)
-- want example config files:
+- want to choose a different example:
   [../examples/README.md](../examples/README.md)
+- want to understand the chart itself:
+  [../charts/dlh-in-a-box/README.md](../charts/dlh-in-a-box/README.md)
 - want to understand login and access:
   [auth-architecture.md](auth-architecture.md)
-- want to understand data approval rules:
+- want to understand governed data rules:
   [data-governance.md](data-governance.md)
