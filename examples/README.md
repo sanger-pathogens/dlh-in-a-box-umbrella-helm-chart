@@ -1,85 +1,75 @@
-# Example Overlays
+# Example Settings Files
 
-This folder contains example values files.
+This folder contains example chart settings files.
 
-If you are new, think of an overlay as an example config file you can learn
-from or start from.
+If the word "values" is new: a values file is the YAML file that tells the
+chart what to install and how to configure it.
 
-Audience: people choosing a starting values file.
+```mermaid
+flowchart TD
+  Start[Pick an example file] --> Simple[Simple local install]
+  Start --> Smoke[Auth-heavy smoke test]
+  Start --> Shared[Shared environment]
+  Start --> Special[Special case examples]
+```
 
-What you will learn: which overlay is the easiest first path, which ones are
-for shared environments, and which files are special-case examples.
+## Which file should you start with
 
-Read next: [../docs/quickstart.md](../docs/quickstart.md) for the recommended
-first install, or [../docs/auth-architecture.md](../docs/auth-architecture.md)
-if you are choosing an auth model.
-
-## Overlay selection
-
-Choose the first matching row:
-
-| Plain-English label | File | Use this when |
+| File | Plain meaning | Use this when |
 | --- | --- | --- |
-| Simplest local install | `values-local.yaml` | You want the easiest manual first install. |
-| Auth-enabled smoke test | `values-local-auth.yaml` | You want a local path that also exercises login and access pieces. |
-| Shared development example | `values-dev.yaml` | You want the main LDAP-backed dev baseline. |
-| Production-shaped example | `values-prod.yaml` | You want the main LDAP-backed production baseline. |
-| Shared environment with external OIDC provider | `values-shared-auth.yaml` | You already have an external OIDC provider and do not want bundled Keycloak. |
+| `values-local.yaml` | Simplest local install | You want the easiest manual first try. |
+| `values-local-auth.yaml` | Auth-heavy local smoke test | You want to test sign-in, browser proxies, and Ranger too. |
+| `values-dev.yaml` | Shared development example | You want the main shared development baseline. |
+| `values-prod.yaml` | Production-shaped example | You want the main shared production baseline. |
+| `values-shared-auth.yaml` | Shared example with an external sign-in provider | You already have an external sign-in provider and do not want bundled Keycloak. |
 
-## Overlay inventory
+## Full file list
 
-| File | Plain-English label | What it is for |
-| --- | --- | --- |
-| `values-local.yaml` | Simplest local install | The recommended first manual install. |
-| `values-local-auth.yaml` | Auth-enabled smoke test | Local install with Keycloak, Ranger, browser proxies, and seeded demo secrets. |
-| `values-local-superset.yaml` | Local Superset example | Local install focused on Superset. |
-| `values-local-layers.yaml` | Richer local layout | Local install that shows more layering and structure. |
-| `values-dev.yaml` | Shared development example | Main shared development baseline. |
-| `values-prod.yaml` | Production-shaped example | Main shared production baseline. |
-| `values-prod-layers.yaml` | Layered production example | Production-shaped example with more layering. |
-| `values-shared-auth.yaml` | Shared environment with external OIDC provider | Shared example that expects an external OIDC provider. |
-| `values-external-s3.yaml` | External S3 example | Example that points at external object storage. |
-| `values-minio.yaml` | MinIO-focused example | Example focused on MinIO setup. |
+| File | Plain meaning |
+| --- | --- |
+| `values-local.yaml` | Simplest local install |
+| `values-local-auth.yaml` | Auth-heavy smoke test |
+| `values-local-superset.yaml` | Local example focused on Superset |
+| `values-local-layers.yaml` | Local example with more layering |
+| `values-dev.yaml` | Shared development baseline |
+| `values-prod.yaml` | Shared production baseline |
+| `values-prod-layers.yaml` | Production-style example with more layering |
+| `values-shared-auth.yaml` | Shared example with an external sign-in provider |
+| `values-external-s3.yaml` | Example that points at external object storage |
+| `values-minio.yaml` | Example focused on MinIO |
 
-## Validation expectations
+## Two important first-timer rules
 
-- every file in this folder is part of the repo’s validation story
-- `./hack/lint.sh` checks them
-- `./hack/template.sh` renders them
+- `values-local.yaml` is the easiest manual first install.
+- `values-local-auth.yaml` is normally run through `make smoke-install`
+  because that script creates the demo Secrets that file needs.
 
-Important difference between the two main local examples:
-
-- `values-local.yaml`
-  is the easiest manual local install
-- `values-local-auth.yaml`
-  is the auth-enabled smoke path and is normally run through
-  `make smoke-install` because that script creates the demo Secrets it needs
-
-## Shared-Environment Expectations
+## Shared-environment warning
 
 The shared examples are not self-contained.
 
-They expect real environment-specific things such as:
+They usually expect real:
 
-- real hostnames
-- real TLS Secrets
-- real LDAP credentials
-- real OIDC client secrets
-- real storage credentials
+- hostnames
+- TLS Secrets
+- sign-in client Secrets
+- directory-service settings
+- storage credentials
 
-## Governance Expectation
+## Governed-data warning
 
-For non-local datasets, the examples should include a `governance` block under
-`global.dataCatalogs.<catalog>.governance`.
+For non-local datasets, shared examples should include a
+`global.dataCatalogs.<catalog>.governance` block.
 
-## Security note
+That block tells the chart what kind of data it is and whether the access
+rules are safe enough for that kind of data.
 
-- local examples may contain demo credentials
-- non-local examples should not contain real secrets
-- external storage examples should point to existing Secrets instead of
-  committing credentials into Git
+## When you can ignore this folder
 
-## Maintainer note
+You can ignore this folder only if you never use the source repo and only work
+with the already-published chart package.
 
-Keep these files readable. They are not just test inputs. They are also part of
-the user documentation.
+## Common mistake
+
+Do not guess which local file to use first. Start with `values-local.yaml`
+unless you specifically want the auth-heavy smoke path.

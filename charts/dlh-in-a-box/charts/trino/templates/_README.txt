@@ -1,24 +1,24 @@
 # Trino Template Patch Guide
 
-This directory belongs to the vendored upstream Trino chart.
+This folder contains the Trino render files.
 
-Most files are kept as upstream reference material. `dlh-in-a-box` carries only
-the local patches needed to connect the Trino chart to the umbrella values
-model.
+Most of this folder is upstream Trino chart code.
+
+This repo adds only a small local patch set so Trino fits the umbrella chart.
 
 ## Patch model
 
 ```mermaid
 flowchart TD
-  Upstream[Upstream Trino templates] --> LocalPatch[Small local patch set]
+  Upstream[Upstream Trino templates] --> LocalPatch[Small local changes]
   LocalPatch --> Catalogs[Generated catalog config]
-  LocalPatch --> AccessControl[Generated access-control config]
-  LocalPatch --> Pods[Coordinator and worker mounts]
+  LocalPatch --> Access[Generated access config]
+  LocalPatch --> Pods[Pod mounts and wiring]
 ```
 
 ## Files with local modifications
 
-| File | Local purpose |
+| File | Plain meaning |
 | --- | --- |
 | `_helpers.tpl` | Helper behavior needed by the patched templates |
 | `configmap-access-control-coordinator.yaml` | Generated access-control config for the coordinator |
@@ -29,16 +29,12 @@ flowchart TD
 All other files should be assumed to be upstream unless you see a deliberate
 local change notice.
 
-## Child guide
+## When you can ignore this folder
 
-| Path | Guide | Purpose |
-| --- | --- | --- |
-| `tests/` | [tests/_README.txt](tests/_README.txt) | Helm tests shipped with the vendored Trino chart |
+You can ignore this folder unless you are changing Trino internals.
 
-## Maintainer note
+## Common mistakes
 
-- Each local patch file carries an explicit `Modified for dlh-in-a-box` notice.
-- If the vendored Trino chart is refreshed, preserve the patch set
-  deliberately instead of re-applying changes ad hoc.
-- The parent [../README.md](../README.md) is the upstream consumer README and
-  should be treated as reference material.
+- changing an upstream file without noticing it is upstream
+- forgetting to preserve the local patch set when the vendored Trino chart is
+  refreshed

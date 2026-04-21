@@ -1,10 +1,27 @@
-This directory contains static browser assets used by `platformHome`.
+# platform-home Extra Files
 
-The main application HTML, CSS, and Python API code live inline in
+This folder contains extra browser files used by `platformHome`.
+
+`platformHome` is the optional home page this chart can show in a browser.
+
+```mermaid
+flowchart LR
+  Asset[keycloak.js] --> PortalConfig[platform-home render]
+  PortalConfig --> Browser[User browser]
+```
+
+## What is in this folder
+
+| File | Plain meaning |
+| --- | --- |
+| `keycloak.js` | The browser adapter used by the home page for Keycloak sign-in |
+
+## When you can ignore this folder
+
+You can ignore this folder unless you are changing the browser home page or
+its sign-in file.
+
+## Common mistake
+
+Most of the home page code does not live here. It lives inline in
 [`../../templates/platform-home.yaml`](../../templates/platform-home.yaml).
-This directory is only for file payloads that are easier to manage as separate
-assets.
-
-- `keycloak.js` is the vendored Keycloak browser adapter used by the launchpad
-  so the portal does not depend on a separate `/js/keycloak.js` endpoint at
-  runtime.

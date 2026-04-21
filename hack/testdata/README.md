@@ -1,12 +1,28 @@
-# Test Data
+# Script Test Data
 
-This directory holds non-production fixtures used by the maintainer scripts.
+This folder contains small fake input files used by the maintainer scripts.
 
-Nothing here is part of the supported chart API. These files exist to prove the
-chart accepts supported input and rejects unsafe or stale input.
+These files are not real deployments.
 
-## Child guide
+They are tiny fake inputs used only by local check scripts.
 
-| Path | Guide | Purpose |
-| --- | --- | --- |
-| `render-contract/` | [render-contract/README.md](render-contract/README.md) | Positive and negative values fragments used by `hack/render-contract.sh` |
+```mermaid
+flowchart LR
+  Fixtures[Test data files] --> Scripts[Maintainer scripts]
+  Scripts --> PassFail[Expected pass or fail result]
+```
+
+## What is in this folder
+
+| Path | Plain meaning |
+| --- | --- |
+| `render-contract/` | Small YAML files used by `hack/render-contract.sh` |
+
+## When you can ignore this folder
+
+You can ignore this folder unless you are changing validation or test scripts.
+
+## Common mistake
+
+These files are supposed to be small and fake. Do not turn them into full
+real-world example files.

@@ -1,23 +1,12 @@
 # Support
 
-This repository publishes and documents the `dlh-in-a-box` Helm chart.
-
-Support is focused on helping people understand, validate, and consume that
-chart.
-
-Audience: chart consumers, operators, and public readers who need help.
-
-What you will learn: what kinds of questions fit this repository, what details
-to include when asking for help, and where the collaborator boundary is.
-
-Read next: [README.md](README.md) for the repo overview, or
-[docs/quickstart.md](docs/quickstart.md) for the simplest first install.
+This file explains what kind of help fits this repo.
 
 ## What support is a good fit for
 
 - chart installation and upgrade questions
-- example overlay usage
-- values-surface questions
+- example settings file usage
+- chart setting questions
 - GHCR consumption from downstream repositories
 - local validation, including the difference between manual local install and
   the auth-enabled smoke path
@@ -27,7 +16,7 @@ Read next: [README.md](README.md) for the repo overview, or
 
 - custom pipeline or application code in downstream repositories
 - cluster bootstrap decisions outside this chart
-- institution-specific platform decisions that belong in the consumer repo
+- institution-specific platform decisions that belong in the downstream repo
 - purely upstream bugs that need to be fixed in the original project first
 
 ## How to ask for help
@@ -35,9 +24,9 @@ Read next: [README.md](README.md) for the repo overview, or
 Use the repository issue templates when appropriate and include:
 
 - the chart version or commit SHA
-- the example overlay or values fragment involved
+- the example file or settings fragment involved
 - whether you used `examples/values-local.yaml`,
-  `examples/values-local-auth.yaml`, or another overlay
+  `examples/values-local-auth.yaml`, or another example file
 - whether you ran a manual install or `make smoke-install`
 - the Kubernetes distribution and version
 - the exact error or unexpected behavior

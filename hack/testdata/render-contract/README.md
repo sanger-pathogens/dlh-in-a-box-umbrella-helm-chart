@@ -1,24 +1,39 @@
-# Render Contract Fixtures
+# Render-Check Test Files
 
-These files are small YAML fragments layered on top of the main example
-overlays by `hack/render-contract.sh`.
+This folder contains small YAML files used by `hack/render-contract.sh`.
 
-Some fixtures are intentionally valid and some are intentionally invalid. The
-goal is to prove the chart still accepts the supported contract and still
-rejects unsafe or outdated combinations.
+Each file is meant to prove one rule.
 
-## What these fixtures cover
+```mermaid
+flowchart LR
+  Base[Base example file] --> Merge[Add one small test file]
+  Merge --> Helm[helm template]
+  Helm --> Result[Should pass or should fail]
+```
 
-- missing governance or identity requirements
-- missing explicit environment selection
-- missing required redirect URIs or group restrictions
-- invalid Prefect bearer-token settings
-- invalid CloudBeaver auth-proxy wiring
-- unsupported legacy identity or Trino auth keys
-- invalid `keycloakLocal` and usersync combinations
-- exception-role metadata validation
+## What is in this folder
 
-## Maintainer note
+| Group | Plain meaning |
+| --- | --- |
+| `missing-*` files | Cases that should fail because something required is missing |
+| `prefect-*` files | Cases that test Prefect sign-in and token rules |
+| `cloudbeaver-*` files | Cases that test CloudBeaver sign-in wiring |
+| `keycloak-*` files | Cases that test Keycloak-local rules |
+| `bootstrap-*` files | Cases that test bootstrap-user and password-auth rules |
+| `legacy-*` files | Old keys or old patterns that should no longer be accepted |
+| `exception-*` files | Cases that test exception-role metadata |
 
-Keep these fixtures small and single-purpose. Each file should explain one
-contract rule, not three at once.
+## How to think about these files
+
+- some files are supposed to pass
+- some files are supposed to fail
+- each file should stay small
+- each file should prove one thing, not many things at once
+
+## When you can ignore this folder
+
+You can ignore this folder unless you are changing validation behavior.
+
+## Common mistake
+
+Do not add a large example here when a tiny one-purpose test file will do.

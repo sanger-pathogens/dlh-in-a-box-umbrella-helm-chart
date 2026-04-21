@@ -1,18 +1,28 @@
 # Trino Helm Tests
 
-This directory contains the Helm tests that ship with the vendored upstream
+This folder contains the Helm tests that ship with the vendored upstream
 Trino chart.
+
+```mermaid
+flowchart LR
+  TestFiles[Test files] --> HelmTest[helm test]
+  HelmTest --> BasicChecks[Basic Trino checks]
+```
 
 ## What these tests cover
 
-| File | Purpose |
+| File | Plain meaning |
 | --- | --- |
 | `test-connection.yaml` | Basic service reachability test |
 | `test-graceful-shutdown.yaml` | Graceful shutdown behavior |
 | `test-jmx.yaml` | JMX metrics surface |
 | `test-networkpolicy.yaml` | Network policy behavior where applicable |
 
-## Maintainer note
+## When you can ignore this folder
+
+You can ignore this folder unless you are changing Trino tests.
+
+## Common mistake
 
 These tests are upstream coverage. Avoid changing them unless the local Trino
-patch set genuinely requires it.
+patch set truly needs it.
