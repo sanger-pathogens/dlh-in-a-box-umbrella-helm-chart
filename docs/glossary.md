@@ -1,94 +1,110 @@
 # Glossary
 
-This glossary explains the core terms used across the chart and consumer
-documentation.
+This page explains the words used in the docs in the simplest way possible.
+
+Audience: readers who hit an unfamiliar word and do not want to guess.
+
+What you will learn: the basic words used across the README, quickstart,
+examples, and chart guide.
+
+Read next: go back to the page you were reading, or start with
+[prerequisites.md](prerequisites.md).
 
 ## Core Platform Terms
 
-- `Lakehouse`
-  The combined platform made up of object storage, metadata, SQL access,
-  orchestration, and optional BI or metadata services.
-- `Catalog`
-  A named Trino data source such as `redcap` or `bronze`. In this chart, each
-  catalog can generate Trino and Hive resources.
-- `Consumer overlay`
-  An environment-specific values file in a downstream repository that consumes
-  this chart.
+- `Kubernetes`
+  The system that runs containers in a cluster.
+- `cluster`
+  The Kubernetes environment where your apps run.
+- `namespace`
+  A folder-like space inside a Kubernetes cluster.
+- `Helm`
+  A tool used to install apps on Kubernetes.
+- `Helm chart`
+  A reusable install package for Kubernetes.
+- `Umbrella chart`
+  One chart that installs several other tools together.
+- `values file`
+  A YAML file that tells the chart what to install and how to configure it.
+- `Consumer repository`
+  Another repository that uses this chart and adds environment-specific config.
+- `Example overlay`
+  A YAML file in [`../examples/`](../examples/) that shows one way to configure
+  the chart.
+- `platformHome`
+  An optional home page for users in the browser.
 
 ## Identity And Access Terms
 
-- `OIDC`
-  OpenID Connect. This is the browser login protocol used by Keycloak and the
-  applications that trust it.
+- `Identity`
+  Who the user is.
+- `Authentication`
+  How the system checks who the user is.
+- `Authorization`
+  What the user is allowed to do.
 - `Keycloak`
-  The default OIDC provider in the documented platform model.
+  The login system used in the shared examples in this repository.
+- `OIDC`
+  The browser login standard used by Keycloak and several apps in this chart.
 - `LDAP`
-  Lightweight Directory Access Protocol. In this project it is the interface
-  used to read users and groups from an organizational LDAP directory or Active Directory.
+  A directory service that stores users and groups.
 - `Active Directory`
-  Microsoft’s directory service. In this project it is treated as an LDAP/LDAPS
-  directory plus a source of institutional users and groups.
+  Microsoft’s directory service. In this project, it is treated as one kind of
+  LDAP directory.
 - `LDAPS`
-  LDAP over TLS. This is the production-style way the platform talks to Active
-  Directory or another secured LDAP service.
+  LDAP over TLS. In simple terms: LDAP with encryption.
+- `externalLdap`
+  The mode where Keycloak handles sign-in, but users and groups still come from
+  LDAP or Active Directory.
+- `keycloakLocal`
+  The mode where Keycloak stores users itself instead of reading them from LDAP.
+- `Group`
+  A named set of users.
 - `Principal`
-  The user identity that reaches Trino or another application after login.
-- `Group alignment`
-  The requirement that the identity seen by Keycloak, LDAP/AD, and Ranger all
-  refer to the same human user.
+  The username or identity the app sees after login.
 
 ## Authorization Terms
 
 - `Ranger`
-  Apache Ranger. In this project it is the Trino authorization surface for
-  catalog, schema, table, column, masking, and row-filter policies.
-- `authorizedGroups`
-  Coarse catalog-level access lists still accepted by the chart. These are now
-  migration input, not the end state for sensitive datasets.
-- `bootstrapPolicies`
-  The chart-owned Ranger policy payload applied during install or upgrade.
+  The tool used for access rules and role information.
 - `Platform role`
-  A Git-managed access bundle declared under
-  `global.authorization.platformRoles`. A platform role can map directory
-  groups, direct users, and nested roles to one Ranger role name.
+  A named bundle of access rules in the chart.
 - `Exception role`
-  A time-bounded Ranger role used for additive direct-user access outside the
-  long-lived Git baseline. Exception roles must carry approval metadata and an
-  expiry date.
-- `Fine-grained policy`
-  A Ranger policy that does more than allow or deny a whole catalog. Examples:
-  column masking and row filtering.
+  A temporary extra access rule for one person or case.
+- `bootstrapPolicies`
+  Access rules the chart creates in Ranger from the values file.
+- `authorizedGroups`
+  An older, simpler access-list input still supported for migration.
 
-## Governance Terms
+## Data Terms
 
+- `Catalog`
+  A named data source in Trino.
 - `Governance metadata`
-  The required `global.dataCatalogs.*.governance` block that classifies a
-  dataset and ties it to an approval path.
+  The required information that says what kind of data a catalog contains and
+  why it is allowed on the platform.
 - `Classification`
-  The sensitivity tier for a dataset, such as `restricted-identifiable` or
-  `public`.
-- `Data steward`
-  The person or team responsible for the operational handling of a dataset.
+  The sensitivity level of the data, such as private or public.
 - `Owner PI`
-  The principal investigator or equivalent accountable owner for the dataset.
+  The person who is accountable for the dataset.
+- `Data steward`
+  The person or team who looks after the dataset day to day.
 - `Approval reference`
-  The human-governance record showing why the dataset is allowed to exist in
-  the platform in its current form.
+  The record that says the dataset is allowed on the platform.
 
 ## Application Terms
 
-- `platformHome`
-  The lightweight browser launchpad that becomes the default entrypoint for
-  human users in the current model.
+- `Trino`
+  The SQL engine people use to query data.
+- `Hive Metastore`
+  The service that stores table metadata.
+- `Prefect`
+  The workflow tool.
 - `CloudBeaver`
-  Browser SQL client. In this chart it is protected by `oauth2-proxy` for
-  browser access, but it still connects to Trino with the user’s LDAP or AD
-  username and password.
-- `Prefect auth proxy`
-  `oauth2-proxy` placed in front of Prefect so Keycloak can be the login
-  system even though Prefect OSS does not provide the same native auth model as
-  the other applications.
-- `Bundled component`
-  A dependency this chart can deploy directly, such as Keycloak or Ranger.
-- `Reference-only doc`
-  Documentation kept for context, but not part of the main onboarding path.
+  The browser SQL tool.
+- `JupyterHub`
+  The notebook server.
+- `DataHub`
+  The metadata catalog.
+- `Smoke install`
+  A scripted local test install that proves the auth-enabled example really works.

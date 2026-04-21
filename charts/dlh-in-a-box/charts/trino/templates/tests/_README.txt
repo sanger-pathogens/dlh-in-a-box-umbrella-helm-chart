@@ -8,12 +8,11 @@ Trino chart.
 | File | Purpose |
 | --- | --- |
 | `test-connection.yaml` | Basic service reachability test |
-| `test-graceful-shutdown.yaml` | Shutdown behavior validation |
-| `test-jmx.yaml` | JMX surface validation |
-| `test-networkpolicy.yaml` | Network policy validation where applicable |
+| `test-graceful-shutdown.yaml` | Graceful shutdown behavior |
+| `test-jmx.yaml` | JMX metrics surface |
+| `test-networkpolicy.yaml` | Network policy behavior where applicable |
 
 ## Maintainer note
 
-These tests are primarily upstream coverage. Treat them as part of the vendor
-surface and avoid changing them unless the local Trino patch set genuinely
-requires it.
+These tests are upstream coverage. Avoid changing them unless the local Trino
+patch set genuinely requires it.

@@ -1,19 +1,24 @@
 # Render Contract Fixtures
 
-These values overlays are intentionally small and often intentionally invalid.
+These files are small YAML fragments layered on top of the main example
+overlays by `hack/render-contract.sh`.
 
-`hack/render-contract.sh` layers them on top of the main example files to
-prove that the chart accepts the supported contract and rejects unsafe or
-stale configurations.
+Some fixtures are intentionally valid and some are intentionally invalid. The
+goal is to prove the chart still accepts the supported contract and still
+rejects unsafe or outdated combinations.
 
-The negative fixtures deliberately cover:
+## What these fixtures cover
 
-- missing governance and auth requirements
-- missing explicit environment selection for shared identity or governed catalogs
-- wildcard OIDC client settings outside local mode
-- missing Prefect group restrictions
-- invalid Prefect machine-auth settings
-- missing CloudBeaver group restrictions
-- missing portal redirect URIs
-- missing CloudBeaver proxy secret wiring
-- stale top-level auth blocks and legacy Trino auth toggles
+- missing governance or identity requirements
+- missing explicit environment selection
+- missing required redirect URIs or group restrictions
+- invalid Prefect bearer-token settings
+- invalid CloudBeaver auth-proxy wiring
+- unsupported legacy identity or Trino auth keys
+- invalid `keycloakLocal` and usersync combinations
+- exception-role metadata validation
+
+## Maintainer note
+
+Keep these fixtures small and single-purpose. Each file should explain one
+contract rule, not three at once.

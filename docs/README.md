@@ -1,36 +1,52 @@
-# Documentation
+# Documentation Guide
 
-This directory holds the long-form documentation for the chart repository.
+This folder holds the longer explanations that sit behind the main README.
 
-Use it when the chart README has already told you where to start, but you now
-need the deeper explanation behind the values contract or the default platform
-model.
+Audience: people who need more than the short repo overview.
 
-## Read In This Order
+What you will learn: where to go next based on your role and question.
 
-1. [../README.md](../README.md)
-2. [../charts/dlh-in-a-box/README.md](../charts/dlh-in-a-box/README.md)
-3. [quickstart.md](quickstart.md)
-4. [glossary.md](glossary.md)
-5. [auth-architecture.md](auth-architecture.md)
-6. [data-governance.md](data-governance.md)
-7. [release-playbook.md](release-playbook.md)
+Read next: pick one track below and follow only that next page first.
 
-## What Lives Here
+## I Am New Here
 
-| File | Purpose |
-| --- | --- |
-| `quickstart.md` | Fastest route from inspection to install |
-| `glossary.md` | Definitions for the terms used across the chart docs |
-| `auth-architecture.md` | Default Keycloak, LDAP/AD, Ranger, and Prefect access model |
-| `data-governance.md` | Governance metadata contract and policy-compliance boundary |
-| `release-playbook.md` | Maintainer-oriented release and publication workflow |
-| `assets/` | Static images and branding assets used by the repo |
+Start with [prerequisites.md](prerequisites.md).
+
+That page explains the basic words, the tools you need, and what this
+repository does not do for you.
+
+## I Want To Install This
+
+Start with [quickstart.md](quickstart.md).
+
+That page walks through the simplest manual local install first. After that,
+use [../examples/README.md](../examples/README.md) if you need a different
+overlay.
+
+## I Maintain This Repo
+
+Start with [contributor-map.md](contributor-map.md).
+
+That page explains where changes belong. After that, use
+[../CONTRIBUTING.md](../CONTRIBUTING.md),
+[../hack/README.md](../hack/README.md), and
+[release-playbook.md](release-playbook.md).
+
+## Optional Reference Pages
+
+- [glossary.md](glossary.md)
+  for unfamiliar words
+- [auth-architecture.md](auth-architecture.md)
+  for login and access details
+- [data-governance.md](data-governance.md)
+  for governed data rules
+- [assets/README.md](assets/README.md)
+  for documentation images and chart icon notes
 
 ## Documentation Rules
 
-- Primary docs explain the default path first.
-- Escape hatches are documented, but not presented as the main story.
-- Vendored upstream docs are reference-only.
-- The docs say clearly when Helm enforces something and when a human approval
-  process is still required.
+- explain the simple version first
+- define basic words before using them
+- give one recommended next step per page
+- say clearly what the chart checks and what people still need to do
+- treat vendored upstream docs as reference material, not the starting point

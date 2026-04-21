@@ -1,39 +1,50 @@
 # Data Governance And Ranger Policy Model
 
-This guide explains how the chart supports policy-compliant data exposure.
+This guide explains one simple idea:
 
-It is not a replacement for institutional governance. It is the technical layer
-that enforces access after a dataset has been classified and approved.
+the chart can block unsafe or incomplete data setup, but it does not replace
+your human approval process.
+
+Audience: readers who need to understand the required governed-data fields and
+how those fields relate to access rules.
+
+What you will learn: where the chart draws the line, which fields are required
+for shared environments, and what those fields do and do not change at
+runtime.
+
+Read next: [auth-architecture.md](auth-architecture.md) for the access model,
+or [../examples/README.md](../examples/README.md) for working examples.
 
 ## The Boundary
 
 ```mermaid
 flowchart LR
-  Review[PI, DCC, DRC, IRB, consent review] --> Classification[Dataset classification]
-  Classification --> Values[governance metadata in values]
-  Values --> Validation[Helm validation]
-  Validation --> Ranger[Ranger policies]
-  Ranger --> Trino[Trino access decisions]
-  Values --> DataHub[Metadata tags and ownership]
+  Human[Human approval] --> Metadata[Governance info in values file]
+  Metadata --> Validation[Chart validation]
+  Validation --> Ranger[Ranger rules]
+  Ranger --> Trino[Trino access]
 ```
 
-The chart can do these things:
+This governance model is organization-specific. It is the model enforced by
+this chart and its example overlays. It is not a universal open-source data
+governance standard.
 
-- refuse to render non-local datasets that have no governance metadata
-- refuse to expose restricted datasets with wildcard access or missing Ranger
-  policy coverage
-- require Ranger fine-grained policy coverage for restricted-identifiable data
-- optionally import coarse catalog access lists into Ranger during migration
+What the chart can do:
 
-The chart cannot do these things:
+- stop a non-local dataset from being added without the required metadata
+- stop sensitive data from being added without matching access rules
 
-- decide whether a dataset is allowed to exist on the platform
-- replace PI ownership, DCC or DRC approval, IRB review, or consent review
-- decide whether publication or external sharing is permitted
+What the chart cannot do:
+
+- decide whether your team should use a dataset at all
+- replace ethics review, governance review, PI approval, or legal approval
 
 ## Governance Metadata Contract
 
-Every non-local catalog needs:
+This heading uses the word "contract" because the chart validates the shape.
+In practice, treat it as a required fields list.
+
+For a non-local dataset, the chart expects a `governance` block like this:
 
 ```yaml
 global:
@@ -54,88 +65,97 @@ global:
         retentionNotes: Retain according to the approved study retention schedule.
 ```
 
+Required fields in plain language:
+
+| Field | Plain meaning |
+| --- | --- |
+| `dataType` | What kind of data this is. |
+| `classification` | How sensitive the data is. |
+| `containsDirectIdentifiers` | Whether the data directly identifies a person. |
+| `containsQuasiIdentifiers` | Whether the data could help re-identify a person when combined with other information. |
+| `consentBasis` | Why the data may be used. |
+| `irbStatus` | Whether the approval process is complete. |
+| `sharingStatus` | Whether the data may be shared and at what level. |
+| `ownerPi` | Who is accountable for the dataset. |
+| `dataSteward` | Who looks after the dataset day to day. |
+| `sourceSystem` | Where the data came from. |
+| `approvalReference` | The record that says the dataset is allowed on the platform. |
+| `retentionNotes` | Notes about how long the data should be kept. |
+
 ## How The Chart Interprets Classification
 
-| Classification | What the chart expects |
+| Classification | Simple meaning |
 | --- | --- |
-| `restricted-identifiable` | Ranger enabled, explicit Ranger policy coverage, and fine-grained masking or row-filter policy coverage when identifiers are present |
-| `restricted-deidentified` | Explicit Ranger policy coverage and no wildcard exposure |
-| `internal-deidentified` | Explicit Ranger policy coverage and no wildcard exposure |
-| `public` | Broad read access is allowed, but direct or quasi identifiers must be false |
+| `restricted-identifiable` | Sensitive data with identifying information; strict policy coverage is required |
+| `restricted-deidentified` | Sensitive data without direct identifiers; explicit policy coverage is still required |
+| `internal-deidentified` | Internal-only data; explicit policy coverage is still required |
+| `public` | Public data; the identifier flags must still make sense |
+
+## Resulting Behavior
+
+This table shows the end-to-end effect of the main governance inputs:
+
+| Input | What the chart checks | Effect in Ranger | Effect in Trino | Effect in DataHub |
+| --- | --- | --- | --- | --- |
+| Missing `governance` block in `dev` or `prod` | Install fails | No policies are applied because rendering stops | No catalog access is created because rendering stops | Nothing is pushed automatically |
+| Invalid field combinations such as `sharingStatus=public` with non-public `classification` | Install fails | No policies are applied because rendering stops | No catalog access is created because rendering stops | Nothing is pushed automatically |
+| Sensitive classifications with wildcard access or no explicit allowlist | Install fails | The chart refuses broad policy coverage for sensitive data | No access rules are produced for that catalog because rendering stops | Nothing is pushed automatically |
+| `restricted-identifiable` with identifier flags but no masking or row filter policy | Install fails | Requires an explicit fine-grained Ranger policy | Trino access is blocked at install time until that policy exists | Nothing is pushed automatically |
+| Valid `authorizedGroups` and/or explicit `bootstrapPolicies` | Ranger automation can create or import catalog rules | Catalog access rules are created or imported | Trino can use those rules only when the Ranger plugin path is enabled; otherwise Trino continues to use its configured rule path | Nothing is copied automatically from the governance block |
+| Metadata fields such as `ownerPi`, `dataSteward`, and `approvalReference` | Presence is checked in shared environments | No direct runtime policy change by themselves | No direct runtime query change by themselves | The chart does not automatically map them into DataHub |
 
 ## Ranger Mapping
 
-The chart uses two policy sources:
+There are three places access information can come from:
 
-1. `authorizedGroups`
-   Migration-only input imported as coarse catalog policies when
-   `global.authorization.ranger.importCatalogAcls=true`
-2. `global.authorization.platformRoles`
-   The Git-managed mapping between directory groups or approved direct users
-   and named Ranger roles
-3. `global.authorization.ranger.bootstrapPolicies`
-   Used for table, column, row-filter, and masking policies, normally targeted
-   at Ranger roles rather than raw groups or users
+1. `global.authorization.platformRoles`
+   The normal long-term access model.
+2. `global.authorization.ranger.bootstrapPolicies`
+   The detailed Ranger rules the chart creates.
+3. `global.dataCatalogs.<catalog>.authorizedGroups`
+   An older, simpler input kept for migration.
 
-The steady-state model is:
+The normal recommended pattern is:
 
-- platform roles define the approved long-lived access bundles
-- Ranger bootstrap policies target those roles
-- `authorizedGroups` only helps move older catalog ACLs into Ranger while a
-  consumer is transitioning
-
-Temporary direct-user access should not become the default model. Use
-time-bounded exception roles in Ranger for that case and attach approval
-metadata plus expiry.
+- define the long-term roles in `platformRoles`
+- point Ranger rules at those roles
+- use direct-user exceptions only when you really need them
 
 ## DataHub Mapping
 
-This chart treats DataHub as a metadata and discovery layer, not the SQL
-enforcement engine.
+In this repo, DataHub is for metadata and discovery.
 
-In practice:
+Ranger is the thing used for SQL access rules.
 
-- the governance block is the source of truth in Helm
-- DataHub tags and ownership should mirror that metadata through an operator
-  workflow
-- Ranger remains the enforcement plane for Trino
-
-The chart does not yet push governance metadata into DataHub automatically.
-Treat that mapping as a required manual step until a dedicated sync/export path
-is added.
+The chart does not automatically copy the governance block into DataHub for
+you. If you want matching metadata in DataHub, you still need to model that in
+your wider platform setup.
 
 ## New Data Source Rule
 
-Do not add a new non-local catalog until all of the following are known:
+Do not add a new non-local dataset until you know all of these:
 
-1. Its classification.
-2. Whether it contains direct or quasi identifiers.
-3. Its PI owner and operational data steward.
-4. Its consent and IRB status.
-5. The approval reference that permits it to be on the platform.
-6. The groups that may read or write it.
-7. The platform roles that should carry that approved access.
-8. Any masking or row-filter policy that sensitive columns or rows require.
+1. What kind of data it is.
+2. How sensitive it is.
+3. Whether it contains identifying information.
+4. Who owns it.
+5. Who looks after it.
+6. Which approval record allows it to be on the platform.
+7. Which roles should be allowed to access it.
 
-If any of those are missing, the dataset is not ready to be exposed.
+If you do not know those things yet, the dataset is not ready.
 
 ## Practical Maintainer Checklist
 
-When adding a new dataset, update all of the following together:
+When you add a new governed dataset, update these together:
 
 - `global.dataCatalogs.<catalog>`
 - `global.dataCatalogs.<catalog>.governance`
-- `global.authorization.platformRoles` for the approved access bundles
-- `global.authorization.ranger.bootstrapPolicies` with coarse read/write access plus any masking or row-filter rules
-- only if you are explicitly migrating old ACLs: `global.dataCatalogs.<catalog>.authorizedGroups`
-- downstream metadata tagging and ownership in DataHub, if enabled
-- the human onboarding record that captures PI ownership, DCC/DRC or IRB
-  approval, and consent constraints
+- `global.authorization.platformRoles`
+- `global.authorization.ranger.bootstrapPolicies`
 
-If you need to grant one specific person extra data access temporarily, do not
-quietly edit the long-lived baseline role. Create an exception role with
-approval metadata and expiry, then let the audit job clean it up after the
-grace period.
+If you need one person to get temporary extra access, use an exception role
+instead of widening the normal access role for everyone.
 
 ## Related Docs
 

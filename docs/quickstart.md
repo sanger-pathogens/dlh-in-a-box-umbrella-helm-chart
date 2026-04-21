@@ -1,114 +1,142 @@
-# First Five Minutes
+# Quickstart
 
-This guide is for someone who has just discovered `dlh-in-a-box` and wants to
-get from zero to a working deployment path quickly.
+This page is the one true happy-path tutorial for a first local install.
 
-## Choose your path
+Audience: someone who wants the simplest possible first success.
 
-```mermaid
-flowchart TD
-  Start[Start here]
-  Start --> Local[Validate locally]
-  Start --> SharedIdentity[Plan shared identity]
-  Start --> Consume[Consume from another repo]
-  Start --> Inspect[Inspect the published chart]
+What you will learn: how to install the chart locally with
+`examples/values-local.yaml`, how to tell whether it worked, and what to try
+next.
 
-  Local --> Kind[kind plus examples/values-local-auth.yaml]
-  SharedIdentity --> AuthGuide[docs/auth-architecture.md<br/>plus examples/values-shared-auth.yaml]
-  Consume --> Dependency[Add as a Helm dependency]
-  Inspect --> Show[helm show chart or helm show readme]
-```
+Read next: [../examples/README.md](../examples/README.md) if you need a
+different overlay after this tutorial.
 
-## 1. Inspect the published chart
+## 1. Before You Start
 
-```bash
-helm show chart oci://ghcr.io/sanger-pathogens/charts/dlh-in-a-box --version <chart-version>
-helm show readme oci://ghcr.io/sanger-pathogens/charts/dlh-in-a-box --version <chart-version>
-```
+Read [prerequisites.md](prerequisites.md) first.
 
-Use this when you want to confirm the published metadata, dependencies, and
-consumer-facing README before you install anything.
+This quickstart assumes:
 
-## 2. Deploy the validated local example
+- `kubectl` works against a real Kubernetes cluster
+- `helm` is installed
+- you are running commands from the repository root
 
-From the repository root:
+## 2. Install The Chart Dependencies
+
+Run:
 
 ```bash
 ./hack/helm-dependency-update.sh
-./hack/lint.sh
+```
+
+This downloads the packaged chart dependencies that the umbrella chart needs.
+
+## 3. Install The Simplest Local Overlay
+
+Run:
+
+```bash
 helm upgrade --install dlh charts/dlh-in-a-box \
   -n data-lakehouse-local \
   --create-namespace \
-  -f examples/values-local-auth.yaml
+  -f examples/values-local.yaml
 ```
 
-Then inspect the result:
+Why this is the recommended first path:
+
+- it is the simplest tracked example
+- it does not rely on pre-seeded demo Secrets
+- it is the easiest way to prove the chart can install in your cluster
+
+## 4. Check That It Worked
+
+Run:
 
 ```bash
-kubectl get all -n data-lakehouse-local
+kubectl get pods -n data-lakehouse-local
+kubectl get svc -n data-lakehouse-local
 ```
 
-Useful port-forwards:
+What success looks like:
+
+- most pods are `Running`
+- one-off setup jobs may be `Completed`
+- services such as `dlh-trino`, `prefect-server`, `dlh-minio`, and
+  `dlh-vault` exist in the namespace
+
+If the namespace is empty or many pods are stuck in `Pending`, the install did
+not complete successfully.
+
+## 5. Open A Few Local Endpoints
+
+Run each port-forward command in its own terminal.
+
+Trino UI:
 
 ```bash
-kubectl port-forward -n data-lakehouse-local svc/dlh-platform-home 8110:80
-kubectl port-forward -n data-lakehouse-local svc/dlh-prefect-auth-proxy 4200:80
-kubectl port-forward -n data-lakehouse-local svc/dlh-cloudbeaver-auth-proxy 8978:80
-kubectl port-forward -n data-lakehouse-local svc/dlh-keycloak 8081:80
+kubectl port-forward -n data-lakehouse-local svc/dlh-trino 8080:8080
+```
+
+Then open `http://localhost:8080/ui/`.
+
+Prefect UI:
+
+```bash
+kubectl port-forward -n data-lakehouse-local svc/prefect-server 4200:4200
+```
+
+Then open `http://localhost:4200`.
+
+MinIO console:
+
+```bash
 kubectl port-forward -n data-lakehouse-local svc/dlh-minio 9001:9001
-kubectl port-forward -n data-lakehouse-local svc/dlh-ranger-admin 6080:6080
-kubectl port-forward -n data-lakehouse-local svc/dlh-trino 8443:8443
-kubectl port-forward -n data-lakehouse-local svc/dlh-vault 8200:8200
 ```
 
-If you are maintaining the chart itself rather than just evaluating it, the
-closest local mirror of CI is:
+Then open `http://localhost:9001`.
+
+The tracked local overlay uses the demo MinIO credentials from
+[`../examples/values-local.yaml`](../examples/values-local.yaml):
+
+- username: `minioadmin`
+- password: `minioadmin123`
+
+## 6. Clean Up When You Are Done
+
+Run:
+
+```bash
+helm uninstall dlh -n data-lakehouse-local
+kubectl delete namespace data-lakehouse-local
+```
+
+## 7. If You Need The Auth-Enabled Path Next
+
+Do not use `examples/values-local-auth.yaml` as your first manual install.
+
+That overlay expects demo Kubernetes Secrets to exist first. The normal way to
+run it is:
 
 ```bash
 make smoke-install
 ```
 
-## 3. Consume the chart from another repository
+Or, in script form:
 
-In the consumer repository `Chart.yaml`:
-
-```yaml
-dependencies:
-  - name: dlh-in-a-box
-    version: <chart-version>
-    repository: oci://ghcr.io/sanger-pathogens/charts
+```bash
+./hack/smoke-install.sh charts/dlh-in-a-box examples/values-local-auth.yaml
 ```
 
-In the consumer workflow:
+Use that path when you want to exercise login, browser proxies, Ranger, and
+other auth-related pieces.
 
-```yaml
-permissions:
-  contents: read
-  packages: read
+## 8. What To Read Next
 
-steps:
-  - uses: actions/checkout@v4
-  - uses: azure/setup-helm@v4
-  - name: Log in to GHCR
-    run: |
-      printf '%s' "${{ secrets.GITHUB_TOKEN }}" | \
-        helm registry login ghcr.io -u "${{ github.actor }}" --password-stdin
-  - name: Build chart dependencies
-    run: helm dependency build
-```
-
-If the consumer repository cannot read the package yet, add it under GitHub
-package settings `Manage Actions access`.
-
-## 4. Know where to go next
-
-- chart API and values surface:
-  [../charts/dlh-in-a-box/README.md](../charts/dlh-in-a-box/README.md)
-- shared identity and access model:
-  [auth-architecture.md](auth-architecture.md)
-- overlay selection:
+- want to choose a different example:
   [../examples/README.md](../examples/README.md)
-- support expectations:
-  [../SUPPORT.md](../SUPPORT.md)
-- release and publication flow:
-  [release-playbook.md](release-playbook.md)
+- want to understand the chart itself:
+  [../charts/dlh-in-a-box/README.md](../charts/dlh-in-a-box/README.md)
+- want to understand login and access:
+  [auth-architecture.md](auth-architecture.md)
+- want to understand governed data rules:
+  [data-governance.md](data-governance.md)
