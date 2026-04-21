@@ -1,23 +1,16 @@
 # Contributing
 
-Thanks for contributing to `dlh-in-a-box`.
+This file is for people changing the repo.
 
-This repository is intentionally focused on one job: maintaining and publishing
-the reusable umbrella chart.
+The repo is public to read, but pull requests are mainly for repository
+collaborators.
 
-Audience: mainly repository collaborators who change the chart, examples, docs,
-or release flow.
-
-What you will learn: the local validation path, when to run the smoke install,
-and how contribution rights work in this repository.
-
-Read next: [docs/contributor-map.md](docs/contributor-map.md) for the repo
-layout, or [SUPPORT.md](SUPPORT.md) if you are a chart consumer looking for
-help rather than a collaborator preparing a change.
+If you are not a collaborator, use [SUPPORT.md](SUPPORT.md) instead of
+assuming you can open a pull request.
 
 ## Local workflow
 
-Before opening a pull request, run the standard CI-aligned local checks:
+Before opening a pull request, run:
 
 ```bash
 ./hack/helm-dependency-update.sh
@@ -36,54 +29,34 @@ make template
 make package
 ```
 
-Notes:
+Use `make smoke-install` too when you changed:
 
-- `./hack/lint.sh` already includes docs, license, security, render-contract,
-  schema, and Helm lint checks.
-- full Mermaid rendering in `./hack/docs-check.sh` requires a working Docker
-  daemon. `SKIP_MERMAID_CHECK=1` is the intentional local bypass when Docker
-  is unavailable.
-- the tracked example overlays under `examples/` are part of the supported
-  contract and are exercised by the validation scripts.
+- sign-in behavior
+- access rules
+- example values files
+- local smoke-install behavior
+- scripts or workflows
 
-For the simplest manual local install, use:
+The smoke path installs `examples/values-local-auth.yaml` and creates the demo
+Secrets that file needs.
 
-```bash
-helm upgrade --install dlh charts/dlh-in-a-box \
-  -n data-lakehouse-local \
-  --create-namespace \
-  -f examples/values-local.yaml
-```
-
-For the auth-enabled local proof path, use:
+Full Mermaid checking needs Docker. If Docker is not running, use:
 
 ```bash
-make smoke-install
+SKIP_MERMAID_CHECK=1 ./hack/docs-check.sh
 ```
 
-That path installs `examples/values-local-auth.yaml` and seeds the demo
-Secrets that overlay requires.
+## Keep These Things In Sync
 
-`make local-install` is lower-level. It does not create Secrets, and its
-default `LOCAL_VALUES` points at `examples/values-local-auth.yaml`. Override
-`LOCAL_VALUES=examples/values-local.yaml` for the simple self-contained path,
-or pre-create the auth demo Secrets yourself before using the auth overlay.
-
-## What Counts As A Complete Change
-
-Good changes in this repo usually keep these four views aligned:
+Good changes usually update these together:
 
 - chart behavior
-- example overlays
-- user-facing docs
-- local validation and workflow docs
-
-If you change one of those and skip the others, the repository starts giving
-different answers to different readers.
+- example settings files
+- folder guide files
+- local scripts and workflow docs
 
 ## Dependency updates
 
-- Keep upstream services upstream wherever possible.
 - When you change chart dependencies, run
   `./hack/helm-dependency-update.sh` so `Chart.lock` and packaged dependency
   archives stay aligned.
@@ -96,24 +69,6 @@ different answers to different readers.
 - Stable releases should keep `charts/dlh-in-a-box/Chart.yaml` in sync with
   the Git tag used for publication.
 
-## Documentation
-
-- Keep [README.md](README.md) focused on repository context, architecture, and
-  navigation.
-- Keep [charts/dlh-in-a-box/README.md](charts/dlh-in-a-box/README.md) focused
-  on chart usage and chart-facing behavior.
-- Keep [`examples/`](examples/README.md) readable enough to serve as living
-  examples, not just test fixtures.
-- Every maintained directory should have a local guide file. Use `README.md`
-  by default and `_README.txt` inside Helm `templates/` directories.
-- Treat genuinely vendored upstream docs as reference material. Prefer
-  rewriting the local wrapper docs around them instead of editing vendor docs
-  in place.
-- If you add or vendor third-party material, update
-  [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md),
-  [charts/dlh-in-a-box/THIRD_PARTY_NOTICES.md](charts/dlh-in-a-box/THIRD_PARTY_NOTICES.md),
-  and any required bundled notice files.
-
 ## Ownership
 
 - Repository ownership is managed in `.github/CODEOWNERS`.
@@ -122,12 +77,11 @@ different answers to different readers.
 
 ## Contribution model
 
-- This repository may be publicly visible, but pull requests are mainly limited
+- This repository may be public to read, but pull requests are mainly limited
   to repository collaborators.
-- External users should not assume that public visibility implies open
-  contribution rights.
-- If you are not a collaborator, the best starting point is usually
-  [SUPPORT.md](SUPPORT.md) or the repository issue templates.
+- External readers should not assume that public visibility means open write
+  access.
+- Non-collaborators should use the issue templates or support path.
 - Review routing and stewardship live in `.github/CODEOWNERS`.
 - Public issue intake is handled through `.github/ISSUE_TEMPLATE/`.
 
@@ -136,6 +90,6 @@ different answers to different readers.
 Good pull requests for this repository usually include:
 
 - a short explanation of the chart-facing change
-- documentation or example updates when the supported values surface changes
+- example or guide updates when behavior changed
 - note of dependency or license impact, if any
 - updates to local directory guides when repository structure changes

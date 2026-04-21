@@ -1,18 +1,28 @@
 # Issue Templates
 
-This directory contains the structured issue forms used by the repository.
+This folder contains the issue forms people see on GitHub.
 
-## Templates
+```mermaid
+flowchart LR
+  User[User needs help] --> Form[Issue form]
+  Form --> Maintainers[Maintainers]
+  Form --> Routing[Right support path]
+```
 
-| File | Purpose |
+## What is in this folder
+
+| File | Plain meaning |
 | --- | --- |
-| `bug_report.yml` | Runtime, packaging, or deployment problems in the chart |
-| `documentation.yml` | Documentation gaps, unclear guides, or handover issues |
-| `feature_request.yml` | Requests for chart improvements or new supported patterns |
-| `config.yml` | Repository issue-routing and contact-link configuration |
+| `bug_report.yml` | Use this when the chart seems broken |
+| `documentation.yml` | Use this when the guide files are confusing or missing something |
+| `feature_request.yml` | Use this when you want the chart to support a new pattern |
+| `config.yml` | GitHub's routing settings for the issue page |
 
-## Maintainer note
+## When you can ignore this folder
 
-These templates are part of the repository's public-facing support surface.
-Keep them aligned with [SUPPORT.md](../../SUPPORT.md),
-[SECURITY.md](../../SECURITY.md), and the collaborator-only contribution model.
+You can ignore this folder unless you are changing issue intake on GitHub.
+
+## Common mistake
+
+Keep these forms aligned with [../../SUPPORT.md](../../SUPPORT.md) and the
+collaborator-only pull request boundary.

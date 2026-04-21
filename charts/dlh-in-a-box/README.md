@@ -1,65 +1,61 @@
 # dlh-in-a-box Chart Guide
 
-This is the main guide for the chart itself.
-
-Audience: people who want to understand what the chart deploys and how to pick
-the right install path.
-
-What you will learn: what the chart can deploy, which identity modes it
-supports, which values areas matter most, and when to use each example
-overlay.
-
-Read next: [../../docs/quickstart.md](../../docs/quickstart.md) for the
-simplest first install, or [../../examples/README.md](../../examples/README.md)
-if you are choosing between overlays.
+This folder contains the Helm chart that this repo publishes.
 
 ## What This Chart Does
 
-This chart installs a group of data-platform tools together as one Helm
-release.
+This chart installs a small data platform as one Helm release.
 
-Use it when you want one chart to wire the platform pieces together instead of
-installing each tool by hand.
+In plain language, it is one install package that can turn on several tools at
+once.
 
-Common components in this chart:
+```mermaid
+flowchart LR
+  Values[Your settings file] --> Chart[dlh-in-a-box chart]
+  Chart --> Trino[Trino]
+  Chart --> Hive[Hive Metastore]
+  Chart --> Keycloak[Keycloak]
+  Chart --> Ranger[Ranger]
+  Chart --> Browser[Browser tools]
+  Chart --> Extras[Other optional tools]
+```
 
-| Component | Plain meaning |
+Main tools this chart can install:
+
+| Tool | Plain meaning |
 | --- | --- |
-| `Trino` | The SQL engine people query. |
-| `Hive Metastore` | The place where table metadata is stored. |
-| `Keycloak` | The login system used by the shared examples. |
-| `Ranger` | The system that stores access rules. |
-| `Prefect` | The workflow UI and worker components. |
-| `CloudBeaver` | A browser-based SQL tool. |
-| `DataHub` | An optional metadata catalog. |
-| `JupyterHub` | An optional notebook service. |
-| `MinIO` | Object storage for local and simple installs. |
-| `Vault` | Optional secrets tooling. |
+| `Trino` | The SQL engine |
+| `Hive Metastore` | The place where table metadata is stored |
+| `Keycloak` | The sign-in system |
+| `Ranger` | The access-rule system |
+| `Prefect` | The workflow UI and workers |
+| `CloudBeaver` | Browser SQL |
+| `DataHub` | Metadata and discovery |
+| `JupyterHub` | Notebooks |
+| `MinIO` | Object storage |
+| `Vault` | Optional secrets tooling |
 
-You can enable only the pieces you need.
+## Sign-In Options
 
-## Supported Identity Modes
+This chart has two main ways to handle sign-in:
 
-There are two main ways this chart can handle users:
-
-| Mode | Simple meaning |
+| Mode | Plain meaning |
 | --- | --- |
-| `externalLdap` | Keycloak handles browser login, but users and groups come from LDAP or Active Directory. This is the shared-environment model used by the dev and prod examples. |
-| `keycloakLocal` | Keycloak stores users itself. This is the self-contained local auth model used by `values-local-auth.yaml`. |
+| `externalLdap` | Keycloak handles browser sign-in, but the real user list still comes from a company or lab directory service. This is the shared development and production model in this repo. |
+| `keycloakLocal` | Keycloak stores users itself. This is the local auth model used by `examples/values-local-auth.yaml`. |
 
 ## Default Architecture
 
-The shared development and production examples in this repository use this
-general model:
+For the shared development and production examples, the normal model is:
 
-- Keycloak handles browser login.
-- LDAP or Active Directory supplies users and groups.
+- Keycloak handles browser sign-in.
+- A company or lab directory service supplies users and groups.
 - Ranger stores access rules.
-- `platformHome` is the optional landing page people see in the browser.
-- Prefect and CloudBeaver sit behind browser auth proxies.
+- `platformHome` can act as a simple landing page.
+- Prefect and CloudBeaver can sit behind the same browser sign-in.
 - Trino is the main SQL engine.
 
-The auth-enabled local example uses the simpler `keycloakLocal` mode instead.
+The local auth example uses `keycloakLocal` instead.
 
 One important detail:
 
@@ -68,38 +64,33 @@ enabled elsewhere in the chart. Trino only switches to that plugin when
 `global.authorization.ranger.trino.enabled=true` and the Trino image supports
 that plugin.
 
-## Start With These Docs
+## What Is In This Folder
 
-- brand new to the repo:
-  [../../docs/prerequisites.md](../../docs/prerequisites.md)
-- want the simplest install first:
-  [../../docs/quickstart.md](../../docs/quickstart.md)
-- want help choosing an example overlay:
-  [../../examples/README.md](../../examples/README.md)
-- want the access model:
-  [../../docs/auth-architecture.md](../../docs/auth-architecture.md)
-- want the governed data rules:
-  [../../docs/data-governance.md](../../docs/data-governance.md)
-- want an optional word list:
-  [../../docs/glossary.md](../../docs/glossary.md)
+| File or folder | Plain meaning |
+| --- | --- |
+| `Chart.yaml` | Chart metadata and dependency list |
+| `values.yaml` | Default settings |
+| `values.schema.json` | The file that says which settings are allowed |
+| `templates/` | Render files that turn settings into Kubernetes YAML |
+| `files/` | Extra files copied into rendered objects |
+| `charts/` | Local subcharts, vendored chart source, and packaged dependency archives |
+| `third_party/` | License and notice files that must ship with the chart |
 
 ## Choose An Install Path
 
-| Path | Plain-English label | Use this when |
+| Path | Plain meaning | Use this when |
 | --- | --- | --- |
 | `examples/values-local.yaml` | Simplest local install | You want the easiest manual first install. |
-| `make smoke-install` with `examples/values-local-auth.yaml` | Auth-enabled smoke test | You want a local path that also exercises login, browser proxies, and Ranger. |
-| `examples/values-dev.yaml` | Shared development example | You want the main LDAP-backed development baseline. |
-| `examples/values-prod.yaml` | Production-shaped example | You want the main LDAP-backed production baseline. |
-| `examples/values-shared-auth.yaml` | Shared environment with external OIDC provider | You already have an external OIDC provider and do not want bundled Keycloak. |
+| `make smoke-install` with `examples/values-local-auth.yaml` | Auth-heavy smoke test | You want a local path that also exercises sign-in, browser proxies, and Ranger. |
+| `examples/values-dev.yaml` | Shared development example | You want the main shared development baseline. |
+| `examples/values-prod.yaml` | Production-shaped example | You want the main shared production baseline. |
+| `examples/values-shared-auth.yaml` | Shared example with an external sign-in provider | You already have an external sign-in provider and do not want bundled Keycloak. |
 
 ## Values You Will Touch Most Often
 
-If you are new, these are the main values areas to know:
-
-| Values path | Simple meaning |
+| Values path | Plain meaning |
 | --- | --- |
-| `global.identity` | Login settings |
+| `global.identity` | Sign-in settings |
 | `global.authorization` | Access and role settings |
 | `global.dataCatalogs` | Data source definitions |
 | `platformHome` | Browser home page settings |
@@ -111,7 +102,7 @@ If you are new, these are the main values areas to know:
 ## Governance And Policy
 
 For shared development and production environments, the chart expects extra
-metadata for non-local datasets.
+data-approval details for non-local datasets.
 
 In simple terms, it wants to know:
 
@@ -128,13 +119,13 @@ obviously unsafe.
 The chart cannot decide whether your organization should approve a dataset in
 the first place.
 
-## Platform Roles And Exceptions
+## Access Model
 
-The chart uses platform roles as the normal long-term access model.
+This chart has something called a platform role.
 
-In plain language, a platform role is a named bundle of access.
+In plain language, it is a named bundle of access.
 
-Use platform roles for:
+Use these named access bundles for:
 
 - normal team access
 - normal app access
@@ -143,7 +134,7 @@ Use platform roles for:
 If one person needs extra access for a short time, use an exception role
 instead of changing the normal role for everyone.
 
-## Browser Apps And Access Paths
+## Browser Tools
 
 The chart can expose browser apps such as:
 
@@ -157,95 +148,27 @@ These can share the same sign-in story.
 For CloudBeaver, remember:
 
 - browser sign-in goes through the auth proxy
-- the saved datasource can be pre-created by admins
-- that datasource may use a shared service account
-- the chart does not assume every CloudBeaver user types an LDAP password into
-  Trino directly
+- admins can pre-make the saved database connection
+- that saved connection may use a shared service account
 
-For Prefect, the recommended pattern is to keep the auth proxy in front of it.
+For Prefect, the normal pattern is to keep the auth proxy in front of it.
 
-## Keycloak Local Users Mode
+## Common Extra Settings
 
-Use `keycloakLocal` when you want Keycloak to store users itself.
-
-That usually means:
-
-- no LDAP connection
-- no Ranger usersync
-- a more self-contained setup
-
-The main example for that mode in this repository is:
-
-- [`../../examples/values-local-auth.yaml`](../../examples/values-local-auth.yaml)
-
-## Portal Branding, Icons, And Health
-
-`platformHome` is the optional browser home page.
-
-The most common settings are:
-
-| Values path | Simple meaning |
+| Setting | Plain meaning |
 | --- | --- |
-| `platformHome.branding.title` | Main title on the page |
-| `platformHome.branding.subtitle` | Smaller text under the title |
-| `platformHome.branding.logoUrl` | Logo image |
-| `platformHome.branding.faviconUrl` | Browser tab icon |
-| `platformHome.theme.*` | Colors and fonts |
-| `platformHome.health.enabled` | Turn on built-in health checks for the UI |
-
-## CloudBeaver Seeded Datasources And Trust Material
-
-CloudBeaver can be set up so admins pre-create the connection information for
-users.
-
-The most important settings are:
-
-| Values path | Simple meaning |
-| --- | --- |
-| `cloudbeaver.bootstrap.workspaceSeedExistingSecret` | Secret with saved connection data |
-| `cloudbeaver.trustedCa.*` | TLS trust settings for secure database connections |
-
-## LDAPS And Trust Material
-
-If you use secure LDAP, the chart needs certificate trust settings so services
-know which LDAP certificate to trust.
-
-Main values:
-
-- `global.identity.directory.ldap.trustedCaExistingSecret`
-- `keycloak.trustedCertsExistingSecret`
-
-## Keycloak Client Secret Settings
-
-When Keycloak creates OIDC clients, it reads secret values from one Kubernetes
-Secret.
-
-The main setting is:
-
-- `global.identity.provider.keycloak.configCliEnvExistingSecret`
-
-Default name:
-
-- `dlh-keycloak-config-cli-env`
-
-## Example Overlays
-
-- `examples/values-local.yaml`
-  simplest manual local install
-- `examples/values-local-auth.yaml`
-  auth-enabled smoke path that expects demo Secrets
-- `examples/values-dev.yaml`
-  shared development example
-- `examples/values-prod.yaml`
-  shared production-shaped example
-- `examples/values-shared-auth.yaml`
-  shared example using an external OIDC provider
+| `platformHome.branding.*` | Text, logo, and look of the home page |
+| `cloudbeaver.bootstrap.workspaceSeedExistingSecret` | Pre-made CloudBeaver connection details |
+| `global.identity.directory.ldap.trustedCaExistingSecret` | The certificate trust Secret for a secure directory connection |
+| `keycloak.trustedCertsExistingSecret` | The certificate trust Secret for Keycloak when it talks to a secure directory |
+| `global.identity.provider.keycloak.configCliEnvExistingSecret` | The Secret Keycloak reads when it creates app clients |
 
 ## Reference-Only Material
 
-Some docs under `charts/dlh-in-a-box/charts/` come from upstream projects.
+Some parts of `charts/` come from upstream projects.
 
-Those are reference docs, not the main starting point for this chart.
+Treat those as reference material. The local guide files around them explain
+how this repo uses them.
 
 ## Validation
 
@@ -262,4 +185,20 @@ make smoke-install
 
 `make smoke-install` is the normal way to exercise
 `examples/values-local-auth.yaml`, because the smoke script seeds the demo
-Secrets that overlay expects.
+Secrets that file expects.
+
+## When You Can Ignore This Folder
+
+If you are only reading a published chart package, you may never open this
+folder.
+
+If you are working from source, this is the main chart folder and you should
+not ignore it.
+
+## Common Mistakes
+
+- assuming Ranger automatically controls Trino just because Ranger is enabled
+- using `examples/values-local-auth.yaml` in a manual install without the demo
+  Secrets it expects
+- treating shared development or production examples as if they were
+  self-contained local demos

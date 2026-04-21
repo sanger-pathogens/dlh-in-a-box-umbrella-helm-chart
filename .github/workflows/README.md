@@ -1,19 +1,8 @@
 # GitHub Actions Workflows
 
-This directory contains the automation that validates and publishes the chart.
+This folder contains the GitHub Actions jobs for this repo.
 
-Use the local scripts under [`../../hack/README.md`](../../hack/README.md) when
-you want the same logic outside GitHub Actions.
-
-Audience: collaborators who need to understand how CI maps to the local
-maintainer workflow.
-
-What you will learn: which workflow runs when, how it relates to the local
-scripts, and which workflow covers the auth-enabled smoke path.
-
-Read next: [../../hack/README.md](../../hack/README.md) for the local script
-equivalents, or [../../docs/release-playbook.md](../../docs/release-playbook.md)
-for release-specific steps.
+These jobs check the chart and publish it.
 
 ## Workflow inventory
 
@@ -27,35 +16,31 @@ for release-specific steps.
 
 ```mermaid
 flowchart TD
-  PR[Pull request] --> Lint[helm-lint]
+  PR[Pull request] --> Lint[Lint workflow]
   Main[Push to main] --> Lint
-  Main --> Publish[helm-publish prerelease]
-  Tag[Push tag vX.Y.Z] --> PublishStable[helm-publish stable release]
-  Manual[workflow_dispatch] --> Smoke[helm-smoke-install]
-
-  Lint --> Deps[dependency refresh]
-  Deps --> Checks[docs, license, security, render-contract, lint]
-  Checks --> Render[helm template]
-  Render --> Package[helm package]
-  Smoke --> Kind[kind cluster]
-  Kind --> LocalAuth[run smoke-install with values-local-auth]
+  Main --> Pre[Prerelease publish]
+  Tag[Version tag] --> Stable[Stable publish]
+  Manual[Manual run] --> Smoke[Smoke install workflow]
 ```
 
-## Publication behavior
+## What each workflow really means
 
-- `main` publishes a unique prerelease version:
-  `<base-version>-main.<run-number>.<run-attempt>.<short-sha>`
-- `vX.Y.Z` tags publish the stable `X.Y.Z` version and fail if the Git tag does
-  not match `charts/dlh-in-a-box/Chart.yaml`
-- GHCR authentication uses `GITHUB_TOKEN` by default, with optional
-  `GHCR_TOKEN` and `GHCR_USERNAME` overrides if organization policy requires them
+- `helm-lint.yaml`
+  runs the main check path
+- `helm-smoke-install.yaml`
+  runs the local auth-heavy test path in a throwaway cluster
+- `helm-publish.yaml`
+  builds and pushes the chart package to GHCR
 
-## Operational expectations
+## When you can ignore this folder
 
-- `helm-lint.yaml` should stay aligned with `./hack/lint.sh`.
-- `helm-smoke-install.yaml` should stay aligned with `./hack/smoke-install.sh`.
-- the smoke workflow intentionally uses `examples/values-local-auth.yaml`,
-  because that overlay exercises the auth-enabled local path and the smoke
-  script seeds the demo Secrets it needs.
-- local Mermaid rendering in `docs-check.sh` needs Docker; GitHub Actions runs
-  in an environment where that full check can execute.
+You can ignore this folder if you only use the chart.
+
+You need this folder when you are changing CI, publish behavior, or the smoke
+test path.
+
+## Common mistakes
+
+- Keep these workflows aligned with the local scripts in `hack/`.
+- The smoke workflow is supposed to use `examples/values-local-auth.yaml`.
+- Local Mermaid checking needs Docker even though GitHub Actions can run it.

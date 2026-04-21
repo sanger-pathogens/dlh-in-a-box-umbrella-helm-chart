@@ -1,12 +1,26 @@
-This directory contains static assets packaged into rendered Kubernetes
-objects.
+# Chart File Payloads
 
-Most readers do not need this directory directly. It matters when you are
-working on chart-owned browser assets or other file payloads that are embedded
-into ConfigMaps or mounted volumes.
+This folder contains extra files that the chart copies into rendered
+Kubernetes objects.
 
-- `platform-home/` stores the browser-launchpad asset(s) packaged by
-  `templates/platform-home.yaml`.
+```mermaid
+flowchart LR
+  Files[files/] --> ConfigMap[Rendered ConfigMap or volume]
+  ConfigMap --> App[Running app]
+```
 
-See [platform-home/README.md](platform-home/README.md) for the only current
-child guide here.
+## What is in this folder
+
+| Path | Plain meaning |
+| --- | --- |
+| `platform-home/` | Extra browser files for the optional home page |
+
+## When you can ignore this folder
+
+You can ignore this folder unless you are changing a file that must be copied
+into a running app.
+
+## Common mistake
+
+Do not put normal template logic here. This folder is for file payloads, not
+for Helm render logic.

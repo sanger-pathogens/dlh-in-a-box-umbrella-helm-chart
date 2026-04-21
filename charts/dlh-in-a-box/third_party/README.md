@@ -1,36 +1,28 @@
 # Third-Party Notice Material
 
-This directory contains bundled notice and license material that must travel
-with the chart source or packaged chart for redistribution hygiene.
-
-This is compliance support material, not part of the main onboarding path.
-
-## Why this exists
+This folder contains license and notice files that must ship with the chart.
 
 ```mermaid
 flowchart LR
-  Upstream[Upstream dependency charts] --> Redistribution[Repository and OCI package redistribution]
-  Redistribution --> Notices[Bundled notice and license files]
+  Upstream[Upstream projects] --> Bundle[This repo bundles some project material]
+  Bundle --> Notices[License and notice files]
 ```
 
-## Inventory
+## What is in this folder
 
-| Path | Purpose |
+| Path | Plain meaning |
 | --- | --- |
 | `datahub/` | Reproduced upstream DataHub `NOTICE` file |
 | `gcloud-sqlproxy/` | Reproduced MIT license text for bundled `gcloud-sqlproxy` material |
 | `oauth2-proxy/` | Reproduced MIT license text for bundled `oauth2-proxy` material |
 
-## Child guides
+## When you can ignore this folder
 
-| Path | Guide | Purpose |
-| --- | --- | --- |
-| `datahub/` | [datahub/README.md](datahub/README.md) | Provenance of the bundled DataHub notice |
-| `gcloud-sqlproxy/` | [gcloud-sqlproxy/README.md](gcloud-sqlproxy/README.md) | Provenance of the bundled MIT license text |
-| `oauth2-proxy/` | [oauth2-proxy/README.md](oauth2-proxy/README.md) | Provenance of the bundled MIT license text |
+Most people can ignore this folder.
 
-## Maintainer note
+You only need it when you are checking license or notice files.
 
-The canonical dependency inventory lives in
-[../THIRD_PARTY_NOTICES.md](../THIRD_PARTY_NOTICES.md). This directory exists
-for the actual notice and license files that need to ship with the chart.
+## Common mistake
+
+Do not treat this folder as the main dependency list. The main summary lives in
+[../THIRD_PARTY_NOTICES.md](../THIRD_PARTY_NOTICES.md).

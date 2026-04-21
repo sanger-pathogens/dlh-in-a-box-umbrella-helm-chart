@@ -1,40 +1,32 @@
-# Subcharts And Vendored Dependencies
+# Subcharts And Dependency Bundles
 
-This directory is where the umbrella chart meets its local subcharts and
-vendored dependency material.
+This folder contains:
 
-It is not the main onboarding path for chart consumers. Use the parent
-[../README.md](../README.md) first unless you are working on chart internals.
-
-## Ownership model
+- local subcharts written in this repo
+- vendored chart source copied from upstream
+- packaged dependency archives
 
 ```mermaid
 flowchart LR
-  Subcharts[charts/dlh-in-a-box/charts] --> Hive[hive local subchart]
-  Subcharts --> Trino[trino vendored source]
-  Subcharts --> Archives[packaged dependency archives]
+  Folder[charts/] --> Hive[Local Hive subchart]
+  Folder --> Trino[Vendored Trino chart]
+  Folder --> Archives[Packaged .tgz files]
 ```
 
-## Inventory
+## What is in this folder
 
-| Path or pattern | Role |
+| Path or pattern | Plain meaning |
 | --- | --- |
-| `hive/` | Local subchart that generates one Hive metastore per catalog |
-| `trino/` | Vendored upstream Trino chart source with a small local patch set |
-| `*.tgz` | Packaged dependency archives refreshed by `helm dependency update` |
+| `hive/` | Local Hive subchart owned by this repo |
+| `trino/` | Vendored upstream Trino chart source plus local wrapper notes |
+| `*.tgz` | Packaged dependency archives used for reproducible builds |
 
-## Child guides
+## When you can ignore this folder
 
-| Path | Guide | Purpose |
-| --- | --- | --- |
-| `hive/` | [hive/README.md](hive/README.md) | Local Hive subchart behavior |
-| `trino/` | [trino/README.md](trino/README.md) | Upstream Trino chart README kept as reference material |
-| `trino/templates/` | [trino/templates/_README.txt](trino/templates/_README.txt) | Local patch points inside the vendored Trino source |
+You can ignore this folder unless you are working on chart internals or chart
+dependencies.
 
-## Maintainer note
+## Common mistake
 
-- The Hive chart is locally owned and documented in this repository.
-- The Trino chart README is upstream reference material; prefer updating the
-  local wrapper docs around it instead of rewriting the vendored README.
-- The packaged archives in this directory are part of the reproducible release
-  inputs.
+Not everything here is locally owned. The Hive subchart is local. The Trino
+chart source is mostly upstream and should be treated more carefully.

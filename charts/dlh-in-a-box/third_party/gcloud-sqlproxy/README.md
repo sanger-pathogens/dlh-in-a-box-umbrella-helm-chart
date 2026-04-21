@@ -1,16 +1,25 @@
 # gcloud-sqlproxy License Provenance
 
-This directory contains the MIT license text reproduced for the bundled
-`gcloud-sqlproxy` chart material that arrives transitively through
-`datahub-prerequisites`.
+This folder contains the MIT license text reproduced for the bundled
+`gcloud-sqlproxy` chart material that arrives through `datahub-prerequisites`.
 
-## Contents
+```mermaid
+flowchart LR
+  Upstream[Upstream gcloud-sqlproxy license] --> LocalCopy[LICENSE file in this folder]
+  LocalCopy --> ChartBundle[Chart source and package]
+```
 
-| File | Purpose |
+## What is in this folder
+
+| File | Plain meaning |
 | --- | --- |
 | `LICENSE` | MIT license text reproduced for bundled `gcloud-sqlproxy` material |
 
-## Maintainer note
+## When you can ignore this folder
+
+Most people can ignore this folder.
+
+## Common mistake
 
 If the `datahub-prerequisites` dependency changes, confirm that the bundled
 `gcloud-sqlproxy` component is still present and that its license treatment has

@@ -1,52 +1,33 @@
 # Documentation Guide
 
-This folder holds the longer explanations that sit behind the main README.
+This folder contains the small amount of shared documentation support material
+that is still left in the repo.
 
-Audience: people who need more than the short repo overview.
+The main documentation does not live here anymore.
 
-What you will learn: where to go next based on your role and question.
+Every important folder now explains itself with its own guide file.
 
-Read next: pick one track below and follow only that next page first.
+```mermaid
+flowchart LR
+  Root[Root README] --> FolderGuides[Folder guide files]
+  FolderGuides --> DocsFolder[docs/]
+  DocsFolder --> Assets[assets/]
+```
 
-## I Am New Here
+## What is in this folder
 
-Start with [prerequisites.md](prerequisites.md).
+| File or folder | Plain meaning |
+| --- | --- |
+| `README.md` | This short explanation of what `docs/` is now |
+| `assets/` | Shared images and icon files used by the docs or chart metadata |
 
-That page explains the basic words, the tools you need, and what this
-repository does not do for you.
+## When you can ignore this folder
 
-## I Want To Install This
+You can ignore this folder if you are:
 
-Start with [quickstart.md](quickstart.md).
+- trying the chart
+- choosing an example file
+- working on chart logic
+- working on scripts or workflows
 
-That page walks through the simplest manual local install first. After that,
-use [../examples/README.md](../examples/README.md) if you need a different
-overlay.
-
-## I Maintain This Repo
-
-Start with [contributor-map.md](contributor-map.md).
-
-That page explains where changes belong. After that, use
-[../CONTRIBUTING.md](../CONTRIBUTING.md),
-[../hack/README.md](../hack/README.md), and
-[release-playbook.md](release-playbook.md).
-
-## Optional Reference Pages
-
-- [glossary.md](glossary.md)
-  for unfamiliar words
-- [auth-architecture.md](auth-architecture.md)
-  for login and access details
-- [data-governance.md](data-governance.md)
-  for governed data rules
-- [assets/README.md](assets/README.md)
-  for documentation images and chart icon notes
-
-## Documentation Rules
-
-- explain the simple version first
-- define basic words before using them
-- give one recommended next step per page
-- say clearly what the chart checks and what people still need to do
-- treat vendored upstream docs as reference material, not the starting point
+In those cases, read the guide file in the folder you are actually using.

@@ -1,20 +1,26 @@
-# Documentation Assets Inventory
+# Documentation Assets
 
-This directory contains static assets referenced by the local documentation and
-chart metadata.
+This folder contains shared image files used by the docs or chart metadata.
 
-It is not part of the main onboarding path. Most readers only need to know
-that the image here is the chart icon referenced from
-[`charts/dlh-in-a-box/Chart.yaml`](../../charts/dlh-in-a-box/Chart.yaml).
+```mermaid
+flowchart LR
+  AssetFile[Image file] --> Docs[Guide files]
+  AssetFile --> ChartMeta[Chart metadata]
+```
 
-## Contents
+## What is in this folder
 
-| File | Purpose |
+| File | Plain meaning |
 | --- | --- |
-| `dlh-in-a-box-icon.jpg` | Repository and chart icon used by the published chart metadata |
+| `dlh-in-a-box-icon.jpg` | The icon used by the chart metadata |
 
-## Maintainer note
+## When you can ignore this folder
 
-If the icon is replaced or moved, update the `icon` URL in
-[`charts/dlh-in-a-box/Chart.yaml`](../../charts/dlh-in-a-box/Chart.yaml) so
-the published chart metadata stays correct.
+Most people can ignore this folder.
+
+You only need it when you are changing the chart icon or another shared image.
+
+## Common mistake
+
+If you rename or replace the icon, also update the matching path in
+[`../../charts/dlh-in-a-box/Chart.yaml`](../../charts/dlh-in-a-box/Chart.yaml).

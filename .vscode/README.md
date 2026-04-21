@@ -1,16 +1,21 @@
 # VS Code Workspace Settings
 
-This directory contains optional editor settings for maintainers working on the
-repository locally.
+This folder contains optional VS Code settings for people editing the repo.
 
-## Current contents
+```mermaid
+flowchart LR
+  Settings[settings.json] --> Editor[VS Code]
+  Editor --> Human[Local developer]
+```
 
-| File | Purpose |
+## What is in this folder
+
+| File | Plain meaning |
 | --- | --- |
-| `settings.json` | Local editor convenience settings only |
+| `settings.json` | Small editor convenience settings |
 
-## Maintainer note
+## When you can ignore this folder
 
-Nothing in this directory is required for packaging, validation, CI, or chart
-publication. Treat it as optional local ergonomics rather than part of the
-runtime or release surface.
+Almost everyone can ignore this folder.
+
+It does not change chart behavior, CI, packaging, or releases.

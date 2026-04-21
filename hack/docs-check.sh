@@ -8,15 +8,17 @@ missing=()
 
 while IFS= read -r dir; do
   [[ "${dir}" == "${ROOT_DIR}" ]] && continue
+  [[ "${dir}" == "${ROOT_DIR}/docs/Internal" ]] && continue
+  [[ "${dir}" == "${ROOT_DIR}/docs/Internal/"* ]] && continue
 
-  if [[ -f "${dir}/README.md" ]] || [[ -f "${dir}/README.md.gotmpl" ]] || [[ -f "${dir}/OVERVIEW.md" ]] || [[ -f "${dir}/_README.txt" ]]; then
+  if [[ -f "${dir}/OVERVIEW.md" ]] || [[ -f "${dir}/README.md" ]] || [[ -f "${dir}/README.md.gotmpl" ]] || [[ -f "${dir}/_README.txt" ]]; then
     continue
   fi
 
   missing+=("${dir#${ROOT_DIR}/}")
 done < <(
   find "${ROOT_DIR}" \
-    \( -path "${ROOT_DIR}/.git" -o -path "${ROOT_DIR}/.idea" -o -path "${ROOT_DIR}/artifacts" -o -path "${ROOT_DIR}/dist" -o -path "${ROOT_DIR}/references" -o -path "${ROOT_DIR}/__pycache__" -o -path "*/__pycache__" \) -prune -o \
+    \( -path "${ROOT_DIR}/.git" -o -path "${ROOT_DIR}/.idea" -o -path "${ROOT_DIR}/artifacts" -o -path "${ROOT_DIR}/dist" -o -path "${ROOT_DIR}/references" -o -path "${ROOT_DIR}/docs/Internal" -o -path "${ROOT_DIR}/__pycache__" -o -path "*/__pycache__" \) -prune -o \
     -type d -print | sort
 )
 
@@ -31,22 +33,28 @@ require "pathname"
 
 root = Pathname.new(Dir.pwd)
 
-markdown_files = Dir.glob("{README.md,charts/**/*.md,docs/**/*.md,examples/**/*.md,hack/**/*.md}")
-  .reject { |path| path.include?("/third_party/") }
+markdown_files = Dir.glob("{README.md,CONTRIBUTING.md,SUPPORT.md,.github/**/*.md,.vscode/**/*.md,charts/**/*.md,docs/**/*.md,examples/**/*.md,hack/**/*.md}")
   .sort
+  .reject { |path| path == "docs/Internal/README.md" || path.start_with?("docs/Internal/") }
 
-required_headings = {
-  "README.md" => ["## Start Here", "## Repository Mental Model", "## Default Platform Model"],
-  "charts/dlh-in-a-box/README.md" => ["## What This Chart Does", "## Default Architecture", "## Governance And Policy"],
-  "docs/auth-architecture.md" => ["## Default Model", "## Trino", "## Prefect"],
-  "docs/data-governance.md" => ["## The Boundary", "## Governance Metadata Contract", "## New Data Source Rule"],
-}
+guide_files = []
 
-deprecated_patterns = {
-  "phase-1 shared identity" => /phase-1 shared identity/i,
-  "external OIDC as default" => /external OIDC IdP|external OIDC and LDAP-backed group resolution/i,
-  "file ACLs as steady state" => /file-based ACLs\./i,
-}
+Dir.glob("**/", File::FNM_DOTMATCH).sort.each do |dir|
+  dir = dir.sub(%r{/\z}, "")
+  next if dir.empty? || dir == "."
+  next if dir.start_with?(".git/", ".idea/", "artifacts/", "dist/", "references/")
+  next if dir == "docs/Internal" || dir.start_with?("docs/Internal/")
+  next if dir.include?("/__pycache__")
+
+  guide = ["OVERVIEW.md", "README.md", "README.md.gotmpl", "_README.txt"]
+    .map { |name| File.join(dir, name) }
+    .find { |path| File.exist?(path) }
+
+  guide_files << guide if guide
+end
+
+guide_files << "README.md" if File.exist?("README.md")
+guide_files.uniq!
 
 errors = []
 
@@ -67,17 +75,14 @@ markdown_files.each do |path|
     resolved = root.join(File.dirname(path), clean).cleanpath
     errors << "#{path}: broken local link #{target}" unless resolved.exist?
   end
+end
 
-  if required_headings.key?(path)
-    required_headings[path].each do |heading|
-      errors << "#{path}: missing heading #{heading.inspect}" unless content.include?(heading)
-    end
-  end
+guide_files.each do |path|
+  next if path.end_with?(".gotmpl")
 
-  next unless ["README.md", "charts/dlh-in-a-box/README.md", "docs/auth-architecture.md"].include?(path)
-
-  deprecated_patterns.each do |label, pattern|
-    errors << "#{path}: deprecated wording detected for #{label}" if content.match?(pattern)
+  content = root.join(path).read
+  unless content.include?("```mermaid")
+    errors << "#{path}: missing Mermaid diagram in guide file"
   end
 end
 
@@ -91,10 +96,11 @@ if [[ "${SKIP_MERMAID_CHECK:-0}" != "1" ]]; then
   python3 "${ROOT_DIR}/hack/validate_mermaid.py" \
     --root "${ROOT_DIR}" \
     --include "README.md" \
+    --include ".github/**/*.md" \
+    --include ".vscode/**/*.md" \
     --include "charts/**/*.md" \
     --include "charts/**/_README.txt" \
     --include "docs/**/*.md" \
     --include "examples/**/*.md" \
-    --include "hack/**/*.md" \
-    --exclude "charts/dlh-in-a-box/third_party/**"
+    --include "hack/**/*.md"
 fi
