@@ -1,0 +1,191 @@
+:root {
+  color-scheme: light;
+  --text: #102a43;
+  --muted: #52606d;
+  --border: #cbd2d9;
+  --surface: #f8fafc;
+  --surface-strong: #eef5f2;
+  --accent: #1b6e55;
+  --link: #0f6cbd;
+  --code-bg: #0b1f2a;
+  --code-text: #f8fafc;
+}
+
+@page {
+  size: Letter;
+  margin: 0.6in 0.55in 0.8in 0.55in;
+}
+
+html {
+  font-size: 11pt;
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
+}
+
+body {
+  margin: 0;
+  color: var(--text);
+  background: #ffffff;
+  font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+  line-height: 1.55;
+}
+
+main {
+  max-width: 8.2in;
+  margin: 0 auto;
+}
+
+h1,
+h2,
+h3,
+h4 {
+  color: var(--text);
+  break-after: avoid-page;
+}
+
+h1 {
+  margin: 0 0 1.2rem;
+  padding-bottom: 0.7rem;
+  border-bottom: 3px solid #d9e2ec;
+  font-size: 2rem;
+  line-height: 1.2;
+}
+
+h2 {
+  margin: 2.4rem 0 0.8rem;
+  padding-top: 1rem;
+  border-top: 1px solid #d9e2ec;
+  font-size: 1.5rem;
+}
+
+h3 {
+  margin: 1.8rem 0 0.6rem;
+  font-size: 1.15rem;
+}
+
+h4 {
+  margin: 1.25rem 0 0.4rem;
+  font-size: 1rem;
+}
+
+p,
+ul,
+ol,
+table,
+pre,
+blockquote {
+  margin: 0 0 1rem;
+}
+
+ul,
+ol {
+  padding-left: 1.25rem;
+}
+
+li {
+  margin: 0.22rem 0;
+}
+
+a {
+  color: var(--link);
+  text-decoration: none;
+}
+
+a:hover {
+  text-decoration: underline;
+}
+
+strong {
+  color: #0b253b;
+}
+
+hr {
+  border: 0;
+  border-top: 1px solid #d9e2ec;
+  margin: 2rem 0;
+}
+
+code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  font-size: 0.88em;
+  overflow-wrap: anywhere;
+}
+
+pre {
+  padding: 0.9rem 1rem;
+  border-radius: 10px;
+  background: var(--code-bg);
+  color: var(--code-text);
+  overflow: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+  break-inside: avoid-page;
+}
+
+pre code {
+  color: inherit;
+  overflow-wrap: normal;
+}
+
+blockquote {
+  padding: 0.6rem 1rem;
+  border-left: 4px solid #bcccdc;
+  color: #334e68;
+  background: #f8fbfd;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.92rem;
+  break-inside: avoid-page;
+}
+
+thead {
+  display: table-header-group;
+}
+
+th,
+td {
+  padding: 0.55rem 0.6rem;
+  border: 1px solid var(--border);
+  vertical-align: top;
+  text-align: left;
+}
+
+th {
+  background: var(--surface-strong);
+}
+
+tr {
+  break-inside: avoid-page;
+}
+
+img,
+svg {
+  max-width: 100%;
+  height: auto;
+  break-inside: avoid-page;
+}
+
+pre.mermaid {
+  padding: 0.7rem;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: #ffffff;
+  text-align: center;
+}
+
+pre.mermaid svg {
+  display: block;
+  margin: 0 auto;
+}
+
+.page-break {
+  break-before: page;
+}
+
+.small-note {
+  color: var(--muted);
+  font-size: 0.92rem;
+}

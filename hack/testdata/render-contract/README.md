@@ -1,39 +1,174 @@
 # Render-Check Test Files
 
-This folder contains small YAML files used by `hack/render-contract.sh`.
+This folder contains the focused YAML overlays used by `hack/render-contract.sh`.
 
-Each file is meant to prove one rule.
+Each file is intentionally small. The script merges one of these overlays onto
+top of a known-good baseline example from `examples/`, then checks whether the
+render should pass or fail.
+
+## Who Should Read This
+
+| Reader | Why this guide matters |
+| --- | --- |
+| contributor | to know how to add a new contract test without creating a new full example environment |
+| maintainer | to map fixtures back to the validation logic they are exercising |
 
 ```mermaid
-flowchart LR
-  Base[Base example file] --> Merge[Add one small test file]
-  Merge --> Helm[helm template]
-  Helm --> Result[Should pass or should fail]
+flowchart TD
+  subgraph Baselines["Baseline examples"]
+    Local[values local auth]
+    Dev[values dev]
+    Prod[values prod]
+    Shared[values shared auth]
+  end
+
+  subgraph Fixtures["Focused overlays"]
+    Identity[identity and auth fixtures]
+    Governance[governance fixtures]
+    Legacy[legacy migration fixtures]
+    Positive[expected pass fixtures]
+  end
+
+  subgraph Script["render-contract sh"]
+    Merge[merge values]
+    Render[helm template]
+    Assert[assert pass or fail]
+  end
+
+  Local --> Merge
+  Dev --> Merge
+  Prod --> Merge
+  Shared --> Merge
+  Identity --> Merge
+  Governance --> Merge
+  Legacy --> Merge
+  Positive --> Merge
+  Merge --> Render --> Assert
 ```
 
-## What is in this folder
+## How The Script Uses This Folder
 
-| Group | Plain meaning |
+`hack/render-contract.sh` currently uses baseline examples from:
+
+- `examples/values-local-auth.yaml`
+- `examples/values-dev.yaml`
+- `examples/values-prod.yaml`
+- `examples/values-shared-auth.yaml`
+
+The fixtures in this folder are never meant to stand alone. They are overlays.
+
+That means a newcomer should read any fixture file as:
+
+"What tiny change are we applying to a known-good baseline to prove one rule?"
+
+## Fixture Inventory
+
+### Positive overlays
+
+These fixtures are expected to render successfully and prove supported paths:
+
+| File | What it proves |
 | --- | --- |
-| `missing-*` files | Cases that should fail because something required is missing |
-| `prefect-*` files | Cases that test Prefect sign-in and token rules |
-| `cloudbeaver-*` files | Cases that test CloudBeaver sign-in wiring |
-| `keycloak-*` files | Cases that test Keycloak-local rules |
-| `bootstrap-*` files | Cases that test bootstrap-user and password-auth rules |
-| `legacy-*` files | Old keys or old patterns that should no longer be accepted |
-| `exception-*` files | Cases that test exception-role metadata |
+| `prefect-automation-enabled.yaml` | machine access for Prefect can be enabled when the required proxy and client wiring exist |
+| `prefect-direct-grant-enabled.yaml` | developer direct-grant access for Prefect can be enabled when the required client wiring exists |
+| `bootstrap-users-base.yaml` | shared starting point for the bundled-Keycloak bootstrap-user fallback tests |
 
-## How to think about these files
+### Governance and authorization failures
 
-- some files are supposed to pass
-- some files are supposed to fail
-- each file should stay small
-- each file should prove one thing, not many things at once
+These fixtures exercise the governance validation template:
 
-## When you can ignore this folder
+| File | What it targets |
+| --- | --- |
+| `missing-governance.yaml` | catalog governance block missing in `dev` or `prod` |
+| `missing-fine-grained-policy.yaml` | restricted catalog missing masking or row-filter policy coverage |
+| `invalid-platform-role-app.yaml` | unsupported platform app entitlement |
+| `exception-missing-metadata.yaml` | platform role exception missing required approval metadata |
 
-You can ignore this folder unless you are changing validation behavior.
+### Identity and environment failures
 
-## Common mistake
+These fixtures target the shared identity contract and environment checks:
 
-Do not add a large example here when a tiny one-purpose test file will do.
+| File | What it targets |
+| --- | --- |
+| `missing-environment.yaml` | shared catalog governance without a valid `global.environment` |
+| `missing-identity-environment.yaml` | shared identity without a valid `global.environment` |
+| `missing-config-cli-secret.yaml` | bundled Keycloak without the required config CLI secret |
+| `missing-directory-url.yaml` | LDAP-backed shared identity without a directory URL |
+| `platform-home-missing-redirect.yaml` | bundled Keycloak-managed `platformHome` client missing redirect URIs |
+| `wildcard-redirect.yaml` | wildcard redirect URIs outside local environments |
+| `legacy-top-level-identity.yaml` | deprecated top-level `identity` block |
+| `legacy-trino-authentication-type.yaml` | deprecated Trino password-auth configuration path |
+
+### Prefect and CloudBeaver auth failures
+
+These fixtures test app-client wiring around oauth2-proxy and bearer-token
+configuration:
+
+| File | What it targets |
+| --- | --- |
+| `prefect-missing-groups.yaml` | Prefect browser auth client missing allowed groups in shared environments |
+| `prefect-automation-missing-client-id.yaml` | Prefect automation client missing required client ID |
+| `prefect-automation-authproxy-disabled.yaml` | Prefect automation enabled while Prefect auth proxy is disabled |
+| `prefect-automation-prefectproxy-disabled.yaml` | Prefect automation enabled while the shared Prefect browser client is disabled |
+| `prefect-direct-grant-missing-client-id.yaml` | Prefect direct-grant client missing required client ID |
+| `prefect-direct-grant-authproxy-disabled.yaml` | Prefect direct-grant enabled while Prefect auth proxy is disabled |
+| `prefect-direct-grant-prefectproxy-disabled.yaml` | Prefect direct-grant enabled while the shared Prefect browser client is disabled |
+| `prefect-token-audience-mismatch.yaml` | Prefect machine and developer bearer-token clients disagree on token audience |
+| `cloudbeaver-missing-groups.yaml` | CloudBeaver browser auth client missing allowed groups in shared environments |
+| `cloudbeaver-missing-secret.yaml` | CloudBeaver auth-proxy config secret missing |
+
+### Bundled Keycloak bootstrap and `keycloakLocal` edge cases
+
+These fixtures target the local auth-heavy modes:
+
+| File | What it targets |
+| --- | --- |
+| `bootstrap-password-auth-without-ldap.yaml` | Trino password auth enabled while using bootstrap users without LDAP |
+| `bootstrap-usersync-without-ldap.yaml` | Ranger usersync enabled while using bootstrap users without LDAP |
+| `keycloak-local-registration-disabled.yaml` | `keycloakLocal` mode without self-registration enabled |
+| `keycloak-local-trino-password-auth-enabled.yaml` | `keycloakLocal` mode trying to use LDAP-style Trino password auth |
+| `keycloak-local-usersync-enabled.yaml` | `keycloakLocal` mode with Ranger LDAP usersync still enabled |
+| `keycloak-local-ldap-enabled.yaml` | `keycloakLocal` mode with LDAP directory mode still enabled |
+| `keycloak-local-email-verification-disabled.yaml` | focused edge-case fixture for local Keycloak registration behavior; if it is not referenced in `hack/render-contract.sh`, it is inert until explicitly added |
+
+## How To Add A New Fixture
+
+Keep the pattern consistent:
+
+1. choose the smallest baseline example that already has most required settings
+2. add only the keys needed to prove the new rule
+3. give the file a name that says what should fail or pass
+4. wire the file into `hack/render-contract.sh`
+5. assert on a specific success marker or failure message
+
+## What Not To Do
+
+Do not use this folder for:
+
+- full install profiles
+- secrets copied from real environments
+- fixtures that test several unrelated behaviors at once
+- documentation examples meant for users
+
+That work belongs under `examples/`, not here.
+
+## Validation
+
+After changing any fixture in this folder, run:
+
+```bash
+./hack/render-contract.sh
+./hack/lint.sh
+```
+
+## Common Mistakes
+
+- adding a fixture file without adding the corresponding assertion in
+  `hack/render-contract.sh`
+- putting too much content in one file so the failure reason becomes unclear
+- reusing a baseline that hides the specific rule you were trying to test
+
+## When You Can Ignore This Folder
+
+You can ignore this folder unless you are changing validation behavior or
+adding a regression fixture.
