@@ -2,40 +2,200 @@
 
 This folder contains the local Hive subchart used by `dlh-in-a-box`.
 
-This subchart exists because the umbrella chart needs Hive behavior that is
-specific to this repo.
+The repo keeps Hive as a local subchart because the platform needs
+catalog-aware metastore generation that is tightly coupled to the umbrella
+chart's shared catalog and storage model.
 
-## How it works
+## Who Should Read This
+
+| Reader | Why this guide matters |
+| --- | --- |
+| contributor | to understand where Hive Metastore resources are generated and why they are local |
+| operator | to see how catalog definitions, PostgreSQL, and object storage become working metastores |
+| maintainer | to understand the boundary between this local subchart and the rest of the umbrella chart |
+
+## What This Subchart Does
+
+The Hive subchart turns shared catalog definitions into one Hive Metastore
+deployment per catalog.
+
+It is responsible for:
+
+- creating the per-catalog metastore configuration files
+- wiring PostgreSQL and S3 credentials into Hive
+- creating the database if needed
+- initializing the metastore schema
+- creating the Service and optional Ingress for each metastore
 
 ```mermaid
 flowchart TD
-  Catalogs[Data catalog settings] --> Config[Config files]
-  Catalogs --> Deployments[Hive metastore pods]
-  Catalogs --> Services[Services]
-  Secrets[Database and storage secrets] --> Deployments
+  subgraph Inputs["Hive inputs"]
+    Catalogs[global dataCatalogs]
+    Storage[hive s3 settings]
+    Database[hive postgres settings]
+  end
+
+  subgraph Render["Local Hive subchart"]
+    Config[metastore config secrets]
+    Init[init config and schema init]
+    Runtime[service deployment ingress]
+  end
+
+  subgraph Outcome["Runtime shape"]
+    Metastores[one metastore per catalog]
+    Postgres[shared or external postgres]
+    ObjectStore[minio or external s3]
+    Trino[trino catalog clients]
+  end
+
+  Catalogs --> Config
+  Storage --> Config
+  Database --> Config
+  Database --> Init
+  Config --> Runtime
+  Init --> Runtime
+  Runtime --> Metastores
+  Postgres --> Metastores
+  ObjectStore --> Metastores
+  Metastores --> Trino
 ```
 
-## What is in this folder
+## What Lives In This Folder
 
-| File or folder | Plain meaning |
-| --- | --- |
-| `Chart.yaml` | Hive subchart metadata |
-| `values.yaml` | Default Hive settings used by the umbrella chart |
-| `templates/` | The render files for the Hive subchart |
+| Path | Ownership | What it is for |
+| --- | --- | --- |
+| `Chart.yaml` | repo-owned | local subchart metadata |
+| `values.yaml` | repo-owned | default Hive-specific settings used by the umbrella chart |
+| `templates/` | repo-owned | all Hive Metastore render logic |
+| `README.md` | repo-owned guide | this folder manual |
 
-## What this subchart is responsible for
+There is no vendored Hive chart here. This entire subchart is locally owned.
 
-- turning data catalog settings into Hive resources
-- wiring database settings into Hive
-- wiring object storage settings into Hive
-- creating optional schema setup jobs
-- creating optional network exposure for Hive
+## How The Subchart Works
 
-## When you can ignore this folder
+### Catalog iteration is the core pattern
 
-You can ignore this folder unless you are changing Hive-specific render logic.
+The subchart reads `global.dataCatalogs` from the umbrella values and loops
+over those catalogs.
 
-## Common mistake
+For each catalog, it renders:
 
-Keep this subchart narrow. If a change can be done by passing settings into an
-upstream chart instead, prefer that.
+- a Service
+- a Deployment
+- a metastore configuration secret
+- an optional Ingress
+
+This is why a single values file can create several independent metastore
+endpoints.
+
+### Storage wiring
+
+Hive needs object-store credentials and endpoint information.
+
+The subchart uses:
+
+- `hive.s3.endpoint`
+- `hive.s3.accessKey` and `hive.s3.secretKey`, unless an existing secret is
+  supplied
+- `hive.warehouseDir`
+
+Those values become `core-site.xml` and `metastore-site.xml` entries so Hive
+can talk to MinIO or an external S3-compatible backend.
+
+### PostgreSQL wiring
+
+Hive Metastore state is stored in PostgreSQL.
+
+The subchart supports two patterns:
+
+- generate a small secret from inline values
+- reuse an existing PostgreSQL secret
+
+The rendered config points every catalog at the same PostgreSQL host and port,
+but uses a separate database name per catalog.
+
+### Schema initialization lifecycle
+
+There are two schema-initialization paths and this is easy to miss when reading
+only the values file:
+
+- the main metastore Deployment includes init containers that create the
+  catalog database and run `schematool` if the schema is missing
+- `init-schema-job.yaml` can also render a post-install or post-upgrade Helm
+  hook Job when `schemainit.job.enabled=true`
+
+The default path is the init-container path inside the Deployment. The hook Job
+is an opt-in operational pattern for teams that want schema init to happen as a
+separate hook lifecycle step.
+
+### How Trino uses the result
+
+This subchart does not configure Trino directly.
+
+Instead:
+
+1. this subchart creates the Hive Metastore services
+2. the vendored Trino chart patches render Trino catalog properties from the
+   shared catalog contract
+3. those Trino catalogs point at the per-catalog Hive Metastore services
+
+That is the end-to-end bridge from `global.dataCatalogs` to queryable tables.
+
+## Important Files
+
+### `values.yaml`
+
+This file is intentionally small compared with the umbrella chart defaults.
+
+It defines:
+
+- image locations for the metastore and schema-init containers
+- PostgreSQL and S3 secret expectations
+- the warehouse directory base
+- ingress toggles
+
+The actual catalog list still comes from `global.dataCatalogs` at the umbrella
+layer.
+
+### `templates/`
+
+This is where the real behavior lives. Read
+[`templates/_README.txt`](templates/_README.txt) next if you are changing the
+subchart.
+
+## Common Tasks
+
+If you need to:
+
+- change how per-catalog metastore config is generated: edit
+  `templates/configmap.yaml`
+- change startup or mounts for the metastore pods: edit
+  `templates/metastore.yaml`
+- change schema-init behavior: edit `templates/init-schema-job.yaml`
+- change how generated secrets work: edit `templates/postgres-secret.yaml` or
+  `templates/s3-secret.yaml`
+
+## Validation
+
+After changing anything here, run:
+
+```bash
+./hack/template.sh
+./hack/lint.sh
+```
+
+Use `helm template` output to confirm the expected number of metastore Services
+and Deployments are rendered for your example catalogs.
+
+## Common Mistakes
+
+- assuming Hive owns the catalog list locally instead of consuming
+  `global.dataCatalogs`
+- forgetting that one catalog means one metastore Deployment and Service
+- changing secret generation without checking the existing-secret path
+- adding umbrella-only logic here when it belongs at the parent chart layer
+
+## When You Can Ignore This Folder
+
+You can ignore this folder unless you are changing Hive Metastore generation or
+debugging how a catalog reaches Trino.

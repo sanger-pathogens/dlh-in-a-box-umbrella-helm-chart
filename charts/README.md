@@ -2,35 +2,127 @@
 
 This folder contains the chart source code for this repo.
 
-The main thing in here is `charts/dlh-in-a-box/`.
+The main thing in here is `charts/dlh-in-a-box/`, because that is the chart the
+repository publishes.
+
+## Who Should Read This
+
+| Reader | Why this guide matters |
+| --- | --- |
+| deployer reading source | to know where the published chart actually lives |
+| contributor | to understand the difference between owned source, vendored source, and packaged archives |
+| maintainer | to understand dependency refresh and packaging flow |
 
 ```mermaid
 flowchart TD
-  Charts[charts/] --> Umbrella[dlh-in-a-box]
-  Umbrella --> Values[Default settings]
-  Umbrella --> Templates[Render files]
-  Umbrella --> Files[Extra files]
-  Umbrella --> Deps[Subcharts and dependencies]
+  subgraph Source["Repo chart tree"]
+    ChartsFolder[charts/]
+    Umbrella[dlh-in-a-box]
+  end
+
+  subgraph Inputs["Owned inputs"]
+    Values[values.yaml]
+    Templates[templates/]
+    Files[files/]
+    LocalSubcharts[local subcharts]
+  end
+
+  subgraph Dependencies["Dependency material"]
+    Vendored[vendored chart source]
+    Archives[packaged dependency archives]
+    Notices[third party notices]
+  end
+
+  subgraph Output["Release outcome"]
+    Release[Helm release]
+    Platform[platform components]
+  end
+
+  ChartsFolder --> Umbrella
+  Umbrella --> Values
+  Umbrella --> Templates
+  Umbrella --> Files
+  Umbrella --> LocalSubcharts
+  Umbrella --> Vendored
+  Umbrella --> Archives
+  Umbrella --> Notices
+  Values --> Release
+  Templates --> Release
+  Files --> Release
+  LocalSubcharts --> Release
+  Vendored --> Release
+  Archives --> Release
+  Release --> Platform
 ```
 
-## What is in this folder
+## What Lives In This Folder
 
-| Path | Plain meaning |
-| --- | --- |
-| `dlh-in-a-box/` | The chart this repo publishes |
-| `dlh-in-a-box/templates/` | Files that turn chart settings into Kubernetes YAML |
-| `dlh-in-a-box/files/` | Extra files copied into rendered objects |
-| `dlh-in-a-box/charts/` | Local subcharts, vendored chart source, and packaged archives |
-| `dlh-in-a-box/third_party/` | License and notice files that must ship with the chart |
+| Path | Ownership | What it is for |
+| --- | --- | --- |
+| `dlh-in-a-box/` | repo-owned chart | the chart this repository publishes |
+| `dlh-in-a-box/templates/` | repo-owned | umbrella-specific render logic |
+| `dlh-in-a-box/files/` | repo-owned | static payload files copied into runtime objects |
+| `dlh-in-a-box/charts/` | mixed | local subcharts, vendored Trino source, packaged dependency archives |
+| `dlh-in-a-box/third_party/` | repo-owned provenance | bundled notice and license copies |
 
-## When you can ignore this folder
+This folder does not contain several independently published local charts. It
+contains one published umbrella chart plus the material needed to package it
+reproducibly.
 
-You can ignore most of this folder if you only want to use the published chart
-package.
+## Ownership Boundaries
 
-You need this folder when you are changing the chart itself.
+This tree mixes four kinds of material:
 
-## Common mistake
+- repo-owned umbrella-chart source
+- repo-owned local subchart source
+- vendored upstream source with local patch points
+- packaged dependency archives generated from dependency refresh
 
-This tree mixes local chart code with vendored material and packaged archives.
-Do not assume every file here should be edited by hand.
+That distinction matters because the edit strategy is different for each class.
+
+## How Dependency Updates Move Through This Folder
+
+When a dependency version changes:
+
+1. update `charts/dlh-in-a-box/Chart.yaml`
+2. run `./hack/helm-dependency-update.sh`
+3. review the refreshed `Chart.lock`
+4. review the packaged `.tgz` archives under `charts/dlh-in-a-box/charts/`
+5. review licensing and notice files
+
+This folder is the physical home of those artifacts, even though the dependency
+decision itself starts in `Chart.yaml`.
+
+## Common Tasks
+
+If you need to:
+
+- change default chart behavior: go to `dlh-in-a-box/`
+- understand why a dependency archive changed: inspect
+  `dlh-in-a-box/Chart.yaml`, `Chart.lock`, and `dlh-in-a-box/charts/`
+- change local Hive behavior: go to `dlh-in-a-box/charts/hive/`
+- change repo-specific Trino behavior: go to
+  `dlh-in-a-box/charts/trino/OVERVIEW.md`
+
+## Validation
+
+After changing anything in this tree, the normal checks are:
+
+```bash
+./hack/helm-dependency-update.sh
+./hack/lint.sh
+./hack/template.sh
+./hack/package.sh
+```
+
+## Common Mistakes
+
+- assuming every file here should be edited by hand
+- forgetting that packaged `.tgz` archives are generated artifacts with a
+  deliberate place in the repo
+- editing vendored upstream material without understanding ownership
+
+## When You Can Ignore This Folder
+
+You can ignore most of this folder only if you consume the already-published
+chart package and do not work from source.

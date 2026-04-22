@@ -6,7 +6,7 @@ NAMESPACE ?= data-lakehouse-local
 
 .DEFAULT_GOAL := help
 
-.PHONY: help deps docs-check render-contract lint template package smoke-install local-install
+.PHONY: help deps docs-check render-contract lint template package smoke-install local-install manual-pdf
 
 help: ## Show common maintainer targets.
 	@awk 'BEGIN {FS = ": ## "}; /^[a-zA-Z0-9_.-]+: ## / {printf "%-15s %s\n", $$1, $$2}' $(MAKEFILE_LIST)
@@ -37,3 +37,6 @@ local-install: ## Install the validated local overlay into the target namespace.
 		-n $(NAMESPACE) \
 		--create-namespace \
 		-f $(LOCAL_VALUES)
+
+manual-pdf: ## Build docs/umbrella-chart-manual.pdf from the Markdown source in docs/.
+	npm --prefix docs run build:manual
