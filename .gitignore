@@ -3,6 +3,7 @@ charts/dlh-in-a-box/charts/*.tgz
 
 # macOS and editor files
 .DS_Store
+.idea
 *.swp
 *.swo
 

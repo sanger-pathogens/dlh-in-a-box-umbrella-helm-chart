@@ -144,6 +144,7 @@
                 "usernameClaim": { "type": "string" },
                 "groupsClaim": { "type": "string" },
                 "userMappingPattern": { "type": "string" },
+                "providerCaFile": { "type": "string" },
                 "processForwardedHeaders": { "type": "boolean" },
                 "scopes": {
                   "type": "array",

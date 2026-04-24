@@ -20,6 +20,7 @@ global:
         usernameClaim: email
         groupsClaim: groups
         userMappingPattern: "([^@]+)"
+        providerCaFile: /etc/oauth2-proxy/keycloak-ca/ca.crt
         scopes:
           - openid
           - profile
@@ -326,6 +327,17 @@ prefect:
 prefect-auth-proxy:
   config:
     existingSecret: dlh-prefect-oauth2-proxy
+  extraVolumes:
+    - name: keycloak-issuer-ca
+      secret:
+        secretName: prod-example-wildcard
+        items:
+          - key: ca.crt
+            path: ca.crt
+  extraVolumeMounts:
+    - name: keycloak-issuer-ca
+      mountPath: /etc/oauth2-proxy/keycloak-ca
+      readOnly: true
   ingress:
     enabled: true
     className: nginx
