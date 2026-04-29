@@ -1451,6 +1451,67 @@
           "properties": {
             "enabled": { "type": "boolean" }
           }
+        },
+        "jobRunner": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "enabled": {
+              "type": "boolean",
+              "description": "Create Kubernetes primitives for Prefect flow-run Job pods."
+            },
+            "serviceAccount": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "create": { "type": "boolean" },
+                "name": { "type": "string" },
+                "automountServiceAccountToken": { "type": "boolean" },
+                "annotations": {
+                  "type": "object",
+                  "additionalProperties": { "type": "string" }
+                },
+                "labels": {
+                  "type": "object",
+                  "additionalProperties": { "type": "string" }
+                },
+                "imagePullSecrets": {
+                  "type": "array",
+                  "items": {
+                    "oneOf": [
+                      { "type": "string" },
+                      {
+                        "type": "object",
+                        "additionalProperties": true,
+                        "properties": {
+                          "name": { "type": "string" }
+                        }
+                      }
+                    ]
+                  }
+                }
+              }
+            },
+            "pullSecret": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "create": { "type": "boolean" },
+                "name": { "type": "string" },
+                "annotations": {
+                  "type": "object",
+                  "additionalProperties": { "type": "string" }
+                },
+                "labels": {
+                  "type": "object",
+                  "additionalProperties": { "type": "string" }
+                },
+                "server": { "type": "string" },
+                "username": { "type": "string" },
+                "password": { "type": "string" }
+              }
+            }
+          }
         }
       }
     },

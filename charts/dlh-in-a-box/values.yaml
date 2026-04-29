@@ -1339,6 +1339,25 @@ prefect:
     enabled: true
   authProxy:
     enabled: false
+  jobRunner:
+    # Creates a lightweight service account intended for Prefect Kubernetes
+    # flow-run Jobs. Wire it into the work pool base job template separately.
+    enabled: false
+    serviceAccount:
+      create: true
+      name: prefect-job-runner
+      automountServiceAccountToken: false
+      annotations: {}
+      labels: {}
+      imagePullSecrets: []
+    pullSecret:
+      create: false
+      name: prefect-job-runner-registry
+      annotations: {}
+      labels: {}
+      server: ghcr.io
+      username: ""
+      password: ""
 
 # Upstream Prefect chart values can be passed directly via these aliases.
 prefectServer:
@@ -1356,6 +1375,8 @@ prefectWorker:
       workPool: kubernetes-pool
       workQueues:
         - default
+      baseJobTemplate:
+        existingConfigMapName: prefect-worker-base-job-template
     selfHostedServerApiConfig:
       apiUrl: http://prefect-server:4200/api
 
