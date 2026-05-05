@@ -24,6 +24,7 @@ global:
         usernameClaim: email
         groupsClaim: groups
         userMappingPattern: "([^@]+)"
+        providerCaFile: ""
         scopes:
           - openid
           - profile
@@ -1393,6 +1394,10 @@ prefect-auth-proxy:
       skip_jwt_bearer_tokens = true
       api_routes = [ "^/api/" ]
       extra_jwt_issuers = "{{ include "dlh-in-a-box.identity.issuer" $ }}={{ ternary .Values.global.identity.external.clients.prefectAutomation.tokenAudience .Values.global.identity.external.clients.prefectDirectGrant.tokenAudience .Values.global.identity.external.clients.prefectAutomation.enabled }}"
+      oidc_extra_audiences = [ "{{ ternary .Values.global.identity.external.clients.prefectAutomation.tokenAudience .Values.global.identity.external.clients.prefectDirectGrant.tokenAudience .Values.global.identity.external.clients.prefectAutomation.enabled }}" ]
+      {{- end }}
+      {{- if .Values.global.identity.external.oidc.providerCaFile }}
+      provider_ca_files = [ "{{ .Values.global.identity.external.oidc.providerCaFile }}" ]
       {{- end }}
   service:
     type: ClusterIP

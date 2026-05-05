@@ -1,6 +1,8 @@
 global:
   identity:
     external:
+      oidc:
+        providerCaFile: /etc/oauth2-proxy/keycloak-ca/ca.crt
       clients:
         prefectDirectGrant:
           enabled: true

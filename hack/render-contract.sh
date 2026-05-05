@@ -236,12 +236,16 @@ assert_contains "${prod_manifest}" 'protocol/openid-connect/token'
 assert_contains "${prefect_automation_manifest}" 'skip_jwt_bearer_tokens = true'
 assert_contains "${prefect_automation_manifest}" 'api_routes = [ \"^/api/\" ]'
 assert_contains "${prefect_automation_manifest}" 'extra_jwt_issuers = \"https://keycloak.dev.example.org/realms/dlh=prefect-api\"'
+assert_contains "${prefect_automation_manifest}" 'oidc_extra_audiences = [ \"prefect-api\" ]'
+assert_contains "${prefect_automation_manifest}" 'provider_ca_files = [ \"/etc/oauth2-proxy/keycloak-ca/ca.crt\" ]'
 assert_contains "${prefect_automation_manifest}" "Prefect Automation"
 assert_contains "${prefect_automation_manifest}" "protocolMapper: oidc-audience-mapper"
 assert_contains "${prefect_automation_manifest}" "KC_PREFECT_AUTOMATION_CLIENT_SECRET"
 assert_contains "${prefect_direct_grant_manifest}" 'skip_jwt_bearer_tokens = true'
 assert_contains "${prefect_direct_grant_manifest}" 'api_routes = [ \"^/api/\" ]'
 assert_contains "${prefect_direct_grant_manifest}" 'extra_jwt_issuers = \"https://keycloak.dev.example.org/realms/dlh=prefect-api\"'
+assert_contains "${prefect_direct_grant_manifest}" 'oidc_extra_audiences = [ \"prefect-api\" ]'
+assert_contains "${prefect_direct_grant_manifest}" 'provider_ca_files = [ \"/etc/oauth2-proxy/keycloak-ca/ca.crt\" ]'
 assert_contains "${prefect_direct_grant_manifest}" "Prefect Direct Grant"
 assert_contains "${prefect_direct_grant_manifest}" "directAccessGrantsEnabled: true"
 assert_contains "${prefect_direct_grant_manifest}" "protocolMapper: oidc-audience-mapper"
