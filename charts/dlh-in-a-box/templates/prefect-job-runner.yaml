@@ -6,6 +6,17 @@
 {{- $serviceAccountName := default "prefect-job-runner" (get $serviceAccount "name") -}}
 {{- $pullSecretName := default "prefect-job-runner-registry" (get $pullSecret "name") -}}
 {{- $pullSecretCreate := default false (get $pullSecret "create") -}}
+{{- $server := default "ghcr.io" (get $pullSecret "server") -}}
+{{- $username := "" -}}
+{{- $password := "" -}}
+{{- $auth := "" -}}
+{{- $entry := dict -}}
+{{- if $pullSecretCreate -}}
+{{- $username = required "prefect.jobRunner.pullSecret.username is required when prefect.jobRunner.pullSecret.create=true." (get $pullSecret "username") -}}
+{{- $password = required "prefect.jobRunner.pullSecret.password is required when prefect.jobRunner.pullSecret.create=true." (get $pullSecret "password") -}}
+{{- $auth = printf "%s:%s" $username $password | b64enc -}}
+{{- $entry = dict "username" $username "password" $password "auth" $auth -}}
+{{- end -}}
 {{- if $pullSecretCreate }}
 ---
 apiVersion: v1
@@ -25,11 +36,6 @@ metadata:
   {{- end }}
 type: kubernetes.io/dockerconfigjson
 stringData:
-  {{- $server := default "ghcr.io" (get $pullSecret "server") -}}
-  {{- $username := required "prefect.jobRunner.pullSecret.username is required when prefect.jobRunner.pullSecret.create=true." (get $pullSecret "username") -}}
-  {{- $password := required "prefect.jobRunner.pullSecret.password is required when prefect.jobRunner.pullSecret.create=true." (get $pullSecret "password") -}}
-  {{- $auth := printf "%s:%s" $username $password | b64enc -}}
-  {{- $entry := dict "username" $username "password" $password "auth" $auth -}}
   .dockerconfigjson: {{ dict "auths" (dict $server $entry) | toJson | quote }}
 {{- end }}
 {{- $serviceAccountCreate := true -}}
