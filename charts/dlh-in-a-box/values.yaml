@@ -1340,8 +1340,7 @@ prefect:
   authProxy:
     enabled: false
   jobRunner:
-    # Creates a lightweight service account intended for Prefect Kubernetes
-    # flow-run Jobs. Wire it into the work pool base job template separately.
+    # Creates a lightweight service account intended for Prefect Kubernetes flow-run Jobs.
     enabled: false
     serviceAccount:
       create: true
@@ -1349,8 +1348,14 @@ prefect:
       automountServiceAccountToken: false
       annotations: {}
       labels: {}
+      # Use this for image pull secrets created outside this chart, such as
+      # Vault Secrets Operator or External Secrets Operator outputs. When
+      # pullSecret.create=true, the created pull secret is added automatically.
       imagePullSecrets: []
     pullSecret:
+      # Set create=true only when Helm should own the registry credential Secret.
+      # The created Secret is automatically attached to the job runner service
+      # account; do not also list the same Secret in serviceAccount.imagePullSecrets.
       create: false
       name: prefect-job-runner-registry
       annotations: {}
