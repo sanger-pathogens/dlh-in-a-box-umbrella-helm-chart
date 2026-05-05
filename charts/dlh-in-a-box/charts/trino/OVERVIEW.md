@@ -49,7 +49,7 @@ flowchart TD
 | `README.md` | upstream reference | upstream Trino chart documentation |
 | `README.md.gotmpl` | upstream reference source | source for the upstream README generation |
 | `LICENSE` | upstream license text | license material that must stay with the vendored source |
-| `Chart.yaml` | vendored upstream metadata | current vendored chart metadata, version `0.34.0` and app version `465` in this repo snapshot |
+| `Chart.yaml` | vendored upstream metadata | current vendored chart metadata, version `1.41.0` and app version `477` in this repo snapshot |
 | `values.yaml` | vendored upstream defaults | base Trino chart defaults consumed by the umbrella chart |
 | `templates/` | mixed | mostly upstream templates plus the repo's local patch points |
 | `OVERVIEW.md` | repo-owned guide | this file |

@@ -45,7 +45,7 @@ maintainers:
 # This chart intentionally prefers upstream dependencies with minimal local templates.
 dependencies:
   - name: trino
-    version: "0.34.0"
+    version: "1.41.0"
     repository: file://charts/trino
     condition: trino.enabled
 

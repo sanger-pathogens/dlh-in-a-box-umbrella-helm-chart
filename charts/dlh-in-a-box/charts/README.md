@@ -59,7 +59,7 @@ flowchart TD
 | `prefect-worker-2025.12.31221620.tgz` | generated dependency archive | packaged Prefect worker dependency |
 | `spark-operator-2.4.0.tgz` | generated dependency archive | packaged Spark Operator dependency |
 | `superset-0.15.2.tgz` | generated dependency archive | packaged Superset dependency |
-| `trino-0.34.0.tgz` | generated dependency archive | packaged Trino dependency |
+| `trino-1.41.0.tgz` | generated dependency archive | packaged Trino dependency |
 | `vault-0.32.0.tgz` | generated dependency archive | packaged Vault dependency |
 
 ## How To Think About Each Material Class

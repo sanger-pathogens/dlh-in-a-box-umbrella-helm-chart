@@ -1,5 +1,5 @@
 apiVersion: v2
-appVersion: "465"
+appVersion: "477"
 description: Fast distributed SQL query engine for big data analytics that helps you
   explore your data universe
 home: https://trino.io/
@@ -11,4 +11,4 @@ sources:
 - https://github.com/trinodb/charts
 - https://github.com/trinodb/trino/tree/master/core/docker
 type: application
-version: 0.34.0
+version: 1.41.0
