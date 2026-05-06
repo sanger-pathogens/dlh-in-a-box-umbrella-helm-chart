@@ -3,6 +3,7 @@
 {{- $platformRoleExceptions := get $authorization "platformRoleExceptions" | default (list) -}}
 {{- $platformRoleMembershipSource := default "git" (get $authorization "platformRoleMembershipSource") -}}
 {{- $ranger := get $authorization "ranger" | default dict -}}
+{{- $rangerTrino := get $ranger "trino" | default dict -}}
 {{- $exceptionRoleAudit := get $ranger "exceptionRoleAudit" | default dict -}}
 {{- $identity := .Values.global.identity | default dict -}}
 {{- $directory := get $identity "directory" | default dict -}}
@@ -72,6 +73,7 @@ data:
         "legacyManagedGroups" ($ranger.legacyManagedGroups | default (list))
         "legacyManagedRoles" ($ranger.legacyManagedRoles | default (list))
         "legacyManagedPolicies" ($ranger.legacyManagedPolicies | default (list))
+        "trinoEnabled" (and (default false $ranger.enabled) (default false $rangerTrino.enabled))
         "platformRoleMembershipSource" $platformRoleMembershipSource
         "importCatalogAcls" $importCatalogAcls
         "bootstrapPolicies" $bootstrapPolicies
@@ -199,6 +201,9 @@ data:
 
     def normalize_names(items):
         return sorted({str(item) for item in items if str(item).strip()})
+
+
+    RANGER_POLICY_USER_TOKENS = {"{USER}"}
 
 
     def role_member(name, is_admin=False):
@@ -420,7 +425,7 @@ data:
         missing = [
             build_external_user(username)
             for username in normalize_names(usernames)
-            if username not in existing_usernames
+            if username not in existing_usernames and username not in RANGER_POLICY_USER_TOKENS
         ]
         if not missing:
             return
@@ -604,43 +609,106 @@ data:
             users_acl = catalog.get("authorizedUsers", {}) or {}
             read_item = access_item(users_acl.get("read", []), groups_acl.get("read", []), [], read_accesses)
             write_item = access_item(users_acl.get("write", []), groups_acl.get("write", []), [], write_accesses)
+            policy_items = [item for item in [read_item, write_item] if item]
 
-            if read_item:
+            if policy_items:
                 policies.append(
                     normalize_policy(
                         {
-                            "name": f"{service_name}-{catalog_name}-read",
-                            "description": f"Imported read-only catalog policy for {catalog_name}.",
+                            "name": f"{service_name}-{catalog_name}-access",
+                            "description": f"Imported catalog access policy for {catalog_name}.",
                             "resources": {
                                 "catalog": catalog_name,
                                 "schema": "*",
                                 "table": "*",
                                 "column": "*",
                             },
-                            "policyItems": [read_item],
-                        },
-                        service_name,
-                    )
-                )
-            if write_item:
-                policies.append(
-                    normalize_policy(
-                        {
-                            "name": f"{service_name}-{catalog_name}-write",
-                            "description": f"Imported read-write catalog policy for {catalog_name}.",
-                            "resources": {
-                                "catalog": catalog_name,
-                                "schema": "*",
-                                "table": "*",
-                                "column": "*",
-                            },
-                            "policyItems": [write_item],
+                            "policyItems": policy_items,
                         },
                         service_name,
                     )
                 )
 
         return policies
+
+
+    def build_trino_baseline_policies(config):
+        service_name = config["ranger"]["serviceName"]
+        if not config["ranger"].get("trinoEnabled", False):
+            return []
+        return [
+            normalize_policy(
+                {
+                    "name": "all - queryid",
+                    "description": "Required Trino/Ranger baseline policy that lets each authenticated user execute their own queries.",
+                    "resources": {
+                        "queryid": "*",
+                    },
+                    "policyItems": [
+                        {
+                            "users": ["{USER}"],
+                            "groups": [],
+                            "roles": [],
+                            "accesses": [
+                                {"type": "all", "isAllowed": True},
+                            ],
+                            "conditions": [],
+                            "delegateAdmin": False,
+                        },
+                    ],
+                },
+                service_name,
+            ),
+            normalize_policy(
+                {
+                    "name": "all - trinouser",
+                    "description": "Required Trino/Ranger baseline policy that lets each authenticated principal become the matching Trino user.",
+                    "resources": {
+                        "trinouser": "{USER}",
+                    },
+                    "policyItems": [
+                        {
+                            "users": ["{USER}"],
+                            "groups": [],
+                            "roles": [],
+                            "accesses": [
+                                {"type": "all", "isAllowed": True},
+                            ],
+                            "conditions": [],
+                            "delegateAdmin": False,
+                        },
+                    ],
+                },
+                service_name,
+            ),
+            normalize_policy(
+                {
+                    "name": "all - system",
+                    "description": "Allow each authenticated user to read JDBC metadata in the system catalog.",
+                    "resources": {
+                        "catalog": "system",
+                        "schema": "jdbc",
+                        "table": "*",
+                        "column": "*",
+                    },
+                    "policyItems": [
+                        {
+                            "users": ["{USER}"],
+                            "groups": [],
+                            "roles": [],
+                            "accesses": [
+                                {"type": "select", "isAllowed": True},
+                                {"type": "show", "isAllowed": True},
+                                {"type": "use", "isAllowed": True},
+                            ],
+                            "conditions": [],
+                            "delegateAdmin": False,
+                        },
+                    ],
+                },
+                service_name,
+            ),
+        ]
 
 
     def usernames_from_policy_items(items):
@@ -965,6 +1033,7 @@ data:
         reconcile_roles(config)
 
         policies = []
+        policies.extend(build_trino_baseline_policies(config))
         policies.extend(build_catalog_acl_policies(config))
         for raw_policy in config["ranger"].get("bootstrapPolicies", []):
             policies.append(normalize_policy(raw_policy, service_name))
