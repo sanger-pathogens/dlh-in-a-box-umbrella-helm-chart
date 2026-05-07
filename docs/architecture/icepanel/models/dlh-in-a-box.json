@@ -114,6 +114,12 @@
           "y": -120,
           "width": 256,
           "height": 128
+        },
+        "chart-product": {
+          "x": 2180,
+          "y": 140,
+          "width": 256,
+          "height": 128
         }
       },
       "sourceIds": [
@@ -1215,10 +1221,10 @@
       },
       "layout": {
         "runtime": {
-          "x": -360,
+          "x": 20,
           "y": -360,
-          "width": 1380,
-          "height": 660
+          "width": 620,
+          "height": 620
         }
       },
       "caption": "Identity, browser authentication, and secret-delivery services used by the runtime.",
@@ -1245,7 +1251,7 @@
         "runtime": {
           "x": 720,
           "y": -20,
-          "width": 760,
+          "width": 420,
           "height": 260
         }
       },
@@ -1300,9 +1306,9 @@
       "layout": {
         "runtime": {
           "x": 1120,
-          "y": -780,
-          "width": 760,
-          "height": 560
+          "y": -700,
+          "width": 360,
+          "height": 820
         }
       },
       "caption": "Browser-based analysis and data exploration tools used by researchers and analysts.",
@@ -1328,9 +1334,9 @@
       "layout": {
         "runtime": {
           "x": 720,
-          "y": 460,
-          "width": 1180,
-          "height": 460
+          "y": 500,
+          "width": 760,
+          "height": 420
         }
       },
       "caption": "Workflow orchestration and distributed compute services for data pipelines.",
@@ -1356,9 +1362,9 @@
       "layout": {
         "runtime": {
           "x": 1120,
-          "y": 120,
-          "width": 760,
-          "height": 360
+          "y": 140,
+          "width": 360,
+          "height": 260
         }
       },
       "caption": "Optional metadata catalog services for discovery and lineage.",
@@ -1384,9 +1390,9 @@
       "layout": {
         "runtime": {
           "x": 1500,
-          "y": -780,
+          "y": -760,
           "width": 380,
-          "height": 1380
+          "height": 1760
         }
       },
       "caption": "Databases, queues, and indexes required by application services.",
@@ -1453,7 +1459,7 @@
       "layout": {
         "runtime": {
           "x": 1180,
-          "y": 520,
+          "y": 560,
           "width": 256,
           "height": 128
         }
@@ -1492,7 +1498,7 @@
       "layout": {
         "runtime": {
           "x": 1560,
-          "y": 520,
+          "y": 560,
           "width": 256,
           "height": 128
         }
@@ -1570,7 +1576,7 @@
       "layout": {
         "runtime": {
           "x": 780,
-          "y": 840,
+          "y": 740,
           "width": 256,
           "height": 128
         }
@@ -1717,7 +1723,7 @@
       "parent": "DLH-L1-RUNTIME",
       "status": "live",
       "external": false,
-      "description": "PostgreSQL persistence layer for Keycloak realms, clients, users, sessions, and configuration when bundled Keycloak is enabled.\n\nModel metadata: source ID DLH-R-KEYCLOAK-DB; IcePanel type data store or repository; Child of Deployed DLH-in-a-box Runtime (DLH-L1-RUNTIME). IcePanel group membership: Identity And Secrets, Support Services And Stores. Lifecycle status: Live in the current IcePanel model. Ownership or stewardship: Sanger PaM Data Engineering and Integration, icddr,b IT. Location or hosting context: icddr,b. Reality links: GitHub: PostgreSQL chart archive. Source of truth: docs/architecture/icepanel/models/dlh-in-a-box.json in the DLH-in-a-box chart repository.",
+      "description": "PostgreSQL persistence layer for Keycloak realms, clients, users, sessions, and configuration when bundled Keycloak is enabled.\n\nModel metadata: source ID DLH-R-KEYCLOAK-DB; IcePanel type data store or repository; Child of Deployed DLH-in-a-box Runtime (DLH-L1-RUNTIME). IcePanel group membership: Support Services And Stores. Lifecycle status: Live in the current IcePanel model. Ownership or stewardship: Sanger PaM Data Engineering and Integration, icddr,b IT. Location or hosting context: icddr,b. Reality links: GitHub: PostgreSQL chart archive. Source of truth: docs/architecture/icepanel/models/dlh-in-a-box.json in the DLH-in-a-box chart repository.",
       "labels": {
         "dlhTechnology": "PostgreSQL",
         "dlhEnabledBy": "keycloak.postgresql.enabled",
@@ -1725,14 +1731,13 @@
       },
       "layout": {
         "runtime": {
-          "x": 680,
-          "y": -240,
+          "x": 1560,
+          "y": -340,
           "width": 256,
           "height": 128
         }
       },
       "groups": [
-        "DLH-G-runtime-IDENTITY-AND-SECRETS",
         "DLH-G-runtime-SUPPORT-SERVICES-AND-STORES"
       ],
       "links": [
@@ -1757,7 +1762,7 @@
       "parent": "DLH-L1-RUNTIME",
       "status": "live",
       "external": false,
-      "description": "oauth2-proxy instances that enforce browser sign-in in front of selected applications, including Ranger, CloudBeaver, and Prefect.\n\nModel metadata: source ID DLH-R-AUTH-PROXIES; IcePanel type application or executable service; Child of Deployed DLH-in-a-box Runtime (DLH-L1-RUNTIME). IcePanel group membership: Browser Entry, Identity And Secrets. Lifecycle status: Live in the current IcePanel model. Ownership or stewardship: Sanger PaM Data Engineering and Integration, icddr,b IT. Location or hosting context: icddr,b. Reality links: GitHub: oauth2-proxy chart archive. Source of truth: docs/architecture/icepanel/models/dlh-in-a-box.json in the DLH-in-a-box chart repository.",
+      "description": "oauth2-proxy instances that enforce browser sign-in in front of selected applications, including Ranger, CloudBeaver, and Prefect.\n\nModel metadata: source ID DLH-R-AUTH-PROXIES; IcePanel type application or executable service; Child of Deployed DLH-in-a-box Runtime (DLH-L1-RUNTIME). IcePanel group membership: Browser Entry. Lifecycle status: Live in the current IcePanel model. Ownership or stewardship: Sanger PaM Data Engineering and Integration, icddr,b IT. Location or hosting context: icddr,b. Reality links: GitHub: oauth2-proxy chart archive. Source of truth: docs/architecture/icepanel/models/dlh-in-a-box.json in the DLH-in-a-box chart repository.",
       "labels": {
         "dlhTechnology": "oauth2-proxy instances",
         "dlhEnabledBy": "application auth-proxy settings",
@@ -1772,8 +1777,7 @@
         }
       },
       "groups": [
-        "DLH-G-runtime-BROWSER-ENTRY",
-        "DLH-G-runtime-IDENTITY-AND-SECRETS"
+        "DLH-G-runtime-BROWSER-ENTRY"
       ],
       "links": [
         {
@@ -1836,7 +1840,7 @@
       "parent": "DLH-L1-RUNTIME",
       "status": "live",
       "external": false,
-      "description": "PostgreSQL store for Ranger policy definitions, users, roles, service metadata, and audit-related state.\n\nModel metadata: source ID DLH-R-RANGER-DB; IcePanel type data store or repository; Child of Deployed DLH-in-a-box Runtime (DLH-L1-RUNTIME). IcePanel group membership: Governance, Support Services And Stores. Lifecycle status: Live in the current IcePanel model. Ownership or stewardship: Sanger PaM Data Engineering and Integration, icddr,b IT. Location or hosting context: icddr,b. Reality links: GitHub: PostgreSQL chart archive. Source of truth: docs/architecture/icepanel/models/dlh-in-a-box.json in the DLH-in-a-box chart repository.",
+      "description": "PostgreSQL store for Ranger policy definitions, users, roles, service metadata, and audit-related state.\n\nModel metadata: source ID DLH-R-RANGER-DB; IcePanel type data store or repository; Child of Deployed DLH-in-a-box Runtime (DLH-L1-RUNTIME). IcePanel group membership: Support Services And Stores. Lifecycle status: Live in the current IcePanel model. Ownership or stewardship: Sanger PaM Data Engineering and Integration, icddr,b IT. Location or hosting context: icddr,b. Reality links: GitHub: PostgreSQL chart archive. Source of truth: docs/architecture/icepanel/models/dlh-in-a-box.json in the DLH-in-a-box chart repository.",
       "labels": {
         "dlhTechnology": "PostgreSQL",
         "dlhEnabledBy": "Ranger PostgreSQL dependency/settings",
@@ -1844,14 +1848,13 @@
       },
       "layout": {
         "runtime": {
-          "x": 1180,
-          "y": 80,
+          "x": 1560,
+          "y": -160,
           "width": 256,
           "height": 128
         }
       },
       "groups": [
-        "DLH-G-runtime-GOVERNANCE",
         "DLH-G-runtime-SUPPORT-SERVICES-AND-STORES"
       ],
       "links": [
@@ -1954,7 +1957,7 @@
       "parent": "DLH-L1-RUNTIME",
       "status": "live",
       "external": false,
-      "description": "PostgreSQL persistence layer for Hive Metastore catalog metadata.\n\nModel metadata: source ID DLH-R-HIVE-DB; IcePanel type data store or repository; Child of Deployed DLH-in-a-box Runtime (DLH-L1-RUNTIME). IcePanel group membership: Lakehouse Core, Support Services And Stores. Lifecycle status: Live in the current IcePanel model. Ownership or stewardship: Sanger PaM Data Engineering and Integration, icddr,b IT. Location or hosting context: icddr,b. Reality links: GitHub: PostgreSQL chart archive. Source of truth: docs/architecture/icepanel/models/dlh-in-a-box.json in the DLH-in-a-box chart repository.",
+      "description": "PostgreSQL persistence layer for Hive Metastore catalog metadata.\n\nModel metadata: source ID DLH-R-HIVE-DB; IcePanel type data store or repository; Child of Deployed DLH-in-a-box Runtime (DLH-L1-RUNTIME). IcePanel group membership: Support Services And Stores. Lifecycle status: Live in the current IcePanel model. Ownership or stewardship: Sanger PaM Data Engineering and Integration, icddr,b IT. Location or hosting context: icddr,b. Reality links: GitHub: PostgreSQL chart archive. Source of truth: docs/architecture/icepanel/models/dlh-in-a-box.json in the DLH-in-a-box chart repository.",
       "labels": {
         "dlhTechnology": "PostgreSQL",
         "dlhEnabledBy": "hivePostgresql dependency/settings",
@@ -1962,14 +1965,13 @@
       },
       "layout": {
         "runtime": {
-          "x": 380,
-          "y": 560,
+          "x": 1560,
+          "y": 740,
           "width": 256,
           "height": 128
         }
       },
       "groups": [
-        "DLH-G-runtime-LAKEHOUSE-CORE",
         "DLH-G-runtime-SUPPORT-SERVICES-AND-STORES"
       ],
       "links": [
@@ -2033,7 +2035,7 @@
       "parent": "DLH-L1-RUNTIME",
       "status": "live",
       "external": false,
-      "description": "Relational metadata store for Superset users, dashboards, charts, datasets, and application settings.\n\nModel metadata: source ID DLH-R-SUPERSET-DB; IcePanel type data store or repository; Child of Deployed DLH-in-a-box Runtime (DLH-L1-RUNTIME). IcePanel group membership: Analysis Tools, Support Services And Stores. Lifecycle status: Live in the current IcePanel model. Ownership or stewardship: Sanger PaM Data Engineering and Integration, icddr,b IT. Location or hosting context: icddr,b. Reality links: GitHub: PostgreSQL chart archive. Source of truth: docs/architecture/icepanel/models/dlh-in-a-box.json in the DLH-in-a-box chart repository.",
+      "description": "Relational metadata store for Superset users, dashboards, charts, datasets, and application settings.\n\nModel metadata: source ID DLH-R-SUPERSET-DB; IcePanel type data store or repository; Child of Deployed DLH-in-a-box Runtime (DLH-L1-RUNTIME). IcePanel group membership: Support Services And Stores. Lifecycle status: Live in the current IcePanel model. Ownership or stewardship: Sanger PaM Data Engineering and Integration, icddr,b IT. Location or hosting context: icddr,b. Reality links: GitHub: PostgreSQL chart archive. Source of truth: docs/architecture/icepanel/models/dlh-in-a-box.json in the DLH-in-a-box chart repository.",
       "labels": {
         "dlhTechnology": "PostgreSQL",
         "dlhEnabledBy": "Superset chart settings",
@@ -2042,13 +2044,12 @@
       "layout": {
         "runtime": {
           "x": 1560,
-          "y": -720,
+          "y": -700,
           "width": 256,
           "height": 128
         }
       },
       "groups": [
-        "DLH-G-runtime-ANALYSIS-TOOLS",
         "DLH-G-runtime-SUPPORT-SERVICES-AND-STORES"
       ],
       "links": [
@@ -2073,7 +2074,7 @@
       "parent": "DLH-L1-RUNTIME",
       "status": "live",
       "external": false,
-      "description": "Cache and asynchronous task queue used by Superset for responsive dashboard execution and background work.\n\nModel metadata: source ID DLH-R-SUPERSET-REDIS; IcePanel type data store or repository; Child of Deployed DLH-in-a-box Runtime (DLH-L1-RUNTIME). IcePanel group membership: Analysis Tools, Support Services And Stores. Lifecycle status: Live in the current IcePanel model. Ownership or stewardship: Sanger PaM Data Engineering and Integration, icddr,b IT. Location or hosting context: icddr,b. Reality links: GitHub: Superset chart archive. Source of truth: docs/architecture/icepanel/models/dlh-in-a-box.json in the DLH-in-a-box chart repository.",
+      "description": "Cache and asynchronous task queue used by Superset for responsive dashboard execution and background work.\n\nModel metadata: source ID DLH-R-SUPERSET-REDIS; IcePanel type data store or repository; Child of Deployed DLH-in-a-box Runtime (DLH-L1-RUNTIME). IcePanel group membership: Support Services And Stores. Lifecycle status: Live in the current IcePanel model. Ownership or stewardship: Sanger PaM Data Engineering and Integration, icddr,b IT. Location or hosting context: icddr,b. Reality links: GitHub: Superset chart archive. Source of truth: docs/architecture/icepanel/models/dlh-in-a-box.json in the DLH-in-a-box chart repository.",
       "labels": {
         "dlhTechnology": "Redis",
         "dlhEnabledBy": "Superset chart settings",
@@ -2082,13 +2083,12 @@
       "layout": {
         "runtime": {
           "x": 1560,
-          "y": -540,
+          "y": -520,
           "width": 256,
           "height": 128
         }
       },
       "groups": [
-        "DLH-G-runtime-ANALYSIS-TOOLS",
         "DLH-G-runtime-SUPPORT-SERVICES-AND-STORES"
       ],
       "links": [
@@ -2122,7 +2122,7 @@
       "layout": {
         "runtime": {
           "x": 1180,
-          "y": -360,
+          "y": -420,
           "width": 256,
           "height": 128
         }
@@ -2160,8 +2160,8 @@
       },
       "layout": {
         "runtime": {
-          "x": 1560,
-          "y": -360,
+          "x": 1180,
+          "y": -240,
           "width": 256,
           "height": 128
         }
@@ -2200,7 +2200,7 @@
       "layout": {
         "runtime": {
           "x": 1180,
-          "y": -120,
+          "y": -60,
           "width": 256,
           "height": 128
         }
@@ -2278,7 +2278,7 @@
       "layout": {
         "runtime": {
           "x": 1560,
-          "y": 40,
+          "y": 20,
           "width": 256,
           "height": 128
         }
@@ -2317,7 +2317,7 @@
       "layout": {
         "runtime": {
           "x": 1560,
-          "y": 220,
+          "y": 200,
           "width": 256,
           "height": 128
         }
@@ -2356,7 +2356,7 @@
       "layout": {
         "runtime": {
           "x": 1560,
-          "y": 400,
+          "y": 380,
           "width": 256,
           "height": 128
         }
@@ -2391,7 +2391,7 @@
       "layout": {
         "runtime": {
           "x": 60,
-          "y": -900,
+          "y": -940,
           "width": 256,
           "height": 160
         }
@@ -2416,7 +2416,7 @@
       "layout": {
         "runtime": {
           "x": 440,
-          "y": -860,
+          "y": -900,
           "width": 256,
           "height": 128
         }
@@ -2436,19 +2436,16 @@
       "parent": null,
       "status": "live",
       "external": true,
-      "description": "Institutional or external OIDC identity provider used when the deployment does not use bundled Keycloak.\n\nModel metadata: source ID DLH-X-OIDC; IcePanel type system-level object; Top-level object in the DLH-in-a-box domain. IcePanel group membership: Identity And Secrets. Lifecycle status: Live in the current IcePanel model. Ownership or stewardship: Deployment-specific external service; the operating institution should be assigned when the concrete provider is known. Location or hosting context: Deployment-specific; this may be institutional infrastructure or a cloud-hosted service. Reality links: No repository reality link has been assigned; this object is conceptual, deployment-specific, or external to the repository. Source of truth: docs/architecture/icepanel/models/dlh-in-a-box.json in the DLH-in-a-box chart repository.",
+      "description": "Institutional or external OIDC identity provider used when the deployment does not use bundled Keycloak.\n\nModel metadata: source ID DLH-X-OIDC; IcePanel type system-level object; Top-level object in the DLH-in-a-box domain. No IcePanel group membership is assigned. Lifecycle status: Live in the current IcePanel model. Ownership or stewardship: Deployment-specific external service; the operating institution should be assigned when the concrete provider is known. Location or hosting context: Deployment-specific; this may be institutional infrastructure or a cloud-hosted service. Reality links: No repository reality link has been assigned; this object is conceptual, deployment-specific, or external to the repository. Source of truth: docs/architecture/icepanel/models/dlh-in-a-box.json in the DLH-in-a-box chart repository.",
       "labels": {},
       "layout": {
         "runtime": {
           "x": 900,
-          "y": -860,
+          "y": -900,
           "width": 256,
           "height": 128
         }
       },
-      "groups": [
-        "DLH-G-runtime-IDENTITY-AND-SECRETS"
-      ],
       "caption": "Institutional or external OIDC identity provider used when the deployment does not use bundled Keycloak.",
       "teamIds": [],
       "tagIds": []
@@ -2460,19 +2457,16 @@
       "parent": null,
       "status": "live",
       "external": true,
-      "description": "Enterprise directory that supplies users and groups to Keycloak when identity federation is configured.\n\nModel metadata: source ID DLH-X-LDAP; IcePanel type system-level object; Top-level object in the DLH-in-a-box domain. IcePanel group membership: Identity And Secrets. Lifecycle status: Live in the current IcePanel model. Ownership or stewardship: Deployment-specific external service; the operating institution should be assigned when the concrete provider is known. Location or hosting context: Deployment-specific; this may be institutional infrastructure or a cloud-hosted service. Reality links: No repository reality link has been assigned; this object is conceptual, deployment-specific, or external to the repository. Source of truth: docs/architecture/icepanel/models/dlh-in-a-box.json in the DLH-in-a-box chart repository.",
+      "description": "Enterprise directory that supplies users and groups to Keycloak when identity federation is configured.\n\nModel metadata: source ID DLH-X-LDAP; IcePanel type system-level object; Top-level object in the DLH-in-a-box domain. No IcePanel group membership is assigned. Lifecycle status: Live in the current IcePanel model. Ownership or stewardship: Deployment-specific external service; the operating institution should be assigned when the concrete provider is known. Location or hosting context: Deployment-specific; this may be institutional infrastructure or a cloud-hosted service. Reality links: No repository reality link has been assigned; this object is conceptual, deployment-specific, or external to the repository. Source of truth: docs/architecture/icepanel/models/dlh-in-a-box.json in the DLH-in-a-box chart repository.",
       "labels": {},
       "layout": {
         "runtime": {
-          "x": -300,
-          "y": -260,
+          "x": -320,
+          "y": -420,
           "width": 256,
           "height": 128
         }
       },
-      "groups": [
-        "DLH-G-runtime-IDENTITY-AND-SECRETS"
-      ],
       "caption": "Enterprise directory that supplies users and groups to Keycloak when identity federation is configured.",
       "teamIds": [],
       "tagIds": []
@@ -2484,19 +2478,16 @@
       "parent": null,
       "status": "live",
       "external": true,
-      "description": "External object-storage service that contains lakehouse data objects when the deployment uses external S3-compatible storage.\n\nModel metadata: source ID DLH-X-OBJECT-STORAGE; IcePanel type system-level object; Top-level object in the DLH-in-a-box domain. IcePanel group membership: Lakehouse Core. Lifecycle status: Live in the current IcePanel model. Ownership or stewardship: Deployment-specific external service; the operating institution should be assigned when the concrete provider is known. Location or hosting context: Deployment-specific; this may be institutional infrastructure or a cloud-hosted service. Reality links: No repository reality link has been assigned; this object is conceptual, deployment-specific, or external to the repository. Source of truth: docs/architecture/icepanel/models/dlh-in-a-box.json in the DLH-in-a-box chart repository.",
+      "description": "External object-storage service that contains lakehouse data objects when the deployment uses external S3-compatible storage.\n\nModel metadata: source ID DLH-X-OBJECT-STORAGE; IcePanel type system-level object; Top-level object in the DLH-in-a-box domain. No IcePanel group membership is assigned. Lifecycle status: Live in the current IcePanel model. Ownership or stewardship: Deployment-specific external service; the operating institution should be assigned when the concrete provider is known. Location or hosting context: Deployment-specific; this may be institutional infrastructure or a cloud-hosted service. Reality links: No repository reality link has been assigned; this object is conceptual, deployment-specific, or external to the repository. Source of truth: docs/architecture/icepanel/models/dlh-in-a-box.json in the DLH-in-a-box chart repository.",
       "labels": {},
       "layout": {
         "runtime": {
-          "x": 80,
-          "y": 780,
+          "x": -320,
+          "y": 640,
           "width": 256,
           "height": 128
         }
       },
-      "groups": [
-        "DLH-G-runtime-LAKEHOUSE-CORE"
-      ],
       "caption": "External object-storage service that contains lakehouse data objects when the deployment uses external S3-compatible storage.",
       "teamIds": [],
       "tagIds": []
@@ -2508,19 +2499,16 @@
       "parent": null,
       "status": "live",
       "external": true,
-      "description": "External mechanism that creates Kubernetes Secrets consumed by the release, such as Vault Secrets Operator.\n\nModel metadata: source ID DLH-X-SECRET-SYNC; IcePanel type system-level object; Top-level object in the DLH-in-a-box domain. IcePanel group membership: Identity And Secrets. Lifecycle status: Live in the current IcePanel model. Ownership or stewardship: Deployment-specific external service; the operating institution should be assigned when the concrete provider is known. Location or hosting context: Deployment-specific; this may be institutional infrastructure or a cloud-hosted service. Reality links: No repository reality link has been assigned; this object is conceptual, deployment-specific, or external to the repository. Source of truth: docs/architecture/icepanel/models/dlh-in-a-box.json in the DLH-in-a-box chart repository.",
+      "description": "External mechanism that creates Kubernetes Secrets consumed by the release, such as Vault Secrets Operator.\n\nModel metadata: source ID DLH-X-SECRET-SYNC; IcePanel type system-level object; Top-level object in the DLH-in-a-box domain. No IcePanel group membership is assigned. Lifecycle status: Live in the current IcePanel model. Ownership or stewardship: Deployment-specific external service; the operating institution should be assigned when the concrete provider is known. Location or hosting context: Deployment-specific; this may be institutional infrastructure or a cloud-hosted service. Reality links: No repository reality link has been assigned; this object is conceptual, deployment-specific, or external to the repository. Source of truth: docs/architecture/icepanel/models/dlh-in-a-box.json in the DLH-in-a-box chart repository.",
       "labels": {},
       "layout": {
         "runtime": {
           "x": -320,
-          "y": 220,
+          "y": 120,
           "width": 256,
           "height": 128
         }
       },
-      "groups": [
-        "DLH-G-runtime-IDENTITY-AND-SECRETS"
-      ],
       "caption": "External mechanism that creates Kubernetes Secrets consumed by the release, such as Vault Secrets Operator.",
       "teamIds": [],
       "tagIds": []
@@ -2537,7 +2525,7 @@
       "layout": {
         "runtime": {
           "x": 1960,
-          "y": 560,
+          "y": 520,
           "width": 256,
           "height": 128
         }
@@ -2564,7 +2552,7 @@
       "layout": {
         "runtime": {
           "x": 1960,
-          "y": 760,
+          "y": 720,
           "width": 256,
           "height": 128
         }
@@ -4860,10 +4848,16 @@
       "bounds": {
         "x": -380,
         "y": -360,
-        "width": 2580,
+        "width": 2860,
         "height": 900
       },
-      "exportFilename": "02-chart-product-and-packaging.png"
+      "exportFilename": "02-chart-product-and-packaging.png",
+      "parentAreaBounds": {
+        "x": 600,
+        "y": -340,
+        "width": 1520,
+        "height": 860
+      }
     },
     {
       "key": "runtime",
@@ -4973,7 +4967,13 @@
         "width": 2740,
         "height": 2000
       },
-      "exportFilename": "03-runtime-deployed-by-the-chart.png"
+      "exportFilename": "03-runtime-deployed-by-the-chart.png",
+      "parentAreaBounds": {
+        "x": 0,
+        "y": -760,
+        "width": 1900,
+        "height": 1760
+      }
     },
     {
       "key": "chart-source",

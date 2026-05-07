@@ -55,7 +55,7 @@ DIAGRAM_EXPORT_FILENAMES = {
 }
 
 DIAGRAM_BOUNDS = {
-    "chart-product": {"x": -380, "y": -360, "width": 2580, "height": 900},
+    "chart-product": {"x": -380, "y": -360, "width": 2860, "height": 900},
     "runtime": {"x": -420, "y": -980, "width": 2740, "height": 2000},
     "chart-source": {"x": 0, "y": 0, "width": 1480, "height": 840},
     "packaged-dependencies": {"x": 0, "y": 0, "width": 1480, "height": 660},
@@ -66,6 +66,11 @@ DIAGRAM_BOUNDS = {
 }
 
 DEFAULT_DIAGRAM_BOUNDS = {"x": -160, "y": -160, "width": 1480, "height": 920}
+
+PARENT_AREA_BOUNDS = {
+    "chart-product": {"x": 600, "y": -340, "width": 1520, "height": 860},
+    "runtime": {"x": 0, "y": -760, "width": 1900, "height": 1760},
+}
 
 
 @dataclass
@@ -116,6 +121,7 @@ class DiagramSpec:
     description: str = ""
     export_filename: str = ""
     bounds: dict[str, int] = field(default_factory=dict)
+    parent_area_bounds: dict[str, int] = field(default_factory=dict)
 
 
 @dataclass
@@ -642,6 +648,8 @@ def canonicalize_source_model(
             export_filename=diagram.export_filename
             or DIAGRAM_EXPORT_FILENAMES.get(diagram.key, f"{diagram.key}.png"),
             bounds=diagram.bounds or DIAGRAM_BOUNDS.get(diagram.key, DEFAULT_DIAGRAM_BOUNDS),
+            parent_area_bounds=diagram.parent_area_bounds
+            or PARENT_AREA_BOUNDS.get(diagram.key, {}),
         )
 
     return SourceModel(
@@ -730,6 +738,7 @@ def parse_json_source_model(path: Path) -> SourceModel:
             description=item.get("description", ""),
             export_filename=item.get("exportFilename", ""),
             bounds=normalize_bounds(item.get("bounds") or {}),
+            parent_area_bounds=normalize_bounds(item.get("parentAreaBounds") or {}),
         )
 
     source = canonicalize_source_model(objects, connections, diagrams)
@@ -804,22 +813,23 @@ def source_model_to_json(source: SourceModel, source_file: str) -> dict[str, Any
 
     diagrams = []
     for key, diagram in source.diagrams.items():
-        diagrams.append(
-            {
-                "key": key,
-                "name": diagram.name,
-                "type": diagram.type,
-                "modelObject": None
-                if diagram.model_source_id == ROOT_PARENT
-                else diagram.model_source_id,
-                "objects": diagram.object_source_ids,
-                "connections": diagram.connection_source_ids,
-                "description": diagram.description,
-                "bounds": diagram.bounds or DIAGRAM_BOUNDS.get(key, DEFAULT_DIAGRAM_BOUNDS),
-                "exportFilename": diagram.export_filename
-                or DIAGRAM_EXPORT_FILENAMES.get(key, f"{key}.png"),
-            }
-        )
+        item = {
+            "key": key,
+            "name": diagram.name,
+            "type": diagram.type,
+            "modelObject": None
+            if diagram.model_source_id == ROOT_PARENT
+            else diagram.model_source_id,
+            "objects": diagram.object_source_ids,
+            "connections": diagram.connection_source_ids,
+            "description": diagram.description,
+            "bounds": diagram.bounds or DIAGRAM_BOUNDS.get(key, DEFAULT_DIAGRAM_BOUNDS),
+            "exportFilename": diagram.export_filename
+            or DIAGRAM_EXPORT_FILENAMES.get(key, f"{key}.png"),
+        }
+        if diagram.parent_area_bounds:
+            item["parentAreaBounds"] = diagram.parent_area_bounds
+        diagrams.append(item)
 
     return {
         "$schema": "./dlh-in-a-box.schema.json",
@@ -1630,7 +1640,7 @@ class SyncRunner:
         return content
 
     def parent_area_object(self, diagram: DiagramSpec, model_id: str) -> dict[str, Any]:
-        bounds = self.diagram_bounds(diagram.key)
+        bounds = diagram.parent_area_bounds or self.diagram_bounds(diagram.key)
         source_obj = self.source.objects.get(diagram.model_source_id)
         object_type = source_obj.type if source_obj else "system"
         return {
@@ -1814,42 +1824,43 @@ EXPLICIT_POSITIONS: dict[str, dict[str, dict[str, int]]] = {
         "DLH-C2-VALIDATION": pos(1060, 20),
         "DLH-C2-PUBLISH": pos(1400, 20),
         "DLH-C2-OCI-PACKAGE": pos(1780, -120),
-        "DLH-X-CONSUMER-REPO": pos(1780, 140),
+        "DLH-L1-CONSUMER-REPO": pos(2180, 140),
+        "DLH-X-CONSUMER-REPO": pos(2180, 140),
     },
     "runtime": {
-        "DLH-X-USERS": pos(60, -900, height=160),
-        "DLH-X-INGRESS-CONTROLLER": pos(440, -860),
-        "DLH-X-OIDC": pos(900, -860),
-        "DLH-X-LDAP": pos(-300, -260),
-        "DLH-X-SECRET-SYNC": pos(-320, 220),
-        "DLH-X-OBJECT-STORAGE": pos(80, 780),
-        "DLH-X-SOURCE-SYSTEMS": pos(1960, 760),
-        "DLH-X-PIPELINE-CODE": pos(1960, 560),
+        "DLH-X-USERS": pos(60, -940, height=160),
+        "DLH-X-INGRESS-CONTROLLER": pos(440, -900),
+        "DLH-X-OIDC": pos(900, -900),
+        "DLH-X-LDAP": pos(-320, -420),
+        "DLH-X-SECRET-SYNC": pos(-320, 120),
+        "DLH-X-OBJECT-STORAGE": pos(-320, 640),
+        "DLH-X-SOURCE-SYSTEMS": pos(1960, 720),
+        "DLH-X-PIPELINE-CODE": pos(1960, 520),
         "DLH-R-PLATFORM-HOME": pos(80, -580),
         "DLH-R-AUTH-PROXIES": pos(420, -580),
         "DLH-R-KEYCLOAK": pos(280, -240),
-        "DLH-R-KEYCLOAK-DB": pos(680, -240),
+        "DLH-R-KEYCLOAK-DB": pos(1560, -340),
         "DLH-R-VAULT": pos(80, 120),
         "DLH-R-RANGER": pos(780, 80),
-        "DLH-R-RANGER-DB": pos(1180, 80),
+        "DLH-R-RANGER-DB": pos(1560, -160),
         "DLH-R-TRINO": pos(780, 360),
         "DLH-R-HIVE": pos(380, 360),
-        "DLH-R-HIVE-DB": pos(380, 560),
+        "DLH-R-HIVE-DB": pos(1560, 740),
         "DLH-R-MINIO": pos(780, 620),
         "DLH-R-SUPERSET": pos(1180, -620),
-        "DLH-R-SUPERSET-DB": pos(1560, -720),
-        "DLH-R-SUPERSET-REDIS": pos(1560, -540),
-        "DLH-R-JUPYTERHUB": pos(1180, -360),
-        "DLH-R-JUPYTER-PODS": pos(1560, -360),
-        "DLH-R-CLOUDBEAVER": pos(1180, -120),
-        "DLH-R-PREFECT-SERVER": pos(1180, 520),
-        "DLH-R-PREFECT-DB": pos(1560, 520),
+        "DLH-R-SUPERSET-DB": pos(1560, -700),
+        "DLH-R-SUPERSET-REDIS": pos(1560, -520),
+        "DLH-R-JUPYTERHUB": pos(1180, -420),
+        "DLH-R-JUPYTER-PODS": pos(1180, -240),
+        "DLH-R-CLOUDBEAVER": pos(1180, -60),
+        "DLH-R-PREFECT-SERVER": pos(1180, 560),
+        "DLH-R-PREFECT-DB": pos(1560, 560),
         "DLH-R-PREFECT-WORKER": pos(1180, 740),
-        "DLH-R-SPARK-OPERATOR": pos(780, 840),
+        "DLH-R-SPARK-OPERATOR": pos(780, 740),
         "DLH-R-DATAHUB": pos(1180, 220),
-        "DLH-R-DATAHUB-MYSQL": pos(1560, 40),
-        "DLH-R-DATAHUB-KAFKA": pos(1560, 220),
-        "DLH-R-DATAHUB-ELASTICSEARCH": pos(1560, 400),
+        "DLH-R-DATAHUB-MYSQL": pos(1560, 20),
+        "DLH-R-DATAHUB-KAFKA": pos(1560, 200),
+        "DLH-R-DATAHUB-ELASTICSEARCH": pos(1560, 380),
     },
 }
 
@@ -1863,13 +1874,13 @@ EXPLICIT_GROUP_POSITIONS: dict[str, dict[str, dict[str, int]]] = {
     },
     "runtime": {
         "DLH-G-runtime-BROWSER-ENTRY": pos(20, -660, 720, 240),
-        "DLH-G-runtime-IDENTITY-AND-SECRETS": pos(-360, -360, 1380, 660),
-        "DLH-G-runtime-GOVERNANCE": pos(720, -20, 760, 260),
+        "DLH-G-runtime-IDENTITY-AND-SECRETS": pos(20, -360, 620, 620),
+        "DLH-G-runtime-GOVERNANCE": pos(720, -20, 420, 260),
         "DLH-G-runtime-LAKEHOUSE-CORE": pos(320, 300, 820, 520),
-        "DLH-G-runtime-ANALYSIS-TOOLS": pos(1120, -780, 760, 560),
-        "DLH-G-runtime-ORCHESTRATION-AND-COMPUTE": pos(720, 460, 1180, 460),
-        "DLH-G-runtime-DISCOVERY": pos(1120, 120, 760, 360),
-        "DLH-G-runtime-SUPPORT-SERVICES-AND-STORES": pos(1500, -780, 380, 1380),
+        "DLH-G-runtime-ANALYSIS-TOOLS": pos(1120, -700, 360, 820),
+        "DLH-G-runtime-ORCHESTRATION-AND-COMPUTE": pos(720, 500, 760, 420),
+        "DLH-G-runtime-DISCOVERY": pos(1120, 140, 360, 260),
+        "DLH-G-runtime-SUPPORT-SERVICES-AND-STORES": pos(1500, -760, 380, 1760),
     },
 }
 

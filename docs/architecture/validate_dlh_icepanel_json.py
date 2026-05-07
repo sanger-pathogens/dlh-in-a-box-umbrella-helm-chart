@@ -31,6 +31,35 @@ KNOWN_TEAM_IDS = {
     "YD4KdnnwJtWane4R039f",  # Sanger PaM Data Engineering and Integration
     "yNlfFPPI683RFZ2aq3bk",  # icddr,b IT
 }
+RUNTIME_GROUP_BY_OBJECT = {
+    "DLH-R-PLATFORM-HOME": "DLH-G-runtime-BROWSER-ENTRY",
+    "DLH-R-AUTH-PROXIES": "DLH-G-runtime-BROWSER-ENTRY",
+    "DLH-R-KEYCLOAK": "DLH-G-runtime-IDENTITY-AND-SECRETS",
+    "DLH-R-VAULT": "DLH-G-runtime-IDENTITY-AND-SECRETS",
+    "DLH-R-RANGER": "DLH-G-runtime-GOVERNANCE",
+    "DLH-R-TRINO": "DLH-G-runtime-LAKEHOUSE-CORE",
+    "DLH-R-HIVE": "DLH-G-runtime-LAKEHOUSE-CORE",
+    "DLH-R-MINIO": "DLH-G-runtime-LAKEHOUSE-CORE",
+    "DLH-R-SUPERSET": "DLH-G-runtime-ANALYSIS-TOOLS",
+    "DLH-R-JUPYTERHUB": "DLH-G-runtime-ANALYSIS-TOOLS",
+    "DLH-R-JUPYTER-PODS": "DLH-G-runtime-ANALYSIS-TOOLS",
+    "DLH-R-CLOUDBEAVER": "DLH-G-runtime-ANALYSIS-TOOLS",
+    "DLH-R-PREFECT-SERVER": "DLH-G-runtime-ORCHESTRATION-AND-COMPUTE",
+    "DLH-R-PREFECT-WORKER": "DLH-G-runtime-ORCHESTRATION-AND-COMPUTE",
+    "DLH-R-SPARK-OPERATOR": "DLH-G-runtime-ORCHESTRATION-AND-COMPUTE",
+    "DLH-R-DATAHUB": "DLH-G-runtime-DISCOVERY",
+    "DLH-R-KEYCLOAK-DB": "DLH-G-runtime-SUPPORT-SERVICES-AND-STORES",
+    "DLH-R-RANGER-DB": "DLH-G-runtime-SUPPORT-SERVICES-AND-STORES",
+    "DLH-R-HIVE-DB": "DLH-G-runtime-SUPPORT-SERVICES-AND-STORES",
+    "DLH-R-SUPERSET-DB": "DLH-G-runtime-SUPPORT-SERVICES-AND-STORES",
+    "DLH-R-SUPERSET-REDIS": "DLH-G-runtime-SUPPORT-SERVICES-AND-STORES",
+    "DLH-R-PREFECT-DB": "DLH-G-runtime-SUPPORT-SERVICES-AND-STORES",
+    "DLH-R-DATAHUB-MYSQL": "DLH-G-runtime-SUPPORT-SERVICES-AND-STORES",
+    "DLH-R-DATAHUB-KAFKA": "DLH-G-runtime-SUPPORT-SERVICES-AND-STORES",
+    "DLH-R-DATAHUB-ELASTICSEARCH": "DLH-G-runtime-SUPPORT-SERVICES-AND-STORES",
+}
+RUNTIME_GROUP_IDS = set(RUNTIME_GROUP_BY_OBJECT.values())
+SUPPORT_GROUP_ID = "DLH-G-runtime-SUPPORT-SERVICES-AND-STORES"
 
 
 def load_json(path: Path) -> Any:
@@ -133,6 +162,8 @@ def validate_semantics(model: dict[str, Any]) -> list[str]:
     connection_ids = [item["id"] for item in model["connections"]]
     diagram_keys = [item["key"] for item in model["diagrams"]]
     export_filenames = [item["exportFilename"] for item in model["diagrams"]]
+    object_by_id = {item["id"]: item for item in model["objects"]}
+    connection_by_id = {item["id"]: item for item in model["connections"]}
 
     for label, values in [
         ("object id", object_ids),
@@ -171,7 +202,7 @@ def validate_semantics(model: dict[str, Any]) -> list[str]:
             if group_id not in object_id_set:
                 errors.append(f"object {item['id']} group does not exist: {group_id}")
                 continue
-            group = next(obj for obj in model["objects"] if obj["id"] == group_id)
+            group = object_by_id[group_id]
             if group["type"] != "group":
                 errors.append(f"object {item['id']} group is not a group object: {group_id}")
             if item["type"] == "group":
@@ -195,24 +226,133 @@ def validate_semantics(model: dict[str, Any]) -> list[str]:
     for item in model["connections"]:
         if item["origin"] not in object_id_set:
             errors.append(f"connection {item['id']} origin does not exist: {item['origin']}")
+        elif object_by_id[item["origin"]]["type"] == "group":
+            errors.append(f"connection {item['id']} origin must not be a group: {item['origin']}")
         if item["target"] not in object_id_set:
             errors.append(f"connection {item['id']} target does not exist: {item['target']}")
+        elif object_by_id[item["target"]]["type"] == "group":
+            errors.append(f"connection {item['id']} target must not be a group: {item['target']}")
 
     for item in model["diagrams"]:
         model_object = item.get("modelObject")
         if model_object is not None and model_object not in object_id_set:
             errors.append(f"diagram {item['key']} modelObject does not exist: {model_object}")
+        diagram_object_ids = set(item["objects"])
         for object_id in item["objects"]:
             if object_id not in object_id_set:
                 errors.append(f"diagram {item['key']} object does not exist: {object_id}")
         for connection_id in item["connections"]:
             if connection_id not in connection_id_set:
                 errors.append(f"diagram {item['key']} connection does not exist: {connection_id}")
+                continue
+            connection = connection_by_id[connection_id]
+            if connection["origin"] not in diagram_object_ids:
+                errors.append(
+                    f"diagram {item['key']} connection {connection_id} origin is not shown: {connection['origin']}"
+                )
+            if connection["target"] not in diagram_object_ids:
+                errors.append(
+                    f"diagram {item['key']} connection {connection_id} target is not shown: {connection['target']}"
+                )
+        errors.extend(validate_parent_area(item, object_by_id))
+
+    errors.extend(validate_runtime_groups(model, object_by_id))
 
     if len(model["diagrams"]) != 9:
         errors.append(f"expected 9 official diagrams, found {len(model['diagrams'])}")
 
     return errors
+
+
+def validate_parent_area(
+    diagram: dict[str, Any],
+    object_by_id: dict[str, dict[str, Any]],
+) -> list[str]:
+    errors: list[str] = []
+    parent_area = diagram.get("parentAreaBounds")
+    model_object = diagram.get("modelObject")
+    if not parent_area or not model_object:
+        return errors
+
+    for object_id in diagram["objects"]:
+        obj = object_by_id.get(object_id)
+        if not obj:
+            continue
+        layout = (obj.get("layout") or {}).get(diagram["key"])
+        if not layout:
+            errors.append(
+                f"diagram {diagram['key']} object {object_id} has no explicit layout"
+            )
+            continue
+        if obj.get("parent") == model_object and not box_contains(parent_area, layout):
+            errors.append(
+                f"diagram {diagram['key']} child object {object_id} is outside its parent area"
+            )
+        if obj.get("external") and box_intersects(parent_area, layout):
+            errors.append(
+                f"diagram {diagram['key']} external object {object_id} intersects its parent area"
+            )
+        if object_id in RUNTIME_GROUP_IDS and not box_contains(parent_area, layout):
+            errors.append(
+                f"diagram {diagram['key']} runtime group {object_id} is outside its parent area"
+            )
+    return errors
+
+
+def validate_runtime_groups(
+    model: dict[str, Any],
+    object_by_id: dict[str, dict[str, Any]],
+) -> list[str]:
+    errors: list[str] = []
+    for obj in model["objects"]:
+        runtime_groups = [group for group in obj.get("groups", []) if group in RUNTIME_GROUP_IDS]
+        expected_group = RUNTIME_GROUP_BY_OBJECT.get(obj["id"])
+        if expected_group and runtime_groups != [expected_group]:
+            errors.append(
+                f"object {obj['id']} must belong only to runtime group {expected_group}; got {runtime_groups}"
+            )
+        if not expected_group and runtime_groups:
+            errors.append(f"object {obj['id']} has unexpected runtime groups: {runtime_groups}")
+
+    support_members = sorted(
+        obj["id"] for obj in model["objects"] if SUPPORT_GROUP_ID in (obj.get("groups") or [])
+    )
+    expected_support_members = sorted(
+        object_id
+        for object_id, group_id in RUNTIME_GROUP_BY_OBJECT.items()
+        if group_id == SUPPORT_GROUP_ID
+    )
+    if support_members != expected_support_members:
+        errors.append(
+            "support-services group membership mismatch: "
+            f"expected {expected_support_members}, got {support_members}"
+        )
+
+    runtime_diagrams = [diagram for diagram in model["diagrams"] if diagram["key"] == "runtime"]
+    if runtime_diagrams:
+        for object_id in runtime_diagrams[0]["objects"]:
+            obj = object_by_id.get(object_id)
+            if obj and obj.get("parent") == "DLH-L1-RUNTIME" and object_id not in RUNTIME_GROUP_BY_OBJECT:
+                errors.append(f"runtime object {object_id} has no explicit runtime group policy")
+    return errors
+
+
+def box_contains(outer: dict[str, int], inner: dict[str, int]) -> bool:
+    return (
+        inner["x"] >= outer["x"]
+        and inner["y"] >= outer["y"]
+        and inner["x"] + inner["width"] <= outer["x"] + outer["width"]
+        and inner["y"] + inner["height"] <= outer["y"] + outer["height"]
+    )
+
+
+def box_intersects(first: dict[str, int], second: dict[str, int]) -> bool:
+    return not (
+        second["x"] + second["width"] <= first["x"]
+        or second["x"] >= first["x"] + first["width"]
+        or second["y"] + second["height"] <= first["y"]
+        or second["y"] >= first["y"] + first["height"]
+    )
 
 
 def github_main_path(url: str) -> str | None:
