@@ -48,6 +48,7 @@ flowchart TD
 | --- | --- |
 | `README.md` | explains the reduced role of `docs/` |
 | `assets/` | shared image and icon files used by docs or chart metadata |
+| `architecture/` | IcePanel model source, publication companion text, and exported architecture diagrams |
 | `Internal/` | internal review material and audit notes, not part of the public folder-guide scope |
 
 ## Why This Folder Is Small
@@ -69,6 +70,7 @@ they describe. That means:
 Good fits for this folder:
 
 - shared assets used across documentation
+- shared architecture artifacts used for publication and review
 - very small cross-cutting support material
 - internal review notes that should not become part of the public folder-guide
   contract

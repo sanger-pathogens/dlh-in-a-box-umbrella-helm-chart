@@ -1,0 +1,370 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.org/dlh-in-a-box-icepanel-model.schema.json",
+  "title": "DLH-in-a-box IcePanel model",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "icepanel",
+    "objects",
+    "connections",
+    "diagrams"
+  ],
+  "properties": {
+    "$schema": {
+      "type": "string"
+    },
+    "schemaVersion": {
+      "const": 1
+    },
+    "icepanel": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "landscapeId",
+        "versionId",
+        "domainId",
+        "apiBaseUrl",
+        "labels"
+      ],
+      "properties": {
+        "landscapeId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "versionId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "domainId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "apiBaseUrl": {
+          "type": "string",
+          "format": "uri"
+        },
+        "labels": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "sourceId",
+            "sourceIds",
+            "sourceFile",
+            "diagramKey",
+            "sourceFileValue"
+          ],
+          "properties": {
+            "sourceId": {
+              "const": "dlhSourceId"
+            },
+            "sourceIds": {
+              "const": "dlhSourceIds"
+            },
+            "sourceFile": {
+              "const": "dlhSourceFile"
+            },
+            "diagramKey": {
+              "const": "dlhDiagramKey"
+            },
+            "sourceFileValue": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        }
+      }
+    },
+    "objects": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/object"
+      }
+    },
+    "connections": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/connection"
+      }
+    },
+    "diagrams": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/diagram"
+      }
+    }
+  },
+  "$defs": {
+    "sourceId": {
+      "type": "string",
+      "pattern": "^DLH-[A-Za-z0-9-]+$"
+    },
+    "icepanelType": {
+      "enum": [
+        "actor",
+        "app",
+        "component",
+        "group",
+        "root",
+        "store",
+        "system"
+      ]
+    },
+    "status": {
+      "enum": [
+        "deprecated",
+        "future",
+        "live",
+        "removed"
+      ]
+    },
+    "layoutBox": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "x",
+        "y",
+        "width",
+        "height"
+      ],
+      "properties": {
+        "x": {
+          "type": "integer"
+        },
+        "y": {
+          "type": "integer"
+        },
+        "width": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "height": {
+          "type": "integer",
+          "minimum": 1
+        }
+      }
+    },
+    "labels": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "string"
+      }
+    },
+    "link": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "url"
+      ],
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "url": {
+          "type": "string",
+          "pattern": "^https://github\\.com/.+/(tree|blob)/main(/.*)?$"
+        }
+      }
+    },
+    "object": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "name",
+        "type",
+        "parent",
+        "status",
+        "external",
+        "description",
+        "labels",
+        "layout"
+      ],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/sourceId"
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "type": {
+          "$ref": "#/$defs/icepanelType"
+        },
+        "parent": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/sourceId"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "status": {
+          "$ref": "#/$defs/status"
+        },
+        "external": {
+          "type": "boolean"
+        },
+        "description": {
+          "type": "string"
+        },
+        "caption": {
+          "type": "string",
+          "minLength": 1
+        },
+        "labels": {
+          "$ref": "#/$defs/labels"
+        },
+        "layout": {
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/$defs/layoutBox"
+          }
+        },
+        "groups": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/sourceId"
+          }
+        },
+        "sourceIds": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/sourceId"
+          }
+        },
+        "links": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/link"
+          }
+        },
+        "tagIds": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "teamIds": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
+    "connection": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "origin",
+        "target",
+        "label",
+        "direction"
+      ],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/sourceId"
+        },
+        "origin": {
+          "$ref": "#/$defs/sourceId"
+        },
+        "target": {
+          "$ref": "#/$defs/sourceId"
+        },
+        "label": {
+          "type": "string",
+          "minLength": 1
+        },
+        "direction": {
+          "enum": [
+            "incoming",
+            "outgoing"
+          ]
+        },
+        "sourceIds": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/sourceId"
+          }
+        }
+      }
+    },
+    "diagram": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "key",
+        "name",
+        "type",
+        "modelObject",
+        "objects",
+        "connections",
+        "description",
+        "bounds",
+        "exportFilename"
+      ],
+      "properties": {
+        "key": {
+          "type": "string",
+          "pattern": "^[a-z0-9-]+$"
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "type": {
+          "enum": [
+            "app-diagram",
+            "component-diagram",
+            "context-diagram"
+          ]
+        },
+        "modelObject": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/sourceId"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "objects": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/sourceId"
+          }
+        },
+        "connections": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/sourceId"
+          }
+        },
+        "description": {
+          "type": "string"
+        },
+        "bounds": {
+          "$ref": "#/$defs/layoutBox"
+        },
+        "exportFilename": {
+          "type": "string",
+          "pattern": "^[0-9]{2}-[a-z0-9-]+\\.png$"
+        }
+      }
+    }
+  }
+}
