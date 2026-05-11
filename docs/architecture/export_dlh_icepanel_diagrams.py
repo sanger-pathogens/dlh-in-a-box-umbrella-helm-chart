@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Export official DLH-in-a-box IcePanel diagrams and model-summary PDF."""
+"""Export official DLH-in-a-box IcePanel diagrams as PNG and PDF assets."""
 
 from __future__ import annotations
 
@@ -8,7 +8,8 @@ import time
 import urllib.request
 from pathlib import Path
 from typing import Any
-from urllib.parse import urlencode
+
+from png_diagram_pdf import write_pngs_as_pdf
 
 from sync_dlh_icepanel import (
     DEFAULT_JSON_SOURCE_FILE,
@@ -21,7 +22,7 @@ from sync_dlh_icepanel import (
 
 DEFAULT_OUTPUT_DIR = "docs/architecture/icepanel/exports/dlh-in-a-box/png-dark"
 DEFAULT_PDF_OUTPUT_DIR = "docs/architecture/icepanel/exports/dlh-in-a-box/pdf"
-DEFAULT_PDF_FILENAME = "dlh-in-a-box-model-summary.pdf"
+DEFAULT_PDF_FILENAME = "dlh-in-a-box-diagrams.pdf"
 
 
 def wait_for_export(
@@ -46,29 +47,6 @@ def wait_for_export(
             return current
         time.sleep(2)
     raise TimeoutError(f"Timed out waiting for IcePanel export {export_id}")
-
-
-def wait_for_model_export(
-    client: IcePanelClient,
-    source: Any,
-    export_id: str,
-    *,
-    timeout_seconds: int,
-) -> dict[str, Any]:
-    deadline = time.monotonic() + timeout_seconds
-    current: dict[str, Any] = {}
-    while time.monotonic() < deadline:
-        payload = client.get(
-            f"/landscapes/{source.landscape_id}/versions/{source.version_id}"
-            f"/export/{export_id}"
-        )
-        current = payload["landscapeExport"]
-        if current.get("error"):
-            raise RuntimeError(f"IcePanel PDF export failed: {current['error']}")
-        if current.get("completedAt") and current.get("fileUrl"):
-            return current
-        time.sleep(2)
-    raise TimeoutError(f"Timed out waiting for IcePanel PDF export {export_id}")
 
 
 def download_file(url: str, output_path: Path, *, expected_header: bytes) -> None:
@@ -134,65 +112,26 @@ def export_diagrams(
     return exported
 
 
-def domain_root_object_id(client: IcePanelClient, source: Any) -> str:
-    objects = list_response(
-        client.get(f"/landscapes/{source.landscape_id}/versions/{source.version_id}/model/objects"),
-        "modelObjects",
-    )
-    candidates = [
-        obj
-        for obj in objects
-        if obj.get("domainId") == source.domain_id
-        and obj.get("type") == "root"
-        and obj.get("parentId") is None
-    ]
-    if len(candidates) != 1:
-        raise RuntimeError(f"Expected one domain root object, found {len(candidates)}")
-    return str(candidates[0]["id"])
-
-
-def export_model_summary_pdf(
+def export_diagram_pdf(
     *,
-    repo_root: Path,
     source_path: Path,
+    png_dir: Path,
     output_dir: Path,
     filename: str,
     dry_run: bool,
 ) -> Path:
     source = load_source_model(source_path, "json")
-    client = IcePanelClient(load_api_key(repo_root), dry_run=False)
     output_path = output_dir / filename
+    png_paths = [png_dir / diagram.export_filename for diagram in source.diagrams.values()]
+    missing = [path for path in png_paths if not path.exists()]
+    if missing:
+        raise RuntimeError("Cannot create PDF; missing PNG exports: " + ", ".join(str(path) for path in missing))
     if dry_run:
-        print(f"Would export model summary PDF -> {output_path}")
+        print(f"Would create diagram PDF from {len(png_paths)} PNGs -> {output_path}")
         return output_path
 
-    output_dir.mkdir(parents=True, exist_ok=True)
-    root_id = domain_root_object_id(client, source)
-    query = urlencode(
-        {
-            "type": "pdf",
-            "filter[modelObjectId]": root_id,
-            "filter[includeDiagrams]": "true",
-            "filter[includeFlows]": "true",
-        }
-    )
-    try:
-        payload = client.post(
-            f"/landscapes/{source.landscape_id}/versions/{source.version_id}/export?{query}",
-            {"orientation": "landscape"},
-        )
-    except RuntimeError as error:
-        if "Scoped exports not available" not in str(error):
-            raise
-        print("Scoped IcePanel PDF exports are unavailable; exporting the full landscape summary instead.")
-        payload = client.post(
-            f"/landscapes/{source.landscape_id}/versions/{source.version_id}/export?type=pdf",
-            {"orientation": "landscape"},
-        )
-    export = payload["landscapeExport"]
-    export = wait_for_model_export(client, source, export["id"], timeout_seconds=180)
-    download_file(export["fileUrl"], output_path, expected_header=b"%PDF")
-    print(f"Exported model summary PDF: {output_path}")
+    write_pngs_as_pdf(png_paths, output_path)
+    print(f"Created diagram PDF: {output_path}")
     return output_path
 
 
@@ -234,9 +173,9 @@ def main() -> int:
         )
     if not args.skip_pdf:
         exported.append(
-            export_model_summary_pdf(
-                repo_root=repo_root,
+            export_diagram_pdf(
                 source_path=source_path,
+                png_dir=output_dir,
                 output_dir=pdf_output_dir,
                 filename=args.pdf_filename,
                 dry_run=args.dry_run,
