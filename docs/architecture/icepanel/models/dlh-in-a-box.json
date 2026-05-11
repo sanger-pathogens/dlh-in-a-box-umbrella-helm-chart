@@ -243,7 +243,7 @@
         "chart-product": {
           "x": -340,
           "y": -300,
-          "width": 900,
+          "width": 920,
           "height": 800
         }
       },
@@ -3025,7 +3025,14 @@
       "labels": {
         "dlhPath": "charts/dlh-in-a-box/charts/superset-0.15.2.tgz"
       },
-      "layout": {},
+      "layout": {
+        "packaged-dependencies": {
+          "x": 60,
+          "y": 320,
+          "width": 300,
+          "height": 130
+        }
+      },
       "links": [
         {
           "name": "GitHub: charts/dlh-in-a-box/charts/superset-0.15.2.tgz",
@@ -3052,7 +3059,14 @@
       "labels": {
         "dlhPath": "charts/dlh-in-a-box/charts/prefect-server-2025.12.31221620.tgz"
       },
-      "layout": {},
+      "layout": {
+        "packaged-dependencies": {
+          "x": 420,
+          "y": 320,
+          "width": 300,
+          "height": 130
+        }
+      },
       "links": [
         {
           "name": "GitHub: charts/dlh-in-a-box/charts/prefect-server-2025.12.31221620.tgz",
@@ -3079,7 +3093,14 @@
       "labels": {
         "dlhPath": "charts/dlh-in-a-box/charts/prefect-worker-2025.12.31221620.tgz"
       },
-      "layout": {},
+      "layout": {
+        "packaged-dependencies": {
+          "x": 780,
+          "y": 320,
+          "width": 300,
+          "height": 130
+        }
+      },
       "links": [
         {
           "name": "GitHub: charts/dlh-in-a-box/charts/prefect-worker-2025.12.31221620.tgz",
@@ -3106,7 +3127,14 @@
       "labels": {
         "dlhPath": "charts/dlh-in-a-box/charts/oauth2-proxy-10.1.4.tgz"
       },
-      "layout": {},
+      "layout": {
+        "packaged-dependencies": {
+          "x": 1140,
+          "y": 320,
+          "width": 300,
+          "height": 130
+        }
+      },
       "links": [
         {
           "name": "GitHub: charts/dlh-in-a-box/charts/oauth2-proxy-10.1.4.tgz",
@@ -3133,7 +3161,14 @@
       "labels": {
         "dlhPath": "charts/dlh-in-a-box/charts/keycloak-25.2.0.tgz"
       },
-      "layout": {},
+      "layout": {
+        "packaged-dependencies": {
+          "x": 60,
+          "y": 500,
+          "width": 300,
+          "height": 130
+        }
+      },
       "links": [
         {
           "name": "GitHub: charts/dlh-in-a-box/charts/keycloak-25.2.0.tgz",
@@ -3160,7 +3195,14 @@
       "labels": {
         "dlhPath": "charts/dlh-in-a-box/charts/spark-operator-2.4.0.tgz"
       },
-      "layout": {},
+      "layout": {
+        "packaged-dependencies": {
+          "x": 420,
+          "y": 500,
+          "width": 300,
+          "height": 130
+        }
+      },
       "links": [
         {
           "name": "GitHub: charts/dlh-in-a-box/charts/spark-operator-2.4.0.tgz",
@@ -3187,7 +3229,14 @@
       "labels": {
         "dlhPath": "charts/dlh-in-a-box/charts/minio-15.0.7.tgz"
       },
-      "layout": {},
+      "layout": {
+        "packaged-dependencies": {
+          "x": 780,
+          "y": 500,
+          "width": 300,
+          "height": 130
+        }
+      },
       "links": [
         {
           "name": "GitHub: charts/dlh-in-a-box/charts/minio-15.0.7.tgz",
@@ -3214,7 +3263,14 @@
       "labels": {
         "dlhPath": "charts/dlh-in-a-box/charts/datahub-0.8.21.tgz"
       },
-      "layout": {},
+      "layout": {
+        "packaged-dependencies": {
+          "x": 1140,
+          "y": 500,
+          "width": 300,
+          "height": 130
+        }
+      },
       "links": [
         {
           "name": "GitHub: charts/dlh-in-a-box/charts/datahub-0.8.21.tgz",
@@ -3241,7 +3297,14 @@
       "labels": {
         "dlhPath": "charts/dlh-in-a-box/charts/datahub-prerequisites-0.2.3.tgz"
       },
-      "layout": {},
+      "layout": {
+        "packaged-dependencies": {
+          "x": 60,
+          "y": 680,
+          "width": 300,
+          "height": 130
+        }
+      },
       "links": [
         {
           "name": "GitHub: charts/dlh-in-a-box/charts/datahub-prerequisites-0.2.3.tgz",
@@ -3268,7 +3331,14 @@
       "labels": {
         "dlhPath": "charts/dlh-in-a-box/charts/vault-0.32.0.tgz"
       },
-      "layout": {},
+      "layout": {
+        "packaged-dependencies": {
+          "x": 420,
+          "y": 680,
+          "width": 300,
+          "height": 130
+        }
+      },
       "links": [
         {
           "name": "GitHub: charts/dlh-in-a-box/charts/vault-0.32.0.tgz",
@@ -3295,7 +3365,14 @@
       "labels": {
         "dlhPath": "charts/dlh-in-a-box/charts/jupyterhub-4.3.3.tgz"
       },
-      "layout": {},
+      "layout": {
+        "packaged-dependencies": {
+          "x": 780,
+          "y": 680,
+          "width": 300,
+          "height": 130
+        }
+      },
       "links": [
         {
           "name": "GitHub: charts/dlh-in-a-box/charts/jupyterhub-4.3.3.tgz",
@@ -3322,7 +3399,14 @@
       "labels": {
         "dlhPath": "charts/dlh-in-a-box/charts/postgresql-14.3.3.tgz"
       },
-      "layout": {},
+      "layout": {
+        "packaged-dependencies": {
+          "x": 1140,
+          "y": 680,
+          "width": 300,
+          "height": 130
+        }
+      },
       "links": [
         {
           "name": "GitHub: charts/dlh-in-a-box/charts/postgresql-14.3.3.tgz",
@@ -3330,6 +3414,40 @@
         }
       ],
       "caption": "Bundled Helm archive for the upstream PostgreSQL chart reused by service-specific database components.",
+      "teamIds": [
+        "YD4KdnnwJtWane4R039f"
+      ],
+      "tagIds": [
+        "PpEgyQQaEuEyVUQB4LjJ",
+        "S193ciAwZE82mjfqMqis"
+      ]
+    },
+    {
+      "id": "DLH-C3-PKG-LOCK",
+      "name": "Packaged Dependency Lock",
+      "type": "component",
+      "parent": "DLH-C2-UPSTREAM-ARCHIVES",
+      "status": "live",
+      "external": false,
+      "description": "Records the exact upstream Helm chart archive versions included in the local charts directory.\n\nModel metadata: source ID DLH-C3-PKG-LOCK; IcePanel type component within a parent object; Child of Packaged Upstream Dependency Helm Charts (DLH-C2-UPSTREAM-ARCHIVES). No IcePanel group membership is assigned. Lifecycle status: Live in the current IcePanel model. Ownership or stewardship: Sanger PaM Data Engineering and Integration. Location or hosting context: Wellcome Sanger Institute, Cloud. Reality link: GitHub: charts/dlh-in-a-box/Chart.lock. Source of truth: docs/architecture/icepanel/models/dlh-in-a-box.json in the DLH-in-a-box chart repository.",
+      "labels": {
+        "dlhPath": "charts/dlh-in-a-box/Chart.lock"
+      },
+      "layout": {
+        "packaged-dependencies": {
+          "x": 580,
+          "y": 40,
+          "width": 360,
+          "height": 130
+        }
+      },
+      "links": [
+        {
+          "name": "GitHub: charts/dlh-in-a-box/Chart.lock",
+          "url": "https://github.com/sanger-pathogens/dlh-in-a-box-umbrella-helm-chart/blob/main/charts/dlh-in-a-box/Chart.lock"
+        }
+      ],
+      "caption": "Records the exact upstream Helm chart archive versions included in the local charts directory.",
       "teamIds": [
         "YD4KdnnwJtWane4R039f"
       ],
@@ -4553,6 +4671,90 @@
       "direction": "outgoing"
     },
     {
+      "id": "DLH-CONN-75ab924ffd69",
+      "origin": "DLH-C3-PKG-LOCK",
+      "target": "DLH-C3-PKG-SUPERSET",
+      "label": "locks",
+      "direction": "outgoing"
+    },
+    {
+      "id": "DLH-CONN-d2d717d90454",
+      "origin": "DLH-C3-PKG-LOCK",
+      "target": "DLH-C3-PKG-PREFECT-SERVER",
+      "label": "locks",
+      "direction": "outgoing"
+    },
+    {
+      "id": "DLH-CONN-df6c2e3c69b5",
+      "origin": "DLH-C3-PKG-LOCK",
+      "target": "DLH-C3-PKG-PREFECT-WORKER",
+      "label": "locks",
+      "direction": "outgoing"
+    },
+    {
+      "id": "DLH-CONN-3c0ce1c163ce",
+      "origin": "DLH-C3-PKG-LOCK",
+      "target": "DLH-C3-PKG-OAUTH2-PROXY",
+      "label": "locks",
+      "direction": "outgoing"
+    },
+    {
+      "id": "DLH-CONN-75c210464683",
+      "origin": "DLH-C3-PKG-LOCK",
+      "target": "DLH-C3-PKG-KEYCLOAK",
+      "label": "locks",
+      "direction": "outgoing"
+    },
+    {
+      "id": "DLH-CONN-9691315cc3e3",
+      "origin": "DLH-C3-PKG-LOCK",
+      "target": "DLH-C3-PKG-SPARK",
+      "label": "locks",
+      "direction": "outgoing"
+    },
+    {
+      "id": "DLH-CONN-8119094a65bf",
+      "origin": "DLH-C3-PKG-LOCK",
+      "target": "DLH-C3-PKG-MINIO",
+      "label": "locks",
+      "direction": "outgoing"
+    },
+    {
+      "id": "DLH-CONN-76e47b2d7999",
+      "origin": "DLH-C3-PKG-LOCK",
+      "target": "DLH-C3-PKG-DATAHUB",
+      "label": "locks",
+      "direction": "outgoing"
+    },
+    {
+      "id": "DLH-CONN-168887e44664",
+      "origin": "DLH-C3-PKG-LOCK",
+      "target": "DLH-C3-PKG-DATAHUB-PREREQS",
+      "label": "locks",
+      "direction": "outgoing"
+    },
+    {
+      "id": "DLH-CONN-8d312098b4f8",
+      "origin": "DLH-C3-PKG-LOCK",
+      "target": "DLH-C3-PKG-VAULT",
+      "label": "locks",
+      "direction": "outgoing"
+    },
+    {
+      "id": "DLH-CONN-198bd2d6a3dd",
+      "origin": "DLH-C3-PKG-LOCK",
+      "target": "DLH-C3-PKG-JUPYTERHUB",
+      "label": "locks",
+      "direction": "outgoing"
+    },
+    {
+      "id": "DLH-CONN-bd1159d8435e",
+      "origin": "DLH-C3-PKG-LOCK",
+      "target": "DLH-C3-PKG-POSTGRESQL",
+      "label": "locks",
+      "direction": "outgoing"
+    },
+    {
       "id": "DLH-CONN-e9f619f29af1",
       "origin": "DLH-C3-SOURCE-METADATA",
       "target": "DLH-C3-SOURCE-LOCK",
@@ -4637,6 +4839,13 @@
       "direction": "outgoing"
     },
     {
+      "id": "DLH-CONN-3e08f784a21a",
+      "origin": "DLH-C3-TRINO-DOCS",
+      "target": "DLH-C3-TRINO-HELPERS",
+      "label": "documents local chart integration",
+      "direction": "outgoing"
+    },
+    {
       "id": "DLH-CONN-cdcfa5d873df",
       "origin": "DLH-C3-TRINO-HELPERS",
       "target": "DLH-C3-TRINO-CATALOGS",
@@ -4683,6 +4892,20 @@
       "origin": "DLH-C3-TRINO-ACCESS",
       "target": "DLH-C3-TRINO-WORKER",
       "label": "configures",
+      "direction": "outgoing"
+    },
+    {
+      "id": "DLH-CONN-c8914db7e293",
+      "origin": "DLH-C3-HIVE-DOCS",
+      "target": "DLH-C3-HIVE-METASTORE",
+      "label": "documents local subchart boundary",
+      "direction": "outgoing"
+    },
+    {
+      "id": "DLH-CONN-4fa057ea48ed",
+      "origin": "DLH-C3-HIVE-METADATA",
+      "target": "DLH-C3-HIVE-VALUES",
+      "label": "declares chart metadata for",
       "direction": "outgoing"
     },
     {
@@ -5046,6 +5269,7 @@
       "type": "component-diagram",
       "modelObject": "DLH-C2-UPSTREAM-ARCHIVES",
       "objects": [
+        "DLH-C3-PKG-LOCK",
         "DLH-C3-PKG-SUPERSET",
         "DLH-C3-PKG-PREFECT-SERVER",
         "DLH-C3-PKG-PREFECT-WORKER",
@@ -5059,13 +5283,26 @@
         "DLH-C3-PKG-JUPYTERHUB",
         "DLH-C3-PKG-POSTGRESQL"
       ],
-      "connections": [],
+      "connections": [
+        "DLH-CONN-75ab924ffd69",
+        "DLH-CONN-d2d717d90454",
+        "DLH-CONN-df6c2e3c69b5",
+        "DLH-CONN-3c0ce1c163ce",
+        "DLH-CONN-75c210464683",
+        "DLH-CONN-9691315cc3e3",
+        "DLH-CONN-8119094a65bf",
+        "DLH-CONN-76e47b2d7999",
+        "DLH-CONN-168887e44664",
+        "DLH-CONN-8d312098b4f8",
+        "DLH-CONN-198bd2d6a3dd",
+        "DLH-CONN-bd1159d8435e"
+      ],
       "description": "Bundled upstream Helm archives included with the umbrella chart.",
       "bounds": {
         "x": 0,
         "y": 0,
-        "width": 1480,
-        "height": 660
+        "width": 1520,
+        "height": 880
       },
       "exportFilename": "05-packaged-upstream-dependencies.png"
     },
@@ -5083,6 +5320,7 @@
         "DLH-C3-TRINO-WORKER"
       ],
       "connections": [
+        "DLH-CONN-3e08f784a21a",
         "DLH-CONN-cdcfa5d873df",
         "DLH-CONN-5759d912c638",
         "DLH-CONN-8329be11c836",
@@ -5116,6 +5354,8 @@
         "DLH-C3-HIVE-SECRETS"
       ],
       "connections": [
+        "DLH-CONN-c8914db7e293",
+        "DLH-CONN-4fa057ea48ed",
         "DLH-CONN-b754a4e6a4bc",
         "DLH-CONN-c2ceb626f9ea",
         "DLH-CONN-4c7bfeb61653",

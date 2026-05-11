@@ -256,12 +256,78 @@ def validate_semantics(model: dict[str, Any]) -> list[str]:
                     f"diagram {item['key']} connection {connection_id} target is not shown: {connection['target']}"
                 )
         errors.extend(validate_parent_area(item, object_by_id))
+        errors.extend(validate_diagram_connectivity(item, object_by_id, connection_by_id))
+        errors.extend(validate_diagram_groups(item, object_by_id))
 
     errors.extend(validate_runtime_groups(model, object_by_id))
 
     if len(model["diagrams"]) != 9:
         errors.append(f"expected 9 official diagrams, found {len(model['diagrams'])}")
 
+    return errors
+
+
+def validate_diagram_connectivity(
+    diagram: dict[str, Any],
+    object_by_id: dict[str, dict[str, Any]],
+    connection_by_id: dict[str, dict[str, Any]],
+) -> list[str]:
+    errors: list[str] = []
+    diagram_object_ids = set(diagram["objects"])
+    degree = {object_id: 0 for object_id in diagram_object_ids}
+    for connection_id in diagram["connections"]:
+        connection = connection_by_id.get(connection_id)
+        if not connection:
+            continue
+        for endpoint_key in ("origin", "target"):
+            endpoint = connection[endpoint_key]
+            if endpoint in degree:
+                degree[endpoint] += 1
+
+    for object_id, count in sorted(degree.items()):
+        obj = object_by_id.get(object_id)
+        if obj and obj["type"] != "group" and count == 0:
+            errors.append(f"diagram {diagram['key']} object {object_id} has no visible connection")
+    return errors
+
+
+def validate_diagram_groups(
+    diagram: dict[str, Any],
+    object_by_id: dict[str, dict[str, Any]],
+) -> list[str]:
+    errors: list[str] = []
+    diagram_key = diagram["key"]
+    diagram_object_ids = set(diagram["objects"])
+    group_ids = sorted(
+        object_id
+        for object_id in diagram_object_ids
+        if object_by_id.get(object_id, {}).get("type") == "group"
+    )
+
+    for group_id in group_ids:
+        group = object_by_id[group_id]
+        members = sorted(
+            object_id
+            for object_id in diagram_object_ids
+            if group_id in (object_by_id.get(object_id, {}).get("groups") or [])
+        )
+        if not members:
+            errors.append(f"diagram {diagram_key} group {group_id} has no visible member objects")
+            continue
+
+        group_layout = (group.get("layout") or {}).get(diagram_key)
+        if not group_layout:
+            continue
+        for member_id in members:
+            member_layout = (object_by_id[member_id].get("layout") or {}).get(diagram_key)
+            if not member_layout:
+                errors.append(
+                    f"diagram {diagram_key} grouped object {member_id} has no layout for group {group_id}"
+                )
+            elif not box_contains(group_layout, member_layout):
+                errors.append(
+                    f"diagram {diagram_key} grouped object {member_id} is outside group {group_id}"
+                )
     return errors
 
 
