@@ -685,7 +685,7 @@
       "parent": "DLH-L1-CHART",
       "status": "live",
       "external": false,
-      "description": "Versioned Helm chart artifact stored in the GHCR OCI registry and consumed by deployment repositories.\n\nModel metadata: source ID DLH-C2-OCI-PACKAGE; IcePanel type data store or repository; Child of DLH-in-a-box Umbrella Helm Chart (DLH-L1-CHART). IcePanel group membership: Published Artifact. Lifecycle status: Live in the current IcePanel model. Ownership or stewardship: Sanger PaM Data Engineering and Integration. Location or hosting context: Wellcome Sanger Institute, Cloud. Reality links: No repository reality link has been assigned; this object is conceptual, deployment-specific, or external to the repository. Source of truth: docs/architecture/icepanel/models/dlh-in-a-box.json in the DLH-in-a-box chart repository.",
+      "description": "Versioned Helm chart artifact stored in the GHCR OCI registry and consumed by deployment repositories.\n\nModel metadata: source ID DLH-C2-OCI-PACKAGE; IcePanel type data store or repository; Child of DLH-in-a-box Umbrella Helm Chart (DLH-L1-CHART). IcePanel group membership: Published Artifact. Lifecycle status: Live in the current IcePanel model. Ownership or stewardship: Sanger PaM Data Engineering and Integration. Location or hosting context: Wellcome Sanger Institute, Cloud. Reality links: GitHub: chart package metadata; GitHub: chart publish workflow. Source of truth: docs/architecture/icepanel/models/dlh-in-a-box.json in the DLH-in-a-box chart repository.",
       "labels": {
         "dlhPath": "oci://ghcr.io/sanger-pathogens/charts/dlh-in-a-box",
         "dlhTechnology": "GHCR OCI Helm artifact"
@@ -708,6 +708,16 @@
       "tagIds": [
         "PpEgyQQaEuEyVUQB4LjJ",
         "S193ciAwZE82mjfqMqis"
+      ],
+      "links": [
+        {
+          "name": "GitHub: chart package metadata",
+          "url": "https://github.com/sanger-pathogens/dlh-in-a-box-umbrella-helm-chart/blob/main/charts/dlh-in-a-box/Chart.yaml"
+        },
+        {
+          "name": "GitHub: chart publish workflow",
+          "url": "https://github.com/sanger-pathogens/dlh-in-a-box-umbrella-helm-chart/blob/main/.github/workflows/helm-publish.yaml"
+        }
       ]
     },
     {
@@ -1159,7 +1169,7 @@
       "parent": null,
       "status": "live",
       "external": true,
-      "description": "Runtime container image referenced by the local Hive subchart to run the Hive Metastore service.\n\nModel metadata: source ID DLH-X-HIVE-IMAGE; IcePanel type system-level object; Top-level object in the DLH-in-a-box domain. IcePanel group membership: Upstream Sources. Lifecycle status: Live in the current IcePanel model. Ownership or stewardship: No internal IcePanel owner is assigned because the upstream project is externally maintained; Sanger PaM Data Engineering and Integration stewards the packaging decision. Location or hosting context: Cloud. Reality links: No repository reality link has been assigned; this object is conceptual, deployment-specific, or external to the repository. Source of truth: docs/architecture/icepanel/models/dlh-in-a-box.json in the DLH-in-a-box chart repository.",
+      "description": "Runtime container image referenced by the local Hive subchart to run the Hive Metastore service.\n\nModel metadata: source ID DLH-X-HIVE-IMAGE; IcePanel type system-level object; Top-level object in the DLH-in-a-box domain. IcePanel group membership: Upstream Sources. Lifecycle status: Live in the current IcePanel model. Ownership or stewardship: No internal IcePanel owner is assigned because the upstream project is externally maintained; Sanger PaM Data Engineering and Integration stewards the packaging decision. Location or hosting context: Cloud. Reality links: GitHub: Hive Metastore image Dockerfile; GitHub: Hive image chart settings. Source of truth: docs/architecture/icepanel/models/dlh-in-a-box.json in the DLH-in-a-box chart repository.",
       "labels": {
         "dlhTechnology": "Docker image"
       },
@@ -1178,6 +1188,16 @@
       "teamIds": [],
       "tagIds": [
         "S193ciAwZE82mjfqMqis"
+      ],
+      "links": [
+        {
+          "name": "GitHub: Hive Metastore image Dockerfile",
+          "url": "https://github.com/sanger-pathogens/dlh-in-a-box-umbrella-helm-chart/blob/main/references/data-lakehouse/hive/Dockerfile"
+        },
+        {
+          "name": "GitHub: Hive image chart settings",
+          "url": "https://github.com/sanger-pathogens/dlh-in-a-box-umbrella-helm-chart/blob/main/charts/dlh-in-a-box/charts/hive/values.yaml"
+        }
       ]
     },
     {

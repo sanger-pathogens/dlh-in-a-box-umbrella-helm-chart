@@ -8,6 +8,7 @@ for model references that JSON Schema alone does not express.
 
 from __future__ import annotations
 
+import argparse
 import json
 import re
 import sys
@@ -264,6 +265,19 @@ def validate_semantics(model: dict[str, Any]) -> list[str]:
     return errors
 
 
+def print_link_audit(model: dict[str, Any]) -> None:
+    linked = 0
+    unlinked = []
+    for item in model["objects"]:
+        if item.get("links"):
+            linked += 1
+        else:
+            unlinked.append(f"{item['id']} | {item['name']} | {item['type']}")
+    print(f"Reality link audit: {linked} linked, {len(unlinked)} intentionally unlinked or pending")
+    for line in unlinked:
+        print(f"- {line}")
+
+
 def validate_parent_area(
     diagram: dict[str, Any],
     object_by_id: dict[str, dict[str, Any]],
@@ -370,8 +384,14 @@ def github_main_path(url: str) -> str | None:
 
 
 def main() -> int:
-    model_path = Path(sys.argv[1]) if len(sys.argv) > 1 else DEFAULT_MODEL
-    schema_path = Path(sys.argv[2]) if len(sys.argv) > 2 else DEFAULT_SCHEMA
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("model", nargs="?", default=DEFAULT_MODEL)
+    parser.add_argument("schema", nargs="?", default=DEFAULT_SCHEMA)
+    parser.add_argument("--audit-links", action="store_true", help="Print objects without reality links")
+    args = parser.parse_args()
+
+    model_path = Path(args.model)
+    schema_path = Path(args.schema)
 
     model = load_json(model_path)
     schema = load_json(schema_path)
@@ -385,6 +405,8 @@ def main() -> int:
             print(f"- {error}", file=sys.stderr)
         return 1
 
+    if args.audit_links:
+        print_link_audit(model)
     print(f"DLH IcePanel JSON validation ok: {model_path}")
     return 0
 
