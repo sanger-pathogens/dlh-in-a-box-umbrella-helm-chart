@@ -4,7 +4,9 @@
 from __future__ import annotations
 
 import argparse
+import http.client
 import time
+import urllib.error
 import urllib.request
 from pathlib import Path
 from typing import Any
@@ -51,8 +53,15 @@ def wait_for_export(
 
 def download_file(url: str, output_path: Path, *, expected_header: bytes) -> None:
     request = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
-    with urllib.request.urlopen(request, timeout=60) as response:
-        data = response.read()
+    for attempt in range(4):
+        try:
+            with urllib.request.urlopen(request, timeout=60) as response:
+                data = response.read()
+            break
+        except (urllib.error.URLError, http.client.RemoteDisconnected, TimeoutError) as exc:
+            if attempt == 3:
+                raise RuntimeError(f"Failed to download IcePanel export: {output_path}") from exc
+            time.sleep(2 * (attempt + 1))
     if not data.startswith(expected_header):
         raise RuntimeError(f"Downloaded file has an unexpected format: {output_path}")
     output_path.write_bytes(data)

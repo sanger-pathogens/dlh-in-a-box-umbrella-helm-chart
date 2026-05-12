@@ -258,12 +258,68 @@ def validate_semantics(model: dict[str, Any]) -> list[str]:
         errors.extend(validate_parent_area(item, object_by_id))
         errors.extend(validate_diagram_connectivity(item, object_by_id, connection_by_id))
         errors.extend(validate_diagram_groups(item, object_by_id))
+        errors.extend(validate_diagram_geometry(item, object_by_id, connection_by_id))
 
     errors.extend(validate_runtime_groups(model, object_by_id))
 
-    if len(model["diagrams"]) != 9:
-        errors.append(f"expected 9 official diagrams, found {len(model['diagrams'])}")
+    if len(model["diagrams"]) != 11:
+        errors.append(f"expected 11 official diagrams, found {len(model['diagrams'])}")
 
+    return errors
+
+
+def validate_diagram_geometry(
+    diagram: dict[str, Any],
+    object_by_id: dict[str, dict[str, Any]],
+    connection_by_id: dict[str, dict[str, Any]],
+) -> list[str]:
+    errors: list[str] = []
+    diagram_key = diagram["key"]
+    boxes: dict[str, dict[str, int]] = {}
+    for index, object_id in enumerate(diagram["objects"]):
+        obj = object_by_id.get(object_id)
+        if not obj:
+            continue
+        layout = (obj.get("layout") or {}).get(diagram_key)
+        if layout:
+            boxes[object_id] = layout
+        else:
+            boxes[object_id] = {
+                "x": 80 + (index % 4) * 360,
+                "y": 80 + (index // 4) * 190,
+                "width": 256,
+                "height": 128,
+            }
+
+    non_group_ids = [
+        object_id
+        for object_id in diagram["objects"]
+        if object_by_id.get(object_id, {}).get("type") != "group"
+    ]
+    for index, first_id in enumerate(non_group_ids):
+        for second_id in non_group_ids[index + 1 :]:
+            if box_intersects_with_padding(boxes[first_id], boxes[second_id], padding=8):
+                errors.append(
+                    f"diagram {diagram_key} objects overlap: {first_id} and {second_id}"
+                )
+
+    for connection_id in diagram["connections"]:
+        connection = connection_by_id.get(connection_id)
+        if not connection:
+            continue
+        origin = connection["origin"]
+        target = connection["target"]
+        if origin not in boxes or target not in boxes:
+            continue
+        points = connection_points_for_diagram(diagram_key, connection, boxes[origin], boxes[target])
+        for object_id in non_group_ids:
+            if object_id in {origin, target}:
+                continue
+            if polyline_intersects_box(points, boxes[object_id], padding=8):
+                errors.append(
+                    f"diagram {diagram_key} connection {connection_id} crosses object {object_id}"
+                )
+                break
     return errors
 
 
@@ -433,6 +489,97 @@ def box_intersects(first: dict[str, int], second: dict[str, int]) -> bool:
         or second["y"] + second["height"] <= first["y"]
         or second["y"] >= first["y"] + first["height"]
     )
+
+
+def box_intersects_with_padding(
+    first: dict[str, int],
+    second: dict[str, int],
+    *,
+    padding: int,
+) -> bool:
+    expanded = {
+        "x": first["x"] - padding,
+        "y": first["y"] - padding,
+        "width": first["width"] + padding * 2,
+        "height": first["height"] + padding * 2,
+    }
+    return box_intersects(expanded, second)
+
+
+def connection_points_for_diagram(
+    diagram_key: str,
+    connection: dict[str, Any],
+    origin_box: dict[str, int],
+    target_box: dict[str, int],
+) -> list[dict[str, float]]:
+    route = (connection.get("layout") or {}).get(diagram_key)
+    if route and route.get("points"):
+        return [
+            {"x": float(point["x"]), "y": float(point["y"])}
+            for point in route["points"]
+        ]
+    return default_connection_points(origin_box, target_box)
+
+
+def default_connection_points(
+    origin_box: dict[str, int],
+    target_box: dict[str, int],
+) -> list[dict[str, float]]:
+    ox = origin_box["x"] + origin_box["width"] / 2
+    oy = origin_box["y"] + origin_box["height"] / 2
+    tx = target_box["x"] + target_box["width"] / 2
+    ty = target_box["y"] + target_box["height"] / 2
+    if abs(tx - ox) >= abs(ty - oy):
+        if tx >= ox:
+            return [
+                {"x": origin_box["x"] + origin_box["width"], "y": oy},
+                {"x": target_box["x"], "y": ty},
+            ]
+        return [
+            {"x": origin_box["x"], "y": oy},
+            {"x": target_box["x"] + target_box["width"], "y": ty},
+        ]
+    if ty >= oy:
+        return [
+            {"x": ox, "y": origin_box["y"] + origin_box["height"]},
+            {"x": tx, "y": target_box["y"]},
+        ]
+    return [
+        {"x": ox, "y": origin_box["y"]},
+        {"x": tx, "y": target_box["y"] + target_box["height"]},
+    ]
+
+
+def polyline_intersects_box(
+    points: list[dict[str, float]],
+    box: dict[str, int],
+    *,
+    padding: int,
+) -> bool:
+    expanded = {
+        "x": box["x"] - padding,
+        "y": box["y"] - padding,
+        "width": box["width"] + padding * 2,
+        "height": box["height"] + padding * 2,
+    }
+    for start, end in zip(points, points[1:]):
+        if segment_intersects_box(start, end, expanded):
+            return True
+    return False
+
+
+def segment_intersects_box(
+    start: dict[str, float],
+    end: dict[str, float],
+    box: dict[str, int],
+) -> bool:
+    for step in range(1, 40):
+        ratio = step / 40
+        x = start["x"] + (end["x"] - start["x"]) * ratio
+        y = start["y"] + (end["y"] - start["y"]) * ratio
+        if box["x"] <= x <= box["x"] + box["width"] and box["y"] <= y <= box["y"] + box["height"]:
+            return True
+    return False
 
 
 def github_main_path(url: str) -> str | None:

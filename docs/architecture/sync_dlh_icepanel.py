@@ -14,10 +14,12 @@ from __future__ import annotations
 
 import argparse
 import hashlib
+import http.client
 import json
 import os
 import re
 import sys
+import time
 import urllib.error
 import urllib.request
 from dataclasses import dataclass, field
@@ -104,6 +106,7 @@ class SourceConnection:
     label: str
     direction: str = "outgoing"
     source_ids: list[str] = field(default_factory=list)
+    layout: dict[str, dict[str, Any]] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
         if not self.source_ids:
@@ -166,16 +169,20 @@ class IcePanelClient:
             headers["Content-Type"] = "application/json"
 
         request = urllib.request.Request(url, data=data, headers=headers, method=method)
-        try:
-            with urllib.request.urlopen(request, timeout=60) as response:
-                payload = response.read()
-        except urllib.error.HTTPError as exc:
-            payload = exc.read().decode("utf-8", errors="replace")
-            raise RuntimeError(
-                f"IcePanel API {method} {path} failed with {exc.code}: {payload}"
-            ) from exc
-        except urllib.error.URLError as exc:
-            raise RuntimeError(f"IcePanel API {method} {path} failed: {exc}") from exc
+        for attempt in range(4):
+            try:
+                with urllib.request.urlopen(request, timeout=60) as response:
+                    payload = response.read()
+                break
+            except urllib.error.HTTPError as exc:
+                payload = exc.read().decode("utf-8", errors="replace")
+                raise RuntimeError(
+                    f"IcePanel API {method} {path} failed with {exc.code}: {payload}"
+                ) from exc
+            except (urllib.error.URLError, http.client.RemoteDisconnected, TimeoutError) as exc:
+                if attempt == 3:
+                    raise RuntimeError(f"IcePanel API {method} {path} failed: {exc}") from exc
+                time.sleep(2 * (attempt + 1))
 
         if not payload:
             return {}
@@ -724,6 +731,7 @@ def parse_json_source_model(path: Path) -> SourceModel:
             label=item["label"],
             direction=item.get("direction", "outgoing"),
             source_ids=list(item.get("sourceIds") or [item["id"]]),
+            layout=normalize_connection_layout(item.get("layout") or {}),
         )
 
     diagrams: dict[str, DiagramSpec] = {}
@@ -761,6 +769,23 @@ def normalize_layout(layout: dict[str, Any]) -> dict[str, dict[str, int]]:
         for key, value in layout.items()
         if isinstance(value, dict)
     }
+
+
+def normalize_connection_layout(layout: dict[str, Any]) -> dict[str, dict[str, Any]]:
+    normalized: dict[str, dict[str, Any]] = {}
+    for key, value in layout.items():
+        if not isinstance(value, dict):
+            continue
+        route = dict(value)
+        if "points" in route:
+            route["points"] = [
+                {"x": float(point["x"]), "y": float(point["y"])}
+                for point in route.get("points") or []
+            ]
+        if "labelPosition" in route:
+            route["labelPosition"] = int(route["labelPosition"])
+        normalized[str(key)] = route
+    return normalized
 
 
 def normalize_bounds(bounds: dict[str, Any]) -> dict[str, int]:
@@ -809,6 +834,8 @@ def source_model_to_json(source: SourceModel, source_file: str) -> dict[str, Any
         }
         if connection.source_ids != [source_id]:
             item["sourceIds"] = connection.source_ids
+        if connection.layout:
+            item["layout"] = connection.layout
         connections.append(item)
 
     diagrams = []
@@ -1629,6 +1656,7 @@ class SyncRunner:
                 origin_obj,
                 target_obj,
                 existing,
+                connection.layout.get(diagram.key),
             )
             canvas_connections[diagram_connection["id"]] = diagram_connection
 
@@ -1696,6 +1724,7 @@ class SyncRunner:
         origin_obj: dict[str, Any],
         target_obj: dict[str, Any],
         existing: dict[str, Any] | None,
+        explicit_route: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
         if existing:
             diagram_connection = dict(existing)
@@ -1707,6 +1736,19 @@ class SyncRunner:
                 }
             )
             return diagram_connection
+
+        if explicit_route:
+            return {
+                "id": stable_canvas_id(diagram_key, "connection", model_id),
+                "modelId": model_id,
+                "originId": origin_canvas_id,
+                "targetId": target_canvas_id,
+                "originConnector": explicit_route.get("originConnector", "right-middle"),
+                "targetConnector": explicit_route.get("targetConnector", "left-middle"),
+                "points": explicit_route.get("points") or [],
+                "lineShape": explicit_route.get("lineShape", "square"),
+                "labelPosition": explicit_route.get("labelPosition", 50),
+            }
 
         origin_connector, target_connector, points = connector_points(origin_obj, target_obj)
         return {

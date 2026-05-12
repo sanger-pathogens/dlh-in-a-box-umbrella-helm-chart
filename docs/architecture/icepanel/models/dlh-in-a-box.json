@@ -1217,6 +1217,12 @@
           "y": -660,
           "width": 720,
           "height": 240
+        },
+        "runtime-identity-access-secrets": {
+          "x": 720,
+          "y": -430,
+          "width": 340,
+          "height": 470
         }
       },
       "caption": "Browser-facing entry points exposed through the deployment ingress layer.",
@@ -1244,6 +1250,12 @@
           "x": 20,
           "y": -360,
           "width": 620,
+          "height": 620
+        },
+        "runtime-identity-access-secrets": {
+          "x": 360,
+          "y": -40,
+          "width": 340,
           "height": 620
         }
       },
@@ -1273,6 +1285,18 @@
           "y": -20,
           "width": 420,
           "height": 260
+        },
+        "runtime-identity-access-secrets": {
+          "x": 720,
+          "y": 200,
+          "width": 340,
+          "height": 240
+        },
+        "runtime-data-analysis-orchestration": {
+          "x": 380,
+          "y": -180,
+          "width": 340,
+          "height": 220
         }
       },
       "caption": "Authorization and access-policy services for governed SQL access.",
@@ -1301,6 +1325,12 @@
           "y": 300,
           "width": 820,
           "height": 520
+        },
+        "runtime-data-analysis-orchestration": {
+          "x": 380,
+          "y": 120,
+          "width": 680,
+          "height": 500
         }
       },
       "caption": "Core analytical data services for query execution, catalog metadata, and object storage.",
@@ -1329,6 +1359,12 @@
           "y": -700,
           "width": 360,
           "height": 820
+        },
+        "runtime-data-analysis-orchestration": {
+          "x": 1060,
+          "y": -600,
+          "width": 340,
+          "height": 860
         }
       },
       "caption": "Browser-based analysis and data exploration tools used by researchers and analysts.",
@@ -1357,6 +1393,12 @@
           "y": 500,
           "width": 760,
           "height": 420
+        },
+        "runtime-data-analysis-orchestration": {
+          "x": 720,
+          "y": 560,
+          "width": 680,
+          "height": 500
         }
       },
       "caption": "Workflow orchestration and distributed compute services for data pipelines.",
@@ -1385,6 +1427,12 @@
           "y": 140,
           "width": 360,
           "height": 260
+        },
+        "runtime-data-analysis-orchestration": {
+          "x": 1060,
+          "y": 300,
+          "width": 340,
+          "height": 240
         }
       },
       "caption": "Optional metadata catalog services for discovery and lineage.",
@@ -1413,6 +1461,18 @@
           "y": -760,
           "width": 380,
           "height": 1760
+        },
+        "runtime-identity-access-secrets": {
+          "x": 1080,
+          "y": 20,
+          "width": 340,
+          "height": 420
+        },
+        "runtime-data-analysis-orchestration": {
+          "x": 1420,
+          "y": -580,
+          "width": 340,
+          "height": 1600
         }
       },
       "caption": "Databases, queues, and indexes required by application services.",
@@ -1441,6 +1501,12 @@
         "runtime": {
           "x": 780,
           "y": 360,
+          "width": 256,
+          "height": 128
+        },
+        "runtime-data-analysis-orchestration": {
+          "x": 760,
+          "y": 180,
           "width": 256,
           "height": 128
         }
@@ -1482,6 +1548,12 @@
           "y": 560,
           "width": 256,
           "height": 128
+        },
+        "runtime-data-analysis-orchestration": {
+          "x": 1100,
+          "y": 620,
+          "width": 256,
+          "height": 128
         }
       },
       "groups": [
@@ -1519,6 +1591,12 @@
         "runtime": {
           "x": 1560,
           "y": 560,
+          "width": 256,
+          "height": 128
+        },
+        "runtime-data-analysis-orchestration": {
+          "x": 1460,
+          "y": 620,
           "width": 256,
           "height": 128
         }
@@ -1560,6 +1638,12 @@
           "y": 740,
           "width": 256,
           "height": 128
+        },
+        "runtime-data-analysis-orchestration": {
+          "x": 1100,
+          "y": 820,
+          "width": 256,
+          "height": 128
         }
       },
       "groups": [
@@ -1596,6 +1680,12 @@
       "layout": {
         "runtime": {
           "x": 780,
+          "y": 780,
+          "width": 256,
+          "height": 128
+        },
+        "runtime-data-analysis-orchestration": {
+          "x": 760,
           "y": 740,
           "width": 256,
           "height": 128
@@ -1638,6 +1728,12 @@
           "y": 120,
           "width": 256,
           "height": 128
+        },
+        "runtime-identity-access-secrets": {
+          "x": 400,
+          "y": 400,
+          "width": 256,
+          "height": 128
         }
       },
       "groups": [
@@ -1675,6 +1771,12 @@
         "runtime": {
           "x": 80,
           "y": -580,
+          "width": 256,
+          "height": 128
+        },
+        "runtime-identity-access-secrets": {
+          "x": 760,
+          "y": -360,
           "width": 256,
           "height": 128
         }
@@ -1716,6 +1818,12 @@
           "y": -240,
           "width": 256,
           "height": 128
+        },
+        "runtime-identity-access-secrets": {
+          "x": 400,
+          "y": 80,
+          "width": 256,
+          "height": 128
         }
       },
       "groups": [
@@ -1753,6 +1861,12 @@
         "runtime": {
           "x": 1560,
           "y": -340,
+          "width": 256,
+          "height": 128
+        },
+        "runtime-identity-access-secrets": {
+          "x": 1120,
+          "y": 80,
           "width": 256,
           "height": 128
         }
@@ -1794,6 +1908,12 @@
           "y": -580,
           "width": 256,
           "height": 128
+        },
+        "runtime-identity-access-secrets": {
+          "x": 760,
+          "y": -160,
+          "width": 256,
+          "height": 128
         }
       },
       "groups": [
@@ -1831,6 +1951,18 @@
         "runtime": {
           "x": 780,
           "y": 80,
+          "width": 256,
+          "height": 128
+        },
+        "runtime-identity-access-secrets": {
+          "x": 760,
+          "y": 260,
+          "width": 256,
+          "height": 128
+        },
+        "runtime-data-analysis-orchestration": {
+          "x": 420,
+          "y": -120,
           "width": 256,
           "height": 128
         }
@@ -1872,6 +2004,12 @@
           "y": -160,
           "width": 256,
           "height": 128
+        },
+        "runtime-identity-access-secrets": {
+          "x": 1120,
+          "y": 260,
+          "width": 256,
+          "height": 128
         }
       },
       "groups": [
@@ -1909,6 +2047,12 @@
         "runtime": {
           "x": 780,
           "y": 620,
+          "width": 256,
+          "height": 128
+        },
+        "runtime-data-analysis-orchestration": {
+          "x": 760,
+          "y": 420,
           "width": 256,
           "height": 128
         }
@@ -1950,6 +2094,12 @@
           "y": 360,
           "width": 256,
           "height": 128
+        },
+        "runtime-data-analysis-orchestration": {
+          "x": 420,
+          "y": 180,
+          "width": 256,
+          "height": 128
         }
       },
       "groups": [
@@ -1987,6 +2137,12 @@
         "runtime": {
           "x": 1560,
           "y": 740,
+          "width": 256,
+          "height": 128
+        },
+        "runtime-data-analysis-orchestration": {
+          "x": 1460,
+          "y": 180,
           "width": 256,
           "height": 128
         }
@@ -2028,6 +2184,12 @@
           "y": -620,
           "width": 256,
           "height": 128
+        },
+        "runtime-data-analysis-orchestration": {
+          "x": 1100,
+          "y": -520,
+          "width": 256,
+          "height": 128
         }
       },
       "groups": [
@@ -2065,6 +2227,12 @@
         "runtime": {
           "x": 1560,
           "y": -700,
+          "width": 256,
+          "height": 128
+        },
+        "runtime-data-analysis-orchestration": {
+          "x": 1460,
+          "y": -520,
           "width": 256,
           "height": 128
         }
@@ -2106,6 +2274,12 @@
           "y": -520,
           "width": 256,
           "height": 128
+        },
+        "runtime-data-analysis-orchestration": {
+          "x": 1460,
+          "y": -340,
+          "width": 256,
+          "height": 128
         }
       },
       "groups": [
@@ -2143,6 +2317,12 @@
         "runtime": {
           "x": 1180,
           "y": -420,
+          "width": 256,
+          "height": 128
+        },
+        "runtime-data-analysis-orchestration": {
+          "x": 1100,
+          "y": -320,
           "width": 256,
           "height": 128
         }
@@ -2184,6 +2364,12 @@
           "y": -240,
           "width": 256,
           "height": 128
+        },
+        "runtime-data-analysis-orchestration": {
+          "x": 1100,
+          "y": -120,
+          "width": 256,
+          "height": 128
         }
       },
       "groups": [
@@ -2221,6 +2407,12 @@
         "runtime": {
           "x": 1180,
           "y": -60,
+          "width": 256,
+          "height": 128
+        },
+        "runtime-data-analysis-orchestration": {
+          "x": 1100,
+          "y": 80,
           "width": 256,
           "height": 128
         }
@@ -2262,6 +2454,12 @@
           "y": 220,
           "width": 256,
           "height": 128
+        },
+        "runtime-data-analysis-orchestration": {
+          "x": 1100,
+          "y": 360,
+          "width": 256,
+          "height": 128
         }
       },
       "groups": [
@@ -2299,6 +2497,12 @@
         "runtime": {
           "x": 1560,
           "y": 20,
+          "width": 256,
+          "height": 128
+        },
+        "runtime-data-analysis-orchestration": {
+          "x": 1460,
+          "y": 320,
           "width": 256,
           "height": 128
         }
@@ -2340,6 +2544,12 @@
           "y": 200,
           "width": 256,
           "height": 128
+        },
+        "runtime-data-analysis-orchestration": {
+          "x": 1460,
+          "y": 460,
+          "width": 256,
+          "height": 128
         }
       },
       "groups": [
@@ -2379,6 +2589,12 @@
           "y": 380,
           "width": 256,
           "height": 128
+        },
+        "runtime-data-analysis-orchestration": {
+          "x": 1460,
+          "y": 800,
+          "width": 256,
+          "height": 128
         }
       },
       "groups": [
@@ -2414,6 +2630,18 @@
           "y": -940,
           "width": 256,
           "height": 160
+        },
+        "runtime-identity-access-secrets": {
+          "x": 40,
+          "y": -360,
+          "width": 256,
+          "height": 150
+        },
+        "runtime-data-analysis-orchestration": {
+          "x": 40,
+          "y": -520,
+          "width": 256,
+          "height": 150
         }
       },
       "caption": "Researchers, analysts, and authorized staff who access browser applications and governed data services.",
@@ -2437,6 +2665,12 @@
         "runtime": {
           "x": 440,
           "y": -900,
+          "width": 256,
+          "height": 128
+        },
+        "runtime-identity-access-secrets": {
+          "x": 40,
+          "y": -540,
           "width": 256,
           "height": 128
         }
@@ -2464,6 +2698,12 @@
           "y": -900,
           "width": 256,
           "height": 128
+        },
+        "runtime-identity-access-secrets": {
+          "x": 40,
+          "y": -40,
+          "width": 256,
+          "height": 128
         }
       },
       "caption": "Institutional or external OIDC identity provider used when the deployment does not use bundled Keycloak.",
@@ -2483,6 +2723,12 @@
         "runtime": {
           "x": -320,
           "y": -420,
+          "width": 256,
+          "height": 128
+        },
+        "runtime-identity-access-secrets": {
+          "x": 40,
+          "y": 180,
           "width": 256,
           "height": 128
         }
@@ -2506,6 +2752,12 @@
           "y": 640,
           "width": 256,
           "height": 128
+        },
+        "runtime-data-analysis-orchestration": {
+          "x": 40,
+          "y": 220,
+          "width": 256,
+          "height": 128
         }
       },
       "caption": "External object-storage service that contains lakehouse data objects when the deployment uses external S3-compatible storage.",
@@ -2527,6 +2779,12 @@
           "y": 120,
           "width": 256,
           "height": 128
+        },
+        "runtime-identity-access-secrets": {
+          "x": 40,
+          "y": 460,
+          "width": 256,
+          "height": 128
         }
       },
       "caption": "External mechanism that creates Kubernetes Secrets consumed by the release, such as Vault Secrets Operator.",
@@ -2545,6 +2803,12 @@
       "layout": {
         "runtime": {
           "x": 1960,
+          "y": 520,
+          "width": 256,
+          "height": 128
+        },
+        "runtime-data-analysis-orchestration": {
+          "x": 40,
           "y": 520,
           "width": 256,
           "height": 128
@@ -2575,6 +2839,12 @@
           "y": 720,
           "width": 256,
           "height": 128
+        },
+        "runtime-data-analysis-orchestration": {
+          "x": 40,
+          "y": 740,
+          "width": 256,
+          "height": 128
         }
       },
       "caption": "Operational, surveillance, survey, public climate, and other upstream data systems from which pipelines extract source data.",
@@ -2596,7 +2866,14 @@
       "labels": {
         "dlhPath": "charts/dlh-in-a-box/Chart.yaml"
       },
-      "layout": {},
+      "layout": {
+        "chart-source": {
+          "x": 80,
+          "y": 80,
+          "width": 256,
+          "height": 128
+        }
+      },
       "links": [
         {
           "name": "GitHub: charts/dlh-in-a-box/Chart.yaml",
@@ -2623,7 +2900,14 @@
       "labels": {
         "dlhPath": "charts/dlh-in-a-box/Chart.lock"
       },
-      "layout": {},
+      "layout": {
+        "chart-source": {
+          "x": 440,
+          "y": 80,
+          "width": 256,
+          "height": 128
+        }
+      },
       "links": [
         {
           "name": "GitHub: charts/dlh-in-a-box/Chart.lock",
@@ -2650,7 +2934,14 @@
       "labels": {
         "dlhPath": "charts/dlh-in-a-box/values.yaml; charts/dlh-in-a-box/values.schema.json"
       },
-      "layout": {},
+      "layout": {
+        "chart-source": {
+          "x": 80,
+          "y": 420,
+          "width": 256,
+          "height": 128
+        }
+      },
       "links": [
         {
           "name": "GitHub: charts/dlh-in-a-box/values.yaml",
@@ -2681,7 +2972,14 @@
       "labels": {
         "dlhPath": "charts/dlh-in-a-box/.helmignore"
       },
-      "layout": {},
+      "layout": {
+        "chart-source": {
+          "x": 800,
+          "y": 80,
+          "width": 256,
+          "height": 128
+        }
+      },
       "links": [
         {
           "name": "GitHub: charts/dlh-in-a-box/.helmignore",
@@ -2708,7 +3006,14 @@
       "labels": {
         "dlhPath": "charts/dlh-in-a-box/README.md; LICENSE; THIRD_PARTY_NOTICES.md"
       },
-      "layout": {},
+      "layout": {
+        "chart-source": {
+          "x": 1160,
+          "y": 80,
+          "width": 256,
+          "height": 128
+        }
+      },
       "links": [
         {
           "name": "GitHub: charts/dlh-in-a-box/README.md",
@@ -2743,7 +3048,14 @@
       "labels": {
         "dlhPath": "charts/dlh-in-a-box/files/"
       },
-      "layout": {},
+      "layout": {
+        "chart-source": {
+          "x": 440,
+          "y": 1260,
+          "width": 256,
+          "height": 128
+        }
+      },
       "links": [
         {
           "name": "GitHub: charts/dlh-in-a-box/files",
@@ -2770,7 +3082,14 @@
       "labels": {
         "dlhPath": "charts/dlh-in-a-box/third_party/"
       },
-      "layout": {},
+      "layout": {
+        "chart-source": {
+          "x": 1160,
+          "y": 320,
+          "width": 256,
+          "height": 128
+        }
+      },
       "links": [
         {
           "name": "GitHub: charts/dlh-in-a-box/third_party",
@@ -2797,7 +3116,14 @@
       "labels": {
         "dlhPath": "charts/dlh-in-a-box/templates/"
       },
-      "layout": {},
+      "layout": {
+        "chart-source": {
+          "x": 440,
+          "y": 420,
+          "width": 256,
+          "height": 128
+        }
+      },
       "links": [
         {
           "name": "GitHub: charts/dlh-in-a-box/templates",
@@ -2824,7 +3150,14 @@
       "labels": {
         "dlhPath": "charts/dlh-in-a-box/templates/identity-validation.yaml"
       },
-      "layout": {},
+      "layout": {
+        "chart-source": {
+          "x": 80,
+          "y": 720,
+          "width": 256,
+          "height": 128
+        }
+      },
       "links": [
         {
           "name": "GitHub: charts/dlh-in-a-box/templates/identity-validation.yaml",
@@ -2851,7 +3184,14 @@
       "labels": {
         "dlhPath": "charts/dlh-in-a-box/templates/governance-validation.yaml"
       },
-      "layout": {},
+      "layout": {
+        "chart-source": {
+          "x": 440,
+          "y": 720,
+          "width": 256,
+          "height": 128
+        }
+      },
       "links": [
         {
           "name": "GitHub: charts/dlh-in-a-box/templates/governance-validation.yaml",
@@ -2878,7 +3218,14 @@
       "labels": {
         "dlhPath": "charts/dlh-in-a-box/templates/ranger-automation.yaml; ranger-admin.yaml; _ranger-admin.tpl"
       },
-      "layout": {},
+      "layout": {
+        "chart-source": {
+          "x": 800,
+          "y": 720,
+          "width": 256,
+          "height": 128
+        }
+      },
       "links": [
         {
           "name": "GitHub: charts/dlh-in-a-box/templates/ranger-automation.yaml",
@@ -2913,7 +3260,14 @@
       "labels": {
         "dlhPath": "charts/dlh-in-a-box/templates/ranger-browser-proxy.yaml"
       },
-      "layout": {},
+      "layout": {
+        "chart-source": {
+          "x": 1160,
+          "y": 720,
+          "width": 256,
+          "height": 128
+        }
+      },
       "links": [
         {
           "name": "GitHub: charts/dlh-in-a-box/templates/ranger-browser-proxy.yaml",
@@ -2940,7 +3294,14 @@
       "labels": {
         "dlhPath": "charts/dlh-in-a-box/templates/cloudbeaver.yaml"
       },
-      "layout": {},
+      "layout": {
+        "chart-source": {
+          "x": 80,
+          "y": 1020,
+          "width": 256,
+          "height": 128
+        }
+      },
       "links": [
         {
           "name": "GitHub: charts/dlh-in-a-box/templates/cloudbeaver.yaml",
@@ -2967,7 +3328,14 @@
       "labels": {
         "dlhPath": "charts/dlh-in-a-box/templates/platform-home.yaml"
       },
-      "layout": {},
+      "layout": {
+        "chart-source": {
+          "x": 440,
+          "y": 1020,
+          "width": 256,
+          "height": 128
+        }
+      },
       "links": [
         {
           "name": "GitHub: charts/dlh-in-a-box/templates/platform-home.yaml",
@@ -2994,7 +3362,14 @@
       "labels": {
         "dlhPath": "charts/dlh-in-a-box/templates/datahub-auth-secrets.yaml; datahub-prerequisites-compat.yaml"
       },
-      "layout": {},
+      "layout": {
+        "chart-source": {
+          "x": 800,
+          "y": 1020,
+          "width": 256,
+          "height": 128
+        }
+      },
       "links": [
         {
           "name": "GitHub: charts/dlh-in-a-box/templates/datahub-auth-secrets.yaml",
@@ -3467,7 +3842,14 @@
       "labels": {
         "dlhPath": "charts/dlh-in-a-box/charts/trino/OVERVIEW.md; templates/_README.txt"
       },
-      "layout": {},
+      "layout": {
+        "vendored-trino": {
+          "x": 80,
+          "y": 80,
+          "width": 256,
+          "height": 128
+        }
+      },
       "links": [
         {
           "name": "GitHub: charts/dlh-in-a-box/charts/trino/OVERVIEW.md",
@@ -3498,7 +3880,14 @@
       "labels": {
         "dlhPath": "charts/dlh-in-a-box/charts/trino/templates/_helpers.tpl"
       },
-      "layout": {},
+      "layout": {
+        "vendored-trino": {
+          "x": 440,
+          "y": 80,
+          "width": 256,
+          "height": 128
+        }
+      },
       "links": [
         {
           "name": "GitHub: charts/dlh-in-a-box/charts/trino/templates/_helpers.tpl",
@@ -3525,7 +3914,14 @@
       "labels": {
         "dlhPath": "charts/dlh-in-a-box/charts/trino/templates/configmap-catalog.yaml"
       },
-      "layout": {},
+      "layout": {
+        "vendored-trino": {
+          "x": 800,
+          "y": 80,
+          "width": 256,
+          "height": 128
+        }
+      },
       "links": [
         {
           "name": "GitHub: charts/dlh-in-a-box/charts/trino/templates/configmap-catalog.yaml",
@@ -3552,7 +3948,14 @@
       "labels": {
         "dlhPath": "charts/dlh-in-a-box/charts/trino/templates/configmap-access-control-*.yaml"
       },
-      "layout": {},
+      "layout": {
+        "vendored-trino": {
+          "x": 1160,
+          "y": 80,
+          "width": 256,
+          "height": 128
+        }
+      },
       "links": [
         {
           "name": "GitHub: charts/dlh-in-a-box/charts/trino/templates/configmap-access-control-coordinator.yaml",
@@ -3583,7 +3986,14 @@
       "labels": {
         "dlhPath": "charts/dlh-in-a-box/charts/trino/templates/deployment-coordinator.yaml"
       },
-      "layout": {},
+      "layout": {
+        "vendored-trino": {
+          "x": 80,
+          "y": 270,
+          "width": 256,
+          "height": 128
+        }
+      },
       "links": [
         {
           "name": "GitHub: charts/dlh-in-a-box/charts/trino/templates/deployment-coordinator.yaml",
@@ -3610,7 +4020,14 @@
       "labels": {
         "dlhPath": "charts/dlh-in-a-box/charts/trino/templates/deployment-worker.yaml"
       },
-      "layout": {},
+      "layout": {
+        "vendored-trino": {
+          "x": 440,
+          "y": 270,
+          "width": 256,
+          "height": 128
+        }
+      },
       "links": [
         {
           "name": "GitHub: charts/dlh-in-a-box/charts/trino/templates/deployment-worker.yaml",
@@ -3637,7 +4054,14 @@
       "labels": {
         "dlhPath": "charts/dlh-in-a-box/charts/hive/README.md; templates/_README.txt"
       },
-      "layout": {},
+      "layout": {
+        "hive-subchart": {
+          "x": 80,
+          "y": 80,
+          "width": 256,
+          "height": 128
+        }
+      },
       "links": [
         {
           "name": "GitHub: charts/dlh-in-a-box/charts/hive/README.md",
@@ -3668,7 +4092,14 @@
       "labels": {
         "dlhPath": "charts/dlh-in-a-box/charts/hive/Chart.yaml"
       },
-      "layout": {},
+      "layout": {
+        "hive-subchart": {
+          "x": 440,
+          "y": 80,
+          "width": 256,
+          "height": 128
+        }
+      },
       "links": [
         {
           "name": "GitHub: charts/dlh-in-a-box/charts/hive/Chart.yaml",
@@ -3695,7 +4126,14 @@
       "labels": {
         "dlhPath": "charts/dlh-in-a-box/charts/hive/values.yaml"
       },
-      "layout": {},
+      "layout": {
+        "hive-subchart": {
+          "x": 800,
+          "y": 80,
+          "width": 256,
+          "height": 128
+        }
+      },
       "links": [
         {
           "name": "GitHub: charts/dlh-in-a-box/charts/hive/values.yaml",
@@ -3722,7 +4160,14 @@
       "labels": {
         "dlhPath": "charts/dlh-in-a-box/charts/hive/templates/_helpers.tpl"
       },
-      "layout": {},
+      "layout": {
+        "hive-subchart": {
+          "x": 1160,
+          "y": 80,
+          "width": 256,
+          "height": 128
+        }
+      },
       "links": [
         {
           "name": "GitHub: charts/dlh-in-a-box/charts/hive/templates/_helpers.tpl",
@@ -3749,7 +4194,14 @@
       "labels": {
         "dlhPath": "charts/dlh-in-a-box/charts/hive/templates/configmap.yaml"
       },
-      "layout": {},
+      "layout": {
+        "hive-subchart": {
+          "x": 80,
+          "y": 270,
+          "width": 256,
+          "height": 128
+        }
+      },
       "links": [
         {
           "name": "GitHub: charts/dlh-in-a-box/charts/hive/templates/configmap.yaml",
@@ -3776,7 +4228,14 @@
       "labels": {
         "dlhPath": "charts/dlh-in-a-box/charts/hive/templates/metastore.yaml"
       },
-      "layout": {},
+      "layout": {
+        "hive-subchart": {
+          "x": 440,
+          "y": 270,
+          "width": 256,
+          "height": 128
+        }
+      },
       "links": [
         {
           "name": "GitHub: charts/dlh-in-a-box/charts/hive/templates/metastore.yaml",
@@ -3803,7 +4262,14 @@
       "labels": {
         "dlhPath": "charts/dlh-in-a-box/charts/hive/templates/init-*.yaml"
       },
-      "layout": {},
+      "layout": {
+        "hive-subchart": {
+          "x": 800,
+          "y": 270,
+          "width": 256,
+          "height": 128
+        }
+      },
       "links": [
         {
           "name": "GitHub: charts/dlh-in-a-box/charts/hive/templates/init-config.yaml",
@@ -3834,7 +4300,14 @@
       "labels": {
         "dlhPath": "charts/dlh-in-a-box/charts/hive/templates/*secret*.yaml"
       },
-      "layout": {},
+      "layout": {
+        "hive-subchart": {
+          "x": 1160,
+          "y": 270,
+          "width": 256,
+          "height": 128
+        }
+      },
       "links": [
         {
           "name": "GitHub: charts/dlh-in-a-box/charts/hive/templates/postgres-secret.yaml",
@@ -3865,7 +4338,14 @@
       "labels": {
         "dlhPath": ".github/workflows/helm-lint.yaml; hack/lint.sh"
       },
-      "layout": {},
+      "layout": {
+        "validation": {
+          "x": 80,
+          "y": 80,
+          "width": 256,
+          "height": 128
+        }
+      },
       "links": [
         {
           "name": "GitHub: .github/workflows/helm-lint.yaml",
@@ -3896,7 +4376,14 @@
       "labels": {
         "dlhPath": "hack/helm-dependency-update.sh; Chart.lock"
       },
-      "layout": {},
+      "layout": {
+        "validation": {
+          "x": 440,
+          "y": 80,
+          "width": 256,
+          "height": 128
+        }
+      },
       "links": [
         {
           "name": "GitHub: hack/helm-dependency-update.sh",
@@ -3927,7 +4414,14 @@
       "labels": {
         "dlhPath": "hack/template.sh; examples/*.yaml"
       },
-      "layout": {},
+      "layout": {
+        "validation": {
+          "x": 800,
+          "y": 80,
+          "width": 256,
+          "height": 128
+        }
+      },
       "links": [
         {
           "name": "GitHub: hack/template.sh",
@@ -3958,7 +4452,14 @@
       "labels": {
         "dlhPath": "hack/render-contract.sh; hack/testdata/render-contract/"
       },
-      "layout": {},
+      "layout": {
+        "validation": {
+          "x": 1160,
+          "y": 80,
+          "width": 256,
+          "height": 128
+        }
+      },
       "links": [
         {
           "name": "GitHub: hack/render-contract.sh",
@@ -3989,7 +4490,14 @@
       "labels": {
         "dlhPath": ".github/workflows/helm-smoke-install.yaml; hack/smoke-install.sh"
       },
-      "layout": {},
+      "layout": {
+        "validation": {
+          "x": 80,
+          "y": 270,
+          "width": 256,
+          "height": 128
+        }
+      },
       "links": [
         {
           "name": "GitHub: .github/workflows/helm-smoke-install.yaml",
@@ -4020,7 +4528,14 @@
       "labels": {
         "dlhPath": "hack/package.sh; dist/"
       },
-      "layout": {},
+      "layout": {
+        "publish": {
+          "x": 80,
+          "y": 80,
+          "width": 256,
+          "height": 128
+        }
+      },
       "links": [
         {
           "name": "GitHub: hack/package.sh",
@@ -4047,7 +4562,14 @@
       "labels": {
         "dlhPath": ".github/workflows/helm-publish.yaml"
       },
-      "layout": {},
+      "layout": {
+        "publish": {
+          "x": 440,
+          "y": 80,
+          "width": 256,
+          "height": 128
+        }
+      },
       "links": [
         {
           "name": "GitHub: .github/workflows/helm-publish.yaml",
@@ -4074,7 +4596,14 @@
       "labels": {
         "dlhPath": ".github/release.yml; Chart.yaml annotations"
       },
-      "layout": {},
+      "layout": {
+        "publish": {
+          "x": 800,
+          "y": 80,
+          "width": 256,
+          "height": 128
+        }
+      },
       "links": [
         {
           "name": "GitHub: .github/release.yml",
@@ -4101,896 +4630,4896 @@
       "origin": "DLH-L1-OPERATOR",
       "target": "DLH-L1-CONSUMER-REPO",
       "label": "prepares institutional deployment configuration",
-      "direction": "outgoing"
+      "direction": "outgoing",
+      "layout": {
+        "context": {
+          "originConnector": "right-middle",
+          "targetConnector": "left-middle",
+          "points": [
+            {
+              "x": 336,
+              "y": -100
+            },
+            {
+              "x": 378,
+              "y": -100
+            },
+            {
+              "x": 378,
+              "y": -56
+            },
+            {
+              "x": 420,
+              "y": -56
+            }
+          ],
+          "lineShape": "square",
+          "labelPosition": 38
+        }
+      }
     },
     {
       "id": "DLH-CONN-f1a2af9e5d15",
       "origin": "DLH-L1-CONSUMER-REPO",
       "target": "DLH-L1-CHART",
       "label": "selects published Helm chart",
-      "direction": "outgoing"
+      "direction": "outgoing",
+      "layout": {
+        "context": {
+          "originConnector": "right-middle",
+          "targetConnector": "left-middle",
+          "points": [
+            {
+              "x": 676,
+              "y": -56
+            },
+            {
+              "x": 728,
+              "y": -56
+            },
+            {
+              "x": 728,
+              "y": 84
+            },
+            {
+              "x": 780,
+              "y": 84
+            }
+          ],
+          "lineShape": "square",
+          "labelPosition": 47
+        }
+      }
     },
     {
       "id": "DLH-CONN-56f40e2f2084",
       "origin": "DLH-L1-CONSUMER-REPO",
       "target": "DLH-L1-RUNTIME",
       "label": "provides deployment configuration",
-      "direction": "outgoing"
+      "direction": "outgoing",
+      "layout": {
+        "context": {
+          "originConnector": "right-middle",
+          "targetConnector": "top-center",
+          "points": [
+            {
+              "x": 676,
+              "y": -56
+            },
+            {
+              "x": 676,
+              "y": -18
+            },
+            {
+              "x": 1288,
+              "y": -18
+            },
+            {
+              "x": 1288,
+              "y": 20
+            }
+          ],
+          "lineShape": "square",
+          "labelPosition": 56
+        }
+      }
     },
     {
       "id": "DLH-CONN-6471f4598293",
       "origin": "DLH-L1-UPSTREAM-DEPS",
       "target": "DLH-L1-CHART",
       "label": "provides packaged charts and images",
-      "direction": "outgoing"
+      "direction": "outgoing",
+      "layout": {
+        "context": {
+          "originConnector": "right-middle",
+          "targetConnector": "left-middle",
+          "points": [
+            {
+              "x": 676,
+              "y": 204
+            },
+            {
+              "x": 728,
+              "y": 204
+            },
+            {
+              "x": 728,
+              "y": 84
+            },
+            {
+              "x": 780,
+              "y": 84
+            }
+          ],
+          "lineShape": "square",
+          "labelPosition": 65
+        }
+      }
     },
     {
       "id": "DLH-CONN-a2b2c786056b",
       "origin": "DLH-L1-CHART",
       "target": "DLH-L1-RUNTIME",
       "label": "defines deployable lakehouse runtime",
-      "direction": "outgoing"
+      "direction": "outgoing",
+      "layout": {
+        "context": {
+          "originConnector": "right-middle",
+          "targetConnector": "left-middle",
+          "points": [
+            {
+              "x": 1036,
+              "y": 84
+            },
+            {
+              "x": 1160,
+              "y": 84
+            }
+          ],
+          "lineShape": "square",
+          "labelPosition": 40
+        }
+      }
     },
     {
       "id": "DLH-CONN-fe391d1969e4",
       "origin": "DLH-L1-RUNTIME",
       "target": "DLH-L1-TARGET-CLUSTER",
       "label": "runs on institutional Kubernetes infrastructure",
-      "direction": "outgoing"
+      "direction": "outgoing",
+      "layout": {
+        "context": {
+          "originConnector": "bottom-center",
+          "targetConnector": "top-center",
+          "points": [
+            {
+              "x": 1288,
+              "y": 148
+            },
+            {
+              "x": 1288,
+              "y": 260
+            }
+          ],
+          "lineShape": "square",
+          "labelPosition": 49
+        }
+      }
     },
     {
       "id": "DLH-CONN-3550e7b74690",
       "origin": "DLH-L1-USER",
       "target": "DLH-L1-RUNTIME",
       "label": "uses analytical tools and governed data services",
-      "direction": "outgoing"
+      "direction": "outgoing",
+      "layout": {
+        "context": {
+          "originConnector": "left-middle",
+          "targetConnector": "right-middle",
+          "points": [
+            {
+              "x": 1520,
+              "y": 0
+            },
+            {
+              "x": 1468,
+              "y": 0
+            },
+            {
+              "x": 1468,
+              "y": 84
+            },
+            {
+              "x": 1416,
+              "y": 84
+            }
+          ],
+          "lineShape": "square",
+          "labelPosition": 58
+        }
+      }
     },
     {
       "id": "DLH-CONN-da97484e8c06",
       "origin": "DLH-L1-OPERATOR",
       "target": "DLH-L1-RUNTIME",
       "label": "manages deployed Data Lakehouse instance",
-      "direction": "outgoing"
+      "direction": "outgoing",
+      "layout": {
+        "context": {
+          "originConnector": "right-middle",
+          "targetConnector": "left-middle",
+          "points": [
+            {
+              "x": 336,
+              "y": -100
+            },
+            {
+              "x": 336,
+              "y": -300
+            },
+            {
+              "x": 1160,
+              "y": -300
+            },
+            {
+              "x": 1160,
+              "y": 84
+            }
+          ],
+          "lineShape": "square",
+          "labelPosition": 67
+        }
+      }
     },
     {
       "id": "DLH-CONN-b71d2fd4f232",
       "origin": "DLH-X-SUPERSET-CHART",
       "target": "DLH-C2-UPSTREAM-ARCHIVES",
       "label": "is packaged into",
-      "direction": "outgoing"
+      "direction": "outgoing",
+      "layout": {
+        "chart-product": {
+          "originConnector": "right-middle",
+          "targetConnector": "left-middle",
+          "points": [
+            {
+              "x": -24,
+              "y": -176
+            },
+            {
+              "x": -24,
+              "y": -340
+            },
+            {
+              "x": 680,
+              "y": -340
+            },
+            {
+              "x": 680,
+              "y": -176
+            }
+          ],
+          "lineShape": "square",
+          "labelPosition": 38
+        }
+      }
     },
     {
       "id": "DLH-CONN-9e141f001a65",
       "origin": "DLH-X-PREFECT-SERVER-CHART",
       "target": "DLH-C2-UPSTREAM-ARCHIVES",
       "label": "is packaged into",
-      "direction": "outgoing"
+      "direction": "outgoing",
+      "layout": {
+        "chart-product": {
+          "originConnector": "left-middle",
+          "targetConnector": "left-middle",
+          "points": [
+            {
+              "x": -280,
+              "y": -36
+            },
+            {
+              "x": -620,
+              "y": -36
+            },
+            {
+              "x": -620,
+              "y": -580
+            },
+            {
+              "x": 680,
+              "y": -580
+            },
+            {
+              "x": 680,
+              "y": -176
+            }
+          ],
+          "lineShape": "square",
+          "labelPosition": 47
+        }
+      }
     },
     {
       "id": "DLH-CONN-2222103703f3",
       "origin": "DLH-X-PREFECT-WORKER-CHART",
       "target": "DLH-C2-UPSTREAM-ARCHIVES",
       "label": "is packaged into",
-      "direction": "outgoing"
+      "direction": "outgoing",
+      "layout": {
+        "chart-product": {
+          "originConnector": "left-middle",
+          "targetConnector": "left-middle",
+          "points": [
+            {
+              "x": -280,
+              "y": 104
+            },
+            {
+              "x": -620,
+              "y": 104
+            },
+            {
+              "x": -620,
+              "y": -580
+            },
+            {
+              "x": 680,
+              "y": -580
+            },
+            {
+              "x": 680,
+              "y": -176
+            }
+          ],
+          "lineShape": "square",
+          "labelPosition": 56
+        }
+      }
     },
     {
       "id": "DLH-CONN-bb4d32ab26b5",
       "origin": "DLH-X-OAUTH2-PROXY-CHART",
       "target": "DLH-C2-UPSTREAM-ARCHIVES",
       "label": "is packaged into",
-      "direction": "outgoing"
+      "direction": "outgoing",
+      "layout": {
+        "chart-product": {
+          "originConnector": "left-middle",
+          "targetConnector": "left-middle",
+          "points": [
+            {
+              "x": -280,
+              "y": 244
+            },
+            {
+              "x": -620,
+              "y": 244
+            },
+            {
+              "x": -620,
+              "y": -580
+            },
+            {
+              "x": 680,
+              "y": -580
+            },
+            {
+              "x": 680,
+              "y": -176
+            }
+          ],
+          "lineShape": "square",
+          "labelPosition": 65
+        }
+      }
     },
     {
       "id": "DLH-CONN-7dc2a3549ec6",
       "origin": "DLH-X-KEYCLOAK-CHART",
       "target": "DLH-C2-UPSTREAM-ARCHIVES",
       "label": "is packaged into",
-      "direction": "outgoing"
+      "direction": "outgoing",
+      "layout": {
+        "chart-product": {
+          "originConnector": "left-middle",
+          "targetConnector": "left-middle",
+          "points": [
+            {
+              "x": -280,
+              "y": 384
+            },
+            {
+              "x": -620,
+              "y": 384
+            },
+            {
+              "x": -620,
+              "y": -580
+            },
+            {
+              "x": 680,
+              "y": -580
+            },
+            {
+              "x": 680,
+              "y": -176
+            }
+          ],
+          "lineShape": "square",
+          "labelPosition": 40
+        }
+      }
     },
     {
       "id": "DLH-CONN-f0089c07d9ae",
       "origin": "DLH-X-SPARK-OPERATOR-CHART",
       "target": "DLH-C2-UPSTREAM-ARCHIVES",
       "label": "is packaged into",
-      "direction": "outgoing"
+      "direction": "outgoing",
+      "layout": {
+        "chart-product": {
+          "originConnector": "right-middle",
+          "targetConnector": "left-middle",
+          "points": [
+            {
+              "x": 276,
+              "y": -176
+            },
+            {
+              "x": 276,
+              "y": -340
+            },
+            {
+              "x": 680,
+              "y": -340
+            },
+            {
+              "x": 680,
+              "y": -176
+            }
+          ],
+          "lineShape": "square",
+          "labelPosition": 49
+        }
+      }
     },
     {
       "id": "DLH-CONN-bfbbac13926b",
       "origin": "DLH-X-MINIO-CHART",
       "target": "DLH-C2-UPSTREAM-ARCHIVES",
       "label": "is packaged into",
-      "direction": "outgoing"
+      "direction": "outgoing",
+      "layout": {
+        "chart-product": {
+          "originConnector": "left-middle",
+          "targetConnector": "top-center",
+          "points": [
+            {
+              "x": 20,
+              "y": -36
+            },
+            {
+              "x": -620,
+              "y": -36
+            },
+            {
+              "x": -620,
+              "y": -580
+            },
+            {
+              "x": 808,
+              "y": -580
+            },
+            {
+              "x": 808,
+              "y": -240
+            }
+          ],
+          "lineShape": "square",
+          "labelPosition": 58
+        }
+      }
     },
     {
       "id": "DLH-CONN-aec27f58832c",
       "origin": "DLH-X-DATAHUB-CHART",
       "target": "DLH-C2-UPSTREAM-ARCHIVES",
       "label": "is packaged into",
-      "direction": "outgoing"
+      "direction": "outgoing",
+      "layout": {
+        "chart-product": {
+          "originConnector": "left-middle",
+          "targetConnector": "top-center",
+          "points": [
+            {
+              "x": 20,
+              "y": 104
+            },
+            {
+              "x": -620,
+              "y": 104
+            },
+            {
+              "x": -620,
+              "y": -580
+            },
+            {
+              "x": 808,
+              "y": -580
+            },
+            {
+              "x": 808,
+              "y": -240
+            }
+          ],
+          "lineShape": "square",
+          "labelPosition": 58
+        }
+      }
     },
     {
       "id": "DLH-CONN-50be48572492",
       "origin": "DLH-X-DATAHUB-PREREQS-CHART",
       "target": "DLH-C2-UPSTREAM-ARCHIVES",
       "label": "is packaged into",
-      "direction": "outgoing"
+      "direction": "outgoing",
+      "layout": {
+        "chart-product": {
+          "originConnector": "left-middle",
+          "targetConnector": "top-center",
+          "points": [
+            {
+              "x": 20,
+              "y": 244
+            },
+            {
+              "x": -620,
+              "y": 244
+            },
+            {
+              "x": -620,
+              "y": -580
+            },
+            {
+              "x": 808,
+              "y": -580
+            },
+            {
+              "x": 808,
+              "y": -240
+            }
+          ],
+          "lineShape": "square",
+          "labelPosition": 58
+        }
+      }
     },
     {
       "id": "DLH-CONN-39b6a4a6eee0",
       "origin": "DLH-X-VAULT-CHART",
       "target": "DLH-C2-UPSTREAM-ARCHIVES",
       "label": "is packaged into",
-      "direction": "outgoing"
+      "direction": "outgoing",
+      "layout": {
+        "chart-product": {
+          "originConnector": "right-middle",
+          "targetConnector": "right-middle",
+          "points": [
+            {
+              "x": 276,
+              "y": 384
+            },
+            {
+              "x": 606,
+              "y": 384
+            },
+            {
+              "x": 606,
+              "y": -176
+            },
+            {
+              "x": 936,
+              "y": -176
+            }
+          ],
+          "lineShape": "square",
+          "labelPosition": 51
+        }
+      }
     },
     {
       "id": "DLH-CONN-3c8e6c7e17be",
       "origin": "DLH-X-JUPYTERHUB-CHART",
       "target": "DLH-C2-UPSTREAM-ARCHIVES",
       "label": "is packaged into",
-      "direction": "outgoing"
+      "direction": "outgoing",
+      "layout": {
+        "chart-product": {
+          "originConnector": "right-middle",
+          "targetConnector": "left-middle",
+          "points": [
+            {
+              "x": 576,
+              "y": -176
+            },
+            {
+              "x": 680,
+              "y": -176
+            }
+          ],
+          "lineShape": "square",
+          "labelPosition": 60
+        }
+      }
     },
     {
       "id": "DLH-CONN-fc166a90ec4b",
       "origin": "DLH-X-POSTGRESQL-CHART",
       "target": "DLH-C2-UPSTREAM-ARCHIVES",
       "label": "is packaged into",
-      "direction": "outgoing"
+      "direction": "outgoing",
+      "layout": {
+        "chart-product": {
+          "originConnector": "right-middle",
+          "targetConnector": "left-middle",
+          "points": [
+            {
+              "x": 576,
+              "y": -36
+            },
+            {
+              "x": 628,
+              "y": -36
+            },
+            {
+              "x": 628,
+              "y": -176
+            },
+            {
+              "x": 680,
+              "y": -176
+            }
+          ],
+          "lineShape": "square",
+          "labelPosition": 69
+        }
+      }
     },
     {
       "id": "DLH-CONN-a51e81967505",
       "origin": "DLH-X-TRINO-CHART",
       "target": "DLH-C2-TRINO-VENDORED",
       "label": "is adapted as local Trino chart",
-      "direction": "outgoing"
+      "direction": "outgoing",
+      "layout": {
+        "chart-product": {
+          "originConnector": "right-middle",
+          "targetConnector": "left-middle",
+          "points": [
+            {
+              "x": 576,
+              "y": 104
+            },
+            {
+              "x": 628,
+              "y": 104
+            },
+            {
+              "x": 628,
+              "y": 224
+            },
+            {
+              "x": 680,
+              "y": 224
+            }
+          ],
+          "lineShape": "square",
+          "labelPosition": 44
+        }
+      }
     },
     {
       "id": "DLH-CONN-5276a7d1ec27",
       "origin": "DLH-X-HIVE-IMAGE",
       "target": "DLH-C2-HIVE-SUBCHART",
       "label": "is referenced by",
-      "direction": "outgoing"
+      "direction": "outgoing",
+      "layout": {
+        "chart-product": {
+          "originConnector": "right-middle",
+          "targetConnector": "left-middle",
+          "points": [
+            {
+              "x": 576,
+              "y": 244
+            },
+            {
+              "x": 580,
+              "y": 244
+            },
+            {
+              "x": 580,
+              "y": 404
+            },
+            {
+              "x": 680,
+              "y": 404
+            }
+          ],
+          "lineShape": "square",
+          "labelPosition": 53
+        }
+      }
     },
     {
       "id": "DLH-CONN-5d887e5cad43",
       "origin": "DLH-C2-CHART-SOURCE",
       "target": "DLH-C2-UPSTREAM-ARCHIVES",
       "label": "declares and contains",
-      "direction": "outgoing"
+      "direction": "outgoing",
+      "layout": {
+        "chart-product": {
+          "originConnector": "top-center",
+          "targetConnector": "bottom-center",
+          "points": [
+            {
+              "x": 808,
+              "y": -40
+            },
+            {
+              "x": 808,
+              "y": -112
+            }
+          ],
+          "lineShape": "square",
+          "labelPosition": 38
+        }
+      }
     },
     {
       "id": "DLH-CONN-b23c39dc126b",
       "origin": "DLH-C2-CHART-SOURCE",
       "target": "DLH-C2-TRINO-VENDORED",
       "label": "declares and contains",
-      "direction": "outgoing"
+      "direction": "outgoing",
+      "layout": {
+        "chart-product": {
+          "originConnector": "bottom-center",
+          "targetConnector": "top-center",
+          "points": [
+            {
+              "x": 808,
+              "y": 88
+            },
+            {
+              "x": 808,
+              "y": 160
+            }
+          ],
+          "lineShape": "square",
+          "labelPosition": 47
+        }
+      }
     },
     {
       "id": "DLH-CONN-48dd7cad70f8",
       "origin": "DLH-C2-CHART-SOURCE",
       "target": "DLH-C2-HIVE-SUBCHART",
       "label": "declares and contains",
-      "direction": "outgoing"
+      "direction": "outgoing",
+      "layout": {
+        "chart-product": {
+          "originConnector": "left-middle",
+          "targetConnector": "left-middle",
+          "points": [
+            {
+              "x": 680,
+              "y": 24
+            },
+            {
+              "x": 560,
+              "y": 24
+            },
+            {
+              "x": 560,
+              "y": 404
+            },
+            {
+              "x": 680,
+              "y": 404
+            }
+          ],
+          "lineShape": "square",
+          "labelPosition": 56
+        }
+      }
     },
     {
       "id": "DLH-CONN-fadad692f054",
       "origin": "DLH-C2-VALIDATION",
       "target": "DLH-C2-CHART-SOURCE",
       "label": "validates",
-      "direction": "outgoing"
+      "direction": "outgoing",
+      "layout": {
+        "chart-product": {
+          "originConnector": "left-middle",
+          "targetConnector": "right-middle",
+          "points": [
+            {
+              "x": 1060,
+              "y": 84
+            },
+            {
+              "x": 940,
+              "y": 84
+            },
+            {
+              "x": 940,
+              "y": 24
+            },
+            {
+              "x": 936,
+              "y": 24
+            }
+          ],
+          "lineShape": "square",
+          "labelPosition": 65
+        }
+      }
     },
     {
       "id": "DLH-CONN-ed7d341f9df3",
       "origin": "DLH-C2-VALIDATION",
       "target": "DLH-C2-EXAMPLE-PROFILES",
       "label": "tests example configurations",
-      "direction": "outgoing"
+      "direction": "outgoing",
+      "layout": {
+        "chart-product": {
+          "originConnector": "top-center",
+          "targetConnector": "bottom-center",
+          "points": [
+            {
+              "x": 1188,
+              "y": 20
+            },
+            {
+              "x": 1188,
+              "y": -92
+            }
+          ],
+          "lineShape": "square",
+          "labelPosition": 40
+        }
+      }
     },
     {
       "id": "DLH-CONN-6c36ca841c95",
       "origin": "DLH-C2-PUBLISH",
       "target": "DLH-C2-CHART-SOURCE",
       "label": "packages",
-      "direction": "outgoing"
+      "direction": "outgoing",
+      "layout": {
+        "chart-product": {
+          "originConnector": "top-center",
+          "targetConnector": "top-center",
+          "points": [
+            {
+              "x": 1528,
+              "y": 20
+            },
+            {
+              "x": 1528,
+              "y": -10
+            },
+            {
+              "x": 808,
+              "y": -10
+            },
+            {
+              "x": 808,
+              "y": -40
+            }
+          ],
+          "lineShape": "square",
+          "labelPosition": 49
+        }
+      }
     },
     {
       "id": "DLH-CONN-41d399ceb0f8",
       "origin": "DLH-C2-PUBLISH",
       "target": "DLH-C2-OCI-PACKAGE",
       "label": "publishes",
-      "direction": "outgoing"
+      "direction": "outgoing",
+      "layout": {
+        "chart-product": {
+          "originConnector": "right-middle",
+          "targetConnector": "left-middle",
+          "points": [
+            {
+              "x": 1656,
+              "y": 84
+            },
+            {
+              "x": 1776,
+              "y": 84
+            },
+            {
+              "x": 1776,
+              "y": -56
+            },
+            {
+              "x": 1780,
+              "y": -56
+            }
+          ],
+          "lineShape": "square",
+          "labelPosition": 58
+        }
+      }
     },
     {
       "id": "DLH-CONN-b2b4d928074b",
       "origin": "DLH-L1-CONSUMER-REPO",
       "target": "DLH-C2-EXAMPLE-PROFILES",
       "label": "uses example configurations from",
-      "direction": "outgoing"
+      "direction": "outgoing",
+      "layout": {
+        "chart-product": {
+          "originConnector": "left-middle",
+          "targetConnector": "right-middle",
+          "points": [
+            {
+              "x": 2180,
+              "y": 204
+            },
+            {
+              "x": 2060,
+              "y": 204
+            },
+            {
+              "x": 2060,
+              "y": -156
+            },
+            {
+              "x": 1316,
+              "y": -156
+            }
+          ],
+          "lineShape": "square",
+          "labelPosition": 67
+        }
+      }
     },
     {
       "id": "DLH-CONN-e839fab7d1c1",
       "origin": "DLH-L1-CONSUMER-REPO",
       "target": "DLH-C2-OCI-PACKAGE",
       "label": "selects chart version from",
-      "direction": "outgoing"
+      "direction": "outgoing",
+      "layout": {
+        "chart-product": {
+          "originConnector": "left-middle",
+          "targetConnector": "right-middle",
+          "points": [
+            {
+              "x": 2180,
+              "y": 204
+            },
+            {
+              "x": 2060,
+              "y": 204
+            },
+            {
+              "x": 2060,
+              "y": -56
+            },
+            {
+              "x": 2036,
+              "y": -56
+            }
+          ],
+          "lineShape": "square",
+          "labelPosition": 42
+        }
+      }
     },
     {
       "id": "DLH-CONN-19b2eddb4943",
       "origin": "DLH-X-USERS",
       "target": "DLH-X-INGRESS-CONTROLLER",
       "label": "access platform over HTTPS",
-      "direction": "outgoing"
+      "direction": "outgoing",
+      "layout": {
+        "runtime": {
+          "originConnector": "right-middle",
+          "targetConnector": "left-middle",
+          "points": [
+            {
+              "x": 316,
+              "y": -860
+            },
+            {
+              "x": 436,
+              "y": -860
+            },
+            {
+              "x": 436,
+              "y": -836
+            },
+            {
+              "x": 440,
+              "y": -836
+            }
+          ],
+          "lineShape": "square",
+          "labelPosition": 38
+        },
+        "runtime-identity-access-secrets": {
+          "originConnector": "top-center",
+          "targetConnector": "bottom-center",
+          "points": [
+            {
+              "x": 168,
+              "y": -360
+            },
+            {
+              "x": 168,
+              "y": -412
+            }
+          ],
+          "lineShape": "square",
+          "labelPosition": 38
+        }
+      }
     },
     {
       "id": "DLH-CONN-921710f3fea9",
       "origin": "DLH-X-INGRESS-CONTROLLER",
       "target": "DLH-R-PLATFORM-HOME",
       "label": "routes portal traffic",
-      "direction": "outgoing"
+      "direction": "outgoing",
+      "layout": {
+        "runtime": {
+          "originConnector": "left-middle",
+          "targetConnector": "right-middle",
+          "points": [
+            {
+              "x": 440,
+              "y": -836
+            },
+            {
+              "x": 388,
+              "y": -836
+            },
+            {
+              "x": 388,
+              "y": -516
+            },
+            {
+              "x": 336,
+              "y": -516
+            }
+          ],
+          "lineShape": "square",
+          "labelPosition": 47
+        },
+        "runtime-identity-access-secrets": {
+          "originConnector": "right-middle",
+          "targetConnector": "left-middle",
+          "points": [
+            {
+              "x": 296,
+              "y": -476
+            },
+            {
+              "x": 416,
+              "y": -476
+            },
+            {
+              "x": 416,
+              "y": -296
+            },
+            {
+              "x": 760,
+              "y": -296
+            }
+          ],
+          "lineShape": "square",
+          "labelPosition": 47
+        }
+      }
     },
     {
       "id": "DLH-CONN-7d48e3be2a8b",
       "origin": "DLH-X-INGRESS-CONTROLLER",
       "target": "DLH-R-AUTH-PROXIES",
       "label": "routes protected application traffic",
-      "direction": "outgoing"
+      "direction": "outgoing",
+      "layout": {
+        "runtime": {
+          "originConnector": "bottom-center",
+          "targetConnector": "top-center",
+          "points": [
+            {
+              "x": 568,
+              "y": -772
+            },
+            {
+              "x": 558,
+              "y": -772
+            },
+            {
+              "x": 558,
+              "y": -580
+            },
+            {
+              "x": 548,
+              "y": -580
+            }
+          ],
+          "lineShape": "square",
+          "labelPosition": 56
+        },
+        "runtime-identity-access-secrets": {
+          "originConnector": "right-middle",
+          "targetConnector": "left-middle",
+          "points": [
+            {
+              "x": 296,
+              "y": -476
+            },
+            {
+              "x": 416,
+              "y": -476
+            },
+            {
+              "x": 416,
+              "y": -96
+            },
+            {
+              "x": 760,
+              "y": -96
+            }
+          ],
+          "lineShape": "square",
+          "labelPosition": 56
+        }
+      }
     },
     {
       "id": "DLH-CONN-abbfa0c22ce3",
       "origin": "DLH-X-INGRESS-CONTROLLER",
       "target": "DLH-R-VAULT",
       "label": "routes Vault UI traffic when enabled",
-      "direction": "outgoing"
+      "direction": "outgoing",
+      "layout": {
+        "runtime": {
+          "originConnector": "right-middle",
+          "targetConnector": "right-middle",
+          "points": [
+            {
+              "x": 696,
+              "y": -836
+            },
+            {
+              "x": 696,
+              "y": 0
+            },
+            {
+              "x": 336,
+              "y": 0
+            },
+            {
+              "x": 336,
+              "y": 184
+            }
+          ],
+          "lineShape": "square",
+          "labelPosition": 65
+        },
+        "runtime-identity-access-secrets": {
+          "originConnector": "right-middle",
+          "targetConnector": "left-middle",
+          "points": [
+            {
+              "x": 296,
+              "y": -476
+            },
+            {
+              "x": 348,
+              "y": -476
+            },
+            {
+              "x": 348,
+              "y": 464
+            },
+            {
+              "x": 400,
+              "y": 464
+            }
+          ],
+          "lineShape": "square",
+          "labelPosition": 65
+        }
+      }
     },
     {
       "id": "DLH-CONN-411e11cda1cf",
       "origin": "DLH-R-PLATFORM-HOME",
       "target": "DLH-R-KEYCLOAK",
       "label": "authenticates portal users with bundled Keycloak",
-      "direction": "outgoing"
+      "direction": "outgoing",
+      "layout": {
+        "runtime": {
+          "originConnector": "right-middle",
+          "targetConnector": "top-center",
+          "points": [
+            {
+              "x": 336,
+              "y": -516
+            },
+            {
+              "x": 372,
+              "y": -516
+            },
+            {
+              "x": 372,
+              "y": -240
+            },
+            {
+              "x": 408,
+              "y": -240
+            }
+          ],
+          "lineShape": "square",
+          "labelPosition": 40
+        },
+        "runtime-identity-access-secrets": {
+          "originConnector": "left-middle",
+          "targetConnector": "right-middle",
+          "points": [
+            {
+              "x": 760,
+              "y": -296
+            },
+            {
+              "x": 708,
+              "y": -296
+            },
+            {
+              "x": 708,
+              "y": 144
+            },
+            {
+              "x": 656,
+              "y": 144
+            }
+          ],
+          "lineShape": "square",
+          "labelPosition": 40
+        }
+      }
     },
     {
       "id": "DLH-CONN-d24d6980b58a",
       "origin": "DLH-R-AUTH-PROXIES",
       "target": "DLH-R-KEYCLOAK",
       "label": "validates sessions when bundled Keycloak is used",
-      "direction": "outgoing"
+      "direction": "outgoing",
+      "layout": {
+        "runtime": {
+          "originConnector": "left-middle",
+          "targetConnector": "top-center",
+          "points": [
+            {
+              "x": 420,
+              "y": -516
+            },
+            {
+              "x": 414,
+              "y": -516
+            },
+            {
+              "x": 414,
+              "y": -240
+            },
+            {
+              "x": 408,
+              "y": -240
+            }
+          ],
+          "lineShape": "square",
+          "labelPosition": 49
+        },
+        "runtime-identity-access-secrets": {
+          "originConnector": "left-middle",
+          "targetConnector": "right-middle",
+          "points": [
+            {
+              "x": 760,
+              "y": -96
+            },
+            {
+              "x": 708,
+              "y": -96
+            },
+            {
+              "x": 708,
+              "y": 144
+            },
+            {
+              "x": 656,
+              "y": 144
+            }
+          ],
+          "lineShape": "square",
+          "labelPosition": 49
+        }
+      }
     },
     {
       "id": "DLH-CONN-b3fbbe0194af",
       "origin": "DLH-R-AUTH-PROXIES",
       "target": "DLH-X-OIDC",
       "label": "validates sessions when external OIDC is used",
-      "direction": "outgoing"
+      "direction": "outgoing",
+      "layout": {
+        "runtime": {
+          "originConnector": "right-middle",
+          "targetConnector": "left-middle",
+          "points": [
+            {
+              "x": 676,
+              "y": -516
+            },
+            {
+              "x": 796,
+              "y": -516
+            },
+            {
+              "x": 796,
+              "y": -836
+            },
+            {
+              "x": 900,
+              "y": -836
+            }
+          ],
+          "lineShape": "square",
+          "labelPosition": 58
+        },
+        "runtime-identity-access-secrets": {
+          "originConnector": "left-middle",
+          "targetConnector": "right-middle",
+          "points": [
+            {
+              "x": 760,
+              "y": -96
+            },
+            {
+              "x": 640,
+              "y": -96
+            },
+            {
+              "x": 640,
+              "y": 24
+            },
+            {
+              "x": 296,
+              "y": 24
+            }
+          ],
+          "lineShape": "square",
+          "labelPosition": 58
+        }
+      }
     },
     {
       "id": "DLH-CONN-67f9aa9cac26",
       "origin": "DLH-R-TRINO",
       "target": "DLH-R-KEYCLOAK",
       "label": "authenticates users when bundled Keycloak is used",
-      "direction": "outgoing"
+      "direction": "outgoing",
+      "layout": {
+        "runtime": {
+          "originConnector": "left-middle",
+          "targetConnector": "right-middle",
+          "points": [
+            {
+              "x": 780,
+              "y": 424
+            },
+            {
+              "x": 660,
+              "y": 424
+            },
+            {
+              "x": 660,
+              "y": -176
+            },
+            {
+              "x": 536,
+              "y": -176
+            }
+          ],
+          "lineShape": "square",
+          "labelPosition": 67
+        }
+      }
     },
     {
       "id": "DLH-CONN-030da6dc6c4d",
       "origin": "DLH-R-TRINO",
       "target": "DLH-X-OIDC",
       "label": "authenticates users when external OIDC is used",
-      "direction": "outgoing"
+      "direction": "outgoing",
+      "layout": {
+        "runtime": {
+          "originConnector": "right-middle",
+          "targetConnector": "right-middle",
+          "points": [
+            {
+              "x": 1036,
+              "y": 424
+            },
+            {
+              "x": 1156,
+              "y": 424
+            },
+            {
+              "x": 1156,
+              "y": -836
+            }
+          ],
+          "lineShape": "square",
+          "labelPosition": 42
+        }
+      }
     },
     {
       "id": "DLH-CONN-c3ea27dbcc27",
       "origin": "DLH-R-JUPYTERHUB",
       "target": "DLH-R-KEYCLOAK",
       "label": "authenticates notebook users when bundled Keycloak is used",
-      "direction": "outgoing"
+      "direction": "outgoing",
+      "layout": {
+        "runtime": {
+          "originConnector": "left-middle",
+          "targetConnector": "right-middle",
+          "points": [
+            {
+              "x": 1180,
+              "y": -356
+            },
+            {
+              "x": 1060,
+              "y": -356
+            },
+            {
+              "x": 1060,
+              "y": -176
+            },
+            {
+              "x": 536,
+              "y": -176
+            }
+          ],
+          "lineShape": "square",
+          "labelPosition": 51
+        }
+      }
     },
     {
       "id": "DLH-CONN-824f698b74af",
       "origin": "DLH-R-JUPYTERHUB",
       "target": "DLH-X-OIDC",
       "label": "authenticates notebook users when external OIDC is used",
-      "direction": "outgoing"
+      "direction": "outgoing",
+      "layout": {
+        "runtime": {
+          "originConnector": "left-middle",
+          "targetConnector": "bottom-center",
+          "points": [
+            {
+              "x": 1180,
+              "y": -356
+            },
+            {
+              "x": 1060,
+              "y": -356
+            },
+            {
+              "x": 1060,
+              "y": -772
+            },
+            {
+              "x": 1028,
+              "y": -772
+            }
+          ],
+          "lineShape": "square",
+          "labelPosition": 60
+        }
+      }
     },
     {
       "id": "DLH-CONN-38549f74bfdc",
       "origin": "DLH-R-SUPERSET",
       "target": "DLH-R-KEYCLOAK",
       "label": "authenticates dashboard users when bundled Keycloak is used",
-      "direction": "outgoing"
+      "direction": "outgoing",
+      "layout": {
+        "runtime": {
+          "originConnector": "left-middle",
+          "targetConnector": "right-middle",
+          "points": [
+            {
+              "x": 1180,
+              "y": -556
+            },
+            {
+              "x": 1060,
+              "y": -556
+            },
+            {
+              "x": 1060,
+              "y": -176
+            },
+            {
+              "x": 536,
+              "y": -176
+            }
+          ],
+          "lineShape": "square",
+          "labelPosition": 69
+        }
+      }
     },
     {
       "id": "DLH-CONN-0731d755aa25",
       "origin": "DLH-R-SUPERSET",
       "target": "DLH-X-OIDC",
       "label": "authenticates dashboard users when external OIDC is used",
-      "direction": "outgoing"
+      "direction": "outgoing",
+      "layout": {
+        "runtime": {
+          "originConnector": "left-middle",
+          "targetConnector": "right-middle",
+          "points": [
+            {
+              "x": 1180,
+              "y": -556
+            },
+            {
+              "x": 1168,
+              "y": -556
+            },
+            {
+              "x": 1168,
+              "y": -836
+            },
+            {
+              "x": 1156,
+              "y": -836
+            }
+          ],
+          "lineShape": "square",
+          "labelPosition": 44
+        }
+      }
     },
     {
       "id": "DLH-CONN-b14d80587c29",
       "origin": "DLH-R-DATAHUB",
       "target": "DLH-R-KEYCLOAK",
       "label": "authenticates catalog users when bundled Keycloak is used",
-      "direction": "outgoing"
+      "direction": "outgoing",
+      "layout": {
+        "runtime": {
+          "originConnector": "left-middle",
+          "targetConnector": "right-middle",
+          "points": [
+            {
+              "x": 1180,
+              "y": 284
+            },
+            {
+              "x": 1060,
+              "y": 284
+            },
+            {
+              "x": 1060,
+              "y": -176
+            },
+            {
+              "x": 536,
+              "y": -176
+            }
+          ],
+          "lineShape": "square",
+          "labelPosition": 53
+        }
+      }
     },
     {
       "id": "DLH-CONN-6e0b6f38d79c",
       "origin": "DLH-R-DATAHUB",
       "target": "DLH-X-OIDC",
       "label": "authenticates catalog users when external OIDC is used",
-      "direction": "outgoing"
+      "direction": "outgoing",
+      "layout": {
+        "runtime": {
+          "originConnector": "left-middle",
+          "targetConnector": "right-middle",
+          "points": [
+            {
+              "x": 1180,
+              "y": 284
+            },
+            {
+              "x": 1180,
+              "y": 100
+            },
+            {
+              "x": 1156,
+              "y": 100
+            },
+            {
+              "x": 1156,
+              "y": -836
+            }
+          ],
+          "lineShape": "square",
+          "labelPosition": 62
+        }
+      }
     },
     {
       "id": "DLH-CONN-bc09b01dd50e",
       "origin": "DLH-R-VAULT",
       "target": "DLH-R-KEYCLOAK",
       "label": "authenticates Vault users when bundled Keycloak is used",
-      "direction": "outgoing"
+      "direction": "outgoing",
+      "layout": {
+        "runtime": {
+          "originConnector": "right-middle",
+          "targetConnector": "bottom-center",
+          "points": [
+            {
+              "x": 336,
+              "y": 184
+            },
+            {
+              "x": 372,
+              "y": 184
+            },
+            {
+              "x": 372,
+              "y": -112
+            },
+            {
+              "x": 408,
+              "y": -112
+            }
+          ],
+          "lineShape": "square",
+          "labelPosition": 71
+        },
+        "runtime-identity-access-secrets": {
+          "originConnector": "top-center",
+          "targetConnector": "bottom-center",
+          "points": [
+            {
+              "x": 528,
+              "y": 400
+            },
+            {
+              "x": 528,
+              "y": 208
+            }
+          ],
+          "lineShape": "square",
+          "labelPosition": 67
+        }
+      }
     },
     {
       "id": "DLH-CONN-77220a26e766",
       "origin": "DLH-R-VAULT",
       "target": "DLH-X-OIDC",
       "label": "authenticates Vault users when external OIDC is used",
-      "direction": "outgoing"
+      "direction": "outgoing",
+      "layout": {
+        "runtime": {
+          "originConnector": "right-middle",
+          "targetConnector": "left-middle",
+          "points": [
+            {
+              "x": 336,
+              "y": 184
+            },
+            {
+              "x": 336,
+              "y": 0
+            },
+            {
+              "x": 900,
+              "y": 0
+            },
+            {
+              "x": 900,
+              "y": -836
+            }
+          ],
+          "lineShape": "square",
+          "labelPosition": 46
+        },
+        "runtime-identity-access-secrets": {
+          "originConnector": "left-middle",
+          "targetConnector": "right-middle",
+          "points": [
+            {
+              "x": 400,
+              "y": 464
+            },
+            {
+              "x": 348,
+              "y": 464
+            },
+            {
+              "x": 348,
+              "y": 24
+            },
+            {
+              "x": 296,
+              "y": 24
+            }
+          ],
+          "lineShape": "square",
+          "labelPosition": 42
+        }
+      }
     },
     {
       "id": "DLH-CONN-272141bdee94",
       "origin": "DLH-R-KEYCLOAK",
       "target": "DLH-X-LDAP",
       "label": "federates users and groups when external LDAP is configured",
-      "direction": "outgoing"
+      "direction": "outgoing",
+      "layout": {
+        "runtime": {
+          "originConnector": "left-middle",
+          "targetConnector": "right-middle",
+          "points": [
+            {
+              "x": 280,
+              "y": -176
+            },
+            {
+              "x": 160,
+              "y": -176
+            },
+            {
+              "x": 160,
+              "y": -356
+            },
+            {
+              "x": -64,
+              "y": -356
+            }
+          ],
+          "lineShape": "square",
+          "labelPosition": 55
+        },
+        "runtime-identity-access-secrets": {
+          "originConnector": "left-middle",
+          "targetConnector": "right-middle",
+          "points": [
+            {
+              "x": 400,
+              "y": 144
+            },
+            {
+              "x": 348,
+              "y": 144
+            },
+            {
+              "x": 348,
+              "y": 244
+            },
+            {
+              "x": 296,
+              "y": 244
+            }
+          ],
+          "lineShape": "square",
+          "labelPosition": 51
+        }
+      }
     },
     {
       "id": "DLH-CONN-6a7abef7e654",
       "origin": "DLH-R-KEYCLOAK",
       "target": "DLH-R-KEYCLOAK-DB",
       "label": "persists identity state",
-      "direction": "outgoing"
+      "direction": "outgoing",
+      "layout": {
+        "runtime": {
+          "originConnector": "top-center",
+          "targetConnector": "right-middle",
+          "points": [
+            {
+              "x": 408,
+              "y": -240
+            },
+            {
+              "x": 408,
+              "y": -1220
+            },
+            {
+              "x": 2100,
+              "y": -1220
+            },
+            {
+              "x": 2100,
+              "y": -276
+            },
+            {
+              "x": 1816,
+              "y": -276
+            }
+          ],
+          "lineShape": "square",
+          "labelPosition": 64
+        },
+        "runtime-identity-access-secrets": {
+          "originConnector": "right-middle",
+          "targetConnector": "left-middle",
+          "points": [
+            {
+              "x": 656,
+              "y": 144
+            },
+            {
+              "x": 1120,
+              "y": 144
+            }
+          ],
+          "lineShape": "square",
+          "labelPosition": 60
+        }
+      }
     },
     {
       "id": "DLH-CONN-625e85abf0d7",
       "origin": "DLH-X-SECRET-SYNC",
       "target": "DLH-R-VAULT",
       "label": "reads selected secrets when included Vault is used",
-      "direction": "outgoing"
+      "direction": "outgoing",
+      "layout": {
+        "runtime": {
+          "originConnector": "right-middle",
+          "targetConnector": "left-middle",
+          "points": [
+            {
+              "x": -64,
+              "y": 184
+            },
+            {
+              "x": 80,
+              "y": 184
+            }
+          ],
+          "lineShape": "square",
+          "labelPosition": 39
+        },
+        "runtime-identity-access-secrets": {
+          "originConnector": "right-middle",
+          "targetConnector": "left-middle",
+          "points": [
+            {
+              "x": 296,
+              "y": 524
+            },
+            {
+              "x": 348,
+              "y": 524
+            },
+            {
+              "x": 348,
+              "y": 464
+            },
+            {
+              "x": 400,
+              "y": 464
+            }
+          ],
+          "lineShape": "square",
+          "labelPosition": 69
+        }
+      }
     },
     {
       "id": "DLH-CONN-2bd12107285d",
       "origin": "DLH-X-SECRET-SYNC",
       "target": "DLH-R-KEYCLOAK",
       "label": "provides Kubernetes Secrets",
-      "direction": "outgoing"
+      "direction": "outgoing",
+      "layout": {
+        "runtime": {
+          "originConnector": "right-middle",
+          "targetConnector": "left-middle",
+          "points": [
+            {
+              "x": -64,
+              "y": 184
+            },
+            {
+              "x": 56,
+              "y": 184
+            },
+            {
+              "x": 56,
+              "y": -176
+            },
+            {
+              "x": 280,
+              "y": -176
+            }
+          ],
+          "lineShape": "square",
+          "labelPosition": 48
+        },
+        "runtime-identity-access-secrets": {
+          "originConnector": "right-middle",
+          "targetConnector": "left-middle",
+          "points": [
+            {
+              "x": 296,
+              "y": 524
+            },
+            {
+              "x": 348,
+              "y": 524
+            },
+            {
+              "x": 348,
+              "y": 144
+            },
+            {
+              "x": 400,
+              "y": 144
+            }
+          ],
+          "lineShape": "square",
+          "labelPosition": 44
+        }
+      }
     },
     {
       "id": "DLH-CONN-6ec5b06035b3",
       "origin": "DLH-X-SECRET-SYNC",
       "target": "DLH-R-RANGER",
       "label": "provides Kubernetes Secrets",
-      "direction": "outgoing"
+      "direction": "outgoing",
+      "layout": {
+        "runtime": {
+          "originConnector": "right-middle",
+          "targetConnector": "top-center",
+          "points": [
+            {
+              "x": -64,
+              "y": 184
+            },
+            {
+              "x": 56,
+              "y": 184
+            },
+            {
+              "x": 56,
+              "y": 80
+            },
+            {
+              "x": 908,
+              "y": 80
+            }
+          ],
+          "lineShape": "square",
+          "labelPosition": 57
+        },
+        "runtime-identity-access-secrets": {
+          "originConnector": "right-middle",
+          "targetConnector": "left-middle",
+          "points": [
+            {
+              "x": 296,
+              "y": 524
+            },
+            {
+              "x": 296,
+              "y": 340
+            },
+            {
+              "x": 760,
+              "y": 340
+            },
+            {
+              "x": 760,
+              "y": 324
+            }
+          ],
+          "lineShape": "square",
+          "labelPosition": 53
+        }
+      }
     },
     {
       "id": "DLH-CONN-c2e18523321c",
       "origin": "DLH-X-SECRET-SYNC",
       "target": "DLH-R-TRINO",
       "label": "provides Kubernetes Secrets",
-      "direction": "outgoing"
+      "direction": "outgoing",
+      "layout": {
+        "runtime": {
+          "originConnector": "right-middle",
+          "targetConnector": "left-middle",
+          "points": [
+            {
+              "x": -64,
+              "y": 184
+            },
+            {
+              "x": -64,
+              "y": 304
+            },
+            {
+              "x": 780,
+              "y": 304
+            },
+            {
+              "x": 780,
+              "y": 424
+            }
+          ],
+          "lineShape": "square",
+          "labelPosition": 66
+        }
+      }
     },
     {
       "id": "DLH-CONN-96ee74cbd7f7",
       "origin": "DLH-X-SECRET-SYNC",
       "target": "DLH-R-HIVE",
       "label": "provides Kubernetes Secrets",
-      "direction": "outgoing"
+      "direction": "outgoing",
+      "layout": {
+        "runtime": {
+          "originConnector": "right-middle",
+          "targetConnector": "left-middle",
+          "points": [
+            {
+              "x": -64,
+              "y": 184
+            },
+            {
+              "x": 56,
+              "y": 184
+            },
+            {
+              "x": 56,
+              "y": 424
+            },
+            {
+              "x": 380,
+              "y": 424
+            }
+          ],
+          "lineShape": "square",
+          "labelPosition": 41
+        }
+      }
     },
     {
       "id": "DLH-CONN-6f9fd747c068",
       "origin": "DLH-X-SECRET-SYNC",
       "target": "DLH-R-PREFECT-SERVER",
       "label": "provides Kubernetes Secrets",
-      "direction": "outgoing"
+      "direction": "outgoing",
+      "layout": {
+        "runtime": {
+          "originConnector": "right-middle",
+          "targetConnector": "top-center",
+          "points": [
+            {
+              "x": -64,
+              "y": 184
+            },
+            {
+              "x": 56,
+              "y": 184
+            },
+            {
+              "x": 56,
+              "y": 560
+            },
+            {
+              "x": 1308,
+              "y": 560
+            }
+          ],
+          "lineShape": "square",
+          "labelPosition": 50
+        }
+      }
     },
     {
       "id": "DLH-CONN-d4aee4269cc7",
       "origin": "DLH-R-RANGER",
       "target": "DLH-R-RANGER-DB",
       "label": "persists policies and audit",
-      "direction": "outgoing"
+      "direction": "outgoing",
+      "layout": {
+        "runtime": {
+          "originConnector": "left-middle",
+          "targetConnector": "right-middle",
+          "points": [
+            {
+              "x": 780,
+              "y": 144
+            },
+            {
+              "x": 780,
+              "y": -1240
+            },
+            {
+              "x": 2516,
+              "y": -1240
+            },
+            {
+              "x": 2516,
+              "y": -96
+            },
+            {
+              "x": 1816,
+              "y": -96
+            }
+          ],
+          "lineShape": "square",
+          "labelPosition": 59
+        },
+        "runtime-identity-access-secrets": {
+          "originConnector": "right-middle",
+          "targetConnector": "left-middle",
+          "points": [
+            {
+              "x": 1016,
+              "y": 324
+            },
+            {
+              "x": 1120,
+              "y": 324
+            }
+          ],
+          "lineShape": "square",
+          "labelPosition": 62
+        }
+      }
     },
     {
       "id": "DLH-CONN-a22353e1f659",
       "origin": "DLH-R-TRINO",
       "target": "DLH-R-RANGER",
       "label": "checks authorization and masking",
-      "direction": "outgoing"
+      "direction": "outgoing",
+      "layout": {
+        "runtime": {
+          "originConnector": "top-center",
+          "targetConnector": "bottom-center",
+          "points": [
+            {
+              "x": 908,
+              "y": 360
+            },
+            {
+              "x": 908,
+              "y": 208
+            }
+          ],
+          "lineShape": "square",
+          "labelPosition": 68
+        },
+        "runtime-data-analysis-orchestration": {
+          "originConnector": "left-middle",
+          "targetConnector": "right-middle",
+          "points": [
+            {
+              "x": 760,
+              "y": 244
+            },
+            {
+              "x": 718,
+              "y": 244
+            },
+            {
+              "x": 718,
+              "y": -56
+            },
+            {
+              "x": 676,
+              "y": -56
+            }
+          ],
+          "lineShape": "square",
+          "labelPosition": 38
+        }
+      }
     },
     {
       "id": "DLH-CONN-039a8f0edc58",
       "origin": "DLH-R-TRINO",
       "target": "DLH-R-HIVE",
       "label": "reads table metadata",
-      "direction": "outgoing"
+      "direction": "outgoing",
+      "layout": {
+        "runtime": {
+          "originConnector": "left-middle",
+          "targetConnector": "right-middle",
+          "points": [
+            {
+              "x": 780,
+              "y": 424
+            },
+            {
+              "x": 636,
+              "y": 424
+            }
+          ],
+          "lineShape": "square",
+          "labelPosition": 43
+        },
+        "runtime-data-analysis-orchestration": {
+          "originConnector": "left-middle",
+          "targetConnector": "right-middle",
+          "points": [
+            {
+              "x": 760,
+              "y": 244
+            },
+            {
+              "x": 676,
+              "y": 244
+            }
+          ],
+          "lineShape": "square",
+          "labelPosition": 47
+        }
+      }
     },
     {
       "id": "DLH-CONN-8daaf23c95e3",
       "origin": "DLH-R-HIVE",
       "target": "DLH-R-HIVE-DB",
       "label": "persists metastore data",
-      "direction": "outgoing"
+      "direction": "outgoing",
+      "layout": {
+        "runtime": {
+          "originConnector": "right-middle",
+          "targetConnector": "left-middle",
+          "points": [
+            {
+              "x": 636,
+              "y": 424
+            },
+            {
+              "x": 636,
+              "y": 988
+            },
+            {
+              "x": 1560,
+              "y": 988
+            },
+            {
+              "x": 1560,
+              "y": 804
+            }
+          ],
+          "lineShape": "square",
+          "labelPosition": 52
+        },
+        "runtime-data-analysis-orchestration": {
+          "originConnector": "right-middle",
+          "targetConnector": "left-middle",
+          "points": [
+            {
+              "x": 676,
+              "y": 244
+            },
+            {
+              "x": 676,
+              "y": 60
+            },
+            {
+              "x": 1460,
+              "y": 60
+            },
+            {
+              "x": 1460,
+              "y": 244
+            }
+          ],
+          "lineShape": "square",
+          "labelPosition": 56
+        }
+      }
     },
     {
       "id": "DLH-CONN-2e9939a757df",
       "origin": "DLH-R-TRINO",
       "target": "DLH-R-MINIO",
       "label": "reads and writes objects when MinIO is enabled",
-      "direction": "outgoing"
+      "direction": "outgoing",
+      "layout": {
+        "runtime": {
+          "originConnector": "bottom-center",
+          "targetConnector": "top-center",
+          "points": [
+            {
+              "x": 908,
+              "y": 488
+            },
+            {
+              "x": 908,
+              "y": 620
+            }
+          ],
+          "lineShape": "square",
+          "labelPosition": 61
+        },
+        "runtime-data-analysis-orchestration": {
+          "originConnector": "bottom-center",
+          "targetConnector": "top-center",
+          "points": [
+            {
+              "x": 888,
+              "y": 308
+            },
+            {
+              "x": 888,
+              "y": 420
+            }
+          ],
+          "lineShape": "square",
+          "labelPosition": 65
+        }
+      }
     },
     {
       "id": "DLH-CONN-a8ddab3e123d",
       "origin": "DLH-R-TRINO",
       "target": "DLH-X-OBJECT-STORAGE",
       "label": "reads and writes objects when external S3 is used",
-      "direction": "outgoing"
+      "direction": "outgoing",
+      "layout": {
+        "runtime": {
+          "originConnector": "left-middle",
+          "targetConnector": "right-middle",
+          "points": [
+            {
+              "x": 780,
+              "y": 424
+            },
+            {
+              "x": 660,
+              "y": 424
+            },
+            {
+              "x": 660,
+              "y": 704
+            },
+            {
+              "x": -64,
+              "y": 704
+            }
+          ],
+          "lineShape": "square",
+          "labelPosition": 70
+        },
+        "runtime-data-analysis-orchestration": {
+          "originConnector": "bottom-center",
+          "targetConnector": "bottom-center",
+          "points": [
+            {
+              "x": 888,
+              "y": 308
+            },
+            {
+              "x": 888,
+              "y": 328
+            },
+            {
+              "x": 168,
+              "y": 328
+            },
+            {
+              "x": 168,
+              "y": 348
+            }
+          ],
+          "lineShape": "square",
+          "labelPosition": 40
+        }
+      }
     },
     {
       "id": "DLH-CONN-6f0ac516b52b",
       "origin": "DLH-R-HIVE",
       "target": "DLH-R-MINIO",
       "label": "uses object storage for table data when MinIO is enabled",
-      "direction": "outgoing"
+      "direction": "outgoing",
+      "layout": {
+        "runtime": {
+          "originConnector": "right-middle",
+          "targetConnector": "left-middle",
+          "points": [
+            {
+              "x": 636,
+              "y": 424
+            },
+            {
+              "x": 756,
+              "y": 424
+            },
+            {
+              "x": 756,
+              "y": 684
+            },
+            {
+              "x": 780,
+              "y": 684
+            }
+          ],
+          "lineShape": "square",
+          "labelPosition": 45
+        },
+        "runtime-data-analysis-orchestration": {
+          "originConnector": "right-middle",
+          "targetConnector": "left-middle",
+          "points": [
+            {
+              "x": 676,
+              "y": 244
+            },
+            {
+              "x": 718,
+              "y": 244
+            },
+            {
+              "x": 718,
+              "y": 484
+            },
+            {
+              "x": 760,
+              "y": 484
+            }
+          ],
+          "lineShape": "square",
+          "labelPosition": 49
+        }
+      }
     },
     {
       "id": "DLH-CONN-ffef0c195d36",
       "origin": "DLH-R-HIVE",
       "target": "DLH-X-OBJECT-STORAGE",
       "label": "uses object storage for table data when external S3 is used",
-      "direction": "outgoing"
+      "direction": "outgoing",
+      "layout": {
+        "runtime": {
+          "originConnector": "left-middle",
+          "targetConnector": "right-middle",
+          "points": [
+            {
+              "x": 380,
+              "y": 424
+            },
+            {
+              "x": 260,
+              "y": 424
+            },
+            {
+              "x": 260,
+              "y": 704
+            },
+            {
+              "x": -64,
+              "y": 704
+            }
+          ],
+          "lineShape": "square",
+          "labelPosition": 54
+        },
+        "runtime-data-analysis-orchestration": {
+          "originConnector": "left-middle",
+          "targetConnector": "right-middle",
+          "points": [
+            {
+              "x": 420,
+              "y": 244
+            },
+            {
+              "x": 300,
+              "y": 244
+            },
+            {
+              "x": 300,
+              "y": 284
+            },
+            {
+              "x": 296,
+              "y": 284
+            }
+          ],
+          "lineShape": "square",
+          "labelPosition": 58
+        }
+      }
     },
     {
       "id": "DLH-CONN-ac2236ad538d",
       "origin": "DLH-R-SUPERSET",
       "target": "DLH-R-TRINO",
       "label": "queries governed datasets",
-      "direction": "outgoing"
+      "direction": "outgoing",
+      "layout": {
+        "runtime": {
+          "originConnector": "left-middle",
+          "targetConnector": "right-middle",
+          "points": [
+            {
+              "x": 1180,
+              "y": -556
+            },
+            {
+              "x": 1060,
+              "y": -556
+            },
+            {
+              "x": 1060,
+              "y": 424
+            },
+            {
+              "x": 1036,
+              "y": 424
+            }
+          ],
+          "lineShape": "square",
+          "labelPosition": 63
+        },
+        "runtime-data-analysis-orchestration": {
+          "originConnector": "left-middle",
+          "targetConnector": "right-middle",
+          "points": [
+            {
+              "x": 1100,
+              "y": -456
+            },
+            {
+              "x": 1058,
+              "y": -456
+            },
+            {
+              "x": 1058,
+              "y": 244
+            },
+            {
+              "x": 1016,
+              "y": 244
+            }
+          ],
+          "lineShape": "square",
+          "labelPosition": 67
+        }
+      }
     },
     {
       "id": "DLH-CONN-818309eaed79",
       "origin": "DLH-R-SUPERSET",
       "target": "DLH-R-SUPERSET-DB",
       "label": "persists dashboards",
-      "direction": "outgoing"
+      "direction": "outgoing",
+      "layout": {
+        "runtime": {
+          "originConnector": "right-middle",
+          "targetConnector": "left-middle",
+          "points": [
+            {
+              "x": 1436,
+              "y": -556
+            },
+            {
+              "x": 1556,
+              "y": -556
+            },
+            {
+              "x": 1556,
+              "y": -636
+            },
+            {
+              "x": 1560,
+              "y": -636
+            }
+          ],
+          "lineShape": "square",
+          "labelPosition": 38
+        },
+        "runtime-data-analysis-orchestration": {
+          "originConnector": "right-middle",
+          "targetConnector": "left-middle",
+          "points": [
+            {
+              "x": 1356,
+              "y": -456
+            },
+            {
+              "x": 1460,
+              "y": -456
+            }
+          ],
+          "lineShape": "square",
+          "labelPosition": 42
+        }
+      }
     },
     {
       "id": "DLH-CONN-ca6aff52b7f7",
       "origin": "DLH-R-SUPERSET",
       "target": "DLH-R-SUPERSET-REDIS",
       "label": "uses cache and queue",
-      "direction": "outgoing"
+      "direction": "outgoing",
+      "layout": {
+        "runtime": {
+          "originConnector": "right-middle",
+          "targetConnector": "left-middle",
+          "points": [
+            {
+              "x": 1436,
+              "y": -556
+            },
+            {
+              "x": 1440,
+              "y": -556
+            },
+            {
+              "x": 1440,
+              "y": -456
+            },
+            {
+              "x": 1560,
+              "y": -456
+            }
+          ],
+          "lineShape": "square",
+          "labelPosition": 47
+        },
+        "runtime-data-analysis-orchestration": {
+          "originConnector": "right-middle",
+          "targetConnector": "left-middle",
+          "points": [
+            {
+              "x": 1356,
+              "y": -456
+            },
+            {
+              "x": 1408,
+              "y": -456
+            },
+            {
+              "x": 1408,
+              "y": -276
+            },
+            {
+              "x": 1460,
+              "y": -276
+            }
+          ],
+          "lineShape": "square",
+          "labelPosition": 51
+        }
+      }
     },
     {
       "id": "DLH-CONN-15316390f89b",
       "origin": "DLH-R-JUPYTERHUB",
       "target": "DLH-R-JUPYTER-PODS",
       "label": "spawns notebook servers",
-      "direction": "outgoing"
+      "direction": "outgoing",
+      "layout": {
+        "runtime": {
+          "originConnector": "bottom-center",
+          "targetConnector": "top-center",
+          "points": [
+            {
+              "x": 1308,
+              "y": -292
+            },
+            {
+              "x": 1308,
+              "y": -240
+            }
+          ],
+          "lineShape": "square",
+          "labelPosition": 56
+        },
+        "runtime-data-analysis-orchestration": {
+          "originConnector": "bottom-center",
+          "targetConnector": "top-center",
+          "points": [
+            {
+              "x": 1228,
+              "y": -192
+            },
+            {
+              "x": 1228,
+              "y": -120
+            }
+          ],
+          "lineShape": "square",
+          "labelPosition": 60
+        }
+      }
     },
     {
       "id": "DLH-CONN-f5903d55a90e",
       "origin": "DLH-R-JUPYTER-PODS",
       "target": "DLH-R-TRINO",
       "label": "queries governed datasets",
-      "direction": "outgoing"
+      "direction": "outgoing",
+      "layout": {
+        "runtime": {
+          "originConnector": "left-middle",
+          "targetConnector": "right-middle",
+          "points": [
+            {
+              "x": 1180,
+              "y": -176
+            },
+            {
+              "x": 1060,
+              "y": -176
+            },
+            {
+              "x": 1060,
+              "y": 424
+            },
+            {
+              "x": 1036,
+              "y": 424
+            }
+          ],
+          "lineShape": "square",
+          "labelPosition": 65
+        },
+        "runtime-data-analysis-orchestration": {
+          "originConnector": "left-middle",
+          "targetConnector": "right-middle",
+          "points": [
+            {
+              "x": 1100,
+              "y": -56
+            },
+            {
+              "x": 1058,
+              "y": -56
+            },
+            {
+              "x": 1058,
+              "y": 244
+            },
+            {
+              "x": 1016,
+              "y": 244
+            }
+          ],
+          "lineShape": "square",
+          "labelPosition": 69
+        }
+      }
     },
     {
       "id": "DLH-CONN-86e1d2c17336",
       "origin": "DLH-R-CLOUDBEAVER",
       "target": "DLH-R-TRINO",
       "label": "queries governed datasets",
-      "direction": "outgoing"
+      "direction": "outgoing",
+      "layout": {
+        "runtime": {
+          "originConnector": "left-middle",
+          "targetConnector": "right-middle",
+          "points": [
+            {
+              "x": 1180,
+              "y": 4
+            },
+            {
+              "x": 1060,
+              "y": 4
+            },
+            {
+              "x": 1060,
+              "y": 424
+            },
+            {
+              "x": 1036,
+              "y": 424
+            }
+          ],
+          "lineShape": "square",
+          "labelPosition": 40
+        },
+        "runtime-data-analysis-orchestration": {
+          "originConnector": "left-middle",
+          "targetConnector": "right-middle",
+          "points": [
+            {
+              "x": 1100,
+              "y": 144
+            },
+            {
+              "x": 1058,
+              "y": 144
+            },
+            {
+              "x": 1058,
+              "y": 244
+            },
+            {
+              "x": 1016,
+              "y": 244
+            }
+          ],
+          "lineShape": "square",
+          "labelPosition": 44
+        }
+      }
     },
     {
       "id": "DLH-CONN-fd2fb5d5e29f",
       "origin": "DLH-X-PIPELINE-CODE",
       "target": "DLH-R-PREFECT-SERVER",
       "label": "registers reviewed deployments",
-      "direction": "outgoing"
+      "direction": "outgoing",
+      "layout": {
+        "runtime": {
+          "originConnector": "top-center",
+          "targetConnector": "top-center",
+          "points": [
+            {
+              "x": 2088,
+              "y": 520
+            },
+            {
+              "x": 2088,
+              "y": 540
+            },
+            {
+              "x": 1308,
+              "y": 540
+            },
+            {
+              "x": 1308,
+              "y": 560
+            }
+          ],
+          "lineShape": "square",
+          "labelPosition": 49
+        },
+        "runtime-data-analysis-orchestration": {
+          "originConnector": "right-middle",
+          "targetConnector": "left-middle",
+          "points": [
+            {
+              "x": 296,
+              "y": 584
+            },
+            {
+              "x": 416,
+              "y": 584
+            },
+            {
+              "x": 416,
+              "y": 684
+            },
+            {
+              "x": 1100,
+              "y": 684
+            }
+          ],
+          "lineShape": "square",
+          "labelPosition": 53
+        }
+      }
     },
     {
       "id": "DLH-CONN-e20c2ca39665",
       "origin": "DLH-R-PREFECT-SERVER",
       "target": "DLH-R-PREFECT-DB",
       "label": "persists orchestration state",
-      "direction": "outgoing"
+      "direction": "outgoing",
+      "layout": {
+        "runtime": {
+          "originConnector": "right-middle",
+          "targetConnector": "left-middle",
+          "points": [
+            {
+              "x": 1436,
+              "y": 624
+            },
+            {
+              "x": 1560,
+              "y": 624
+            }
+          ],
+          "lineShape": "square",
+          "labelPosition": 58
+        },
+        "runtime-data-analysis-orchestration": {
+          "originConnector": "right-middle",
+          "targetConnector": "left-middle",
+          "points": [
+            {
+              "x": 1356,
+              "y": 684
+            },
+            {
+              "x": 1460,
+              "y": 684
+            }
+          ],
+          "lineShape": "square",
+          "labelPosition": 62
+        }
+      }
     },
     {
       "id": "DLH-CONN-1d3e92479aee",
       "origin": "DLH-R-PREFECT-WORKER",
       "target": "DLH-R-PREFECT-SERVER",
       "label": "polls for flow runs",
-      "direction": "outgoing"
+      "direction": "outgoing",
+      "layout": {
+        "runtime": {
+          "originConnector": "top-center",
+          "targetConnector": "bottom-center",
+          "points": [
+            {
+              "x": 1308,
+              "y": 740
+            },
+            {
+              "x": 1308,
+              "y": 688
+            }
+          ],
+          "lineShape": "square",
+          "labelPosition": 67
+        },
+        "runtime-data-analysis-orchestration": {
+          "originConnector": "top-center",
+          "targetConnector": "bottom-center",
+          "points": [
+            {
+              "x": 1228,
+              "y": 820
+            },
+            {
+              "x": 1228,
+              "y": 748
+            }
+          ],
+          "lineShape": "square",
+          "labelPosition": 71
+        }
+      }
     },
     {
       "id": "DLH-CONN-90e30019a511",
       "origin": "DLH-R-PREFECT-WORKER",
       "target": "DLH-X-SOURCE-SYSTEMS",
       "label": "extracts source data",
-      "direction": "outgoing"
+      "direction": "outgoing",
+      "layout": {
+        "runtime": {
+          "originConnector": "right-middle",
+          "targetConnector": "left-middle",
+          "points": [
+            {
+              "x": 1436,
+              "y": 804
+            },
+            {
+              "x": 1436,
+              "y": 968
+            },
+            {
+              "x": 1960,
+              "y": 968
+            },
+            {
+              "x": 1960,
+              "y": 784
+            }
+          ],
+          "lineShape": "square",
+          "labelPosition": 42
+        },
+        "runtime-data-analysis-orchestration": {
+          "originConnector": "bottom-center",
+          "targetConnector": "right-middle",
+          "points": [
+            {
+              "x": 1228,
+              "y": 948
+            },
+            {
+              "x": 416,
+              "y": 948
+            },
+            {
+              "x": 416,
+              "y": 804
+            },
+            {
+              "x": 296,
+              "y": 804
+            }
+          ],
+          "lineShape": "square",
+          "labelPosition": 46
+        }
+      }
     },
     {
       "id": "DLH-CONN-6a89594fc70e",
       "origin": "DLH-R-PREFECT-WORKER",
       "target": "DLH-R-MINIO",
       "label": "writes lakehouse objects when MinIO is enabled",
-      "direction": "outgoing"
+      "direction": "outgoing",
+      "layout": {
+        "runtime": {
+          "originConnector": "left-middle",
+          "targetConnector": "right-middle",
+          "points": [
+            {
+              "x": 1180,
+              "y": 804
+            },
+            {
+              "x": 1060,
+              "y": 804
+            },
+            {
+              "x": 1060,
+              "y": 684
+            },
+            {
+              "x": 1036,
+              "y": 684
+            }
+          ],
+          "lineShape": "square",
+          "labelPosition": 51
+        },
+        "runtime-data-analysis-orchestration": {
+          "originConnector": "left-middle",
+          "targetConnector": "right-middle",
+          "points": [
+            {
+              "x": 1100,
+              "y": 884
+            },
+            {
+              "x": 1058,
+              "y": 884
+            },
+            {
+              "x": 1058,
+              "y": 484
+            },
+            {
+              "x": 1016,
+              "y": 484
+            }
+          ],
+          "lineShape": "square",
+          "labelPosition": 55
+        }
+      }
     },
     {
       "id": "DLH-CONN-04ea16371eb9",
       "origin": "DLH-R-PREFECT-WORKER",
       "target": "DLH-X-OBJECT-STORAGE",
       "label": "writes lakehouse objects when external S3 is used",
-      "direction": "outgoing"
+      "direction": "outgoing",
+      "layout": {
+        "runtime": {
+          "originConnector": "left-middle",
+          "targetConnector": "right-middle",
+          "points": [
+            {
+              "x": 1180,
+              "y": 804
+            },
+            {
+              "x": 1180,
+              "y": 988
+            },
+            {
+              "x": -64,
+              "y": 988
+            },
+            {
+              "x": -64,
+              "y": 704
+            }
+          ],
+          "lineShape": "square",
+          "labelPosition": 60
+        },
+        "runtime-data-analysis-orchestration": {
+          "originConnector": "bottom-center",
+          "targetConnector": "bottom-center",
+          "points": [
+            {
+              "x": 1228,
+              "y": 948
+            },
+            {
+              "x": 416,
+              "y": 948
+            },
+            {
+              "x": 416,
+              "y": 348
+            },
+            {
+              "x": 168,
+              "y": 348
+            }
+          ],
+          "lineShape": "square",
+          "labelPosition": 64
+        }
+      }
     },
     {
       "id": "DLH-CONN-b771a5ea0596",
       "origin": "DLH-R-PREFECT-WORKER",
       "target": "DLH-R-TRINO",
       "label": "registers and transforms tables",
-      "direction": "outgoing"
+      "direction": "outgoing",
+      "layout": {
+        "runtime": {
+          "originConnector": "left-middle",
+          "targetConnector": "right-middle",
+          "points": [
+            {
+              "x": 1180,
+              "y": 804
+            },
+            {
+              "x": 1060,
+              "y": 804
+            },
+            {
+              "x": 1060,
+              "y": 424
+            },
+            {
+              "x": 1036,
+              "y": 424
+            }
+          ],
+          "lineShape": "square",
+          "labelPosition": 69
+        },
+        "runtime-data-analysis-orchestration": {
+          "originConnector": "left-middle",
+          "targetConnector": "right-middle",
+          "points": [
+            {
+              "x": 1100,
+              "y": 884
+            },
+            {
+              "x": 1058,
+              "y": 884
+            },
+            {
+              "x": 1058,
+              "y": 244
+            },
+            {
+              "x": 1016,
+              "y": 244
+            }
+          ],
+          "lineShape": "square",
+          "labelPosition": 39
+        }
+      }
     },
     {
       "id": "DLH-CONN-805d122f9495",
       "origin": "DLH-R-PREFECT-WORKER",
       "target": "DLH-R-SPARK-OPERATOR",
       "label": "submits Spark jobs",
-      "direction": "outgoing"
+      "direction": "outgoing",
+      "layout": {
+        "runtime": {
+          "originConnector": "left-middle",
+          "targetConnector": "right-middle",
+          "points": [
+            {
+              "x": 1180,
+              "y": 804
+            },
+            {
+              "x": 1060,
+              "y": 804
+            },
+            {
+              "x": 1060,
+              "y": 844
+            },
+            {
+              "x": 1036,
+              "y": 844
+            }
+          ],
+          "lineShape": "square",
+          "labelPosition": 44
+        },
+        "runtime-data-analysis-orchestration": {
+          "originConnector": "left-middle",
+          "targetConnector": "right-middle",
+          "points": [
+            {
+              "x": 1100,
+              "y": 884
+            },
+            {
+              "x": 1058,
+              "y": 884
+            },
+            {
+              "x": 1058,
+              "y": 804
+            },
+            {
+              "x": 1016,
+              "y": 804
+            }
+          ],
+          "lineShape": "square",
+          "labelPosition": 48
+        }
+      }
     },
     {
       "id": "DLH-CONN-ffeafbc3b019",
       "origin": "DLH-R-DATAHUB",
       "target": "DLH-R-DATAHUB-MYSQL",
       "label": "persists metadata state",
-      "direction": "outgoing"
+      "direction": "outgoing",
+      "layout": {
+        "runtime": {
+          "originConnector": "right-middle",
+          "targetConnector": "left-middle",
+          "points": [
+            {
+              "x": 1436,
+              "y": 284
+            },
+            {
+              "x": 1498,
+              "y": 284
+            },
+            {
+              "x": 1498,
+              "y": 84
+            },
+            {
+              "x": 1560,
+              "y": 84
+            }
+          ],
+          "lineShape": "square",
+          "labelPosition": 53
+        },
+        "runtime-data-analysis-orchestration": {
+          "originConnector": "right-middle",
+          "targetConnector": "left-middle",
+          "points": [
+            {
+              "x": 1356,
+              "y": 424
+            },
+            {
+              "x": 1408,
+              "y": 424
+            },
+            {
+              "x": 1408,
+              "y": 384
+            },
+            {
+              "x": 1460,
+              "y": 384
+            }
+          ],
+          "lineShape": "square",
+          "labelPosition": 57
+        }
+      }
     },
     {
       "id": "DLH-CONN-47c9be30f94e",
       "origin": "DLH-R-DATAHUB",
       "target": "DLH-R-DATAHUB-KAFKA",
       "label": "publishes and consumes metadata events",
-      "direction": "outgoing"
+      "direction": "outgoing",
+      "layout": {
+        "runtime": {
+          "originConnector": "right-middle",
+          "targetConnector": "left-middle",
+          "points": [
+            {
+              "x": 1436,
+              "y": 284
+            },
+            {
+              "x": 1556,
+              "y": 284
+            },
+            {
+              "x": 1556,
+              "y": 264
+            },
+            {
+              "x": 1560,
+              "y": 264
+            }
+          ],
+          "lineShape": "square",
+          "labelPosition": 62
+        },
+        "runtime-data-analysis-orchestration": {
+          "originConnector": "right-middle",
+          "targetConnector": "left-middle",
+          "points": [
+            {
+              "x": 1356,
+              "y": 424
+            },
+            {
+              "x": 1408,
+              "y": 424
+            },
+            {
+              "x": 1408,
+              "y": 524
+            },
+            {
+              "x": 1460,
+              "y": 524
+            }
+          ],
+          "lineShape": "square",
+          "labelPosition": 66
+        }
+      }
     },
     {
       "id": "DLH-CONN-6f66ba6e6b61",
       "origin": "DLH-R-DATAHUB",
       "target": "DLH-R-DATAHUB-ELASTICSEARCH",
       "label": "indexes metadata for search",
-      "direction": "outgoing"
+      "direction": "outgoing",
+      "layout": {
+        "runtime": {
+          "originConnector": "right-middle",
+          "targetConnector": "left-middle",
+          "points": [
+            {
+              "x": 1436,
+              "y": 284
+            },
+            {
+              "x": 1440,
+              "y": 284
+            },
+            {
+              "x": 1440,
+              "y": 444
+            },
+            {
+              "x": 1560,
+              "y": 444
+            }
+          ],
+          "lineShape": "square",
+          "labelPosition": 71
+        },
+        "runtime-data-analysis-orchestration": {
+          "originConnector": "right-middle",
+          "targetConnector": "left-middle",
+          "points": [
+            {
+              "x": 1356,
+              "y": 424
+            },
+            {
+              "x": 1408,
+              "y": 424
+            },
+            {
+              "x": 1408,
+              "y": 864
+            },
+            {
+              "x": 1460,
+              "y": 864
+            }
+          ],
+          "lineShape": "square",
+          "labelPosition": 41
+        }
+      }
     },
     {
       "id": "DLH-CONN-68009cb9975e",
       "origin": "DLH-X-PIPELINE-CODE",
       "target": "DLH-R-DATAHUB",
       "label": "publishes product metadata when enabled",
-      "direction": "outgoing"
+      "direction": "outgoing",
+      "layout": {
+        "runtime": {
+          "originConnector": "left-middle",
+          "targetConnector": "bottom-center",
+          "points": [
+            {
+              "x": 1960,
+              "y": 584
+            },
+            {
+              "x": 1840,
+              "y": 584
+            },
+            {
+              "x": 1840,
+              "y": 348
+            },
+            {
+              "x": 1308,
+              "y": 348
+            }
+          ],
+          "lineShape": "square",
+          "labelPosition": 46
+        },
+        "runtime-data-analysis-orchestration": {
+          "originConnector": "right-middle",
+          "targetConnector": "left-middle",
+          "points": [
+            {
+              "x": 296,
+              "y": 584
+            },
+            {
+              "x": 296,
+              "y": 400
+            },
+            {
+              "x": 1100,
+              "y": 400
+            },
+            {
+              "x": 1100,
+              "y": 424
+            }
+          ],
+          "lineShape": "square",
+          "labelPosition": 50
+        }
+      }
     },
     {
       "id": "DLH-CONN-75ab924ffd69",
       "origin": "DLH-C3-PKG-LOCK",
       "target": "DLH-C3-PKG-SUPERSET",
       "label": "locks",
-      "direction": "outgoing"
+      "direction": "outgoing",
+      "layout": {
+        "packaged-dependencies": {
+          "originConnector": "left-middle",
+          "targetConnector": "right-middle",
+          "points": [
+            {
+              "x": 580,
+              "y": 105
+            },
+            {
+              "x": 580,
+              "y": 290
+            },
+            {
+              "x": 360,
+              "y": 290
+            },
+            {
+              "x": 360,
+              "y": 385
+            }
+          ],
+          "lineShape": "square",
+          "labelPosition": 38
+        }
+      }
     },
     {
       "id": "DLH-CONN-d2d717d90454",
       "origin": "DLH-C3-PKG-LOCK",
       "target": "DLH-C3-PKG-PREFECT-SERVER",
       "label": "locks",
-      "direction": "outgoing"
+      "direction": "outgoing",
+      "layout": {
+        "packaged-dependencies": {
+          "originConnector": "left-middle",
+          "targetConnector": "top-center",
+          "points": [
+            {
+              "x": 580,
+              "y": 105
+            },
+            {
+              "x": 575,
+              "y": 105
+            },
+            {
+              "x": 575,
+              "y": 320
+            },
+            {
+              "x": 570,
+              "y": 320
+            }
+          ],
+          "lineShape": "square",
+          "labelPosition": 47
+        }
+      }
     },
     {
       "id": "DLH-CONN-df6c2e3c69b5",
       "origin": "DLH-C3-PKG-LOCK",
       "target": "DLH-C3-PKG-PREFECT-WORKER",
       "label": "locks",
-      "direction": "outgoing"
+      "direction": "outgoing",
+      "layout": {
+        "packaged-dependencies": {
+          "originConnector": "right-middle",
+          "targetConnector": "top-center",
+          "points": [
+            {
+              "x": 940,
+              "y": 105
+            },
+            {
+              "x": 935,
+              "y": 105
+            },
+            {
+              "x": 935,
+              "y": 320
+            },
+            {
+              "x": 930,
+              "y": 320
+            }
+          ],
+          "lineShape": "square",
+          "labelPosition": 56
+        }
+      }
     },
     {
       "id": "DLH-CONN-3c0ce1c163ce",
       "origin": "DLH-C3-PKG-LOCK",
       "target": "DLH-C3-PKG-OAUTH2-PROXY",
       "label": "locks",
-      "direction": "outgoing"
+      "direction": "outgoing",
+      "layout": {
+        "packaged-dependencies": {
+          "originConnector": "right-middle",
+          "targetConnector": "left-middle",
+          "points": [
+            {
+              "x": 940,
+              "y": 105
+            },
+            {
+              "x": 940,
+              "y": 290
+            },
+            {
+              "x": 1140,
+              "y": 290
+            },
+            {
+              "x": 1140,
+              "y": 385
+            }
+          ],
+          "lineShape": "square",
+          "labelPosition": 65
+        }
+      }
     },
     {
       "id": "DLH-CONN-75c210464683",
       "origin": "DLH-C3-PKG-LOCK",
       "target": "DLH-C3-PKG-KEYCLOAK",
       "label": "locks",
-      "direction": "outgoing"
+      "direction": "outgoing",
+      "layout": {
+        "packaged-dependencies": {
+          "originConnector": "left-middle",
+          "targetConnector": "top-center",
+          "points": [
+            {
+              "x": 580,
+              "y": 105
+            },
+            {
+              "x": 395,
+              "y": 105
+            },
+            {
+              "x": 395,
+              "y": 500
+            },
+            {
+              "x": 210,
+              "y": 500
+            }
+          ],
+          "lineShape": "square",
+          "labelPosition": 40
+        }
+      }
     },
     {
       "id": "DLH-CONN-9691315cc3e3",
       "origin": "DLH-C3-PKG-LOCK",
       "target": "DLH-C3-PKG-SPARK",
       "label": "locks",
-      "direction": "outgoing"
+      "direction": "outgoing",
+      "layout": {
+        "packaged-dependencies": {
+          "originConnector": "bottom-center",
+          "targetConnector": "right-middle",
+          "points": [
+            {
+              "x": 760,
+              "y": 170
+            },
+            {
+              "x": 740,
+              "y": 170
+            },
+            {
+              "x": 740,
+              "y": 565
+            },
+            {
+              "x": 720,
+              "y": 565
+            }
+          ],
+          "lineShape": "square",
+          "labelPosition": 49
+        }
+      }
     },
     {
       "id": "DLH-CONN-8119094a65bf",
       "origin": "DLH-C3-PKG-LOCK",
       "target": "DLH-C3-PKG-MINIO",
       "label": "locks",
-      "direction": "outgoing"
+      "direction": "outgoing",
+      "layout": {
+        "packaged-dependencies": {
+          "originConnector": "left-middle",
+          "targetConnector": "top-center",
+          "points": [
+            {
+              "x": 580,
+              "y": 105
+            },
+            {
+              "x": 755,
+              "y": 105
+            },
+            {
+              "x": 755,
+              "y": 500
+            },
+            {
+              "x": 930,
+              "y": 500
+            }
+          ],
+          "lineShape": "square",
+          "labelPosition": 58
+        }
+      }
     },
     {
       "id": "DLH-CONN-76e47b2d7999",
       "origin": "DLH-C3-PKG-LOCK",
       "target": "DLH-C3-PKG-DATAHUB",
       "label": "locks",
-      "direction": "outgoing"
+      "direction": "outgoing",
+      "layout": {
+        "packaged-dependencies": {
+          "originConnector": "right-middle",
+          "targetConnector": "top-center",
+          "points": [
+            {
+              "x": 940,
+              "y": 105
+            },
+            {
+              "x": 1115,
+              "y": 105
+            },
+            {
+              "x": 1115,
+              "y": 500
+            },
+            {
+              "x": 1290,
+              "y": 500
+            }
+          ],
+          "lineShape": "square",
+          "labelPosition": 67
+        }
+      }
     },
     {
       "id": "DLH-CONN-168887e44664",
       "origin": "DLH-C3-PKG-LOCK",
       "target": "DLH-C3-PKG-DATAHUB-PREREQS",
       "label": "locks",
-      "direction": "outgoing"
+      "direction": "outgoing",
+      "layout": {
+        "packaged-dependencies": {
+          "originConnector": "left-middle",
+          "targetConnector": "top-center",
+          "points": [
+            {
+              "x": 580,
+              "y": 105
+            },
+            {
+              "x": 395,
+              "y": 105
+            },
+            {
+              "x": 395,
+              "y": 680
+            },
+            {
+              "x": 210,
+              "y": 680
+            }
+          ],
+          "lineShape": "square",
+          "labelPosition": 42
+        }
+      }
     },
     {
       "id": "DLH-CONN-8d312098b4f8",
       "origin": "DLH-C3-PKG-LOCK",
       "target": "DLH-C3-PKG-VAULT",
       "label": "locks",
-      "direction": "outgoing"
+      "direction": "outgoing",
+      "layout": {
+        "packaged-dependencies": {
+          "originConnector": "bottom-center",
+          "targetConnector": "right-middle",
+          "points": [
+            {
+              "x": 760,
+              "y": 170
+            },
+            {
+              "x": 740,
+              "y": 170
+            },
+            {
+              "x": 740,
+              "y": 745
+            },
+            {
+              "x": 720,
+              "y": 745
+            }
+          ],
+          "lineShape": "square",
+          "labelPosition": 51
+        }
+      }
     },
     {
       "id": "DLH-CONN-198bd2d6a3dd",
       "origin": "DLH-C3-PKG-LOCK",
       "target": "DLH-C3-PKG-JUPYTERHUB",
       "label": "locks",
-      "direction": "outgoing"
+      "direction": "outgoing",
+      "layout": {
+        "packaged-dependencies": {
+          "originConnector": "left-middle",
+          "targetConnector": "top-center",
+          "points": [
+            {
+              "x": 580,
+              "y": 105
+            },
+            {
+              "x": 755,
+              "y": 105
+            },
+            {
+              "x": 755,
+              "y": 680
+            },
+            {
+              "x": 930,
+              "y": 680
+            }
+          ],
+          "lineShape": "square",
+          "labelPosition": 60
+        }
+      }
     },
     {
       "id": "DLH-CONN-bd1159d8435e",
       "origin": "DLH-C3-PKG-LOCK",
       "target": "DLH-C3-PKG-POSTGRESQL",
       "label": "locks",
-      "direction": "outgoing"
+      "direction": "outgoing",
+      "layout": {
+        "packaged-dependencies": {
+          "originConnector": "right-middle",
+          "targetConnector": "top-center",
+          "points": [
+            {
+              "x": 940,
+              "y": 105
+            },
+            {
+              "x": 1115,
+              "y": 105
+            },
+            {
+              "x": 1115,
+              "y": 680
+            },
+            {
+              "x": 1290,
+              "y": 680
+            }
+          ],
+          "lineShape": "square",
+          "labelPosition": 69
+        }
+      }
     },
     {
       "id": "DLH-CONN-e9f619f29af1",
       "origin": "DLH-C3-SOURCE-METADATA",
       "target": "DLH-C3-SOURCE-LOCK",
       "label": "resolves to",
-      "direction": "outgoing"
+      "direction": "outgoing",
+      "layout": {
+        "chart-source": {
+          "originConnector": "right-middle",
+          "targetConnector": "left-middle",
+          "points": [
+            {
+              "x": 336,
+              "y": 144
+            },
+            {
+              "x": 440,
+              "y": 144
+            }
+          ],
+          "lineShape": "square",
+          "labelPosition": 38
+        }
+      }
     },
     {
       "id": "DLH-CONN-f5f129c4a6e6",
       "origin": "DLH-C3-SOURCE-PACKAGING",
       "target": "DLH-C3-SOURCE-METADATA",
       "label": "constrains package content for",
-      "direction": "outgoing"
+      "direction": "outgoing",
+      "layout": {
+        "chart-source": {
+          "originConnector": "left-middle",
+          "targetConnector": "right-middle",
+          "points": [
+            {
+              "x": 800,
+              "y": 144
+            },
+            {
+              "x": 800,
+              "y": -40
+            },
+            {
+              "x": 336,
+              "y": -40
+            },
+            {
+              "x": 336,
+              "y": 144
+            }
+          ],
+          "lineShape": "square",
+          "labelPosition": 47
+        }
+      }
     },
     {
       "id": "DLH-CONN-16c108b475ad",
       "origin": "DLH-C3-SOURCE-PROVENANCE",
       "target": "DLH-C3-SOURCE-DOCS",
       "label": "supplies notices for",
-      "direction": "outgoing"
+      "direction": "outgoing",
+      "layout": {
+        "chart-source": {
+          "originConnector": "top-center",
+          "targetConnector": "bottom-center",
+          "points": [
+            {
+              "x": 1288,
+              "y": 320
+            },
+            {
+              "x": 1288,
+              "y": 208
+            }
+          ],
+          "lineShape": "square",
+          "labelPosition": 56
+        }
+      }
     },
     {
       "id": "DLH-CONN-ec61013a5c32",
       "origin": "DLH-C3-SOURCE-VALUES",
       "target": "DLH-C3-SOURCE-TEMPLATES",
       "label": "configures",
-      "direction": "outgoing"
+      "direction": "outgoing",
+      "layout": {
+        "chart-source": {
+          "originConnector": "right-middle",
+          "targetConnector": "left-middle",
+          "points": [
+            {
+              "x": 336,
+              "y": 484
+            },
+            {
+              "x": 440,
+              "y": 484
+            }
+          ],
+          "lineShape": "square",
+          "labelPosition": 65
+        }
+      }
     },
     {
       "id": "DLH-CONN-d10612ecaad1",
       "origin": "DLH-C3-SOURCE-VALUES",
       "target": "DLH-C3-SOURCE-IDENTITY",
       "label": "configures",
-      "direction": "outgoing"
+      "direction": "outgoing",
+      "layout": {
+        "chart-source": {
+          "originConnector": "bottom-center",
+          "targetConnector": "top-center",
+          "points": [
+            {
+              "x": 208,
+              "y": 548
+            },
+            {
+              "x": 208,
+              "y": 720
+            }
+          ],
+          "lineShape": "square",
+          "labelPosition": 40
+        }
+      }
     },
     {
       "id": "DLH-CONN-1f19f13790c9",
       "origin": "DLH-C3-SOURCE-VALUES",
       "target": "DLH-C3-SOURCE-GOVERNANCE",
       "label": "configures",
-      "direction": "outgoing"
+      "direction": "outgoing",
+      "layout": {
+        "chart-source": {
+          "originConnector": "right-middle",
+          "targetConnector": "left-middle",
+          "points": [
+            {
+              "x": 336,
+              "y": 484
+            },
+            {
+              "x": 388,
+              "y": 484
+            },
+            {
+              "x": 388,
+              "y": 784
+            },
+            {
+              "x": 440,
+              "y": 784
+            }
+          ],
+          "lineShape": "square",
+          "labelPosition": 49
+        }
+      }
     },
     {
       "id": "DLH-CONN-7816d68fefec",
       "origin": "DLH-C3-SOURCE-GOVERNANCE",
       "target": "DLH-C3-SOURCE-RANGER",
       "label": "constrains",
-      "direction": "outgoing"
+      "direction": "outgoing",
+      "layout": {
+        "chart-source": {
+          "originConnector": "right-middle",
+          "targetConnector": "left-middle",
+          "points": [
+            {
+              "x": 696,
+              "y": 784
+            },
+            {
+              "x": 800,
+              "y": 784
+            }
+          ],
+          "lineShape": "square",
+          "labelPosition": 58
+        }
+      }
     },
     {
       "id": "DLH-CONN-e65f4d60e4cd",
       "origin": "DLH-C3-SOURCE-GOVERNANCE",
       "target": "DLH-C3-SOURCE-RANGER-PROXY",
       "label": "constrains",
-      "direction": "outgoing"
+      "direction": "outgoing",
+      "layout": {
+        "chart-source": {
+          "originConnector": "right-middle",
+          "targetConnector": "left-middle",
+          "points": [
+            {
+              "x": 696,
+              "y": 784
+            },
+            {
+              "x": 696,
+              "y": 600
+            },
+            {
+              "x": 1160,
+              "y": 600
+            },
+            {
+              "x": 1160,
+              "y": 784
+            }
+          ],
+          "lineShape": "square",
+          "labelPosition": 67
+        }
+      }
     },
     {
       "id": "DLH-CONN-beb75c330909",
       "origin": "DLH-C3-SOURCE-IDENTITY",
       "target": "DLH-C3-SOURCE-CLOUDBEAVER",
       "label": "constrains",
-      "direction": "outgoing"
+      "direction": "outgoing",
+      "layout": {
+        "chart-source": {
+          "originConnector": "bottom-center",
+          "targetConnector": "top-center",
+          "points": [
+            {
+              "x": 208,
+              "y": 848
+            },
+            {
+              "x": 208,
+              "y": 1020
+            }
+          ],
+          "lineShape": "square",
+          "labelPosition": 42
+        }
+      }
     },
     {
       "id": "DLH-CONN-92448b84f034",
       "origin": "DLH-C3-SOURCE-IDENTITY",
       "target": "DLH-C3-SOURCE-HOME",
       "label": "constrains",
-      "direction": "outgoing"
+      "direction": "outgoing",
+      "layout": {
+        "chart-source": {
+          "originConnector": "right-middle",
+          "targetConnector": "left-middle",
+          "points": [
+            {
+              "x": 336,
+              "y": 784
+            },
+            {
+              "x": 388,
+              "y": 784
+            },
+            {
+              "x": 388,
+              "y": 1084
+            },
+            {
+              "x": 440,
+              "y": 1084
+            }
+          ],
+          "lineShape": "square",
+          "labelPosition": 51
+        }
+      }
     },
     {
       "id": "DLH-CONN-ba247c0a393f",
       "origin": "DLH-C3-SOURCE-IDENTITY",
       "target": "DLH-C3-SOURCE-DATAHUB",
       "label": "constrains",
-      "direction": "outgoing"
+      "direction": "outgoing",
+      "layout": {
+        "chart-source": {
+          "originConnector": "right-middle",
+          "targetConnector": "left-middle",
+          "points": [
+            {
+              "x": 336,
+              "y": 784
+            },
+            {
+              "x": 336,
+              "y": 968
+            },
+            {
+              "x": 800,
+              "y": 968
+            },
+            {
+              "x": 800,
+              "y": 1084
+            }
+          ],
+          "lineShape": "square",
+          "labelPosition": 60
+        }
+      }
     },
     {
       "id": "DLH-CONN-1521f91a4cfe",
       "origin": "DLH-C3-SOURCE-STATIC-FILES",
       "target": "DLH-C3-SOURCE-HOME",
       "label": "provides payloads for",
-      "direction": "outgoing"
+      "direction": "outgoing",
+      "layout": {
+        "chart-source": {
+          "originConnector": "top-center",
+          "targetConnector": "bottom-center",
+          "points": [
+            {
+              "x": 568,
+              "y": 1260
+            },
+            {
+              "x": 568,
+              "y": 1148
+            }
+          ],
+          "lineShape": "square",
+          "labelPosition": 69
+        }
+      }
     },
     {
       "id": "DLH-CONN-3e08f784a21a",
       "origin": "DLH-C3-TRINO-DOCS",
       "target": "DLH-C3-TRINO-HELPERS",
       "label": "documents local chart integration",
-      "direction": "outgoing"
+      "direction": "outgoing",
+      "layout": {
+        "vendored-trino": {
+          "originConnector": "right-middle",
+          "targetConnector": "left-middle",
+          "points": [
+            {
+              "x": 336,
+              "y": 144
+            },
+            {
+              "x": 440,
+              "y": 144
+            }
+          ],
+          "lineShape": "square",
+          "labelPosition": 38
+        }
+      }
     },
     {
       "id": "DLH-CONN-cdcfa5d873df",
       "origin": "DLH-C3-TRINO-HELPERS",
       "target": "DLH-C3-TRINO-CATALOGS",
       "label": "supports rendering",
-      "direction": "outgoing"
+      "direction": "outgoing",
+      "layout": {
+        "vendored-trino": {
+          "originConnector": "right-middle",
+          "targetConnector": "left-middle",
+          "points": [
+            {
+              "x": 696,
+              "y": 144
+            },
+            {
+              "x": 800,
+              "y": 144
+            }
+          ],
+          "lineShape": "square",
+          "labelPosition": 47
+        }
+      }
     },
     {
       "id": "DLH-CONN-5759d912c638",
       "origin": "DLH-C3-TRINO-HELPERS",
       "target": "DLH-C3-TRINO-ACCESS",
       "label": "supports rendering",
-      "direction": "outgoing"
+      "direction": "outgoing",
+      "layout": {
+        "vendored-trino": {
+          "originConnector": "right-middle",
+          "targetConnector": "left-middle",
+          "points": [
+            {
+              "x": 696,
+              "y": 144
+            },
+            {
+              "x": 696,
+              "y": -40
+            },
+            {
+              "x": 1160,
+              "y": -40
+            },
+            {
+              "x": 1160,
+              "y": 144
+            }
+          ],
+          "lineShape": "square",
+          "labelPosition": 56
+        }
+      }
     },
     {
       "id": "DLH-CONN-8329be11c836",
       "origin": "DLH-C3-TRINO-HELPERS",
       "target": "DLH-C3-TRINO-COORDINATOR",
       "label": "supports rendering",
-      "direction": "outgoing"
+      "direction": "outgoing",
+      "layout": {
+        "vendored-trino": {
+          "originConnector": "left-middle",
+          "targetConnector": "right-middle",
+          "points": [
+            {
+              "x": 440,
+              "y": 144
+            },
+            {
+              "x": 388,
+              "y": 144
+            },
+            {
+              "x": 388,
+              "y": 334
+            },
+            {
+              "x": 336,
+              "y": 334
+            }
+          ],
+          "lineShape": "square",
+          "labelPosition": 65
+        }
+      }
     },
     {
       "id": "DLH-CONN-eedb64088d9c",
       "origin": "DLH-C3-TRINO-HELPERS",
       "target": "DLH-C3-TRINO-WORKER",
       "label": "supports rendering",
-      "direction": "outgoing"
+      "direction": "outgoing",
+      "layout": {
+        "vendored-trino": {
+          "originConnector": "bottom-center",
+          "targetConnector": "top-center",
+          "points": [
+            {
+              "x": 568,
+              "y": 208
+            },
+            {
+              "x": 568,
+              "y": 270
+            }
+          ],
+          "lineShape": "square",
+          "labelPosition": 40
+        }
+      }
     },
     {
       "id": "DLH-CONN-8ff949cc59fb",
       "origin": "DLH-C3-TRINO-CATALOGS",
       "target": "DLH-C3-TRINO-COORDINATOR",
       "label": "configures",
-      "direction": "outgoing"
+      "direction": "outgoing",
+      "layout": {
+        "vendored-trino": {
+          "originConnector": "left-middle",
+          "targetConnector": "right-middle",
+          "points": [
+            {
+              "x": 800,
+              "y": 144
+            },
+            {
+              "x": 800,
+              "y": 239
+            },
+            {
+              "x": 336,
+              "y": 239
+            },
+            {
+              "x": 336,
+              "y": 334
+            }
+          ],
+          "lineShape": "square",
+          "labelPosition": 49
+        }
+      }
     },
     {
       "id": "DLH-CONN-ab1857e1e019",
       "origin": "DLH-C3-TRINO-ACCESS",
       "target": "DLH-C3-TRINO-COORDINATOR",
       "label": "configures",
-      "direction": "outgoing"
+      "direction": "outgoing",
+      "layout": {
+        "vendored-trino": {
+          "originConnector": "left-middle",
+          "targetConnector": "right-middle",
+          "points": [
+            {
+              "x": 1160,
+              "y": 144
+            },
+            {
+              "x": 1160,
+              "y": 239
+            },
+            {
+              "x": 336,
+              "y": 239
+            },
+            {
+              "x": 336,
+              "y": 334
+            }
+          ],
+          "lineShape": "square",
+          "labelPosition": 58
+        }
+      }
     },
     {
       "id": "DLH-CONN-f0538b964ceb",
       "origin": "DLH-C3-TRINO-ACCESS",
       "target": "DLH-C3-TRINO-WORKER",
       "label": "configures",
-      "direction": "outgoing"
+      "direction": "outgoing",
+      "layout": {
+        "vendored-trino": {
+          "originConnector": "left-middle",
+          "targetConnector": "right-middle",
+          "points": [
+            {
+              "x": 1160,
+              "y": 144
+            },
+            {
+              "x": 1160,
+              "y": 328
+            },
+            {
+              "x": 696,
+              "y": 328
+            },
+            {
+              "x": 696,
+              "y": 334
+            }
+          ],
+          "lineShape": "square",
+          "labelPosition": 67
+        }
+      }
     },
     {
       "id": "DLH-CONN-c8914db7e293",
       "origin": "DLH-C3-HIVE-DOCS",
       "target": "DLH-C3-HIVE-METASTORE",
       "label": "documents local subchart boundary",
-      "direction": "outgoing"
+      "direction": "outgoing",
+      "layout": {
+        "hive-subchart": {
+          "originConnector": "right-middle",
+          "targetConnector": "left-middle",
+          "points": [
+            {
+              "x": 336,
+              "y": 144
+            },
+            {
+              "x": 388,
+              "y": 144
+            },
+            {
+              "x": 388,
+              "y": 334
+            },
+            {
+              "x": 440,
+              "y": 334
+            }
+          ],
+          "lineShape": "square",
+          "labelPosition": 38
+        }
+      }
     },
     {
       "id": "DLH-CONN-4fa057ea48ed",
       "origin": "DLH-C3-HIVE-METADATA",
       "target": "DLH-C3-HIVE-VALUES",
       "label": "declares chart metadata for",
-      "direction": "outgoing"
+      "direction": "outgoing",
+      "layout": {
+        "hive-subchart": {
+          "originConnector": "right-middle",
+          "targetConnector": "left-middle",
+          "points": [
+            {
+              "x": 696,
+              "y": 144
+            },
+            {
+              "x": 800,
+              "y": 144
+            }
+          ],
+          "lineShape": "square",
+          "labelPosition": 47
+        }
+      }
     },
     {
       "id": "DLH-CONN-b754a4e6a4bc",
       "origin": "DLH-C3-HIVE-VALUES",
       "target": "DLH-C3-HIVE-CONFIG",
       "label": "configures",
-      "direction": "outgoing"
+      "direction": "outgoing",
+      "layout": {
+        "hive-subchart": {
+          "originConnector": "left-middle",
+          "targetConnector": "right-middle",
+          "points": [
+            {
+              "x": 800,
+              "y": 144
+            },
+            {
+              "x": 800,
+              "y": 239
+            },
+            {
+              "x": 336,
+              "y": 239
+            },
+            {
+              "x": 336,
+              "y": 334
+            }
+          ],
+          "lineShape": "square",
+          "labelPosition": 56
+        }
+      }
     },
     {
       "id": "DLH-CONN-c2ceb626f9ea",
       "origin": "DLH-C3-HIVE-HELPERS",
       "target": "DLH-C3-HIVE-CONFIG",
       "label": "supports rendering",
-      "direction": "outgoing"
+      "direction": "outgoing",
+      "layout": {
+        "hive-subchart": {
+          "originConnector": "left-middle",
+          "targetConnector": "right-middle",
+          "points": [
+            {
+              "x": 1160,
+              "y": 144
+            },
+            {
+              "x": 1160,
+              "y": 239
+            },
+            {
+              "x": 336,
+              "y": 239
+            },
+            {
+              "x": 336,
+              "y": 334
+            }
+          ],
+          "lineShape": "square",
+          "labelPosition": 65
+        }
+      }
     },
     {
       "id": "DLH-CONN-4c7bfeb61653",
       "origin": "DLH-C3-HIVE-HELPERS",
       "target": "DLH-C3-HIVE-METASTORE",
       "label": "supports rendering",
-      "direction": "outgoing"
+      "direction": "outgoing",
+      "layout": {
+        "hive-subchart": {
+          "originConnector": "left-middle",
+          "targetConnector": "right-middle",
+          "points": [
+            {
+              "x": 1160,
+              "y": 144
+            },
+            {
+              "x": 1160,
+              "y": 239
+            },
+            {
+              "x": 696,
+              "y": 239
+            },
+            {
+              "x": 696,
+              "y": 334
+            }
+          ],
+          "lineShape": "square",
+          "labelPosition": 40
+        }
+      }
     },
     {
       "id": "DLH-CONN-386d6d056474",
       "origin": "DLH-C3-HIVE-SECRETS",
       "target": "DLH-C3-HIVE-METASTORE",
       "label": "provides credentials",
-      "direction": "outgoing"
+      "direction": "outgoing",
+      "layout": {
+        "hive-subchart": {
+          "originConnector": "left-middle",
+          "targetConnector": "right-middle",
+          "points": [
+            {
+              "x": 1160,
+              "y": 334
+            },
+            {
+              "x": 1160,
+              "y": 518
+            },
+            {
+              "x": 696,
+              "y": 518
+            },
+            {
+              "x": 696,
+              "y": 334
+            }
+          ],
+          "lineShape": "square",
+          "labelPosition": 49
+        }
+      }
     },
     {
       "id": "DLH-CONN-6ddb77d5a37f",
       "origin": "DLH-C3-HIVE-CONFIG",
       "target": "DLH-C3-HIVE-METASTORE",
       "label": "configures",
-      "direction": "outgoing"
+      "direction": "outgoing",
+      "layout": {
+        "hive-subchart": {
+          "originConnector": "right-middle",
+          "targetConnector": "left-middle",
+          "points": [
+            {
+              "x": 336,
+              "y": 334
+            },
+            {
+              "x": 440,
+              "y": 334
+            }
+          ],
+          "lineShape": "square",
+          "labelPosition": 58
+        }
+      }
     },
     {
       "id": "DLH-CONN-8a448b41b719",
       "origin": "DLH-C3-HIVE-SCHEMA",
       "target": "DLH-C3-HIVE-METASTORE",
       "label": "prepares database schema",
-      "direction": "outgoing"
+      "direction": "outgoing",
+      "layout": {
+        "hive-subchart": {
+          "originConnector": "left-middle",
+          "targetConnector": "right-middle",
+          "points": [
+            {
+              "x": 800,
+              "y": 334
+            },
+            {
+              "x": 696,
+              "y": 334
+            }
+          ],
+          "lineShape": "square",
+          "labelPosition": 67
+        }
+      }
     },
     {
       "id": "DLH-CONN-af5b8d08dc0c",
       "origin": "DLH-C3-VALIDATE-DEPS",
       "target": "DLH-C3-VALIDATE-LINT",
       "label": "prepares dependencies for",
-      "direction": "outgoing"
+      "direction": "outgoing",
+      "layout": {
+        "validation": {
+          "originConnector": "left-middle",
+          "targetConnector": "right-middle",
+          "points": [
+            {
+              "x": 440,
+              "y": 144
+            },
+            {
+              "x": 336,
+              "y": 144
+            }
+          ],
+          "lineShape": "square",
+          "labelPosition": 38
+        }
+      }
     },
     {
       "id": "DLH-CONN-f005236c3ac1",
       "origin": "DLH-C3-VALIDATE-LINT",
       "target": "DLH-C3-VALIDATE-RENDER",
       "label": "runs before",
-      "direction": "outgoing"
+      "direction": "outgoing",
+      "layout": {
+        "validation": {
+          "originConnector": "right-middle",
+          "targetConnector": "left-middle",
+          "points": [
+            {
+              "x": 336,
+              "y": 144
+            },
+            {
+              "x": 336,
+              "y": -40
+            },
+            {
+              "x": 800,
+              "y": -40
+            },
+            {
+              "x": 800,
+              "y": 144
+            }
+          ],
+          "lineShape": "square",
+          "labelPosition": 47
+        }
+      }
     },
     {
       "id": "DLH-CONN-86408b276b7b",
       "origin": "DLH-C3-VALIDATE-RENDER",
       "target": "DLH-C3-VALIDATE-CONTRACT",
       "label": "provides rendered manifests for",
-      "direction": "outgoing"
+      "direction": "outgoing",
+      "layout": {
+        "validation": {
+          "originConnector": "right-middle",
+          "targetConnector": "left-middle",
+          "points": [
+            {
+              "x": 1056,
+              "y": 144
+            },
+            {
+              "x": 1160,
+              "y": 144
+            }
+          ],
+          "lineShape": "square",
+          "labelPosition": 56
+        }
+      }
     },
     {
       "id": "DLH-CONN-cfd4dd4d30d7",
       "origin": "DLH-C3-VALIDATE-CONTRACT",
       "target": "DLH-C3-VALIDATE-SMOKE",
       "label": "must pass before",
-      "direction": "outgoing"
+      "direction": "outgoing",
+      "layout": {
+        "validation": {
+          "originConnector": "left-middle",
+          "targetConnector": "right-middle",
+          "points": [
+            {
+              "x": 1160,
+              "y": 144
+            },
+            {
+              "x": 1160,
+              "y": 328
+            },
+            {
+              "x": 336,
+              "y": 328
+            },
+            {
+              "x": 336,
+              "y": 334
+            }
+          ],
+          "lineShape": "square",
+          "labelPosition": 65
+        }
+      }
     },
     {
       "id": "DLH-CONN-6493cc80e00f",
       "origin": "DLH-C3-PUBLISH-PACKAGE",
       "target": "DLH-C3-PUBLISH-OCI",
       "label": "produces package for",
-      "direction": "outgoing"
+      "direction": "outgoing",
+      "layout": {
+        "publish": {
+          "originConnector": "right-middle",
+          "targetConnector": "left-middle",
+          "points": [
+            {
+              "x": 336,
+              "y": 144
+            },
+            {
+              "x": 440,
+              "y": 144
+            }
+          ],
+          "lineShape": "square",
+          "labelPosition": 38
+        }
+      }
     },
     {
       "id": "DLH-CONN-477b2c94b17b",
       "origin": "DLH-C3-PUBLISH-OCI",
       "target": "DLH-C3-PUBLISH-METADATA",
       "label": "records",
-      "direction": "outgoing"
+      "direction": "outgoing",
+      "layout": {
+        "publish": {
+          "originConnector": "right-middle",
+          "targetConnector": "left-middle",
+          "points": [
+            {
+              "x": 696,
+              "y": 144
+            },
+            {
+              "x": 800,
+              "y": 144
+            }
+          ],
+          "lineShape": "square",
+          "labelPosition": 47
+        }
+      }
     }
   ],
   "diagrams": [
@@ -5033,7 +9562,6 @@
       "type": "app-diagram",
       "modelObject": "DLH-L1-CHART",
       "objects": [
-        "DLH-G-chart-product-UPSTREAM-SOURCES",
         "DLH-G-chart-product-CHART-SOURCE",
         "DLH-G-chart-product-INSTALL-PROFILES",
         "DLH-G-chart-product-AUTOMATION",
@@ -5046,37 +9574,9 @@
         "DLH-C2-VALIDATION",
         "DLH-C2-PUBLISH",
         "DLH-C2-OCI-PACKAGE",
-        "DLH-X-SUPERSET-CHART",
-        "DLH-X-PREFECT-SERVER-CHART",
-        "DLH-X-PREFECT-WORKER-CHART",
-        "DLH-X-OAUTH2-PROXY-CHART",
-        "DLH-X-KEYCLOAK-CHART",
-        "DLH-X-SPARK-OPERATOR-CHART",
-        "DLH-X-MINIO-CHART",
-        "DLH-X-DATAHUB-CHART",
-        "DLH-X-DATAHUB-PREREQS-CHART",
-        "DLH-X-VAULT-CHART",
-        "DLH-X-JUPYTERHUB-CHART",
-        "DLH-X-POSTGRESQL-CHART",
-        "DLH-X-TRINO-CHART",
-        "DLH-X-HIVE-IMAGE",
         "DLH-L1-CONSUMER-REPO"
       ],
       "connections": [
-        "DLH-CONN-b71d2fd4f232",
-        "DLH-CONN-9e141f001a65",
-        "DLH-CONN-2222103703f3",
-        "DLH-CONN-bb4d32ab26b5",
-        "DLH-CONN-7dc2a3549ec6",
-        "DLH-CONN-f0089c07d9ae",
-        "DLH-CONN-bfbbac13926b",
-        "DLH-CONN-aec27f58832c",
-        "DLH-CONN-50be48572492",
-        "DLH-CONN-39b6a4a6eee0",
-        "DLH-CONN-3c8e6c7e17be",
-        "DLH-CONN-fc166a90ec4b",
-        "DLH-CONN-a51e81967505",
-        "DLH-CONN-5276a7d1ec27",
         "DLH-CONN-5d887e5cad43",
         "DLH-CONN-b23c39dc126b",
         "DLH-CONN-48dd7cad70f8",
@@ -5258,8 +9758,8 @@
       "bounds": {
         "x": 0,
         "y": 0,
-        "width": 1480,
-        "height": 840
+        "width": 1600,
+        "height": 1560
       },
       "exportFilename": "04-chart-source-components.png"
     },
@@ -5421,6 +9921,138 @@
         "height": 360
       },
       "exportFilename": "09-chart-publish-automation.png"
+    },
+    {
+      "key": "runtime-identity-access-secrets",
+      "name": "Runtime Identity, Access, And Secrets",
+      "type": "app-diagram",
+      "modelObject": "DLH-L1-RUNTIME",
+      "objects": [
+        "DLH-X-USERS",
+        "DLH-X-INGRESS-CONTROLLER",
+        "DLH-X-OIDC",
+        "DLH-X-LDAP",
+        "DLH-X-SECRET-SYNC",
+        "DLH-G-runtime-BROWSER-ENTRY",
+        "DLH-G-runtime-IDENTITY-AND-SECRETS",
+        "DLH-G-runtime-GOVERNANCE",
+        "DLH-G-runtime-SUPPORT-SERVICES-AND-STORES",
+        "DLH-R-PLATFORM-HOME",
+        "DLH-R-AUTH-PROXIES",
+        "DLH-R-KEYCLOAK",
+        "DLH-R-VAULT",
+        "DLH-R-RANGER",
+        "DLH-R-KEYCLOAK-DB",
+        "DLH-R-RANGER-DB"
+      ],
+      "connections": [
+        "DLH-CONN-19b2eddb4943",
+        "DLH-CONN-921710f3fea9",
+        "DLH-CONN-7d48e3be2a8b",
+        "DLH-CONN-abbfa0c22ce3",
+        "DLH-CONN-411e11cda1cf",
+        "DLH-CONN-d24d6980b58a",
+        "DLH-CONN-b3fbbe0194af",
+        "DLH-CONN-bc09b01dd50e",
+        "DLH-CONN-77220a26e766",
+        "DLH-CONN-272141bdee94",
+        "DLH-CONN-6a7abef7e654",
+        "DLH-CONN-625e85abf0d7",
+        "DLH-CONN-2bd12107285d",
+        "DLH-CONN-6ec5b06035b3",
+        "DLH-CONN-d4aee4269cc7"
+      ],
+      "description": "Focused runtime view showing browser entry, identity federation, secret delivery, and governance stores for the deployable DLH-in-a-box runtime.",
+      "bounds": {
+        "x": -80,
+        "y": -520,
+        "width": 1600,
+        "height": 1240
+      },
+      "parentAreaBounds": {
+        "x": 340,
+        "y": -460,
+        "width": 1120,
+        "height": 1100
+      },
+      "exportFilename": "10-runtime-identity-access-secrets.png"
+    },
+    {
+      "key": "runtime-data-analysis-orchestration",
+      "name": "Runtime Data, Analysis, And Orchestration",
+      "type": "app-diagram",
+      "modelObject": "DLH-L1-RUNTIME",
+      "objects": [
+        "DLH-X-OBJECT-STORAGE",
+        "DLH-X-SOURCE-SYSTEMS",
+        "DLH-X-PIPELINE-CODE",
+        "DLH-G-runtime-GOVERNANCE",
+        "DLH-G-runtime-LAKEHOUSE-CORE",
+        "DLH-G-runtime-ANALYSIS-TOOLS",
+        "DLH-G-runtime-ORCHESTRATION-AND-COMPUTE",
+        "DLH-G-runtime-DISCOVERY",
+        "DLH-G-runtime-SUPPORT-SERVICES-AND-STORES",
+        "DLH-R-RANGER",
+        "DLH-R-TRINO",
+        "DLH-R-HIVE",
+        "DLH-R-MINIO",
+        "DLH-R-SUPERSET",
+        "DLH-R-JUPYTERHUB",
+        "DLH-R-JUPYTER-PODS",
+        "DLH-R-CLOUDBEAVER",
+        "DLH-R-PREFECT-SERVER",
+        "DLH-R-PREFECT-WORKER",
+        "DLH-R-SPARK-OPERATOR",
+        "DLH-R-DATAHUB",
+        "DLH-R-HIVE-DB",
+        "DLH-R-SUPERSET-DB",
+        "DLH-R-SUPERSET-REDIS",
+        "DLH-R-PREFECT-DB",
+        "DLH-R-DATAHUB-MYSQL",
+        "DLH-R-DATAHUB-KAFKA",
+        "DLH-R-DATAHUB-ELASTICSEARCH"
+      ],
+      "connections": [
+        "DLH-CONN-a22353e1f659",
+        "DLH-CONN-039a8f0edc58",
+        "DLH-CONN-8daaf23c95e3",
+        "DLH-CONN-2e9939a757df",
+        "DLH-CONN-a8ddab3e123d",
+        "DLH-CONN-6f0ac516b52b",
+        "DLH-CONN-ffef0c195d36",
+        "DLH-CONN-ac2236ad538d",
+        "DLH-CONN-818309eaed79",
+        "DLH-CONN-ca6aff52b7f7",
+        "DLH-CONN-15316390f89b",
+        "DLH-CONN-f5903d55a90e",
+        "DLH-CONN-86e1d2c17336",
+        "DLH-CONN-fd2fb5d5e29f",
+        "DLH-CONN-e20c2ca39665",
+        "DLH-CONN-1d3e92479aee",
+        "DLH-CONN-90e30019a511",
+        "DLH-CONN-6a89594fc70e",
+        "DLH-CONN-04ea16371eb9",
+        "DLH-CONN-b771a5ea0596",
+        "DLH-CONN-805d122f9495",
+        "DLH-CONN-ffeafbc3b019",
+        "DLH-CONN-47c9be30f94e",
+        "DLH-CONN-6f66ba6e6b61",
+        "DLH-CONN-68009cb9975e"
+      ],
+      "description": "Focused runtime view showing governed data access, analytical tools, workflow orchestration, compute services, discovery, and supporting stores.",
+      "bounds": {
+        "x": -80,
+        "y": -720,
+        "width": 1900,
+        "height": 1900
+      },
+      "parentAreaBounds": {
+        "x": 360,
+        "y": -640,
+        "width": 1440,
+        "height": 1760
+      },
+      "exportFilename": "11-runtime-data-analysis-orchestration.png"
     }
   ]
 }

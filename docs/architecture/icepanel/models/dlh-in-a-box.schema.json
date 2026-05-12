@@ -299,8 +299,75 @@
           "items": {
             "$ref": "#/$defs/sourceId"
           }
+        },
+        "layout": {
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/$defs/connectionLayout"
+          }
         }
       }
+    },
+    "connectionPoint": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "x",
+        "y"
+      ],
+      "properties": {
+        "x": {
+          "type": "integer"
+        },
+        "y": {
+          "type": "integer"
+        }
+      }
+    },
+    "connectionLayout": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "originConnector",
+        "targetConnector",
+        "points",
+        "lineShape",
+        "labelPosition"
+      ],
+      "properties": {
+        "originConnector": {
+          "$ref": "#/$defs/connector"
+        },
+        "targetConnector": {
+          "$ref": "#/$defs/connector"
+        },
+        "points": {
+          "type": "array",
+          "minItems": 2,
+          "items": {
+            "$ref": "#/$defs/connectionPoint"
+          }
+        },
+        "lineShape": {
+          "enum": [
+            "curved",
+            "straight",
+            "square"
+          ]
+        },
+        "labelPosition": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "connector": {
+      "enum": [
+        "top-center",
+        "right-middle",
+        "bottom-center",
+        "left-middle"
+      ]
     },
     "diagram": {
       "type": "object",
