@@ -12,6 +12,14 @@ docs/architecture/icepanel/models/dlh-in-a-box.json
 Use the Markdown file as explanatory documentation for reviewers and article
 authors. Do not treat it as the sync source of truth.
 
+```mermaid
+flowchart TD
+  Model[IcePanel JSON model] --> Validator[model validator]
+  Model --> Sync[IcePanel sync]
+  Model --> Exports[diagram exports]
+  Exports --> Docs[architecture documentation]
+```
+
 ## Files
 
 | Path | Purpose |
