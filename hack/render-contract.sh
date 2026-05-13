@@ -57,6 +57,17 @@ assert_not_contains() {
   fi
 }
 
+assert_no_unresolved_helm_templates() {
+  local file="$1"
+
+  assert_not_contains "${file}" "{{ ."
+  assert_not_contains "${file}" "{{-"
+  assert_not_contains "${file}" "{{ include"
+  assert_not_contains "${file}" "{{ template"
+  assert_not_contains "${file}" "{{ tpl"
+  assert_not_contains "${file}" ".Values."
+}
+
 expect_fail() {
   local expected="$1"
   shift
@@ -133,12 +144,15 @@ prefect_automation_manifest="$(make_tmp_file)"
 render_manifest "${prefect_automation_manifest}" -f "${DEV_VALUES}" -f "${FIXTURE_DIR}/prefect-automation-enabled.yaml"
 prefect_direct_grant_manifest="$(make_tmp_file)"
 render_manifest "${prefect_direct_grant_manifest}" -f "${DEV_VALUES}" -f "${FIXTURE_DIR}/prefect-direct-grant-enabled.yaml"
+prefect_job_runner_manifest="$(make_tmp_file)"
+render_manifest "${prefect_job_runner_manifest}" --namespace dlh-dev -f "${DEV_VALUES}" -f "${FIXTURE_DIR}/prefect-job-runner-enabled.yaml"
 
-assert_not_contains "${default_manifest}" "{{"
-assert_not_contains "${local_manifest}" "{{"
-assert_not_contains "${dev_manifest}" "{{"
-assert_not_contains "${prod_manifest}" "{{"
-assert_not_contains "${shared_manifest}" "{{"
+assert_no_unresolved_helm_templates "${default_manifest}"
+assert_no_unresolved_helm_templates "${local_manifest}"
+assert_no_unresolved_helm_templates "${dev_manifest}"
+assert_no_unresolved_helm_templates "${prod_manifest}"
+assert_no_unresolved_helm_templates "${shared_manifest}"
+assert_no_unresolved_helm_templates "${prefect_job_runner_manifest}"
 
 assert_not_contains "${default_manifest}" "icddr,b"
 assert_not_contains "${default_manifest}" "icddrb.org"
@@ -250,6 +264,19 @@ assert_contains "${prefect_direct_grant_manifest}" "Prefect Direct Grant"
 assert_contains "${prefect_direct_grant_manifest}" "directAccessGrantsEnabled: true"
 assert_contains "${prefect_direct_grant_manifest}" "protocolMapper: oidc-audience-mapper"
 assert_not_contains "${prefect_direct_grant_manifest}" "KC_PREFECT_AUTOMATION_CLIENT_SECRET"
+assert_contains "${prefect_job_runner_manifest}" "name: \"prefect-job-runner\""
+assert_contains "${prefect_job_runner_manifest}" "app.kubernetes.io/component: prefect-job-runner"
+assert_contains "${prefect_job_runner_manifest}" "automountServiceAccountToken: false"
+assert_contains "${prefect_job_runner_manifest}" "name: prefect-job-runner-registry"
+assert_contains "${prefect_job_runner_manifest}" "type: kubernetes.io/dockerconfigjson"
+assert_contains "${prefect_job_runner_manifest}" "ghcr.io"
+assert_contains "${prefect_job_runner_manifest}" "name: \"prefect-worker-base-job-template\""
+assert_contains "${prefect_job_runner_manifest}" "baseJobTemplate.json"
+assert_contains "${prefect_job_runner_manifest}" "\"serviceAccountName\": \"{{ service_account_name }}\""
+assert_contains "${prefect_job_runner_manifest}" "\"default\": \"dlh-dev\""
+assert_contains "${prefect_job_runner_manifest}" "\"default\": \"prefect-job-runner\""
+assert_contains "${prefect_job_runner_manifest}" "sync-base-job-template"
+assert_contains "${prefect_job_runner_manifest}" "prefect work-pool update"
 assert_contains "${dev_manifest}" "\"platformRoles\": {"
 assert_contains "${dev_manifest}" "\"data-analyst\""
 assert_contains "${dev_manifest}" "\"principal-investigator\""

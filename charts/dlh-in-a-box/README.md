@@ -199,7 +199,7 @@ These sections configure repo-owned or heavily wrapped features:
 | --- | --- |
 | `platformHome` | landing page, launchers, health checks, and admin UI |
 | `cloudbeaver` | CloudBeaver image, bootstrap secrets, auth-proxy headers, trust store wiring |
-| `prefect` | high-level Prefect toggles |
+| `prefect` | high-level Prefect toggles and optional flow-run job-runner Kubernetes primitives |
 | `prefect-auth-proxy` | oauth2-proxy in front of Prefect |
 | `cloudbeaver-auth-proxy` | oauth2-proxy in front of CloudBeaver |
 | `ranger-auth-proxy` | oauth2-proxy in front of Ranger browser access |
@@ -220,6 +220,22 @@ These sections are mostly upstream chart values exposed at the umbrella level:
 - `vault`
 - `hivePostgresql`
 - `rangerPostgresql`
+
+### Prefect Job Runner Pull Identity
+
+`prefect.jobRunner` can create a lightweight Kubernetes service account for
+Prefect flow-run Jobs and optionally create a `kubernetes.io/dockerconfigjson`
+pull secret for private registries.
+
+Use `prefect.jobRunner.serviceAccount.imagePullSecrets` when another controller
+creates the secret, such as an external secret operator. Use
+`prefect.jobRunner.pullSecret.create=true` only when Helm should own the registry
+Secret directly.
+
+The chart also creates a `prefect-worker-base-job-template` ConfigMap from the
+packaged Prefect Kubernetes base job template and wires the upstream worker
+chart to use it. When `prefect.jobRunner.enabled=true`, the base job template
+defaults Prefect flow-run Jobs to `prefect.jobRunner.serviceAccount.name`.
 
 ## Identity Model
 

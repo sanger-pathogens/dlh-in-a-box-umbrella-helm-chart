@@ -1,0 +1,27 @@
+{{- $prefect := .Values.prefect | default dict -}}
+{{- $workers := get $prefect "workers" | default dict -}}
+{{- $prefectWorker := .Values.prefectWorker | default dict -}}
+{{- $worker := get $prefectWorker "worker" | default dict -}}
+{{- $config := get $worker "config" | default dict -}}
+{{- $baseJobTemplate := get $config "baseJobTemplate" | default dict -}}
+{{- $configMapName := get $baseJobTemplate "existingConfigMapName" | default "" -}}
+{{- if and (default false (get $prefect "enabled")) (default false (get $workers "enabled")) $configMapName -}}
+{{- $jobRunner := get $prefect "jobRunner" | default dict -}}
+{{- $serviceAccount := get $jobRunner "serviceAccount" | default dict -}}
+{{- $serviceAccountName := default "prefect-job-runner" (get $serviceAccount "name") -}}
+{{- $serviceAccountDefault := ternary ($serviceAccountName | quote) "null" (default false (get $jobRunner "enabled")) -}}
+{{- $baseJobTemplateJson := .Files.Get "files/prefect/kubernetes-base-job-template.json" -}}
+{{- $baseJobTemplateJson = replace "\"__DLH_PREFECT_JOB_RUNNER_SERVICE_ACCOUNT__\"" $serviceAccountDefault $baseJobTemplateJson -}}
+{{- $baseJobTemplateJson = replace "__DLH_PREFECT_JOB_NAMESPACE__" .Release.Namespace $baseJobTemplateJson -}}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ $configMapName | quote }}
+  namespace: {{ .Release.Namespace | quote }}
+  labels:
+    {{- include "dlh-in-a-box.labels" . | nindent 4 }}
+    app.kubernetes.io/component: prefect-worker
+data:
+  baseJobTemplate.json: |-
+    {{- $baseJobTemplateJson | nindent 4 }}
+{{- end }}
