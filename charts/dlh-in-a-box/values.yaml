@@ -5,6 +5,33 @@ global:
   imagePullSecrets: []
   identity: &identity_defaults
     enabled: false
+    accessModel:
+      enabled: true
+      builtInRoles:
+        platform-admin:
+          enabled: true
+          appAccess:
+            superset: true
+            datahub: true
+            jupyterhub: true
+            cloudbeaver: true
+            prefect: true
+            ranger: true
+            trinoUi: true
+        platform-user:
+          enabled: true
+          appAccess:
+            superset: true
+            datahub: true
+            jupyterhub: true
+            cloudbeaver: true
+        platform-viewer:
+          enabled: true
+          appAccess:
+            superset: true
+            datahub: true
+      additionalRoles: {}
+      groupRoleMappings: {}
     provider:
       mode: externalOidc
       keycloak:
@@ -361,6 +388,7 @@ keycloak:
           - email
           - roles
           - groups
+          - platform-access
         clientScopes:
           - name: groups
             protocol: openid-connect
@@ -380,11 +408,69 @@ keycloak:
                   introspection.token.claim: "true"
                   claim.name: {{ .Values.global.identity.external.oidc.groupsClaim | quote }}
                   jsonType.label: String
+          - name: platform-access
+            protocol: openid-connect
+            attributes:
+              include.in.token.scope: "true"
+              display.on.consent.screen: "false"
+            protocolMappers:
+              - name: platform-realm-roles
+                protocol: openid-connect
+                protocolMapper: oidc-usermodel-realm-role-mapper
+                consentRequired: false
+                config:
+                  multivalued: "true"
+                  id.token.claim: "true"
+                  access.token.claim: "true"
+                  userinfo.token.claim: "true"
+                  introspection.token.claim: "true"
+                  claim.name: platform_roles
+                  jsonType.label: String
+        {{- $accessModelRoles := fromJson (include "dlh-in-a-box.identity.accessModelRolesJson" $) }}
+        {{- $accessModelAppClients := fromJson (include "dlh-in-a-box.identity.accessModelAppClientsJson" $) }}
+        {{- $accessModelClientRoleApps := dict }}
+        {{- range $roleKey, $role := $accessModelRoles }}
+          {{- range $appName, $enabled := get $role "appAccess" | default dict }}
+            {{- if and $enabled (hasKey $accessModelAppClients $appName) }}
+              {{- $_ := set $accessModelClientRoleApps $appName true }}
+            {{- end }}
+          {{- end }}
+        {{- end }}
+        {{- if gt (len $accessModelRoles) 0 }}
+        roles:
+          realm:
+          {{- range $roleKey := keys $accessModelRoles | sortAlpha }}
+            {{- $role := get $accessModelRoles $roleKey | default dict }}
+            - name: {{ $roleKey | quote }}
+              {{- if get $role "description" }}
+              description: {{ get $role "description" | quote }}
+              {{- else }}
+              description: {{ printf "Built-in platform role %s" $roleKey | quote }}
+              {{- end }}
+          {{- end }}
+          {{- if gt (len $accessModelClientRoleApps) 0 }}
+          client:
+          {{- range $appName := keys $accessModelClientRoleApps | sortAlpha }}
+            {{- $clientId := get $accessModelAppClients $appName }}
+            {{ $clientId | quote }}:
+              - name: access
+                description: {{ printf "Browser access entitlement for %s" $appName | quote }}
+          {{- end }}
+          {{- end }}
+        {{- end }}
         {{- $bootstrapUsers := default (list) .Values.global.identity.provider.keycloak.bootstrapUsers }}
+        {{- $directoryMode := include "dlh-in-a-box.identity.directoryMode" $ }}
+        {{- $keycloakLocalMode := eq $directoryMode "keycloakLocal" }}
+        {{- $accessModelGroupRoleMappings := get (.Values.global.identity.accessModel | default dict) "groupRoleMappings" | default dict }}
         {{- $managedGroups := fromJsonArray (include "dlh-in-a-box.identity.keycloakManagedGroupsJson" $) }}
         {{- $seededGroups := dict }}
         {{- range $groupName := $managedGroups }}
           {{- $_ := set $seededGroups (toString $groupName) true }}
+        {{- end }}
+        {{- if $keycloakLocalMode }}
+          {{- range $groupName, $_ := $accessModelGroupRoleMappings }}
+            {{- $_ := set $seededGroups (toString $groupName) true }}
+          {{- end }}
         {{- end }}
         {{- range $user := $bootstrapUsers }}
           {{- range $group := default (list) $user.groups }}
@@ -395,6 +481,30 @@ keycloak:
         groups:
         {{- range $groupName := keys $seededGroups | sortAlpha }}
           - name: {{ $groupName | quote }}
+            {{- if and $keycloakLocalMode (hasKey $accessModelGroupRoleMappings $groupName) }}
+            {{- $mapping := get $accessModelGroupRoleMappings $groupName | default dict }}
+            {{- $mappedRoles := get $mapping "roles" | default list }}
+            realmRoles:
+            {{- range $roleName := $mappedRoles }}
+              - {{ $roleName | quote }}
+            {{- end }}
+            {{- $groupClientRoles := dict }}
+            {{- range $roleName := $mappedRoles }}
+              {{- $role := get $accessModelRoles (toString $roleName) | default dict }}
+              {{- range $appName, $enabled := get $role "appAccess" | default dict }}
+                {{- if and $enabled (hasKey $accessModelAppClients $appName) }}
+                  {{- $_ := set $groupClientRoles (get $accessModelAppClients $appName) true }}
+                {{- end }}
+              {{- end }}
+            {{- end }}
+            {{- if gt (len $groupClientRoles) 0 }}
+            clientRoles:
+            {{- range $clientId := keys $groupClientRoles | sortAlpha }}
+              {{ $clientId | quote }}:
+                - access
+            {{- end }}
+            {{- end }}
+            {{- end }}
         {{- end }}
         {{- end }}
         {{- if gt (len $bootstrapUsers) 0 }}
@@ -464,6 +574,7 @@ keycloak:
               - email
               - roles
               - groups
+              - platform-access
         {{- end }}
         {{- if .Values.global.identity.external.clients.trinoDirectGrant.enabled }}
           - clientId: {{ .Values.global.identity.external.clients.trinoDirectGrant.clientId | quote }}
@@ -480,6 +591,7 @@ keycloak:
               - email
               - roles
               - groups
+              - platform-access
             protocolMappers:
               - name: trino-audience
                 protocol: openid-connect
@@ -515,6 +627,7 @@ keycloak:
               - email
               - roles
               - groups
+              - platform-access
         {{- end }}
         {{- if .Values.global.identity.external.clients.datahub.enabled }}
           - clientId: {{ .Values.global.identity.external.clients.datahub.clientId | quote }}
@@ -540,6 +653,7 @@ keycloak:
               - email
               - roles
               - groups
+              - platform-access
         {{- end }}
         {{- if .Values.global.identity.external.clients.platformHome.enabled }}
           - clientId: {{ .Values.global.identity.external.clients.platformHome.clientId | quote }}
@@ -564,6 +678,7 @@ keycloak:
               - email
               - roles
               - groups
+              - platform-access
         {{- end }}
         {{- if .Values.global.identity.external.clients.minio.enabled }}
           - clientId: {{ .Values.global.identity.external.clients.minio.clientId | quote }}
@@ -589,6 +704,7 @@ keycloak:
               - email
               - roles
               - groups
+              - platform-access
             protocolMappers:
               - name: minio-policy
                 protocol: openid-connect
@@ -627,6 +743,7 @@ keycloak:
               - email
               - roles
               - groups
+              - platform-access
         {{- end }}
         {{- if .Values.global.identity.external.clients.headlamp.enabled }}
           - clientId: {{ .Values.global.identity.external.clients.headlamp.clientId | quote }}
@@ -652,6 +769,7 @@ keycloak:
               - email
               - roles
               - groups
+              - platform-access
         {{- end }}
         {{- if .Values.global.identity.external.clients.jupyterhub.enabled }}
           - clientId: {{ .Values.global.identity.external.clients.jupyterhub.clientId | quote }}
@@ -677,6 +795,7 @@ keycloak:
               - email
               - roles
               - groups
+              - platform-access
             {{- if .Values.global.identity.external.clients.trino.enabled }}
             protocolMappers:
               - name: trino-audience
@@ -714,6 +833,7 @@ keycloak:
               - email
               - roles
               - groups
+              - platform-access
         {{- end }}
         {{- if .Values.global.identity.external.clients.rangerProxy.enabled }}
           - clientId: {{ .Values.global.identity.external.clients.rangerProxy.clientId | quote }}
@@ -739,6 +859,7 @@ keycloak:
               - email
               - roles
               - groups
+              - platform-access
         {{- end }}
         {{- if .Values.global.identity.external.clients.prefectProxy.enabled }}
           - clientId: {{ .Values.global.identity.external.clients.prefectProxy.clientId | quote }}
@@ -764,6 +885,7 @@ keycloak:
               - email
               - roles
               - groups
+              - platform-access
         {{- end }}
         {{- if .Values.global.identity.external.clients.prefectAutomation.enabled }}
           - clientId: {{ .Values.global.identity.external.clients.prefectAutomation.clientId | quote }}
@@ -781,6 +903,7 @@ keycloak:
               - email
               - roles
               - groups
+              - platform-access
             protocolMappers:
               - name: prefect-automation-audience
                 protocol: openid-connect
@@ -806,6 +929,7 @@ keycloak:
               - email
               - roles
               - groups
+              - platform-access
             protocolMappers:
               - name: prefect-direct-grant-audience
                 protocol: openid-connect

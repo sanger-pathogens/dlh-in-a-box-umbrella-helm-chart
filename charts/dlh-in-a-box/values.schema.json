@@ -62,6 +62,76 @@
         "retentionNotes"
       ]
     },
+    "accessModel": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "builtInRoles": {
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/definitions/accessModelRole"
+          },
+          "properties": {
+            "platform-admin": {
+              "$ref": "#/definitions/accessModelRole"
+            },
+            "platform-user": {
+              "$ref": "#/definitions/accessModelRole"
+            },
+            "platform-viewer": {
+              "$ref": "#/definitions/accessModelRole"
+            }
+          }
+        },
+        "additionalRoles": {
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/definitions/accessModelRole"
+          }
+        },
+        "groupRoleMappings": {
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/definitions/accessModelGroupRoleMapping"
+          }
+        }
+      }
+    },
+    "accessModelRole": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "label": { "type": "string" },
+        "description": { "type": "string" },
+        "appAccess": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "superset": { "type": "boolean" },
+            "datahub": { "type": "boolean" },
+            "trinoUi": { "type": "boolean" },
+            "jupyterhub": { "type": "boolean" },
+            "cloudbeaver": { "type": "boolean" },
+            "prefect": { "type": "boolean" },
+            "ranger": { "type": "boolean" }
+          }
+        }
+      }
+    },
+    "accessModelGroupRoleMapping": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "roles": {
+          "type": "array",
+          "items": { "type": "string" },
+          "minItems": 1
+        }
+      },
+      "required": ["roles"]
+    },
     "identityContract": {
       "type": "object",
       "additionalProperties": true,
@@ -69,6 +139,10 @@
         "enabled": {
           "type": "boolean",
           "description": "Enable the shared external identity contract used by Trino and the optional UI integrations."
+        },
+        "accessModel": {
+          "$ref": "#/definitions/accessModel",
+          "description": "Keycloak-centered catalog of platform roles, app access, and deployment-owned group-to-role mappings."
         },
         "provider": {
           "type": "object",

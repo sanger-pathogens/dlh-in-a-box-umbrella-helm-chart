@@ -8,6 +8,11 @@
 {{- $keycloakLocalMode := eq $directoryMode "keycloakLocal" -}}
 {{- $ldap := get $directory "ldap" | default dict -}}
 {{- $external := get $identity "external" | default dict -}}
+{{- $accessModel := get $identity "accessModel" | default dict -}}
+{{- $accessModelEnabled := default true (get $accessModel "enabled") -}}
+{{- $builtInRoles := get $accessModel "builtInRoles" | default dict -}}
+{{- $additionalRoles := get $accessModel "additionalRoles" | default dict -}}
+{{- $groupRoleMappings := get $accessModel "groupRoleMappings" | default dict -}}
 {{- $clients := get $external "clients" | default dict -}}
 {{- $trinoIdentity := get $clients "trino" | default dict -}}
 {{- $trinoDirectGrantIdentity := get $clients "trinoDirectGrant" | default dict -}}
@@ -60,12 +65,72 @@
 {{- $bootstrapUsersEnabled := gt (len $bootstrapUsers) 0 -}}
 {{- $hasSupersetOauthClientId := false -}}
 {{- $hasSupersetOauthClientSecret := false -}}
+{{- $accessModelBuiltInKeys := list "platform-admin" "platform-user" "platform-viewer" -}}
+{{- $supportedAccessModelApps := list "superset" "datahub" "trinoUi" "jupyterhub" "cloudbeaver" "prefect" "ranger" -}}
+{{- $accessModelRoleKeys := dict -}}
 
 {{- if hasKey .Values "identity" -}}
 {{- fail "The top-level identity block is no longer supported. Move all shared identity settings under global.identity." -}}
 {{- end -}}
 {{- if hasKey .Values "authorization" -}}
 {{- fail "The top-level authorization block is no longer supported. Move all Ranger settings under global.authorization." -}}
+{{- end -}}
+{{- if $accessModelEnabled -}}
+  {{- range $roleKey, $_ := $builtInRoles -}}
+    {{- if not (has $roleKey $accessModelBuiltInKeys) -}}
+      {{- fail (printf "global.identity.accessModel.builtInRoles.%s is not a chart-owned built-in role. Use global.identity.accessModel.additionalRoles.%s for deployment-specific roles." $roleKey $roleKey) -}}
+    {{- end -}}
+  {{- end -}}
+  {{- range $roleKey := $accessModelBuiltInKeys -}}
+    {{- if not (hasKey $builtInRoles $roleKey) -}}
+      {{- fail (printf "global.identity.accessModel.builtInRoles.%s is required when global.identity.accessModel.enabled=true." $roleKey) -}}
+    {{- end -}}
+    {{- $role := get $builtInRoles $roleKey | default dict -}}
+    {{- if not (default true (get $role "enabled")) -}}
+      {{- fail (printf "global.identity.accessModel.builtInRoles.%s.enabled must be true when global.identity.accessModel.enabled=true." $roleKey) -}}
+    {{- end -}}
+  {{- end -}}
+  {{- range $roleKey, $role := $builtInRoles -}}
+    {{- $_ := set $accessModelRoleKeys $roleKey true -}}
+    {{- if hasKey $role "ranger" -}}
+      {{- fail (printf "global.identity.accessModel.builtInRoles.%s.ranger is not supported. Keycloak role names are synced to Ranger exactly as-is." $roleKey) -}}
+    {{- end -}}
+    {{- range $appName, $_ := get $role "appAccess" | default dict -}}
+      {{- if not (has $appName $supportedAccessModelApps) -}}
+        {{- fail (printf "global.identity.accessModel.builtInRoles.%s.appAccess.%s is not supported. Allowed app access keys are superset, datahub, trinoUi, jupyterhub, cloudbeaver, prefect, and ranger." $roleKey $appName) -}}
+      {{- end -}}
+    {{- end -}}
+  {{- end -}}
+  {{- range $roleKey, $role := $additionalRoles -}}
+    {{- if has $roleKey $accessModelBuiltInKeys -}}
+      {{- fail (printf "global.identity.accessModel.additionalRoles.%s conflicts with a chart-owned built-in role. Override built-in role metadata under global.identity.accessModel.builtInRoles.%s." $roleKey $roleKey) -}}
+    {{- end -}}
+    {{- if hasKey $role "ranger" -}}
+      {{- fail (printf "global.identity.accessModel.additionalRoles.%s.ranger is not supported. Keycloak role names are synced to Ranger exactly as-is." $roleKey) -}}
+    {{- end -}}
+    {{- if default true (get $role "enabled") -}}
+      {{- $_ := set $accessModelRoleKeys $roleKey true -}}
+    {{- end -}}
+    {{- range $appName, $_ := get $role "appAccess" | default dict -}}
+      {{- if not (has $appName $supportedAccessModelApps) -}}
+        {{- fail (printf "global.identity.accessModel.additionalRoles.%s.appAccess.%s is not supported. Allowed app access keys are superset, datahub, trinoUi, jupyterhub, cloudbeaver, prefect, and ranger." $roleKey $appName) -}}
+      {{- end -}}
+    {{- end -}}
+  {{- end -}}
+  {{- range $groupName, $mapping := $groupRoleMappings -}}
+    {{- if not (trim $groupName) -}}
+      {{- fail "global.identity.accessModel.groupRoleMappings must not contain an empty group name." -}}
+    {{- end -}}
+    {{- $roles := get $mapping "roles" | default list -}}
+    {{- if eq (len $roles) 0 -}}
+      {{- fail (printf "global.identity.accessModel.groupRoleMappings.%s.roles must contain at least one platform role." $groupName) -}}
+    {{- end -}}
+    {{- range $roleName := $roles -}}
+      {{- if not (hasKey $accessModelRoleKeys (toString $roleName)) -}}
+        {{- fail (printf "global.identity.accessModel.groupRoleMappings.%s.roles references unknown or disabled platform role %s." $groupName $roleName) -}}
+      {{- end -}}
+    {{- end -}}
+  {{- end -}}
 {{- end -}}
 {{- if and (default false $identity.enabled) (or (not $hasEnvironment) (not (has $environment (list "local" "dev" "prod")))) -}}
 {{- fail "global.environment must be set to local, dev, or prod when shared identity is enabled." -}}

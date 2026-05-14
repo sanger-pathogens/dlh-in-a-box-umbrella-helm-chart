@@ -176,6 +176,14 @@ assert_contains "${local_manifest}" "verifyEmail: false"
 assert_contains "${local_manifest}" "\"accessControlEnabled\": false"
 assert_contains "${local_manifest}" "platform-app-cloudbeaver"
 assert_contains "${local_manifest}" "platform-app-prefect"
+assert_contains "${local_manifest}" "name: platform-access"
+assert_contains "${local_manifest}" 'name: "platform-user"'
+assert_contains "${local_manifest}" 'name: "platform-viewer"'
+assert_contains "${local_manifest}" 'name: "admins"'
+assert_contains "${local_manifest}" 'name: "data-analyst"'
+assert_contains "${local_manifest}" 'name: "principal-investigator"'
+assert_contains "${local_manifest}" 'realmRoles:'
+assert_contains "${local_manifest}" 'clientRoles:'
 assert_contains "${local_manifest}" "trino-cli"
 assert_contains "${local_manifest}" "http-server.authentication.type=OAUTH2"
 assert_not_contains "${local_manifest}" "http-server.authentication.type=OAUTH2,PASSWORD"
@@ -429,6 +437,23 @@ expect_fail_any \
   -- \
   -f "${DEV_VALUES}" \
   -f "${FIXTURE_DIR}/invalid-platform-role-app.yaml"
+
+expect_fail_any \
+  "global.identity.accessModel.builtInRoles.platform-admin.appAccess: Additional property notARealApp is not allowed" \
+  "additional properties 'notARealApp' not allowed" \
+  -- \
+  -f "${DEV_VALUES}" \
+  -f "${FIXTURE_DIR}/invalid-access-model-app.yaml"
+
+expect_fail \
+  "global.identity.accessModel.groupRoleMappings.principal-investigator.roles references unknown or disabled platform role missing-role." \
+  -f "${DEV_VALUES}" \
+  -f "${FIXTURE_DIR}/access-model-unknown-role.yaml"
+
+expect_fail \
+  "global.identity.accessModel.builtInRoles.platform-viewer.ranger is not supported. Keycloak role names are synced to Ranger exactly as-is." \
+  -f "${DEV_VALUES}" \
+  -f "${FIXTURE_DIR}/access-model-ranger-override.yaml"
 
 expect_fail \
   "global.authorization.platformRoleExceptions[0].approvalRef must be set." \

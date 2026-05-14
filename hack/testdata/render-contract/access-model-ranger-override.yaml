@@ -1,0 +1,7 @@
+global:
+  identity:
+    accessModel:
+      builtInRoles:
+        platform-viewer:
+          ranger:
+            roleName: reader
