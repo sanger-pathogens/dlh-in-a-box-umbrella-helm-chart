@@ -1,0 +1,525 @@
+import base64
+import json
+import os
+import ssl
+import time
+import urllib.error
+import urllib.request
+import urllib.parse
+
+from ldap3 import BASE, SUBTREE, Connection, Server, Tls
+from ldap3.core.exceptions import LDAPBindError
+
+CONFIG_PATH = "/opt/ranger-automation/bootstrap-config.json"
+RANGER_URL = os.environ["RANGER_URL"].rstrip("/")
+RANGER_PASSWORD = os.environ["RANGER_ADMIN_PASSWORD"]
+LDAP_BIND_PASSWORD = os.environ["LDAP_BIND_PASSWORD"]
+REST_CSRF_HEADER = None
+REST_CSRF_TOKEN = None
+REST_CSRF_METHODS_TO_IGNORE = {"GET", "OPTIONS", "HEAD", "TRACE"}
+REST_CSRF_READY = False
+
+
+def load_config():
+    with open(CONFIG_PATH, "r", encoding="utf-8") as handle:
+        return json.load(handle)
+
+
+def ranger_headers():
+    return {
+        "Authorization": "Basic "
+        + base64.b64encode(f"admin:{RANGER_PASSWORD}".encode("utf-8")).decode("ascii"),
+        "Accept": "application/json",
+    }
+
+
+def ensure_csrf():
+    global REST_CSRF_HEADER, REST_CSRF_TOKEN, REST_CSRF_METHODS_TO_IGNORE, REST_CSRF_READY
+    if REST_CSRF_READY:
+        return
+    req = urllib.request.Request(
+        f"{RANGER_URL}/service/plugins/csrfconf",
+        headers=ranger_headers(),
+        method="GET",
+    )
+    with urllib.request.urlopen(req, timeout=30) as response:
+        payload = json.loads(response.read().decode("utf-8") or "{}")
+    if payload.get("ranger.rest-csrf.enabled"):
+        REST_CSRF_HEADER = str(payload.get("ranger.rest-csrf.custom-header") or "").strip()
+        REST_CSRF_TOKEN = str(payload.get("_csrfToken") or "").strip()
+        ignored = str(payload.get("ranger.rest-csrf.methods-to-ignore") or "").strip()
+        if ignored:
+            REST_CSRF_METHODS_TO_IGNORE = {method.strip().upper() for method in ignored.split(",") if method.strip()}
+    REST_CSRF_READY = True
+
+
+def ranger_request(method, path, payload=None, ok=(200, 201), parse_json=True):
+    url = f"{RANGER_URL}{path}"
+    headers = ranger_headers()
+    if method.upper() not in REST_CSRF_METHODS_TO_IGNORE:
+        ensure_csrf()
+        if REST_CSRF_HEADER:
+            headers[REST_CSRF_HEADER] = REST_CSRF_TOKEN or '""'
+    body = None
+    if payload is not None:
+        body = json.dumps(payload).encode("utf-8")
+        headers["Content-Type"] = "application/json"
+    req = urllib.request.Request(url, data=body, headers=headers, method=method)
+    try:
+        with urllib.request.urlopen(req, timeout=30) as response:
+            data = response.read().decode("utf-8")
+            if not parse_json:
+                return data
+            return json.loads(data) if data else None
+    except urllib.error.HTTPError as exc:
+        if exc.code in ok:
+            data = exc.read().decode("utf-8")
+            if not parse_json:
+                return data
+            return json.loads(data) if data else None
+        raise
+
+
+def wait_for_ranger():
+    deadline = time.time() + 600
+    while time.time() < deadline:
+        try:
+            ranger_request("GET", "/login.jsp", ok=(200,), parse_json=False)
+            return
+        except Exception:
+            time.sleep(5)
+    raise RuntimeError("Timed out waiting for Ranger Admin")
+
+
+def attr_value(entry, name):
+    try:
+        return str(entry[name].value or "")
+    except Exception:
+        return ""
+
+
+def escape_ldap_filter_value(value):
+    escaped = []
+    for char in str(value or ""):
+        if char == "\\":
+            escaped.append("\\5c")
+        elif char == "*":
+            escaped.append("\\2a")
+        elif char == "(":
+            escaped.append("\\28")
+        elif char == ")":
+            escaped.append("\\29")
+        elif char == "\x00":
+            escaped.append("\\00")
+        else:
+            escaped.append(char)
+    return "".join(escaped)
+
+
+def normalize_names(values):
+    seen = set()
+    normalized = []
+    for value in values or []:
+        name = str(value or "").strip()
+        if not name or name in seen:
+            continue
+        seen.add(name)
+        normalized.append(name)
+    return normalized
+
+
+def configured_platform_roles(config):
+    roles = []
+    for role_key in sorted(config.get("platformRoles", {})):
+        raw_role = config["platformRoles"][role_key] or {}
+        ranger_cfg = raw_role.get("ranger", {}) or {}
+        members = raw_role.get("members", {}) or {}
+        portal_cfg = raw_role.get("portal", {}) or {}
+        roles.append(
+            {
+                "name": str(ranger_cfg.get("roleName") or role_key).strip(),
+                "users": normalize_names(members.get("users", [])),
+                "groups": normalize_names(members.get("directoryGroups", [])),
+                "manageable": bool(portal_cfg.get("manageable", True)),
+            }
+        )
+    return roles
+
+
+def get_role(service_name, role_name):
+    encoded_role_name = urllib.parse.quote(str(role_name or "").strip(), safe="")
+    encoded_service_name = urllib.parse.quote(str(service_name or "").strip(), safe="")
+    payload = ranger_request(
+        "GET",
+        f"/service/roles/roles/name/{encoded_role_name}?serviceName={encoded_service_name}",
+        ok=(200, 404),
+    )
+    return payload if isinstance(payload, dict) and payload.get("name") else None
+
+
+def list_users():
+    users = []
+    start_index = 0
+    page_size = 200
+    while True:
+        payload = ranger_request(
+            "GET",
+            f"/service/xusers/users?startIndex={start_index}&pageSize={page_size}",
+            ok=(200,),
+        ) or {}
+        batch = payload.get("vXUsers", []) or []
+        if not batch:
+            break
+        users.extend(batch)
+        total_count = int(payload.get("totalCount", len(users)) or len(users))
+        if len(users) >= total_count:
+            break
+        start_index += len(batch)
+    return users
+
+
+def build_synced_user(username, first_name="", last_name="", email_address=""):
+    username = str(username or "").strip()
+    first_name = str(first_name or "").strip() or username
+    last_name = str(last_name or "").strip() or "User"
+    email_address = str(email_address or "").strip()
+    return {
+        "name": username,
+        "firstName": first_name,
+        "lastName": last_name,
+        "emailAddress": email_address,
+        "status": 1,
+        "isVisible": 1,
+        "userSource": 1,
+        "userRoleList": ["ROLE_USER"],
+        "syncSource": "LDAP",
+    }
+
+
+def search_user_by_dn(conn, ldap_cfg, member_dn):
+    conn.search(
+        member_dn,
+        "(objectClass=*)",
+        search_scope=BASE,
+        attributes=[
+            ldap_cfg["usernameAttribute"],
+            ldap_cfg["firstNameAttribute"],
+            ldap_cfg["lastNameAttribute"],
+            ldap_cfg["emailAttribute"],
+        ],
+    )
+    if not conn.entries:
+        return None
+    return conn.entries[0]
+
+
+def search_user_by_username(conn, ldap_cfg, username):
+    username = str(username or "").strip()
+    if not username:
+        return None
+    username_attribute = ldap_cfg["usernameAttribute"]
+    search_filter = f"({username_attribute}={escape_ldap_filter_value(username)})"
+    conn.search(
+        ldap_cfg["userBaseDn"],
+        search_filter,
+        search_scope=SUBTREE,
+        attributes=[
+            ldap_cfg["usernameAttribute"],
+            ldap_cfg["firstNameAttribute"],
+            ldap_cfg["lastNameAttribute"],
+            ldap_cfg["emailAttribute"],
+        ],
+    )
+    if not conn.entries:
+        return None
+    return conn.entries[0]
+
+
+def synced_user_from_entry(entry, ldap_cfg):
+    username = attr_value(entry, ldap_cfg["usernameAttribute"])
+    if not username:
+        return None, None
+    return username, build_synced_user(
+        username,
+        first_name=attr_value(entry, ldap_cfg["firstNameAttribute"]),
+        last_name=attr_value(entry, ldap_cfg["lastNameAttribute"]),
+        email_address=attr_value(entry, ldap_cfg["emailAttribute"]),
+    )
+
+
+def direct_ldap_usernames(config, configured_roles):
+    usernames = set()
+    for role in configured_roles:
+        if not role.get("manageable", True):
+            continue
+        usernames.update(role["users"])
+
+    for exception in config.get("platformRoleExceptions", []) or []:
+        username = str((exception or {}).get("username") or "").strip()
+        if username:
+            usernames.add(username)
+
+    membership_source = str((config.get("ranger") or {}).get("platformRoleMembershipSource", "git") or "git").lower()
+    if membership_source == "ranger":
+        service_name = str((config.get("ranger") or {}).get("serviceName") or "").strip()
+        for role in configured_roles:
+            if not role.get("manageable", True):
+                continue
+            current_role = get_role(service_name, role["name"])
+            if not current_role:
+                continue
+            for user in current_role.get("users", []) or []:
+                username = str((user or {}).get("name") or "").strip()
+                if username:
+                    usernames.add(username)
+
+    usernames -= protected_usernames(config)
+    service_username = str((config.get("ranger") or {}).get("serviceUsername") or "").strip()
+    if service_username:
+        usernames.discard(service_username)
+    return usernames
+
+
+def desired_usernames(config, configured_roles, synced_ldap_users):
+    desired = set(normalize_names(synced_ldap_users))
+
+    for role in configured_roles:
+        desired.update(role["users"])
+
+    for exception in config.get("platformRoleExceptions", []) or []:
+        username = str((exception or {}).get("username") or "").strip()
+        if username:
+            desired.add(username)
+
+    service_username = str((config.get("ranger") or {}).get("serviceUsername") or "").strip()
+    if service_username:
+        desired.add(service_username)
+    for policy in (config.get("ranger") or {}).get("bootstrapPolicies", []) or []:
+        for key in [
+            "policyItems",
+            "denyPolicyItems",
+            "allowExceptions",
+            "denyExceptions",
+            "dataMaskPolicyItems",
+            "rowFilterPolicyItems",
+        ]:
+            for item in policy.get(key, []) or []:
+                desired.update(normalize_names(item.get("users", [])))
+
+    membership_source = str((config.get("ranger") or {}).get("platformRoleMembershipSource", "git") or "git").lower()
+    if membership_source == "ranger":
+        service_name = str((config.get("ranger") or {}).get("serviceName") or "").strip()
+        for role in configured_roles:
+            current_role = get_role(service_name, role["name"])
+            if not current_role:
+                continue
+            for user in current_role.get("users", []) or []:
+                username = str((user or {}).get("name") or "").strip()
+                if username:
+                    desired.add(username)
+
+    return desired
+
+
+def protected_usernames(config):
+    ranger_cfg = config.get("ranger") or {}
+    protected = {"admin", "rangerusersync", "rangertagsync"}
+    protected.update(normalize_names(ranger_cfg.get("serviceAdminUsers", [])))
+    protected.update(normalize_names(ranger_cfg.get("superUsers", [])))
+    return {username for username in protected if username}
+
+
+def delete_user(user_id):
+    ranger_request(
+        "DELETE",
+        f"/service/xusers/secure/users/id/{user_id}?forceDelete=true",
+        ok=(200, 204, 404),
+        parse_json=False,
+    )
+
+
+def prune_unexpected_users(config, configured_roles, synced_ldap_users):
+    keep_usernames = desired_usernames(config, configured_roles, synced_ldap_users)
+    protected = protected_usernames(config)
+    stale_users = []
+    for user in list_users():
+        username = str(user.get("name") or "").strip()
+        if not username:
+            continue
+        if username in protected:
+            continue
+        if int(user.get("userSource", 1) or 1) == 0:
+            continue
+        if username in keep_usernames:
+            continue
+        stale_users.append(user)
+
+    if not stale_users:
+        print("No stale Ranger users found.")
+        return
+
+    deleted = []
+    failed = []
+    for user in stale_users:
+        username = str(user.get("name") or "").strip()
+        try:
+            delete_user(user["id"])
+            deleted.append(username)
+        except urllib.error.HTTPError as exc:
+            failed.append((username, exc.code, exc.read().decode("utf-8", errors="replace")))
+
+    if deleted:
+        print("Deleted stale Ranger users: " + ", ".join(sorted(name for name in deleted if name)))
+    if failed:
+        for username, status_code, body in failed:
+            print(f"WARNING: unable to delete stale Ranger user {username}: HTTP {status_code} {body}")
+
+
+def sync(config):
+    ldap_cfg = config["ldap"]
+    configured_roles = configured_platform_roles(config)
+    managed_groups = sorted({group_name for role in configured_roles for group_name in role["groups"]})
+    parsed = urllib.parse.urlparse(ldap_cfg["url"])
+    use_ssl = parsed.scheme == "ldaps"
+    host = parsed.hostname or ldap_cfg["url"]
+    port = parsed.port or (636 if use_ssl else 389)
+    tls = None
+    if use_ssl:
+        trusted_ca_path = ldap_cfg.get("trustedCaPath")
+        if ldap_cfg.get("allowInsecure", False):
+            tls = Tls(validate=ssl.CERT_NONE)
+        elif trusted_ca_path and os.path.exists(trusted_ca_path):
+            tls = Tls(validate=ssl.CERT_REQUIRED, ca_certs_file=trusted_ca_path)
+        else:
+            tls = Tls(validate=ssl.CERT_REQUIRED)
+    server = Server(host, port=port, use_ssl=use_ssl, tls=tls, get_info=None)
+    bind_dn = str(ldap_cfg.get("bindDn") or "").strip()
+    if bind_dn and LDAP_BIND_PASSWORD:
+        try:
+            conn = Connection(server, user=bind_dn, password=LDAP_BIND_PASSWORD, auto_bind=True)
+        except LDAPBindError:
+            print(f"LDAP bind failed for {bind_dn}; falling back to anonymous read", flush=True)
+            conn = Connection(server, auto_bind=True)
+    else:
+        conn = Connection(server, auto_bind=True)
+    group_name_attribute = ldap_cfg["groupNameAttribute"]
+    group_search_filter = ldap_cfg["groupSearchFilter"]
+    if managed_groups:
+        escaped_groups = [f"({group_name_attribute}={escape_ldap_filter_value(group_name)})" for group_name in managed_groups]
+        group_search_filter = f"(|{''.join(escaped_groups)})"
+
+    conn.search(
+        ldap_cfg["groupBaseDn"],
+        group_search_filter,
+        search_scope=SUBTREE,
+        attributes=[
+            group_name_attribute,
+            ldap_cfg["groupSearchMemberAttribute"],
+        ],
+    )
+
+    groups = {}
+    users = {}
+
+    for group_entry in conn.entries:
+        group_name = attr_value(group_entry, group_name_attribute)
+        if not group_name:
+            continue
+        if managed_groups and group_name not in managed_groups:
+            continue
+        raw_members = []
+        try:
+            raw_members = list(group_entry[ldap_cfg["groupSearchMemberAttribute"]].values)
+        except Exception:
+            raw_members = []
+
+        member_names = set()
+        for member_dn in raw_members:
+            member_dn = str(member_dn)
+            if not member_dn:
+                continue
+            if "=" in member_dn and "," in member_dn:
+                user_entry = search_user_by_dn(conn, ldap_cfg, member_dn)
+                if user_entry is None:
+                    continue
+                username, synced_user = synced_user_from_entry(user_entry, ldap_cfg)
+                if not username or not synced_user:
+                    continue
+                member_names.add(username)
+                users[username] = synced_user
+            else:
+                member_names.add(member_dn)
+                users.setdefault(member_dn, build_synced_user(member_dn))
+
+        groups[group_name] = sorted(member_names)
+
+    direct_users = direct_ldap_usernames(config, configured_roles)
+    for username in sorted(direct_users):
+        if username in users:
+            continue
+        user_entry = search_user_by_username(conn, ldap_cfg, username)
+        if user_entry is None:
+            print(f"WARNING: approved user {username} was not found in LDAP during Ranger usersync.")
+            continue
+        synced_username, synced_user = synced_user_from_entry(user_entry, ldap_cfg)
+        if not synced_username or not synced_user:
+            print(f"WARNING: approved user {username} resolved in LDAP without a usable username attribute.")
+            continue
+        users[synced_username] = synced_user
+
+    if users:
+        ranger_request(
+            "POST",
+            "/service/xusers/ugsync/users",
+            {"vXUsers": list(users.values())},
+            ok=(200, 201),
+        )
+
+    if groups:
+        ranger_request(
+            "POST",
+            "/service/xusers/ugsync/groups",
+            {
+                "vXGroups": [
+                    {
+                        "name": group_name,
+                        "description": "Synced from LDAP/AD",
+                        "isVisible": 1,
+                        "groupSource": 1,
+                        "syncSource": "LDAP",
+                    }
+                    for group_name in sorted(groups)
+                ]
+            },
+            ok=(200, 201),
+        )
+
+    current = ranger_request("GET", "/service/xusers/ugsync/groupusers", ok=(200,)) or {}
+    deltas = []
+    for group_name, desired_members in groups.items():
+        current_members = set(current.get(group_name, []))
+        desired_members = set(desired_members)
+        add_users = sorted(desired_members - current_members)
+        del_users = sorted(current_members - desired_members)
+        if add_users or del_users:
+            deltas.append(
+                {
+                    "groupName": group_name,
+                    "addUsers": add_users,
+                    "delUsers": del_users,
+                }
+            )
+
+    if deltas:
+        ranger_request("POST", "/service/xusers/ugsync/groupusers", deltas, ok=(200, 201))
+
+    prune_unexpected_users(config, configured_roles, list(users))
+
+
+def main():
+    wait_for_ranger()
+    sync(load_config())
+
+
+if __name__ == "__main__":
+    main()
