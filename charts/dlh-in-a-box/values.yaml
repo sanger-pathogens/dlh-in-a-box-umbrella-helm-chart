@@ -6,7 +6,6 @@ global:
   identity: &identity_defaults
     enabled: false
     accessModel:
-      enabled: true
       builtInRoles:
         platform-admin:
           enabled: true
@@ -1516,7 +1515,7 @@ prefect-auth-proxy:
     # keys `client-id`, `client-secret`, and `cookie-secret`.
     existingSecret: ""
     configFile: |-
-      provider = "oidc"
+      provider = "keycloak-oidc"
       oidc_issuer_url = "{{ include "dlh-in-a-box.identity.issuer" $ }}"
       skip_oidc_discovery = true
       login_url = "{{ include "dlh-in-a-box.identity.authorizeUrl" $ }}"
@@ -1525,7 +1524,7 @@ prefect-auth-proxy:
       profile_url = "{{ include "dlh-in-a-box.identity.internalUserInfoUrl" $ }}"
       scope = "{{ join " " .Values.global.identity.external.oidc.scopes }}"
       email_domains = [{{- range $index, $domain := .Values.global.identity.external.clients.prefectProxy.emailDomains }}{{ if $index }}, {{ end }}{{ $domain | quote }}{{- end }}]
-      allowed_groups = [{{- range $index, $group := .Values.global.identity.external.clients.prefectProxy.allowedGroups }}{{ if $index }}, {{ end }}{{ $group | quote }}{{- end }}]
+      allowed_roles = [{{ printf "%s:access" .Values.global.identity.external.clients.prefectProxy.clientId | quote }}]
       oidc_groups_claim = "{{ .Values.global.identity.external.oidc.groupsClaim }}"
       redirect_url = "{{ .Values.global.identity.external.clients.prefectProxy.redirectUrl }}"
       skip_provider_button = true
@@ -1561,7 +1560,7 @@ cloudbeaver-auth-proxy:
     # keys `client-id`, `client-secret`, and `cookie-secret`.
     existingSecret: ""
     configFile: |-
-      provider = "oidc"
+      provider = "keycloak-oidc"
       oidc_issuer_url = "{{ include "dlh-in-a-box.identity.issuer" $ }}"
       skip_oidc_discovery = true
       login_url = "{{ include "dlh-in-a-box.identity.authorizeUrl" $ }}"
@@ -1570,7 +1569,7 @@ cloudbeaver-auth-proxy:
       profile_url = "{{ include "dlh-in-a-box.identity.internalUserInfoUrl" $ }}"
       scope = "{{ join " " .Values.global.identity.external.oidc.scopes }}"
       email_domains = [{{- range $index, $domain := .Values.global.identity.external.clients.cloudbeaverProxy.emailDomains }}{{ if $index }}, {{ end }}{{ $domain | quote }}{{- end }}]
-      allowed_groups = [{{- range $index, $group := .Values.global.identity.external.clients.cloudbeaverProxy.allowedGroups }}{{ if $index }}, {{ end }}{{ $group | quote }}{{- end }}]
+      allowed_roles = [{{ printf "%s:access" .Values.global.identity.external.clients.cloudbeaverProxy.clientId | quote }}]
       oidc_groups_claim = "{{ .Values.global.identity.external.oidc.groupsClaim }}"
       redirect_url = "{{ .Values.global.identity.external.clients.cloudbeaverProxy.redirectUrl }}"
       skip_provider_button = true
@@ -1607,7 +1606,7 @@ ranger-auth-proxy:
       {{- index .data $secretKey | b64dec -}}
       {{- end -}}
     configFile: |-
-      provider = "oidc"
+      provider = "keycloak-oidc"
       oidc_issuer_url = "{{ include "dlh-in-a-box.identity.issuer" $ }}"
       skip_oidc_discovery = true
       login_url = "{{ include "dlh-in-a-box.identity.authorizeUrl" $ }}"
@@ -1616,7 +1615,7 @@ ranger-auth-proxy:
       profile_url = "{{ include "dlh-in-a-box.identity.internalUserInfoUrl" $ }}"
       scope = "{{ join " " .Values.global.identity.external.oidc.scopes }}"
       email_domains = [{{- range $index, $domain := .Values.global.identity.external.clients.rangerProxy.emailDomains }}{{ if $index }}, {{ end }}{{ $domain | quote }}{{- end }}]
-      allowed_groups = [{{- range $index, $group := .Values.global.identity.external.clients.rangerProxy.allowedGroups }}{{ if $index }}, {{ end }}{{ $group | quote }}{{- end }}]
+      allowed_roles = [{{ printf "%s:access" .Values.global.identity.external.clients.rangerProxy.clientId | quote }}]
       oidc_groups_claim = "{{ .Values.global.identity.external.oidc.groupsClaim }}"
       redirect_url = "{{ .Values.global.identity.external.clients.rangerProxy.redirectUrl }}"
       skip_provider_button = true

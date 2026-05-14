@@ -109,7 +109,6 @@ configuration:
 
 | File | What it targets |
 | --- | --- |
-| `prefect-missing-groups.yaml` | Prefect browser auth client missing allowed groups in shared environments |
 | `prefect-automation-missing-client-id.yaml` | Prefect automation client missing required client ID |
 | `prefect-automation-authproxy-disabled.yaml` | Prefect automation enabled while Prefect auth proxy is disabled |
 | `prefect-automation-prefectproxy-disabled.yaml` | Prefect automation enabled while the shared Prefect browser client is disabled |
@@ -117,7 +116,6 @@ configuration:
 | `prefect-direct-grant-authproxy-disabled.yaml` | Prefect direct-grant enabled while Prefect auth proxy is disabled |
 | `prefect-direct-grant-prefectproxy-disabled.yaml` | Prefect direct-grant enabled while the shared Prefect browser client is disabled |
 | `prefect-token-audience-mismatch.yaml` | Prefect machine and developer bearer-token clients disagree on token audience |
-| `cloudbeaver-missing-groups.yaml` | CloudBeaver browser auth client missing allowed groups in shared environments |
 | `cloudbeaver-missing-secret.yaml` | CloudBeaver auth-proxy config secret missing |
 
 ### Bundled Keycloak bootstrap and `keycloakLocal` edge cases

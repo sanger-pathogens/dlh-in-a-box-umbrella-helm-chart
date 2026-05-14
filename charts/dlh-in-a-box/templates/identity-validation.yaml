@@ -9,7 +9,6 @@
 {{- $ldap := get $directory "ldap" | default dict -}}
 {{- $external := get $identity "external" | default dict -}}
 {{- $accessModel := get $identity "accessModel" | default dict -}}
-{{- $accessModelEnabled := default true (get $accessModel "enabled") -}}
 {{- $builtInRoles := get $accessModel "builtInRoles" | default dict -}}
 {{- $additionalRoles := get $accessModel "additionalRoles" | default dict -}}
 {{- $groupRoleMappings := get $accessModel "groupRoleMappings" | default dict -}}
@@ -68,6 +67,7 @@
 {{- $accessModelBuiltInKeys := list "platform-admin" "platform-user" "platform-viewer" -}}
 {{- $supportedAccessModelApps := list "superset" "datahub" "trinoUi" "jupyterhub" "cloudbeaver" "prefect" "ranger" -}}
 {{- $accessModelRoleKeys := dict -}}
+{{- $accessModelAppAccess := dict -}}
 
 {{- if hasKey .Values "identity" -}}
 {{- fail "The top-level identity block is no longer supported. Move all shared identity settings under global.identity." -}}
@@ -75,7 +75,6 @@
 {{- if hasKey .Values "authorization" -}}
 {{- fail "The top-level authorization block is no longer supported. Move all Ranger settings under global.authorization." -}}
 {{- end -}}
-{{- if $accessModelEnabled -}}
   {{- range $roleKey, $_ := $builtInRoles -}}
     {{- if not (has $roleKey $accessModelBuiltInKeys) -}}
       {{- fail (printf "global.identity.accessModel.builtInRoles.%s is not a chart-owned built-in role. Use global.identity.accessModel.additionalRoles.%s for deployment-specific roles." $roleKey $roleKey) -}}
@@ -83,11 +82,15 @@
   {{- end -}}
   {{- range $roleKey := $accessModelBuiltInKeys -}}
     {{- if not (hasKey $builtInRoles $roleKey) -}}
-      {{- fail (printf "global.identity.accessModel.builtInRoles.%s is required when global.identity.accessModel.enabled=true." $roleKey) -}}
+      {{- fail (printf "global.identity.accessModel.builtInRoles.%s is required." $roleKey) -}}
     {{- end -}}
     {{- $role := get $builtInRoles $roleKey | default dict -}}
-    {{- if not (default true (get $role "enabled")) -}}
-      {{- fail (printf "global.identity.accessModel.builtInRoles.%s.enabled must be true when global.identity.accessModel.enabled=true." $roleKey) -}}
+    {{- $roleEnabled := true -}}
+    {{- if hasKey $role "enabled" -}}
+      {{- $roleEnabled = get $role "enabled" -}}
+    {{- end -}}
+    {{- if not $roleEnabled -}}
+      {{- fail (printf "global.identity.accessModel.builtInRoles.%s.enabled must be true." $roleKey) -}}
     {{- end -}}
   {{- end -}}
   {{- range $roleKey, $role := $builtInRoles -}}
@@ -99,6 +102,9 @@
       {{- if not (has $appName $supportedAccessModelApps) -}}
         {{- fail (printf "global.identity.accessModel.builtInRoles.%s.appAccess.%s is not supported. Allowed app access keys are superset, datahub, trinoUi, jupyterhub, cloudbeaver, prefect, and ranger." $roleKey $appName) -}}
       {{- end -}}
+      {{- if $_ -}}
+        {{- $_ := set $accessModelAppAccess $appName true -}}
+      {{- end -}}
     {{- end -}}
   {{- end -}}
   {{- range $roleKey, $role := $additionalRoles -}}
@@ -108,12 +114,19 @@
     {{- if hasKey $role "ranger" -}}
       {{- fail (printf "global.identity.accessModel.additionalRoles.%s.ranger is not supported. Keycloak role names are synced to Ranger exactly as-is." $roleKey) -}}
     {{- end -}}
-    {{- if default true (get $role "enabled") -}}
+    {{- $roleEnabled := true -}}
+    {{- if hasKey $role "enabled" -}}
+      {{- $roleEnabled = get $role "enabled" -}}
+    {{- end -}}
+    {{- if $roleEnabled -}}
       {{- $_ := set $accessModelRoleKeys $roleKey true -}}
     {{- end -}}
     {{- range $appName, $_ := get $role "appAccess" | default dict -}}
       {{- if not (has $appName $supportedAccessModelApps) -}}
         {{- fail (printf "global.identity.accessModel.additionalRoles.%s.appAccess.%s is not supported. Allowed app access keys are superset, datahub, trinoUi, jupyterhub, cloudbeaver, prefect, and ranger." $roleKey $appName) -}}
+      {{- end -}}
+      {{- if and $roleEnabled $_ -}}
+        {{- $_ := set $accessModelAppAccess $appName true -}}
       {{- end -}}
     {{- end -}}
   {{- end -}}
@@ -131,7 +144,6 @@
       {{- end -}}
     {{- end -}}
   {{- end -}}
-{{- end -}}
 {{- if and (default false $identity.enabled) (or (not $hasEnvironment) (not (has $environment (list "local" "dev" "prod")))) -}}
 {{- fail "global.environment must be set to local, dev, or prod when shared identity is enabled." -}}
 {{- end -}}
@@ -323,14 +335,8 @@
     {{- fail "global.identity.external.clients.cloudbeaverProxy.redirectUrl must also be present in redirectUris." -}}
   {{- end -}}
 {{- end -}}
-{{- if and (get $cloudbeaverIdentity "enabled") (ne $environment "local") (eq (len (get $cloudbeaverIdentity "allowedGroups" | default list)) 0) -}}
-{{- fail "global.identity.external.clients.cloudbeaverProxy.allowedGroups must be set in dev and prod so CloudBeaver is not exposed to every authenticated user." -}}
-{{- end -}}
-{{- if and (get $cloudbeaverIdentity "enabled") (ne $environment "local") (has "*" (get $cloudbeaverIdentity "emailDomains" | default list)) (eq (len (get $cloudbeaverIdentity "allowedGroups" | default list)) 0) -}}
-{{- fail "global.identity.external.clients.cloudbeaverProxy.emailDomains=['*'] requires non-empty allowedGroups outside local environments." -}}
-{{- end -}}
-{{- if and (get $cloudbeaverIdentity "enabled") (ne $environment "local") (has "*" (get $cloudbeaverIdentity "allowedGroups" | default list)) -}}
-{{- fail "global.identity.external.clients.cloudbeaverProxy.allowedGroups must not contain wildcard values outside local environments." -}}
+{{- if and (get $cloudbeaverIdentity "enabled") (not (hasKey $accessModelAppAccess "cloudbeaver")) -}}
+{{- fail "global.identity.accessModel must grant at least one role appAccess.cloudbeaver=true when CloudBeaver proxy auth is enabled." -}}
 {{- end -}}
 {{- if and (get $cloudbeaverIdentity "enabled") (get $cloudbeaverAuthProxyIngress "enabled") (gt (len (get $cloudbeaverAuthProxyIngress "hosts" | default list)) 0) -}}
   {{- $cloudbeaverOrigin := printf "%s://%s" (ternary "https" "http" (gt (len (get $cloudbeaverAuthProxyIngress "tls" | default list)) 0)) (index (get $cloudbeaverAuthProxyIngress "hosts") 0) -}}
@@ -352,11 +358,8 @@
     {{- fail "global.identity.external.clients.rangerProxy.redirectUrl must also be present in redirectUris." -}}
   {{- end -}}
 {{- end -}}
-{{- if and (get $rangerProxyIdentity "enabled") (ne $environment "local") (eq (len (get $rangerProxyIdentity "allowedGroups" | default list)) 0) -}}
-{{- fail "global.identity.external.clients.rangerProxy.allowedGroups must be set in dev and prod so Ranger Admin is not exposed to every authenticated user." -}}
-{{- end -}}
-{{- if and (get $rangerProxyIdentity "enabled") (ne $environment "local") (has "*" (get $rangerProxyIdentity "allowedGroups" | default list)) -}}
-{{- fail "global.identity.external.clients.rangerProxy.allowedGroups must not contain wildcard values outside local environments." -}}
+{{- if and (get $rangerProxyIdentity "enabled") (not (hasKey $accessModelAppAccess "ranger")) -}}
+{{- fail "global.identity.accessModel must grant at least one role appAccess.ranger=true when Ranger proxy auth is enabled." -}}
 {{- end -}}
 {{- if and (get $rangerProxyIdentity "enabled") (get $rangerProxyIngress "enabled") (gt (len (get $rangerProxyIngress "hosts" | default list)) 0) -}}
   {{- $rangerOrigin := printf "%s://%s" (ternary "https" "http" (gt (len (get $rangerProxyIngress "tls" | default list)) 0)) (index (get $rangerProxyIngress "hosts") 0) -}}
@@ -387,14 +390,8 @@
     {{- fail "global.identity.external.clients.prefectProxy.redirectUrl must also be present in redirectUris." -}}
   {{- end -}}
 {{- end -}}
-{{- if and (get $prefectIdentity "enabled") (ne $environment "local") (eq (len (get $prefectIdentity "allowedGroups" | default list)) 0) -}}
-{{- fail "global.identity.external.clients.prefectProxy.allowedGroups must be set in dev and prod so Prefect is not exposed to every authenticated user." -}}
-{{- end -}}
-{{- if and (get $prefectIdentity "enabled") (ne $environment "local") (has "*" (get $prefectIdentity "emailDomains" | default list)) (eq (len (get $prefectIdentity "allowedGroups" | default list)) 0) -}}
-{{- fail "global.identity.external.clients.prefectProxy.emailDomains=['*'] requires non-empty allowedGroups outside local environments." -}}
-{{- end -}}
-{{- if and (get $prefectIdentity "enabled") (ne $environment "local") (has "*" (get $prefectIdentity "allowedGroups" | default list)) -}}
-{{- fail "global.identity.external.clients.prefectProxy.allowedGroups must not contain wildcard values outside local environments." -}}
+{{- if and (get $prefectIdentity "enabled") (not (hasKey $accessModelAppAccess "prefect")) -}}
+{{- fail "global.identity.accessModel must grant at least one role appAccess.prefect=true when Prefect proxy auth is enabled." -}}
 {{- end -}}
 {{- if and (get $prefectIdentity "enabled") (get $prefectProxyIngress "enabled") (gt (len (get $prefectProxyIngress "hosts" | default list)) 0) -}}
   {{- $prefectOrigin := printf "%s://%s" (ternary "https" "http" (gt (len (get $prefectProxyIngress "tls" | default list)) 0)) (index (get $prefectProxyIngress "hosts") 0) -}}

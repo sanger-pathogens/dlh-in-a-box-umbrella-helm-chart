@@ -216,19 +216,19 @@ app.kubernetes.io/managed-by: {{ .Release.Service }}
 {{- $identity := .Values.global.identity | default dict -}}
 {{- $accessModel := get $identity "accessModel" | default dict -}}
 {{- $roles := dict -}}
-{{- if default true (get $accessModel "enabled") -}}
-  {{- $builtInRoles := get $accessModel "builtInRoles" | default dict -}}
-  {{- range $roleKey := list "platform-admin" "platform-user" "platform-viewer" -}}
-    {{- $role := get $builtInRoles $roleKey | default dict -}}
-    {{- if default true (get $role "enabled") -}}
+{{- $builtInRoles := get $accessModel "builtInRoles" | default dict -}}
+{{- range $roleKey := list "platform-admin" "platform-user" "platform-viewer" -}}
+  {{- $role := get $builtInRoles $roleKey | default dict -}}
+  {{- $_ := set $roles $roleKey $role -}}
+{{- end -}}
+{{- range $roleKey, $role := get $accessModel "additionalRoles" | default dict -}}
+    {{- $roleEnabled := true -}}
+    {{- if hasKey $role "enabled" -}}
+      {{- $roleEnabled = get $role "enabled" -}}
+    {{- end -}}
+    {{- if $roleEnabled -}}
       {{- $_ := set $roles $roleKey $role -}}
     {{- end -}}
-  {{- end -}}
-  {{- range $roleKey, $role := get $accessModel "additionalRoles" | default dict -}}
-    {{- if default true (get $role "enabled") -}}
-      {{- $_ := set $roles $roleKey $role -}}
-    {{- end -}}
-  {{- end -}}
 {{- end -}}
 {{- $roles | toJson -}}
 {{- end -}}

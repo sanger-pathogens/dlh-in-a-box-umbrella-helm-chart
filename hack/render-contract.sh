@@ -242,10 +242,16 @@ assert_not_contains "${dev_manifest}" "access-control.name=ranger"
 assert_not_contains "${prod_manifest}" "access-control.name=ranger"
 assert_contains "${dev_manifest}" "access-control.name=file"
 assert_contains "${prod_manifest}" "access-control.name=file"
-assert_contains "${dev_manifest}" 'allowed_groups = [\"platform-app-prefect\", \"platform-role-platform-admin\"]'
-assert_contains "${prod_manifest}" 'allowed_groups = [\"platform-app-prefect\", \"platform-role-platform-admin\"]'
-assert_contains "${dev_manifest}" 'allowed_groups = [\"platform-app-cloudbeaver\", \"platform-role-platform-admin\"]'
-assert_contains "${prod_manifest}" 'allowed_groups = [\"platform-app-cloudbeaver\", \"platform-role-platform-admin\"]'
+assert_contains "${dev_manifest}" 'provider = \"keycloak-oidc\"'
+assert_contains "${prod_manifest}" 'provider = \"keycloak-oidc\"'
+assert_contains "${dev_manifest}" 'allowed_roles = [\"prefect:access\"]'
+assert_contains "${prod_manifest}" 'allowed_roles = [\"prefect:access\"]'
+assert_contains "${dev_manifest}" 'allowed_roles = [\"cloudbeaver:access\"]'
+assert_contains "${prod_manifest}" 'allowed_roles = [\"cloudbeaver:access\"]'
+assert_not_contains "${dev_manifest}" 'allowed_groups = [\"platform-app-prefect\", \"platform-role-platform-admin\"]'
+assert_not_contains "${prod_manifest}" 'allowed_groups = [\"platform-app-prefect\", \"platform-role-platform-admin\"]'
+assert_not_contains "${dev_manifest}" 'allowed_groups = [\"platform-app-cloudbeaver\", \"platform-role-platform-admin\"]'
+assert_not_contains "${prod_manifest}" 'allowed_groups = [\"platform-app-cloudbeaver\", \"platform-role-platform-admin\"]'
 assert_contains "${dev_manifest}" 'skip_oidc_discovery = true'
 assert_contains "${dev_manifest}" 'redeem_url = \"http://dlh-keycloak.'
 assert_contains "${dev_manifest}" '/realms/dlh/protocol/openid-connect/token\"'
@@ -313,11 +319,6 @@ expect_fail \
   -f "${FIXTURE_DIR}/missing-fine-grained-policy.yaml"
 
 expect_fail \
-  "global.identity.external.clients.prefectProxy.allowedGroups must be set in dev and prod so Prefect is not exposed to every authenticated user." \
-  -f "${DEV_VALUES}" \
-  -f "${FIXTURE_DIR}/prefect-missing-groups.yaml"
-
-expect_fail \
   "global.identity.external.clients.prefectAutomation.clientId is required when machine access for Prefect is enabled." \
   -f examples/values-dev.yaml \
   -f "${FIXTURE_DIR}/prefect-automation-missing-client-id.yaml"
@@ -351,11 +352,6 @@ expect_fail \
   "global.identity.external.clients.prefectAutomation.tokenAudience must match global.identity.external.clients.prefectDirectGrant.tokenAudience when both Prefect bearer-token clients are enabled." \
   -f examples/values-dev.yaml \
   -f "${FIXTURE_DIR}/prefect-token-audience-mismatch.yaml"
-
-expect_fail \
-  "global.identity.external.clients.cloudbeaverProxy.allowedGroups must be set in dev and prod so CloudBeaver is not exposed to every authenticated user." \
-  -f "${DEV_VALUES}" \
-  -f "${FIXTURE_DIR}/cloudbeaver-missing-groups.yaml"
 
 expect_fail \
   "global.identity.external.clients.platformHome.redirectUris must be set when bundled Keycloak manages the OIDC client." \
