@@ -80,9 +80,6 @@ global:
             - http://dlh-cloudbeaver-auth-proxy.data-lakehouse-local.svc.cluster.local/oauth2/callback
           webOrigins:
             - http://dlh-cloudbeaver-auth-proxy.data-lakehouse-local.svc.cluster.local
-          allowedGroups:
-            - platform-app-cloudbeaver
-            - platform-role-platform-admin
           emailDomains:
             - "*"
         prefectProxy:
@@ -97,50 +94,22 @@ global:
             - http://dlh-prefect-auth-proxy.data-lakehouse-local.svc.cluster.local/oauth2/callback
           webOrigins:
             - http://dlh-prefect-auth-proxy.data-lakehouse-local.svc.cluster.local
-          allowedGroups:
-            - platform-app-prefect
-            - platform-role-platform-admin
           emailDomains:
             - "*"
     directory:
       mode: keycloakLocal
       ldap:
         enabled: false
-    groupConventions:
-      appAccessPrefix: platform-app-
-      rolePrefix: platform-role-
-      dataPrefix: platform-data-
   authorization:
-    platformRoles:
-      platform-admin:
-        description: Local administrators with full browser access and broad Trino administration rights.
-        members:
-          directoryGroups: []
-        apps:
-          superset: true
-          datahub: true
-          trinoUi: true
-          cloudbeaver: true
-          prefect: true
-      default-readonly-analyst:
-        description: Demo read-only users for the default catalog.
-        members:
-          directoryGroups: []
-        apps:
-          superset: true
-          datahub: true
-          trinoUi: true
-          cloudbeaver: true
-          prefect: false
     platformRoleExceptions: []
     ranger:
       enabled: true
       serviceName: trino
       serviceUsername: trino
       serviceAdminGroups:
-        - platform-role-platform-admin
+        - admins
       superGroups:
-        - platform-role-platform-admin
+        - admins
       useRangerGroups: false
       postgresql:
         enabled: true
@@ -169,7 +138,7 @@ global:
             - groups: []
               users: []
               roles:
-                - default-readonly-analyst
+                - platform-viewer
               accesses:
                 - type: select
                   isAllowed: true
@@ -227,7 +196,7 @@ global:
             - groups: []
               users: []
               roles:
-                - default-readonly-analyst
+                - platform-viewer
               accesses:
                 - type: select
                   isAllowed: true

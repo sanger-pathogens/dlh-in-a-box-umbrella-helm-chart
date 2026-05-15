@@ -9,7 +9,7 @@
 {{- $ldap := get $directory "ldap" | default dict -}}
 {{- $external := get $identity "external" | default dict -}}
 {{- $accessModel := get $identity "accessModel" | default dict -}}
-{{- $builtInRoles := get $accessModel "builtInRoles" | default dict -}}
+{{- $builtinRoles := get $accessModel "builtinRoles" | default dict -}}
 {{- $additionalRoles := get $accessModel "additionalRoles" | default dict -}}
 {{- $groupRoleMappings := get $accessModel "groupRoleMappings" | default dict -}}
 {{- $clients := get $external "clients" | default dict -}}
@@ -78,32 +78,40 @@
 {{- if hasKey $authorization "platformRoleMembershipSource" -}}
 {{- fail "global.authorization.platformRoleMembershipSource is no longer supported. Keycloak is the source of truth for platform roles and role membership." -}}
 {{- end -}}
-  {{- range $roleKey, $_ := $builtInRoles -}}
+{{- if hasKey $authorization "platformRoles" -}}
+{{- fail "global.authorization.platformRoles is no longer supported. Define platform roles and group mappings under global.identity.accessModel." -}}
+{{- end -}}
+{{- range $clientName, $clientConfig := dict "cloudbeaverProxy" $cloudbeaverIdentity "prefectProxy" $prefectIdentity "rangerProxy" $rangerProxyIdentity -}}
+  {{- if hasKey $clientConfig "allowedGroups" -}}
+    {{- fail (printf "global.identity.external.clients.%s.allowedGroups is no longer supported. Browser access is derived from global.identity.accessModel appAccess and enforced with Keycloak client roles." $clientName) -}}
+  {{- end -}}
+{{- end -}}
+  {{- range $roleKey, $_ := $builtinRoles -}}
     {{- if not (has $roleKey $accessModelBuiltInKeys) -}}
-      {{- fail (printf "global.identity.accessModel.builtInRoles.%s is not a chart-owned built-in role. Use global.identity.accessModel.additionalRoles.%s for deployment-specific roles." $roleKey $roleKey) -}}
+      {{- fail (printf "global.identity.accessModel.builtinRoles.%s is not a chart-owned builtin role. Use global.identity.accessModel.additionalRoles.%s for deployment-specific roles." $roleKey $roleKey) -}}
     {{- end -}}
   {{- end -}}
   {{- range $roleKey := $accessModelBuiltInKeys -}}
-    {{- if not (hasKey $builtInRoles $roleKey) -}}
-      {{- fail (printf "global.identity.accessModel.builtInRoles.%s is required." $roleKey) -}}
+    {{- if not (hasKey $builtinRoles $roleKey) -}}
+      {{- fail (printf "global.identity.accessModel.builtinRoles.%s is required." $roleKey) -}}
     {{- end -}}
-    {{- $role := get $builtInRoles $roleKey | default dict -}}
+    {{- $role := get $builtinRoles $roleKey | default dict -}}
     {{- $roleEnabled := true -}}
     {{- if hasKey $role "enabled" -}}
       {{- $roleEnabled = get $role "enabled" -}}
     {{- end -}}
     {{- if not $roleEnabled -}}
-      {{- fail (printf "global.identity.accessModel.builtInRoles.%s.enabled must be true." $roleKey) -}}
+      {{- fail (printf "global.identity.accessModel.builtinRoles.%s.enabled must be true." $roleKey) -}}
     {{- end -}}
   {{- end -}}
-  {{- range $roleKey, $role := $builtInRoles -}}
+  {{- range $roleKey, $role := $builtinRoles -}}
     {{- $_ := set $accessModelRoleKeys $roleKey true -}}
     {{- if hasKey $role "ranger" -}}
-      {{- fail (printf "global.identity.accessModel.builtInRoles.%s.ranger is not supported. Keycloak role names are synced to Ranger exactly as-is." $roleKey) -}}
+      {{- fail (printf "global.identity.accessModel.builtinRoles.%s.ranger is not supported. Keycloak role names are synced to Ranger exactly as-is." $roleKey) -}}
     {{- end -}}
     {{- range $appName, $_ := get $role "appAccess" | default dict -}}
       {{- if not (has $appName $supportedAccessModelApps) -}}
-        {{- fail (printf "global.identity.accessModel.builtInRoles.%s.appAccess.%s is not supported. Allowed app access keys are superset, datahub, trinoUi, jupyterhub, cloudbeaver, prefect, and ranger." $roleKey $appName) -}}
+        {{- fail (printf "global.identity.accessModel.builtinRoles.%s.appAccess.%s is not supported. Allowed app access keys are superset, datahub, trinoUi, jupyterhub, cloudbeaver, prefect, and ranger." $roleKey $appName) -}}
       {{- end -}}
       {{- if $_ -}}
         {{- $_ := set $accessModelAppAccess $appName true -}}
@@ -112,7 +120,7 @@
   {{- end -}}
   {{- range $roleKey, $role := $additionalRoles -}}
     {{- if has $roleKey $accessModelBuiltInKeys -}}
-      {{- fail (printf "global.identity.accessModel.additionalRoles.%s conflicts with a chart-owned built-in role. Override built-in role metadata under global.identity.accessModel.builtInRoles.%s." $roleKey $roleKey) -}}
+      {{- fail (printf "global.identity.accessModel.additionalRoles.%s conflicts with a chart-owned builtin role. Override builtin role metadata under global.identity.accessModel.builtinRoles.%s." $roleKey $roleKey) -}}
     {{- end -}}
     {{- if hasKey $role "ranger" -}}
       {{- fail (printf "global.identity.accessModel.additionalRoles.%s.ranger is not supported. Keycloak role names are synced to Ranger exactly as-is." $roleKey) -}}
@@ -144,6 +152,16 @@
     {{- range $roleName := $roles -}}
       {{- if not (hasKey $accessModelRoleKeys (toString $roleName)) -}}
         {{- fail (printf "global.identity.accessModel.groupRoleMappings.%s.roles references unknown or disabled platform role %s." $groupName $roleName) -}}
+      {{- end -}}
+    {{- end -}}
+  {{- end -}}
+  {{- range $launcherName, $launcher := get $platformHomeValues "launchers" | default dict -}}
+    {{- if hasKey ($launcher | default dict) "requiredGroups" -}}
+      {{- fail (printf "platformHome.launchers.%s.requiredGroups is no longer supported. Use platformHome.launchers.%s.requiredRoles with Keycloak realm role names from global.identity.accessModel." $launcherName $launcherName) -}}
+    {{- end -}}
+    {{- range $roleName := get ($launcher | default dict) "requiredRoles" | default list -}}
+      {{- if not (hasKey $accessModelRoleKeys (toString $roleName)) -}}
+        {{- fail (printf "platformHome.launchers.%s.requiredRoles references unknown or disabled platform role %s." $launcherName $roleName) -}}
       {{- end -}}
     {{- end -}}
   {{- end -}}

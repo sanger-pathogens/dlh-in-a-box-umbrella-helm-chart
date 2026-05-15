@@ -1,5 +1,4 @@
 {{- $authorization := .Values.global.authorization | default dict -}}
-{{- $platformRoles := get $authorization "platformRoles" | default dict -}}
 {{- $platformRoleExceptions := get $authorization "platformRoleExceptions" | default (list) -}}
 {{- $ranger := get $authorization "ranger" | default dict -}}
 {{- $rangerTrino := get $ranger "trino" | default dict -}}
@@ -86,7 +85,6 @@ data:
         )
       )
       "accessModel" $accessModel
-      "platformRoles" $platformRoles
       "platformRoleExceptions" $platformRoleExceptions
       "catalogs" (.Values.global.dataCatalogs | default (dict))
       "trinoJdbcUrl" (include "dlh-in-a-box.ranger.trinoJdbcUrl" .)

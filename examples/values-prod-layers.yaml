@@ -1,42 +1,45 @@
 global:
   environment: prod
   domain: prod.example.com
+  identity:
+    accessModel:
+      additionalRoles:
+        bronze-reader:
+          description: Approved read-only users for the bronze catalog.
+        bronze-writer:
+          description: Approved read-write users for the bronze catalog.
+        silver-reader:
+          description: Approved read-only users for the silver catalog.
+        silver-writer:
+          description: Approved read-write users for the silver catalog.
+        geospatial-reader:
+          description: Approved read-only users for the geospatial catalog.
+        geospatial-writer:
+          description: Approved read-write users for the geospatial catalog.
+      groupRoleMappings:
+        dlh_team:
+          roles:
+            - bronze-reader
+            - silver-reader
+            - geospatial-reader
+        surveillance_dashboard:
+          roles:
+            - bronze-reader
+            - silver-reader
+            - geospatial-reader
+        datahub:
+          roles:
+            - bronze-reader
+        platform-data-bronze-rw:
+          roles:
+            - bronze-writer
+        platform-data-silver-rw:
+          roles:
+            - silver-writer
+        platform-data-geospatial-rw:
+          roles:
+            - geospatial-writer
   authorization:
-    platformRoles:
-      bronze-reader:
-        description: Approved read-only users for the bronze catalog.
-        members:
-          directoryGroups:
-            - dlh_team
-            - surveillance_dashboard
-            - datahub
-      bronze-writer:
-        description: Approved read-write users for the bronze catalog.
-        members:
-          directoryGroups:
-            - platform-data-bronze-rw
-      silver-reader:
-        description: Approved read-only users for the silver catalog.
-        members:
-          directoryGroups:
-            - dlh_team
-            - surveillance_dashboard
-      silver-writer:
-        description: Approved read-write users for the silver catalog.
-        members:
-          directoryGroups:
-            - platform-data-silver-rw
-      geospatial-reader:
-        description: Approved read-only users for the geospatial catalog.
-        members:
-          directoryGroups:
-            - dlh_team
-            - surveillance_dashboard
-      geospatial-writer:
-        description: Approved read-write users for the geospatial catalog.
-        members:
-          directoryGroups:
-            - platform-data-geospatial-rw
     platformRoleExceptions: []
     ranger:
       enabled: true

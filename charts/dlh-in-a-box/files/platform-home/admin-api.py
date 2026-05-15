@@ -21,8 +21,12 @@ RANGER_URL = os.environ.get("RANGER_URL", "").rstrip("/")
 RANGER_PASSWORD = os.environ.get("RANGER_ADMIN_PASSWORD", "")
 USERINFO_URL = os.environ.get("IDENTITY_USERINFO_URL", "")
 EXPECTED_ISSUER = os.environ.get("IDENTITY_EXPECTED_ISSUER", "")
-GROUPS_CLAIM = os.environ.get("OIDC_GROUPS_CLAIM", "groups")
-ADMIN_GROUP = os.environ.get("PLATFORM_ADMIN_GROUP", "")
+ROLES_CLAIM = os.environ.get("OIDC_ROLES_CLAIM", "platform_roles")
+ADMIN_ROLES = [
+    item.strip()
+    for item in os.environ.get("PLATFORM_ADMIN_ROLES", "platform-admin").split(",")
+    if item.strip()
+]
 LDAP_BIND_PASSWORD = os.environ.get("LDAP_BIND_PASSWORD", "")
 ACCESS_CONTROL_STATE_CONFIGMAP_NAME = os.environ.get("ACCESS_CONTROL_STATE_CONFIGMAP_NAME", "")
 ACCESS_CONTROL_STATE_CONFIGMAP_KEY = os.environ.get("ACCESS_CONTROL_STATE_CONFIGMAP_KEY", "state.json")
@@ -192,7 +196,7 @@ def userinfo(token):
         raise
 
 
-def normalize_groups(value):
+def normalize_claim_values(value):
     if isinstance(value, list):
         return [str(item) for item in value if str(item).strip()]
     if isinstance(value, str) and value.strip():
@@ -228,16 +232,16 @@ def authenticate(handler, require_admin=True):
     except ApiError as exc:
         if exc.status != 401:
             raise
-    groups = normalize_groups(profile.get(GROUPS_CLAIM))
-    if not groups:
-        groups = normalize_groups(claims.get(GROUPS_CLAIM))
-    is_admin = bool(ADMIN_GROUP and ADMIN_GROUP in groups)
+    roles = normalize_claim_values(profile.get(ROLES_CLAIM))
+    if not roles:
+        roles = normalize_claim_values(claims.get(ROLES_CLAIM))
+    is_admin = any(role in roles for role in ADMIN_ROLES)
     if require_admin and not is_admin:
         raise ApiError(403, "Platform administration is limited to platform administrators.")
     merged = dict(claims)
     merged.update(profile if isinstance(profile, dict) else {})
     merged["accessToken"] = token
-    merged["groups"] = groups
+    merged["roles"] = roles
     merged["is_admin"] = is_admin
     return merged
 
@@ -255,9 +259,9 @@ def launcher_entry(name):
 
 
 def authorize_launcher(launcher, profile):
-    required_groups = normalize_groups(launcher.get("requiredGroups"))
-    groups = normalize_groups(profile.get("groups"))
-    if required_groups and not any(group in groups for group in required_groups):
+    required_roles = normalize_claim_values(launcher.get("requiredRoles"))
+    roles = normalize_claim_values(profile.get("roles"))
+    if required_roles and not any(role in roles for role in required_roles):
         raise ApiError(403, "You do not have access to that launcher.")
 
 
@@ -898,7 +902,7 @@ def list_platform_roles():
 
 
 def visible_items_for(profile):
-    groups = set(normalize_groups(profile.get("groups")))
+    roles = set(normalize_claim_values(profile.get("roles")))
     is_admin = bool(profile.get("is_admin"))
     visible = []
     for item in CONFIG.get("items", []):
@@ -906,12 +910,12 @@ def visible_items_for(profile):
             continue
         if item.get("adminOnly") and not is_admin:
             continue
-        required_groups = {
-            str(group).strip()
-            for group in (item.get("requiredGroups") or [])
-            if str(group).strip()
+        required_roles = {
+            str(role).strip()
+            for role in (item.get("requiredRoles") or [])
+            if str(role).strip()
         }
-        if required_groups and groups.isdisjoint(required_groups):
+        if required_roles and roles.isdisjoint(required_roles):
             continue
         visible.append(item)
     return visible

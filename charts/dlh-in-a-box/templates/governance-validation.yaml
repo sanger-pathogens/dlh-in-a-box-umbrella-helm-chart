@@ -3,40 +3,15 @@
 {{- $environment := default "" $global.environment -}}
 {{- $catalogs := $global.dataCatalogs | default dict -}}
 {{- $authorization := $global.authorization | default dict -}}
-{{- $platformRoles := get $authorization "platformRoles" | default dict -}}
 {{- $platformRoleExceptions := get $authorization "platformRoleExceptions" | default (list) -}}
 {{- $ranger := get $authorization "ranger" | default dict -}}
 {{- $bootstrapPolicies := get $ranger "bootstrapPolicies" | default (dig "bootstrap" "policies" (list) $ranger) -}}
 {{- $importCatalogAcls := default false $ranger.importCatalogAcls -}}
-{{- $supportedPlatformApps := list "superset" "datahub" "trinoUi" "jupyterhub" "cloudbeaver" "prefect" -}}
+{{- $accessModelRoles := fromJson (include "dlh-in-a-box.identity.accessModelRolesJson" .) -}}
 {{- $platformRoleKeys := dict -}}
-{{- $platformRoleNames := dict -}}
 
-{{- range $roleKey, $_ := $platformRoles -}}
+{{- range $roleKey, $_ := $accessModelRoles -}}
   {{- $_ := set $platformRoleKeys $roleKey true -}}
-{{- end -}}
-
-{{- range $roleKey, $role := $platformRoles -}}
-  {{- if not (trim (default "" (get $role "description"))) -}}
-    {{- fail (printf "global.authorization.platformRoles.%s.description must be set." $roleKey) -}}
-  {{- end -}}
-  {{- $members := get $role "members" | default dict -}}
-  {{- $apps := get $role "apps" | default dict -}}
-  {{- range $appName, $_ := $apps -}}
-    {{- if not (has $appName $supportedPlatformApps) -}}
-      {{- fail (printf "global.authorization.platformRoles.%s.apps.%s is not supported. Allowed app entitlements are superset, datahub, trinoUi, jupyterhub, cloudbeaver, and prefect." $roleKey $appName) -}}
-    {{- end -}}
-  {{- end -}}
-  {{- range $nestedRole := get $members "nestedRoles" | default (list) -}}
-    {{- if not (hasKey $platformRoleKeys (toString $nestedRole)) -}}
-      {{- fail (printf "global.authorization.platformRoles.%s.members.nestedRoles references unknown platform role %s." $roleKey $nestedRole) -}}
-    {{- end -}}
-  {{- end -}}
-  {{- $rangerRoleName := default $roleKey (dig "ranger" "roleName" "" $role) -}}
-  {{- if hasKey $platformRoleNames $rangerRoleName -}}
-    {{- fail (printf "global.authorization.platformRoles.%s resolves to Ranger role name %s, but that Ranger role name is already used by another platform role." $roleKey $rangerRoleName) -}}
-  {{- end -}}
-  {{- $_ := set $platformRoleNames $rangerRoleName true -}}
 {{- end -}}
 
 {{- if and (gt (len $platformRoleExceptions) 0) (not (default false $ranger.enabled)) -}}

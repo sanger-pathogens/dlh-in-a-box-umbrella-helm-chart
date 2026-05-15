@@ -174,8 +174,8 @@ assert_contains "${local_manifest}" "access-control.name=file"
 assert_contains "${local_manifest}" "registrationAllowed: true"
 assert_contains "${local_manifest}" "verifyEmail: false"
 assert_contains "${local_manifest}" "\"accessControlEnabled\": false"
-assert_contains "${local_manifest}" "platform-app-cloudbeaver"
-assert_contains "${local_manifest}" "platform-app-prefect"
+assert_not_contains "${local_manifest}" "platform-app-cloudbeaver"
+assert_not_contains "${local_manifest}" "platform-app-prefect"
 assert_contains "${local_manifest}" "name: platform-access"
 assert_contains "${local_manifest}" 'name: "platform-user"'
 assert_contains "${local_manifest}" 'name: "platform-viewer"'
@@ -210,6 +210,16 @@ assert_contains "${dev_manifest}" "https://jupyterhub.dev.example.org/hub/oauth_
 assert_contains "${prod_manifest}" "https://jupyterhub.data-platform.example.org/hub/oauth_callback"
 assert_contains "${dev_manifest}" "Administration"
 assert_contains "${prod_manifest}" "Administration"
+assert_contains "${dev_manifest}" "\"rolesClaim\": \"platform_roles\""
+assert_contains "${prod_manifest}" "\"rolesClaim\": \"platform_roles\""
+assert_contains "${dev_manifest}" "\"requiredRoles\": ["
+assert_contains "${prod_manifest}" "\"requiredRoles\": ["
+assert_contains "${dev_manifest}" "OIDC_ROLES_CLAIM"
+assert_contains "${dev_manifest}" "PLATFORM_ADMIN_ROLES"
+assert_not_contains "${dev_manifest}" "\"requiredGroups\": ["
+assert_not_contains "${prod_manifest}" "\"requiredGroups\": ["
+assert_not_contains "${dev_manifest}" "OIDC_GROUPS_CLAIM"
+assert_not_contains "${dev_manifest}" "PLATFORM_ADMIN_GROUPS"
 assert_contains "${dev_manifest}" 'add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;'
 assert_contains "${prod_manifest}" 'add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;'
 assert_contains "${dev_manifest}" 'add_header X-Content-Type-Options "nosniff" always;'
@@ -231,8 +241,8 @@ assert_contains "${dev_manifest}" "https://trino.dev.example.org/oauth2/callback
 assert_contains "${prod_manifest}" "https://trino.data-platform.example.org/oauth2/callback"
 assert_contains "${dev_manifest}" "trino-cli"
 assert_contains "${prod_manifest}" "trino-cli"
-assert_contains "${dev_manifest}" "platform-app-jupyterhub"
-assert_contains "${prod_manifest}" "platform-app-jupyterhub"
+assert_not_contains "${dev_manifest}" "platform-app-jupyterhub"
+assert_not_contains "${prod_manifest}" "platform-app-jupyterhub"
 assert_contains "${dev_manifest}" "KC_JUPYTERHUB_CLIENT_SECRET"
 assert_contains "${prod_manifest}" "KC_JUPYTERHUB_CLIENT_SECRET"
 assert_contains "${dev_manifest}" "ICDDRB_Trino_Demo.ipynb"
@@ -299,7 +309,7 @@ assert_contains "${prefect_job_runner_manifest}" "\"default\": \"dlh-dev\""
 assert_contains "${prefect_job_runner_manifest}" "\"default\": \"prefect-job-runner\""
 assert_contains "${prefect_job_runner_manifest}" "sync-base-job-template"
 assert_contains "${prefect_job_runner_manifest}" "prefect work-pool update"
-assert_contains "${dev_manifest}" "\"platformRoles\": {"
+assert_contains "${dev_manifest}" "\"accessModel\": {"
 assert_contains "${dev_manifest}" "\"data-analyst\""
 assert_contains "${dev_manifest}" "\"principal-investigator\""
 assert_contains "${prod_manifest}" "\"platform-admin\""
@@ -436,14 +446,14 @@ expect_fail \
   -f "${FIXTURE_DIR}/legacy-trino-authentication-type.yaml"
 
 expect_fail_any \
-  "global.authorization.platformRoles.platform-admin.apps: Additional property notARealApp is not allowed" \
-  "additional properties 'notARealApp' not allowed" \
+  "global.authorization.platformRoles is no longer supported. Define platform roles and group mappings under global.identity.accessModel." \
+  "global.authorization.platformRoles is no longer supported" \
   -- \
   -f "${DEV_VALUES}" \
   -f "${FIXTURE_DIR}/invalid-platform-role-app.yaml"
 
 expect_fail_any \
-  "global.identity.accessModel.builtInRoles.platform-admin.appAccess: Additional property notARealApp is not allowed" \
+  "global.identity.accessModel.builtinRoles.platform-admin.appAccess: Additional property notARealApp is not allowed" \
   "additional properties 'notARealApp' not allowed" \
   -- \
   -f "${DEV_VALUES}" \
@@ -455,9 +465,19 @@ expect_fail \
   -f "${FIXTURE_DIR}/access-model-unknown-role.yaml"
 
 expect_fail \
-  "global.identity.accessModel.builtInRoles.platform-viewer.ranger is not supported. Keycloak role names are synced to Ranger exactly as-is." \
+  "global.identity.accessModel.builtinRoles.platform-viewer.ranger is not supported. Keycloak role names are synced to Ranger exactly as-is." \
   -f "${DEV_VALUES}" \
   -f "${FIXTURE_DIR}/access-model-ranger-override.yaml"
+
+expect_fail \
+  "global.identity.external.clients.cloudbeaverProxy.allowedGroups is no longer supported. Browser access is derived from global.identity.accessModel appAccess and enforced with Keycloak client roles." \
+  -f "${DEV_VALUES}" \
+  -f "${FIXTURE_DIR}/oauth2-proxy-allowed-groups.yaml"
+
+expect_fail \
+  "platformHome.launchers.vault.requiredGroups is no longer supported. Use platformHome.launchers.vault.requiredRoles with Keycloak realm role names from global.identity.accessModel." \
+  -f "${DEV_VALUES}" \
+  -f "${FIXTURE_DIR}/platform-home-required-groups.yaml"
 
 expect_fail_any \
   "global.authorization.platformRoleMembershipSource is no longer supported. Keycloak is the source of truth for platform roles and role membership." \

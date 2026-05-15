@@ -15,12 +15,14 @@
 {{- $portalHealth := get $platformHomeValues "health" | default dict -}}
 {{- $global := .Values.global | default dict -}}
 {{- $identity := get $global "identity" | default dict -}}
+{{- $accessModel := get $identity "accessModel" | default dict -}}
+{{- $accessModelRoles := fromJson (include "dlh-in-a-box.identity.accessModelRolesJson" .) -}}
+{{- $groupRoleMappings := get $accessModel "groupRoleMappings" | default dict -}}
 {{- $directory := get $identity "directory" | default dict -}}
 {{- $directoryMode := include "dlh-in-a-box.identity.directoryMode" . -}}
 {{- $keycloakLocalMode := eq $directoryMode "keycloakLocal" -}}
 {{- $ldap := get $directory "ldap" | default dict -}}
 {{- $authorization := get $global "authorization" | default dict -}}
-{{- $platformRoles := get $authorization "platformRoles" | default dict -}}
 {{- $platformRoleExceptions := get $authorization "platformRoleExceptions" | default (list) -}}
 {{- $ranger := get $authorization "ranger" | default dict -}}
 {{- $rangerAdmin := get $ranger "admin" | default dict -}}
@@ -30,7 +32,15 @@
 {{- $rangerProxyIdentity := get $clients "rangerProxy" | default dict -}}
 {{- $oidc := get $external "oidc" | default dict -}}
 {{- $rangerBrowserUrl := default (default "" (get $rangerAdmin "browserUrl")) (first (default (list) (get $rangerProxyIdentity "webOrigins"))) -}}
-{{- $adminRequiredGroup := include "dlh-in-a-box.group.role" (dict "root" . "name" "platform-admin") -}}
+{{- $roleGroupsByRole := dict -}}
+{{- range $groupName, $mapping := $groupRoleMappings -}}
+  {{- range $roleName := get ($mapping | default dict) "roles" | default (list) -}}
+    {{- $roleName = toString $roleName -}}
+    {{- $existingGroups := get $roleGroupsByRole $roleName | default (list) -}}
+    {{- $_ := set $roleGroupsByRole $roleName (uniq (append $existingGroups (toString $groupName))) -}}
+  {{- end -}}
+{{- end -}}
+{{- $adminRequiredRoles := list "platform-admin" -}}
 {{- $ldapEnabled := default false $ldap.enabled -}}
 {{- $ldapUrl := include "dlh-in-a-box.identity.directory.url" . -}}
 {{- $ldapUserBaseDn := include "dlh-in-a-box.identity.directory.userBaseDn" . -}}
@@ -69,39 +79,36 @@
       "authMount" (default "" (get $launcher "authMount"))
       "role" (default "" (get $launcher "role"))
       "wrapTtl" (default "" (get $launcher "wrapTtl"))
-      "requiredGroups" (default (list) (get $launcher "requiredGroups"))
+      "requiredRoles" (default (list) (get $launcher "requiredRoles"))
     ) -}}
   {{- end -}}
 {{- end -}}
 {{- $platformRoleViews := list -}}
-{{- $appRoleGroups := dict
+{{- $appRequiredRoles := dict
   "superset" (list)
   "datahub" (list)
   "jupyterhub" (list)
   "cloudbeaver" (list)
   "prefect" (list)
 -}}
-{{- range $roleKey := keys $platformRoles | sortAlpha -}}
-  {{- $role := get $platformRoles $roleKey | default dict -}}
-  {{- $members := get $role "members" | default dict -}}
-  {{- $roleApps := get $role "apps" | default dict -}}
-  {{- $rolePortal := get $role "portal" | default dict -}}
-  {{- $rangerRoleName := default $roleKey (dig "ranger" "roleName" "" $role) -}}
-  {{- $directoryGroups := get $members "directoryGroups" | default (list) -}}
+{{- range $roleKey := keys $accessModelRoles | sortAlpha -}}
+  {{- $role := get $accessModelRoles $roleKey | default dict -}}
+  {{- $roleApps := get $role "appAccess" | default dict -}}
+  {{- $directoryGroups := get $roleGroupsByRole $roleKey | default (list) -}}
   {{- if default false (get $roleApps "superset") -}}
-    {{- $_ := set $appRoleGroups "superset" (uniq (concat (get $appRoleGroups "superset") $directoryGroups)) -}}
+    {{- $_ := set $appRequiredRoles "superset" (uniq (append (get $appRequiredRoles "superset") $roleKey)) -}}
   {{- end -}}
   {{- if default false (get $roleApps "datahub") -}}
-    {{- $_ := set $appRoleGroups "datahub" (uniq (concat (get $appRoleGroups "datahub") $directoryGroups)) -}}
+    {{- $_ := set $appRequiredRoles "datahub" (uniq (append (get $appRequiredRoles "datahub") $roleKey)) -}}
   {{- end -}}
   {{- if default false (get $roleApps "jupyterhub") -}}
-    {{- $_ := set $appRoleGroups "jupyterhub" (uniq (concat (get $appRoleGroups "jupyterhub") $directoryGroups)) -}}
+    {{- $_ := set $appRequiredRoles "jupyterhub" (uniq (append (get $appRequiredRoles "jupyterhub") $roleKey)) -}}
   {{- end -}}
   {{- if default false (get $roleApps "cloudbeaver") -}}
-    {{- $_ := set $appRoleGroups "cloudbeaver" (uniq (concat (get $appRoleGroups "cloudbeaver") $directoryGroups)) -}}
+    {{- $_ := set $appRequiredRoles "cloudbeaver" (uniq (append (get $appRequiredRoles "cloudbeaver") $roleKey)) -}}
   {{- end -}}
   {{- if default false (get $roleApps "prefect") -}}
-    {{- $_ := set $appRoleGroups "prefect" (uniq (concat (get $appRoleGroups "prefect") $directoryGroups)) -}}
+    {{- $_ := set $appRequiredRoles "prefect" (uniq (append (get $appRequiredRoles "prefect") $roleKey)) -}}
   {{- end -}}
   {{- $declaredExceptions := list -}}
   {{- range $exception := $platformRoleExceptions -}}
@@ -128,7 +135,7 @@
       {{- $policyRoles = concat $policyRoles (get $item "roles" | default (list)) -}}
     {{- end -}}
     {{- $policyRoles = uniq $policyRoles -}}
-    {{- if or (has $roleKey $policyRoles) (has $rangerRoleName $policyRoles) -}}
+    {{- if has $roleKey $policyRoles -}}
       {{- $policyType := default 0 (get $policy "policyType") -}}
       {{- $policyKind := "access" -}}
       {{- if eq (printf "%v" $policyType) "1" -}}
@@ -143,19 +150,15 @@
       ) -}}
     {{- end -}}
   {{- end -}}
-  {{- $roleManageable := true -}}
-  {{- if hasKey $rolePortal "manageable" -}}
-    {{- $roleManageable = (get $rolePortal "manageable") -}}
-  {{- end -}}
   {{- $platformRoleViews = append $platformRoleViews (dict
     "key" $roleKey
-    "name" $rangerRoleName
-    "displayName" (default "" (get $rolePortal "displayName"))
-    "manageable" $roleManageable
+    "name" $roleKey
+    "displayName" (default "" (get $role "label"))
+    "manageable" true
     "description" (default "" (get $role "description"))
     "directoryGroups" $directoryGroups
-    "users" (get $members "users" | default (list))
-    "nestedRoles" (get $members "nestedRoles" | default (list))
+    "users" (list)
+    "nestedRoles" (list)
     "apps" (dict
       "superset" (default false (get $roleApps "superset"))
       "datahub" (default false (get $roleApps "datahub"))
@@ -268,7 +271,7 @@
     "iconAlt" (default "Superset logo" (get $appMeta "iconAlt"))
     "iconBackground" (default "" (get $appMeta "iconBackground"))
     "health" (get $appMeta "health" | default dict)
-    "requiredGroups" (uniq (concat (list (include "dlh-in-a-box.group.app" (dict "root" . "name" "superset"))) (get $appRoleGroups "superset")))
+    "requiredRoles" (get $appRequiredRoles "superset")
   ) -}}
 {{- end -}}
 {{- if and .Values.datahub.enabled (default false (dig "datahub" "enabled" false $clients)) -}}
@@ -285,7 +288,7 @@
     "iconAlt" (default "DataHub logo" (get $appMeta "iconAlt"))
     "iconBackground" (default "" (get $appMeta "iconBackground"))
     "health" (get $appMeta "health" | default dict)
-    "requiredGroups" (uniq (concat (list (include "dlh-in-a-box.group.app" (dict "root" . "name" "datahub"))) (get $appRoleGroups "datahub")))
+    "requiredRoles" (get $appRequiredRoles "datahub")
   ) -}}
 {{- end -}}
 {{- if and .Values.jupyterhub.enabled (default false (dig "jupyterhub" "enabled" false $clients)) -}}
@@ -304,7 +307,7 @@
     "iconAlt" (default "JupyterHub logo" (get $appMeta "iconAlt"))
     "iconBackground" (default "" (get $appMeta "iconBackground"))
     "health" (get $appMeta "health" | default dict)
-    "requiredGroups" (uniq (concat (list (include "dlh-in-a-box.group.app" (dict "root" . "name" "jupyterhub"))) (get $appRoleGroups "jupyterhub")))
+    "requiredRoles" (get $appRequiredRoles "jupyterhub")
   ) -}}
 {{- end -}}
 {{- if default false (dig "prefectProxy" "enabled" false $clients) -}}
@@ -322,7 +325,7 @@
     "iconAlt" (default "Prefect logo" (get $appMeta "iconAlt"))
     "iconBackground" (default "" (get $appMeta "iconBackground"))
     "health" (get $appMeta "health" | default dict)
-    "requiredGroups" (uniq (concat (list (include "dlh-in-a-box.group.app" (dict "root" . "name" "prefect"))) (get $appRoleGroups "prefect")))
+    "requiredRoles" (get $appRequiredRoles "prefect")
   ) -}}
 {{- end -}}
 {{- if and .Values.cloudbeaver.enabled (default false (dig "cloudbeaverProxy" "enabled" false $clients)) -}}
@@ -340,7 +343,7 @@
     "iconAlt" (default "CloudBeaver logo" (get $appMeta "iconAlt"))
     "iconBackground" (default "" (get $appMeta "iconBackground"))
     "health" (get $appMeta "health" | default dict)
-    "requiredGroups" (uniq (concat (list (include "dlh-in-a-box.group.app" (dict "root" . "name" "cloudbeaver"))) (get $appRoleGroups "cloudbeaver")))
+    "requiredRoles" (get $appRequiredRoles "cloudbeaver")
   ) -}}
 {{- end -}}
 {{- $healthItems := list -}}
@@ -350,7 +353,7 @@
     "name" (get $app "name")
     "group" (get $app "group")
     "url" (get $app "url")
-    "requiredGroups" (get $app "requiredGroups" | default (list))
+    "requiredRoles" (get $app "requiredRoles" | default (list))
     "adminOnly" false
     "health" (get $app "health" | default dict)
   ) -}}
@@ -361,7 +364,7 @@
     "name" (get $tool "name")
     "group" (get $tool "group")
     "url" (get $tool "url")
-    "requiredGroups" (list)
+    "requiredRoles" $adminRequiredRoles
     "adminOnly" true
     "health" (get $tool "health" | default dict)
   ) -}}
@@ -389,7 +392,7 @@
   )
   "identity" (dict
     "directoryMode" $directoryMode
-    "groupsClaim" (default "groups" $oidc.groupsClaim)
+    "rolesClaim" (default "platform_roles" $oidc.rolesClaim)
     "keycloak" (dict
       "baseUrl" (default (include "dlh-in-a-box.keycloak.browserBaseUrl" .) .Values.platformHome.keycloakBrowserBaseUrl)
       "realm" (include "dlh-in-a-box.keycloak.realm" .)
@@ -398,7 +401,7 @@
   )
   "apps" $portalApps
   "admin" (dict
-    "requiredGroups" (list $adminRequiredGroup)
+    "requiredRoles" $adminRequiredRoles
     "tools" $portalAdminTools
     "roleManagementEnabled" $roleManagementEnabled
     "accessControlEnabled" $roleManagementEnabled
@@ -408,7 +411,7 @@
 -}}
 {{- $platformHomeAdminConfig := dict
   "admin" (dict
-    "requiredGroups" (list $adminRequiredGroup)
+    "requiredRoles" $adminRequiredRoles
     "roleManagementEnabled" $roleManagementEnabled
     "accessControlEnabled" $roleManagementEnabled
     "accessControlNotice" (ternary $accessControlNotice "" $keycloakLocalMode)
@@ -868,10 +871,10 @@ spec:
               value: {{ include "dlh-in-a-box.identity.internalUserInfoUrl" . | quote }}
             - name: IDENTITY_EXPECTED_ISSUER
               value: {{ include "dlh-in-a-box.identity.issuer" . | quote }}
-            - name: OIDC_GROUPS_CLAIM
-              value: {{ default "groups" $oidc.groupsClaim | quote }}
-            - name: PLATFORM_ADMIN_GROUP
-              value: {{ $adminRequiredGroup | quote }}
+            - name: OIDC_ROLES_CLAIM
+              value: {{ default "platform_roles" $oidc.rolesClaim | quote }}
+            - name: PLATFORM_ADMIN_ROLES
+              value: {{ join "," $adminRequiredRoles | quote }}
             - name: POD_NAMESPACE
               valueFrom:
                 fieldRef:
@@ -986,10 +989,10 @@ spec:
                   value: {{ include "dlh-in-a-box.identity.internalUserInfoUrl" . | quote }}
                 - name: IDENTITY_EXPECTED_ISSUER
                   value: {{ include "dlh-in-a-box.identity.issuer" . | quote }}
-                - name: OIDC_GROUPS_CLAIM
-                  value: {{ default "groups" $oidc.groupsClaim | quote }}
-                - name: PLATFORM_ADMIN_GROUP
-                  value: {{ $adminRequiredGroup | quote }}
+                - name: OIDC_ROLES_CLAIM
+                  value: {{ default "platform_roles" $oidc.rolesClaim | quote }}
+                - name: PLATFORM_ADMIN_ROLES
+                  value: {{ join "," $adminRequiredRoles | quote }}
                 - name: POD_NAMESPACE
                   valueFrom:
                     fieldRef:

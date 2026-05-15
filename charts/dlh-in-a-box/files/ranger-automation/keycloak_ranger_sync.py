@@ -243,9 +243,7 @@ def access_model_role_names(config):
         name = str(role_name or "").strip()
         if name:
             role_names.append(name)
-    if role_names:
-        return normalize_names(role_names)
-    return normalize_names(config.get("platformRoles", {}).keys())
+    return normalize_names(role_names)
 
 
 def configured_group_names(config):

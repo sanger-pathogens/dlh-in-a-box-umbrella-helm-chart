@@ -180,7 +180,7 @@ global:
   identity:
     accessModel:
       enabled: true
-      builtInRoles:
+      builtinRoles:
         platform-admin:
           enabled: true
           appAccess:

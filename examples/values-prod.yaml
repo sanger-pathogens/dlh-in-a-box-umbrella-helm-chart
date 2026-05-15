@@ -88,9 +88,6 @@ global:
             - https://cloudbeaver.data-platform.example.org/oauth2/callback
           webOrigins:
             - https://cloudbeaver.data-platform.example.org
-          allowedGroups:
-            - platform-app-cloudbeaver
-            - platform-role-platform-admin
           emailDomains:
             - example.org
           ingress:
@@ -110,9 +107,6 @@ global:
             - https://prefect.data-platform.example.org/oauth2/callback
           webOrigins:
             - https://prefect.data-platform.example.org
-          allowedGroups:
-            - platform-app-prefect
-            - platform-role-platform-admin
           emailDomains:
             - "*"
         prefectAutomation:
@@ -151,57 +145,16 @@ global:
         trustedCaExistingSecret: dlh-ad-ca
         trustedCaCertKey: ca.crt
         allowInsecure: false
-    groupConventions:
-      appAccessPrefix: platform-app-
-      rolePrefix: platform-role-
-      dataPrefix: platform-data-
   authorization:
-    platformRoles:
-      platform-admin:
-        description: Platform administrators with full browser access and broad Trino administration rights.
-        members:
-          directoryGroups:
-            - platform-role-platform-admin
-        apps:
-          superset: true
-          datahub: true
-          trinoUi: true
-          jupyterhub: true
-          cloudbeaver: true
-          prefect: true
-      data-analyst:
-        description: Analysts who can author BI content and query approved data sources through governed tools.
-        members:
-          directoryGroups:
-            - platform-role-data-analyst
-        apps:
-          superset: true
-          datahub: true
-          trinoUi: false
-          jupyterhub: true
-          cloudbeaver: true
-          prefect: false
-      principal-investigator:
-        description: Principal investigators with read-only dashboard and catalog access.
-        members:
-          directoryGroups:
-            - platform-role-principal-investigator
-        apps:
-          superset: true
-          datahub: true
-          trinoUi: false
-          jupyterhub: false
-          cloudbeaver: false
-          prefect: false
     platformRoleExceptions: []
     ranger:
       enabled: true
       serviceName: trino
       serviceUsername: trino
       serviceAdminGroups:
-        - platform-role-platform-admin
+        - admins
       superGroups:
-        - platform-role-platform-admin
+        - admins
       useRangerGroups: false
       postgresql:
         enabled: true
@@ -230,8 +183,8 @@ global:
             - groups: []
               users: []
               roles:
-                - data-analyst
-                - principal-investigator
+                - platform-user
+                - platform-viewer
               accesses:
                 - type: select
                   isAllowed: true
@@ -286,8 +239,8 @@ global:
             - groups: []
               users: []
               roles:
-                - data-analyst
-                - principal-investigator
+                - platform-user
+                - platform-viewer
               accesses:
                 - type: select
                   isAllowed: true
@@ -372,9 +325,9 @@ platformHome:
       mode: redirect
       path: /launch/jupyterhub
       targetUrl: https://jupyterhub.data-platform.example.org/hub/oauth_login?next=%2Fhub%2F
-      requiredGroups:
-        - platform-app-jupyterhub
-        - platform-role-platform-admin
+      requiredRoles:
+        - platform-admin
+        - platform-user
     vault:
       enabled: true
       mode: vault-wrapped-token
@@ -384,8 +337,8 @@ platformHome:
       authMount: portal-jwt
       role: platform-home-launch
       wrapTtl: 5m
-      requiredGroups:
-        - platform-role-platform-admin
+      requiredRoles:
+        - platform-admin
 
 jupyterhub:
   enabled: true
@@ -413,8 +366,8 @@ jupyterhub:
             name: dlh-oidc-clients
             key: jupyterhubClientSecret
       JUPYTERHUB_GROUPS_CLAIM: groups
-      JUPYTERHUB_ALLOWED_GROUP: platform-app-jupyterhub
-      JUPYTERHUB_ADMIN_GROUP: platform-role-platform-admin
+      JUPYTERHUB_ALLOWED_GROUP: data-analyst
+      JUPYTERHUB_ADMIN_GROUP: admins
       JUPYTERHUB_USERNAME_CLAIM: preferred_username
       JUPYTERHUB_LOGIN_SERVICE: Keycloak
   singleuser:

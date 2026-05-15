@@ -6,7 +6,7 @@ global:
   identity: &identity_defaults
     enabled: false
     accessModel:
-      builtInRoles:
+      builtinRoles:
         platform-admin:
           enabled: true
           appAccess:
@@ -49,6 +49,7 @@ global:
         issuer: ""
         usernameClaim: email
         groupsClaim: groups
+        rolesClaim: platform_roles
         userMappingPattern: "([^@]+)"
         providerCaFile: ""
         scopes:
@@ -146,7 +147,6 @@ global:
           redirectUrl: ""
           redirectUris: []
           webOrigins: []
-          allowedGroups: []
           emailDomains:
             - "*"
           ingress:
@@ -165,7 +165,6 @@ global:
           redirectUrl: ""
           redirectUris: []
           webOrigins: []
-          allowedGroups: []
           emailDomains:
             - "*"
           ingress:
@@ -184,7 +183,6 @@ global:
           redirectUrl: ""
           redirectUris: []
           webOrigins: []
-          allowedGroups: []
           emailDomains:
             - "*"
           ingress:
@@ -237,12 +235,7 @@ global:
         allowInsecure: false
         syncGroupsToKeycloak: true
         hostAliases: []
-    groupConventions:
-      appAccessPrefix: platform-app-
-      rolePrefix: platform-role-
-      dataPrefix: platform-data-
   authorization: &authorization_defaults
-    platformRoles: {}
     platformRoleExceptions: []
     ranger:
       enabled: false
@@ -422,7 +415,7 @@ keycloak:
                   access.token.claim: "true"
                   userinfo.token.claim: "true"
                   introspection.token.claim: "true"
-                  claim.name: platform_roles
+                  claim.name: {{ default "platform_roles" .Values.global.identity.external.oidc.rolesClaim | quote }}
                   jsonType.label: String
         {{- $accessModelRoles := fromJson (include "dlh-in-a-box.identity.accessModelRolesJson" $) }}
         {{- $accessModelAppClients := fromJson (include "dlh-in-a-box.identity.accessModelAppClientsJson" $) }}
@@ -454,21 +447,17 @@ keycloak:
               - name: access
                 description: {{ printf "Browser access entitlement for %s" $appName | quote }}
           {{- end }}
-          {{- end }}
+        {{- end }}
         {{- end }}
         {{- $bootstrapUsers := default (list) .Values.global.identity.provider.keycloak.bootstrapUsers }}
-        {{- $directoryMode := include "dlh-in-a-box.identity.directoryMode" $ }}
-        {{- $keycloakLocalMode := eq $directoryMode "keycloakLocal" }}
         {{- $accessModelGroupRoleMappings := get (.Values.global.identity.accessModel | default dict) "groupRoleMappings" | default dict }}
         {{- $managedGroups := fromJsonArray (include "dlh-in-a-box.identity.keycloakManagedGroupsJson" $) }}
         {{- $seededGroups := dict }}
         {{- range $groupName := $managedGroups }}
           {{- $_ := set $seededGroups (toString $groupName) true }}
         {{- end }}
-        {{- if $keycloakLocalMode }}
-          {{- range $groupName, $_ := $accessModelGroupRoleMappings }}
-            {{- $_ := set $seededGroups (toString $groupName) true }}
-          {{- end }}
+        {{- range $groupName, $_ := $accessModelGroupRoleMappings }}
+          {{- $_ := set $seededGroups (toString $groupName) true }}
         {{- end }}
         {{- range $user := $bootstrapUsers }}
           {{- range $group := default (list) $user.groups }}
@@ -479,7 +468,7 @@ keycloak:
         groups:
         {{- range $groupName := keys $seededGroups | sortAlpha }}
           - name: {{ $groupName | quote }}
-            {{- if and $keycloakLocalMode (hasKey $accessModelGroupRoleMappings $groupName) }}
+            {{- if hasKey $accessModelGroupRoleMappings $groupName }}
             {{- $mapping := get $accessModelGroupRoleMappings $groupName | default dict }}
             {{- $mappedRoles := get $mapping "roles" | default list }}
             realmRoles:
@@ -1172,8 +1161,8 @@ jupyterhub:
       JUPYTERHUB_CLIENT_ID: ""
       JUPYTERHUB_CLIENT_SECRET: ""
       JUPYTERHUB_GROUPS_CLAIM: platform_groups
-      JUPYTERHUB_ALLOWED_GROUP: platform-app-jupyterhub
-      JUPYTERHUB_ADMIN_GROUP: platform-role-platform-admin
+      JUPYTERHUB_ALLOWED_GROUP: ""
+      JUPYTERHUB_ADMIN_GROUP: ""
       JUPYTERHUB_USERNAME_CLAIM: preferred_username
       JUPYTERHUB_LOGIN_SERVICE: Keycloak
     extraConfig:
@@ -1672,11 +1661,9 @@ superset:
   enabled: false
   auth:
     roleMappings:
-      Gamma:
-        - platform-app-superset
+      Gamma: []
       Alpha: []
-      Admin:
-        - platform-role-data-engineer
+      Admin: []
   image:
     repository: apache/superset
   bootstrapScript: |

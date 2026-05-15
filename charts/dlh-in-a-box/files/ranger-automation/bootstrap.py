@@ -363,25 +363,6 @@ def detach_role_from_policies(service_name, role_name):
             print(f"Deleted stale Ranger policy with no remaining principals: {policy['name']}")
 
 
-def build_platform_roles(config):
-    result = []
-    for role_key in sorted(config.get("platformRoles", {})):
-        raw_role = config["platformRoles"][role_key] or {}
-        members = raw_role.get("members", {}) or {}
-        ranger_cfg = raw_role.get("ranger", {}) or {}
-        result.append(
-            {
-                "key": role_key,
-                "name": ranger_cfg.get("roleName") or role_key,
-                "description": raw_role.get("description", "").strip(),
-                "users": normalize_names(members.get("users", [])),
-                "groups": normalize_names(members.get("directoryGroups", [])),
-                "nestedRoleKeys": normalize_names(members.get("nestedRoles", [])),
-            }
-        )
-    return result
-
-
 def build_catalog_acl_policies(config):
     service_name = config["ranger"]["serviceName"]
     read_accesses = ["select", "show", "use", "execute"]
@@ -513,8 +494,6 @@ def policy_principal_usernames(config, policies):
     service_username = str(ranger_cfg.get("serviceUsername") or "").strip()
     if service_username:
         usernames.add(service_username)
-    for role in build_platform_roles(config):
-        usernames.update(role.get("users", []))
     for policy in policies or []:
         for key in [
             "policyItems",

@@ -131,13 +131,13 @@ seed_local_auth_demo_secrets() {
       adminPassword: "cloudbeaver-admin-password",
       teams: [
         {
-          subjectId: "platform-role-platform-admin",
+          subjectId: "admins",
           teamName: "Platform administrators",
           description: "Platform administrators with CloudBeaver admin access.",
           permissions: ["admin"]
         },
         {
-          subjectId: "platform-app-cloudbeaver",
+          subjectId: "data-analyst",
           teamName: "CloudBeaver users",
           description: "Approved CloudBeaver browser users.",
           permissions: []

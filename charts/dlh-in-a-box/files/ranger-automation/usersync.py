@@ -128,35 +128,6 @@ def normalize_names(values):
     return normalized
 
 
-def configured_platform_roles(config):
-    roles = []
-    for role_key in sorted(config.get("platformRoles", {})):
-        raw_role = config["platformRoles"][role_key] or {}
-        ranger_cfg = raw_role.get("ranger", {}) or {}
-        members = raw_role.get("members", {}) or {}
-        portal_cfg = raw_role.get("portal", {}) or {}
-        roles.append(
-            {
-                "name": str(ranger_cfg.get("roleName") or role_key).strip(),
-                "users": normalize_names(members.get("users", [])),
-                "groups": normalize_names(members.get("directoryGroups", [])),
-                "manageable": bool(portal_cfg.get("manageable", True)),
-            }
-        )
-    return roles
-
-
-def get_role(service_name, role_name):
-    encoded_role_name = urllib.parse.quote(str(role_name or "").strip(), safe="")
-    encoded_service_name = urllib.parse.quote(str(service_name or "").strip(), safe="")
-    payload = ranger_request(
-        "GET",
-        f"/service/roles/roles/name/{encoded_role_name}?serviceName={encoded_service_name}",
-        ok=(200, 404),
-    )
-    return payload if isinstance(payload, dict) and payload.get("name") else None
-
-
 def list_users():
     users = []
     start_index = 0
@@ -247,13 +218,8 @@ def synced_user_from_entry(entry, ldap_cfg):
     )
 
 
-def direct_ldap_usernames(config, configured_roles):
+def direct_ldap_usernames(config):
     usernames = set()
-    for role in configured_roles:
-        if not role.get("manageable", True):
-            continue
-        usernames.update(role["users"])
-
     for exception in config.get("platformRoleExceptions", []) or []:
         username = str((exception or {}).get("username") or "").strip()
         if username:
@@ -266,11 +232,8 @@ def direct_ldap_usernames(config, configured_roles):
     return usernames
 
 
-def desired_usernames(config, configured_roles, synced_ldap_users):
+def desired_usernames(config, synced_ldap_users):
     desired = set(normalize_names(synced_ldap_users))
-
-    for role in configured_roles:
-        desired.update(role["users"])
 
     for exception in config.get("platformRoleExceptions", []) or []:
         username = str((exception or {}).get("username") or "").strip()
@@ -312,8 +275,8 @@ def delete_user(user_id):
     )
 
 
-def prune_unexpected_users(config, configured_roles, synced_ldap_users):
-    keep_usernames = desired_usernames(config, configured_roles, synced_ldap_users)
+def prune_unexpected_users(config, synced_ldap_users):
+    keep_usernames = desired_usernames(config, synced_ldap_users)
     protected = protected_usernames(config)
     stale_users = []
     for user in list_users():
@@ -351,8 +314,6 @@ def prune_unexpected_users(config, configured_roles, synced_ldap_users):
 
 def sync(config):
     ldap_cfg = config["ldap"]
-    configured_roles = configured_platform_roles(config)
-    managed_groups = sorted({group_name for role in configured_roles for group_name in role["groups"]})
     parsed = urllib.parse.urlparse(ldap_cfg["url"])
     use_ssl = parsed.scheme == "ldaps"
     host = parsed.hostname or ldap_cfg["url"]
@@ -378,9 +339,6 @@ def sync(config):
         conn = Connection(server, auto_bind=True)
     group_name_attribute = ldap_cfg["groupNameAttribute"]
     group_search_filter = ldap_cfg["groupSearchFilter"]
-    if managed_groups:
-        escaped_groups = [f"({group_name_attribute}={escape_ldap_filter_value(group_name)})" for group_name in managed_groups]
-        group_search_filter = f"(|{''.join(escaped_groups)})"
 
     conn.search(
         ldap_cfg["groupBaseDn"],
@@ -398,8 +356,6 @@ def sync(config):
     for group_entry in conn.entries:
         group_name = attr_value(group_entry, group_name_attribute)
         if not group_name:
-            continue
-        if managed_groups and group_name not in managed_groups:
             continue
         raw_members = []
         try:
@@ -427,7 +383,7 @@ def sync(config):
 
         groups[group_name] = sorted(member_names)
 
-    direct_users = direct_ldap_usernames(config, configured_roles)
+    direct_users = direct_ldap_usernames(config)
     for username in sorted(direct_users):
         if username in users:
             continue
@@ -487,7 +443,7 @@ def sync(config):
     if deltas:
         ranger_request("POST", "/service/xusers/ugsync/groupusers", deltas, ok=(200, 201))
 
-    prune_unexpected_users(config, configured_roles, list(users))
+    prune_unexpected_users(config, list(users))
 
 
 def main():

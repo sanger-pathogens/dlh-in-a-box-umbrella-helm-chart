@@ -29,7 +29,7 @@ const accessControlPath = "/access-control";
 const state = {
   config: null,
   keycloak: null,
-  groups: [],
+  userRoles: [],
   isAdmin: false,
   adminStatus: null,
   roles: [],
@@ -435,14 +435,14 @@ function applyBranding(config) {
   }
 }
 
-function renderApps(config, groups) {
+function renderApps(config, userRoles) {
   if (!launchGroups) {
     return;
   }
 
   const visibleApps = (config.apps || []).filter((app) => {
-    const requiredGroups = app.requiredGroups || [];
-    return requiredGroups.length === 0 || requiredGroups.some((group) => groups.includes(group));
+    const requiredRoles = app.requiredRoles || [];
+    return requiredRoles.length === 0 || requiredRoles.some((role) => userRoles.includes(role));
   });
 
   if (visibleApps.length === 0) {
@@ -1122,7 +1122,7 @@ async function refreshHealth() {
   } catch (error) {
     console.warn("Unable to refresh portal health status.", error);
   }
-  renderApps(state.config, state.groups);
+  renderApps(state.config, state.userRoles);
   renderAdminTools(state.config, state.isAdmin);
 }
 
@@ -1406,12 +1406,12 @@ async function bootstrap() {
     return;
   }
 
-  const claimName = state.config.identity.groupsClaim || "groups";
-  const rawGroups = keycloak.tokenParsed?.[claimName];
-  state.groups = Array.isArray(rawGroups) ? rawGroups : [];
+  const claimName = state.config.identity.rolesClaim || "platform_roles";
+  const rawRoles = keycloak.tokenParsed?.[claimName];
+  state.userRoles = Array.isArray(rawRoles) ? rawRoles : typeof rawRoles === "string" && rawRoles ? [rawRoles] : [];
   const adminConfig = state.config.admin || {};
-  const requiredGroups = adminConfig.requiredGroups || [];
-  state.isAdmin = requiredGroups.length > 0 && requiredGroups.some((group) => state.groups.includes(group));
+  const requiredRoles = adminConfig.requiredRoles || [];
+  state.isAdmin = requiredRoles.length > 0 && requiredRoles.some((role) => state.userRoles.includes(role));
   const displayName =
     keycloak.tokenParsed?.name ||
     keycloak.tokenParsed?.preferred_username ||
@@ -1463,7 +1463,7 @@ async function bootstrap() {
     return;
   }
 
-  renderApps(state.config, state.groups);
+  renderApps(state.config, state.userRoles);
   await refreshHealth();
   if (state.config?.health?.enabled && !state.health.timer) {
     const refreshIntervalSeconds = Number(state.config.health.refreshIntervalSeconds || 90);

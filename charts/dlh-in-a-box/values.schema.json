@@ -66,7 +66,7 @@
       "type": "object",
       "additionalProperties": true,
       "properties": {
-        "builtInRoles": {
+        "builtinRoles": {
           "type": "object",
           "additionalProperties": {
             "$ref": "#/definitions/accessModelRole"
@@ -216,6 +216,7 @@
                 "issuer": { "type": "string" },
                 "usernameClaim": { "type": "string" },
                 "groupsClaim": { "type": "string" },
+                "rolesClaim": { "type": "string" },
                 "userMappingPattern": { "type": "string" },
                 "providerCaFile": { "type": "string" },
                 "processForwardedHeaders": { "type": "boolean" },
@@ -506,10 +507,6 @@
                       "type": "array",
                       "items": { "type": "string" }
                     },
-                    "allowedGroups": {
-                      "type": "array",
-                      "items": { "type": "string" }
-                    },
                     "emailDomains": {
                       "type": "array",
                       "items": { "type": "string" }
@@ -593,10 +590,6 @@
                       "type": "array",
                       "items": { "type": "string" }
                     },
-                    "allowedGroups": {
-                      "type": "array",
-                      "items": { "type": "string" }
-                    },
                     "emailDomains": {
                       "type": "array",
                       "items": { "type": "string" }
@@ -648,10 +641,6 @@
                       "items": { "type": "string" }
                     },
                     "webOrigins": {
-                      "type": "array",
-                      "items": { "type": "string" }
-                    },
-                    "allowedGroups": {
                       "type": "array",
                       "items": { "type": "string" }
                     },
@@ -846,12 +835,6 @@
       "type": "object",
       "additionalProperties": true,
       "properties": {
-        "platformRoles": {
-          "type": "object",
-          "additionalProperties": {
-            "$ref": "#/definitions/platformRole"
-          }
-        },
         "platformRoleExceptions": {
           "type": "array",
           "items": {
@@ -960,58 +943,6 @@
                 "auditMode": { "type": "string" }
               }
             }
-          }
-        }
-      }
-    },
-    "platformRole": {
-      "type": "object",
-      "additionalProperties": true,
-      "properties": {
-        "description": { "type": "string" },
-        "members": {
-          "type": "object",
-          "additionalProperties": true,
-          "properties": {
-            "directoryGroups": {
-              "type": "array",
-              "items": { "type": "string" }
-            },
-            "users": {
-              "type": "array",
-              "items": { "type": "string" }
-            },
-            "nestedRoles": {
-              "type": "array",
-              "items": { "type": "string" }
-            }
-          }
-        },
-        "apps": {
-          "type": "object",
-          "additionalProperties": false,
-          "properties": {
-            "superset": { "type": "boolean" },
-            "datahub": { "type": "boolean" },
-            "trinoUi": { "type": "boolean" },
-            "jupyterhub": { "type": "boolean" },
-            "cloudbeaver": { "type": "boolean" },
-            "prefect": { "type": "boolean" }
-          }
-        },
-        "ranger": {
-          "type": "object",
-          "additionalProperties": true,
-          "properties": {
-            "roleName": { "type": "string" }
-          }
-        },
-        "portal": {
-          "type": "object",
-          "additionalProperties": true,
-          "properties": {
-            "displayName": { "type": "string" },
-            "manageable": { "type": "boolean" }
           }
         }
       }
