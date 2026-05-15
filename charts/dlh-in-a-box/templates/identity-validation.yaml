@@ -27,9 +27,13 @@
 {{- $authorization := $global.authorization | default dict -}}
 {{- $ranger := get $authorization "ranger" | default dict -}}
 {{- $datahubValues := .Values.datahub | default dict -}}
+{{- $datahubAuth := get $datahubValues "auth" | default dict -}}
 {{- $datahubFrontend := get $datahubValues "datahub-frontend" | default dict -}}
 {{- $datahubFrontendIngress := get $datahubFrontend "ingress" | default dict -}}
 {{- $datahubOidc := get $datahubFrontend "oidcAuthentication" | default dict -}}
+{{- $jupyterhubValues := .Values.jupyterhub | default dict -}}
+{{- $jupyterhubHub := get $jupyterhubValues "hub" | default dict -}}
+{{- $jupyterhubExtraEnv := get $jupyterhubHub "extraEnv" | default dict -}}
 {{- $platformHomeValues := .Values.platformHome | default dict -}}
 {{- $platformHomeIngress := get $platformHomeValues "ingress" | default dict -}}
 {{- $cloudbeaverValues := .Values.cloudbeaver | default dict -}}
@@ -80,6 +84,14 @@
 {{- end -}}
 {{- if hasKey $authorization "platformRoles" -}}
 {{- fail "global.authorization.platformRoles is no longer supported. Define platform roles and group mappings under global.identity.accessModel." -}}
+{{- end -}}
+{{- if hasKey $datahubAuth "groupProvisioning" -}}
+{{- fail "datahub.auth.groupProvisioning is no longer supported. DataHub browser access must not depend on OIDC group claims; use global.identity.accessModel roles and client roles." -}}
+{{- end -}}
+{{- range $envName := list "JUPYTERHUB_GROUPS_CLAIM" "JUPYTERHUB_ALLOWED_GROUP" "JUPYTERHUB_ADMIN_GROUP" -}}
+  {{- if hasKey $jupyterhubExtraEnv $envName -}}
+    {{- fail (printf "jupyterhub.hub.extraEnv.%s is no longer supported. Use JUPYTERHUB_ROLES_CLAIM, JUPYTERHUB_ALLOWED_ROLES, and JUPYTERHUB_ADMIN_ROLES." $envName) -}}
+  {{- end -}}
 {{- end -}}
 {{- range $clientName, $clientConfig := dict "cloudbeaverProxy" $cloudbeaverIdentity "prefectProxy" $prefectIdentity "rangerProxy" $rangerProxyIdentity -}}
   {{- if hasKey $clientConfig "allowedGroups" -}}

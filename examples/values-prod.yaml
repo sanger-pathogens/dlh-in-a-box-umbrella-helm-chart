@@ -365,9 +365,9 @@ jupyterhub:
           secretKeyRef:
             name: dlh-oidc-clients
             key: jupyterhubClientSecret
-      JUPYTERHUB_GROUPS_CLAIM: groups
-      JUPYTERHUB_ALLOWED_GROUP: data-analyst
-      JUPYTERHUB_ADMIN_GROUP: admins
+      JUPYTERHUB_ROLES_CLAIM: platform_roles
+      JUPYTERHUB_ALLOWED_ROLES: platform-admin,platform-user
+      JUPYTERHUB_ADMIN_ROLES: platform-admin
       JUPYTERHUB_USERNAME_CLAIM: preferred_username
       JUPYTERHUB_LOGIN_SERVICE: Keycloak
   singleuser:

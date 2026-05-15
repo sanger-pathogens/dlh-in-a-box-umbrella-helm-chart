@@ -1558,25 +1558,7 @@
         "enabled": { "type": "boolean" },
         "auth": {
           "type": "object",
-          "additionalProperties": true,
-          "properties": {
-            "groupProvisioning": {
-              "type": "object",
-              "additionalProperties": true,
-              "properties": {
-                "enabled": { "type": "boolean" },
-                "groupsClaim": { "type": "string" },
-                "viewers": {
-                  "type": "array",
-                  "items": { "type": "string" }
-                },
-                "editors": {
-                  "type": "array",
-                  "items": { "type": "string" }
-                }
-              }
-            }
-          }
+          "additionalProperties": true
         }
       }
     },

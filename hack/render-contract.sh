@@ -243,6 +243,18 @@ assert_contains "${dev_manifest}" "trino-cli"
 assert_contains "${prod_manifest}" "trino-cli"
 assert_not_contains "${dev_manifest}" "platform-app-jupyterhub"
 assert_not_contains "${prod_manifest}" "platform-app-jupyterhub"
+assert_not_contains "${dev_manifest}" "JUPYTERHUB_GROUPS_CLAIM"
+assert_not_contains "${prod_manifest}" "JUPYTERHUB_GROUPS_CLAIM"
+assert_not_contains "${dev_manifest}" "JUPYTERHUB_ALLOWED_GROUP"
+assert_not_contains "${prod_manifest}" "JUPYTERHUB_ALLOWED_GROUP"
+assert_not_contains "${dev_manifest}" "JUPYTERHUB_ADMIN_GROUP"
+assert_not_contains "${prod_manifest}" "JUPYTERHUB_ADMIN_GROUP"
+assert_contains "${dev_manifest}" "JUPYTERHUB_ROLES_CLAIM"
+assert_contains "${prod_manifest}" "JUPYTERHUB_ROLES_CLAIM"
+assert_contains "${dev_manifest}" "JUPYTERHUB_ALLOWED_ROLES"
+assert_contains "${prod_manifest}" "JUPYTERHUB_ALLOWED_ROLES"
+assert_contains "${dev_manifest}" "JUPYTERHUB_ADMIN_ROLES"
+assert_contains "${prod_manifest}" "JUPYTERHUB_ADMIN_ROLES"
 assert_contains "${dev_manifest}" "KC_JUPYTERHUB_CLIENT_SECRET"
 assert_contains "${prod_manifest}" "KC_JUPYTERHUB_CLIENT_SECRET"
 assert_contains "${dev_manifest}" "ICDDRB_Trino_Demo.ipynb"
@@ -478,6 +490,16 @@ expect_fail \
   "platformHome.launchers.vault.requiredGroups is no longer supported. Use platformHome.launchers.vault.requiredRoles with Keycloak realm role names from global.identity.accessModel." \
   -f "${DEV_VALUES}" \
   -f "${FIXTURE_DIR}/platform-home-required-groups.yaml"
+
+expect_fail \
+  "jupyterhub.hub.extraEnv.JUPYTERHUB_ALLOWED_GROUP is no longer supported. Use JUPYTERHUB_ROLES_CLAIM, JUPYTERHUB_ALLOWED_ROLES, and JUPYTERHUB_ADMIN_ROLES." \
+  -f "${DEV_VALUES}" \
+  -f "${FIXTURE_DIR}/jupyterhub-group-env.yaml"
+
+expect_fail \
+  "datahub.auth.groupProvisioning is no longer supported. DataHub browser access must not depend on OIDC group claims; use global.identity.accessModel roles and client roles." \
+  -f "${DEV_VALUES}" \
+  -f "${FIXTURE_DIR}/datahub-group-provisioning.yaml"
 
 expect_fail_any \
   "global.authorization.platformRoleMembershipSource is no longer supported. Keycloak is the source of truth for platform roles and role membership." \

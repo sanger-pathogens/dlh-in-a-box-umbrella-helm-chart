@@ -69,7 +69,7 @@ global:
           webOrigins:
             - https://datahub.shared.example.org
           discoveryUri: https://login.example.org/realms/dlh/.well-known/openid-configuration
-          scope: openid profile email groups
+          scope: openid profile email
           userNameClaim: email
           userNameClaimRegex: "([^@]+)"
         cloudbeaverProxy:
@@ -297,14 +297,6 @@ minio:
 
 datahub:
   enabled: true
-  auth:
-    groupProvisioning:
-      enabled: true
-      groupsClaim: groups
-      viewers:
-        - platform-data-default-ro
-      editors:
-        - platform-data-default-rw
   datahub-frontend:
     ingress:
       enabled: true
@@ -324,7 +316,7 @@ datahub:
         secretRef: datahub-oidc-client
         secretKey: clientSecret
       discoveryUri: https://login.example.org/realms/dlh/.well-known/openid-configuration
-      scope: openid profile email groups
+      scope: openid profile email
       user_name_claim: email
       user_name_claim_regex: "([^@]+)"
 

@@ -560,7 +560,6 @@ keycloak:
               - profile
               - email
               - roles
-              - groups
               - platform-access
         {{- end }}
         {{- if .Values.global.identity.external.clients.trinoDirectGrant.enabled }}
@@ -577,7 +576,6 @@ keycloak:
               - profile
               - email
               - roles
-              - groups
               - platform-access
             protocolMappers:
               - name: trino-audience
@@ -613,7 +611,6 @@ keycloak:
               - profile
               - email
               - roles
-              - groups
               - platform-access
         {{- end }}
         {{- if .Values.global.identity.external.clients.datahub.enabled }}
@@ -639,7 +636,6 @@ keycloak:
               - profile
               - email
               - roles
-              - groups
               - platform-access
         {{- end }}
         {{- if .Values.global.identity.external.clients.platformHome.enabled }}
@@ -664,7 +660,6 @@ keycloak:
               - profile
               - email
               - roles
-              - groups
               - platform-access
         {{- end }}
         {{- if .Values.global.identity.external.clients.minio.enabled }}
@@ -690,7 +685,6 @@ keycloak:
               - profile
               - email
               - roles
-              - groups
               - platform-access
             protocolMappers:
               - name: minio-policy
@@ -781,7 +775,6 @@ keycloak:
               - profile
               - email
               - roles
-              - groups
               - platform-access
             {{- if .Values.global.identity.external.clients.trino.enabled }}
             protocolMappers:
@@ -1160,9 +1153,9 @@ jupyterhub:
       JUPYTERHUB_OAUTH_CALLBACK_URL: ""
       JUPYTERHUB_CLIENT_ID: ""
       JUPYTERHUB_CLIENT_SECRET: ""
-      JUPYTERHUB_GROUPS_CLAIM: platform_groups
-      JUPYTERHUB_ALLOWED_GROUP: ""
-      JUPYTERHUB_ADMIN_GROUP: ""
+      JUPYTERHUB_ROLES_CLAIM: platform_roles
+      JUPYTERHUB_ALLOWED_ROLES: ""
+      JUPYTERHUB_ADMIN_ROLES: ""
       JUPYTERHUB_USERNAME_CLAIM: preferred_username
       JUPYTERHUB_LOGIN_SERVICE: Keycloak
     extraConfig:
@@ -1173,14 +1166,19 @@ jupyterhub:
         def _env(name, default=""):
             return os.environ.get(name, default).strip()
 
-        def _group_list(auth_state):
+        def _claim_list(auth_state, claim_name):
             auth_state = auth_state or {}
             oauth_user = auth_state.get("oauth_user") or {}
-            groups_claim = _env("JUPYTERHUB_GROUPS_CLAIM", "groups")
-            groups = oauth_user.get(groups_claim) or oauth_user.get("groups") or []
-            if isinstance(groups, str):
-                groups = [groups]
-            return [group for group in groups if isinstance(group, str) and group]
+            values = oauth_user.get(claim_name) or []
+            if isinstance(values, str):
+                values = [values]
+            return [value for value in values if isinstance(value, str) and value]
+
+        def _role_list(auth_state):
+            return _claim_list(auth_state, _env("JUPYTERHUB_ROLES_CLAIM", "platform_roles"))
+
+        def _csv_set(name):
+            return {value.strip() for value in _env(name).split(",") if value.strip()}
 
         c.GenericOAuthenticator.client_id = _env("JUPYTERHUB_CLIENT_ID")
         c.GenericOAuthenticator.client_secret = _env("JUPYTERHUB_CLIENT_SECRET")
@@ -1190,32 +1188,31 @@ jupyterhub:
         c.GenericOAuthenticator.oauth_callback_url = _env("JUPYTERHUB_OAUTH_CALLBACK_URL")
         c.GenericOAuthenticator.login_service = _env("JUPYTERHUB_LOGIN_SERVICE", "Keycloak")
         c.GenericOAuthenticator.username_claim = _env("JUPYTERHUB_USERNAME_CLAIM", "preferred_username")
-        c.GenericOAuthenticator.scope = ["openid", "profile", "email", "groups"]
+        c.GenericOAuthenticator.scope = ["openid", "profile", "email"]
         c.GenericOAuthenticator.manage_groups = True
-        c.GenericOAuthenticator.auth_state_groups_key = _group_list
+        c.GenericOAuthenticator.auth_state_groups_key = _role_list
         c.GenericOAuthenticator.refresh_pre_spawn = True
         c.Authenticator.enable_auth_state = True
         c.Authenticator.auth_refresh_age = 300
         c.GenericOAuthenticator.allow_all = False
 
-        allowed_group = _env("JUPYTERHUB_ALLOWED_GROUP")
-        if allowed_group:
-            c.GenericOAuthenticator.allowed_groups = {allowed_group}
+        allowed_roles = _csv_set("JUPYTERHUB_ALLOWED_ROLES")
+        if allowed_roles:
+            c.GenericOAuthenticator.allowed_groups = allowed_roles
 
-        admin_group = _env("JUPYTERHUB_ADMIN_GROUP")
-        if admin_group:
-            c.GenericOAuthenticator.admin_groups = {admin_group}
+        admin_roles = _csv_set("JUPYTERHUB_ADMIN_ROLES")
+        if admin_roles:
+            c.GenericOAuthenticator.admin_groups = admin_roles
       20-spawn-env.py: |
         import os
 
-        def _group_list(auth_state):
+        def _claim_list(auth_state, claim_name):
             auth_state = auth_state or {}
             oauth_user = auth_state.get("oauth_user") or {}
-            groups_claim = os.environ.get("JUPYTERHUB_GROUPS_CLAIM", "groups")
-            groups = oauth_user.get(groups_claim) or oauth_user.get("groups") or []
-            if isinstance(groups, str):
-                groups = [groups]
-            return [group for group in groups if isinstance(group, str) and group]
+            values = oauth_user.get(claim_name) or []
+            if isinstance(values, str):
+                values = [values]
+            return [value for value in values if isinstance(value, str) and value]
 
         async def _inject_platform_identity(spawner):
             auth_state = await spawner.user.get_auth_state()
@@ -1227,14 +1224,15 @@ jupyterhub:
             username = oauth_user.get(username_claim) or spawner.user.name
             access_token = auth_state.get("access_token") or ""
             refresh_token = auth_state.get("refresh_token") or ""
-            groups = _group_list(auth_state)
+            roles_claim = os.environ.get("JUPYTERHUB_ROLES_CLAIM", "platform_roles")
+            roles = _claim_list(auth_state, roles_claim)
 
             spawner.environment.update(
                 {
                     "KEYCLOAK_ACCESS_TOKEN": access_token,
                     "KEYCLOAK_REFRESH_TOKEN": refresh_token,
                     "KEYCLOAK_USERNAME": username,
-                    "PLATFORM_GROUPS": ",".join(sorted(groups)),
+                    "PLATFORM_ROLES": ",".join(sorted(roles)),
                     "TRINO_ACCESS_TOKEN": access_token,
                     "TRINO_USER": username,
                 }
@@ -1631,12 +1629,6 @@ minio:
 
 datahub:
   enabled: false
-  auth:
-    groupProvisioning:
-      enabled: false
-      groupsClaim: ""
-      viewers: []
-      editors: []
   # Upstream DataHub chart values should be set directly under this key.
   # Example:
   # datahub-frontend:
@@ -1709,11 +1701,11 @@ superset:
       AUTH_ROLES_SYNC_AT_LOGIN = True
       AUTH_USER_REGISTRATION = True
       AUTH_USER_REGISTRATION_ROLE = "Gamma"
-      GROUPS_CLAIM = {{ .Values.global.identity.external.oidc.groupsClaim | quote }}
+      ROLES_CLAIM = {{ default "platform_roles" .Values.global.identity.external.oidc.rolesClaim | quote }}
       AUTH_ROLES_MAPPING = {
-      {{- range $role, $groups := .Values.auth.roleMappings }}
-        {{- range $group := $groups }}
-        {{ $group | quote }}: ["{{ $role }}"],
+      {{- range $supersetRole, $platformRoles := .Values.auth.roleMappings }}
+        {{- range $platformRole := $platformRoles }}
+        {{ $platformRole | quote }}: ["{{ $supersetRole }}"],
         {{- end }}
       {{- end }}
       }
@@ -1728,7 +1720,7 @@ superset:
                   "client_secret": os.environ.get("OAUTH_CLIENT_SECRET"),
                   "api_base_url": {{ include "dlh-in-a-box.identity.internalApiBaseUrl" $ | quote }},
                   "client_kwargs": {
-                      "scope": {{ join " " .Values.global.identity.external.oidc.scopes | quote }},
+                      "scope": "openid profile email",
                       "verify_signature": False,
                   },
                   "access_token_url": {{ include "dlh-in-a-box.identity.internalAccessTokenUrl" $ | quote }},
@@ -1756,7 +1748,7 @@ superset:
                           "first_name": claims.get("given_name", ""),
                           "last_name": claims.get("family_name", ""),
                           "email": claims.get("email", ""),
-                          "role_keys": claims.get(GROUPS_CLAIM) or claims.get("groups", []),
+                          "role_keys": claims.get(ROLES_CLAIM) or [],
                       }
               return super().oauth_user_info(provider, response)
 
