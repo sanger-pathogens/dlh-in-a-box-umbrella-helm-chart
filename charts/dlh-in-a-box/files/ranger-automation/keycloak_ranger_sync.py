@@ -54,6 +54,8 @@ def ranger_request(method, path, payload=None, ok=(200, 201), parse_json=True):
                 return data
             return json.loads(data) if data else None
         exc.ranger_body = data
+        if data:
+            print(f"Ranger API {method} {path} failed with HTTP {exc.code}: {data}", file=sys.stderr)
         raise
 
 
@@ -251,6 +253,48 @@ def configured_group_names(config):
     return normalize_names((access_model.get("groupRoleMappings") or {}).keys())
 
 
+def list_ranger_users():
+    users = []
+    start_index = 0
+    page_size = 200
+    while True:
+        payload = ranger_request(
+            "GET",
+            f"/service/xusers/users?startIndex={start_index}&pageSize={page_size}",
+            ok=(200,),
+        ) or {}
+        batch = payload.get("vXUsers", []) or []
+        if not batch:
+            break
+        users.extend(batch)
+        total_count = int(payload.get("totalCount", len(users)) or len(users))
+        if len(users) >= total_count:
+            break
+        start_index += len(batch)
+    return users
+
+
+def list_ranger_groups():
+    groups = []
+    start_index = 0
+    page_size = 200
+    while True:
+        payload = ranger_request(
+            "GET",
+            f"/service/xusers/groups?startIndex={start_index}&pageSize={page_size}",
+            ok=(200,),
+        ) or {}
+        batch = payload.get("vXGroups", []) or []
+        if not batch:
+            break
+        groups.extend(batch)
+        total_count = int(payload.get("totalCount", len(groups)) or len(groups))
+        if len(groups) >= total_count:
+            break
+        start_index += len(batch)
+    return groups
+
+
 def list_roles():
     roles = []
     start_index = 0
@@ -404,12 +448,32 @@ def keycloak_role_memberships(config, token, role_names):
 def sync_ranger_users(users):
     if not users:
         return 0
-    ranger_request("POST", "/service/xusers/ugsync/users", {"vXUsers": list(users.values())}, ok=(200, 201))
-    return len(users)
+    existing_names = {
+        str(user.get("name") or "").strip()
+        for user in list_ranger_users()
+        if str(user.get("name") or "").strip()
+    }
+    missing = {
+        username: user
+        for username, user in users.items()
+        if username not in existing_names
+    }
+    if not missing:
+        return 0
+    ranger_request("POST", "/service/xusers/ugsync/users", {"vXUsers": list(missing.values())}, ok=(200, 201))
+    return len(missing)
 
 
 def sync_ranger_groups(group_members):
     if not group_members:
+        return 0
+    existing_names = {
+        str(group.get("name") or "").strip()
+        for group in list_ranger_groups()
+        if str(group.get("name") or "").strip()
+    }
+    missing_names = sorted(set(group_members) - existing_names)
+    if not missing_names:
         return 0
     ranger_request(
         "POST",
@@ -423,12 +487,12 @@ def sync_ranger_groups(group_members):
                     "groupSource": 1,
                     "syncSource": "KEYCLOAK_LOCAL",
                 }
-                for group_name in sorted(group_members)
+                for group_name in missing_names
             ]
         },
         ok=(200, 201),
     )
-    return len(group_members)
+    return len(missing_names)
 
 
 def sync_ranger_group_memberships(group_members):

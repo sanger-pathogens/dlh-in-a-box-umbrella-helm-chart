@@ -133,6 +133,7 @@ metadata:
     app.kubernetes.io/component: ranger-bootstrap
   annotations:
     helm.sh/hook: post-install,post-upgrade
+    helm.sh/hook-weight: "20"
     helm.sh/hook-delete-policy: before-hook-creation,hook-succeeded
 spec:
   backoffLimit: 3
@@ -160,6 +161,62 @@ spec:
                 secretKeyRef:
                   name: {{ $ranger.admin.existingSecret }}
                   key: {{ default "rangerAdminPassword" $ranger.admin.adminPasswordKey }}
+          volumeMounts:
+            - name: automation
+              mountPath: /opt/ranger-automation
+              readOnly: true
+      volumes:
+        - name: automation
+          configMap:
+            name: {{ include "dlh-in-a-box.ranger.admin.serviceName" . }}-automation
+            defaultMode: 0555
+---
+{{- end }}
+{{- if $keycloakRangerSyncEnabled }}
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ include "dlh-in-a-box.ranger.admin.serviceName" . }}-keycloak-sync
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "dlh-in-a-box.labels" . | nindent 4 }}
+    app.kubernetes.io/component: ranger-keycloak-sync
+  annotations:
+    helm.sh/hook: post-install,post-upgrade
+    helm.sh/hook-weight: "10"
+    helm.sh/hook-delete-policy: before-hook-creation,hook-succeeded
+spec:
+  backoffLimit: 3
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/instance: {{ .Release.Name }}
+        app.kubernetes.io/name: {{ include "dlh-in-a-box.name" . }}
+        app.kubernetes.io/component: ranger-keycloak-sync
+    spec:
+      restartPolicy: OnFailure
+      containers:
+        - name: ranger-keycloak-sync
+          image: "{{ $localUserSyncImage.repository }}:{{ $localUserSyncImage.tag }}"
+          imagePullPolicy: {{ $localUserSyncImage.pullPolicy }}
+          command:
+            - /bin/sh
+            - -ec
+            - |
+              python /opt/ranger-automation/keycloak_ranger_sync.py
+          env:
+            - name: RANGER_URL
+              value: {{ include "dlh-in-a-box.ranger.admin.url" . | quote }}
+            - name: RANGER_ADMIN_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $ranger.admin.existingSecret }}
+                  key: {{ default "rangerAdminPassword" $ranger.admin.adminPasswordKey }}
+            - name: KEYCLOAK_ADMIN_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.keycloak.auth.existingSecret }}
+                  key: {{ .Values.keycloak.auth.passwordSecretKey }}
           volumeMounts:
             - name: automation
               mountPath: /opt/ranger-automation
