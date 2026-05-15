@@ -852,10 +852,6 @@
             "$ref": "#/definitions/platformRole"
           }
         },
-        "platformRoleMembershipSource": {
-          "type": "string",
-          "enum": ["git", "ranger"]
-        },
         "platformRoleExceptions": {
           "type": "array",
           "items": {

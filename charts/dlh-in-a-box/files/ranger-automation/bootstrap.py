@@ -102,25 +102,6 @@ def normalize_role_members(items):
     return [members[name] for name in sorted(members)]
 
 
-def role_member_names(items):
-    return normalize_names(
-        [
-            item.get("name", "")
-            if isinstance(item, dict)
-            else item
-            for item in (items or [])
-        ]
-    )
-
-
-def should_preserve_ranger_membership(existing_items, seed_items):
-    seed_names = set(role_member_names(seed_items))
-    if not seed_names:
-        return True
-    existing_names = set(role_member_names(existing_items))
-    return seed_names.issubset(existing_names)
-
-
 def access_item(users, groups, roles, accesses):
     if not users and not groups and not roles:
         return None
@@ -189,11 +170,6 @@ def normalize_policy(policy, service_name):
     normalized.setdefault("dataMaskPolicyItems", [])
     normalized.setdefault("rowFilterPolicyItems", [])
     return normalized
-
-
-def role_create_path(service_name):
-    del service_name
-    return "/service/public/v2/api/roles?createNonExistUserGroup=true"
 
 
 def role_update_path(role_id):
@@ -314,25 +290,6 @@ def ensure_users_exist(usernames):
     print("Seeded Ranger users: " + ", ".join(sorted(user["name"] for user in missing)))
 
 
-def exception_role_name(base_role_name, username, expires_at):
-    return f"exception-{base_role_name}-{username}-{expires_at.replace('-', '')}"
-
-
-def exception_role_description(base_role_name, exception):
-    metadata = {
-        "approvalRef": exception["approvalRef"],
-        "reason": exception["reason"],
-        "grantedBy": exception["grantedBy"],
-        "expiresAt": exception["expiresAt"],
-        "platformRole": exception["platformRole"],
-        "username": exception["username"],
-    }
-    return (
-        f"Temporary additive exception role nested into {base_role_name}. "
-        f"EXCEPTION_METADATA={json.dumps(metadata, sort_keys=True, separators=(',', ':'))}"
-    )
-
-
 def get_role(service_name, role_name):
     del service_name
     for role in list_roles():
@@ -406,26 +363,6 @@ def detach_role_from_policies(service_name, role_name):
             print(f"Deleted stale Ranger policy with no remaining principals: {policy['name']}")
 
 
-def upsert_role(service_name, role, existing=None):
-    payload = {
-        "name": role["name"],
-        "description": role.get("description", ""),
-        "isEnabled": True,
-        "users": normalize_role_members(role.get("users", [])),
-        "groups": normalize_role_members(role.get("groups", [])),
-        "roles": normalize_role_members(role.get("roles", [])),
-    }
-    existing = existing or get_role(service_name, role["name"])
-    if existing:
-        payload["id"] = existing["id"]
-        payload["guid"] = existing.get("guid")
-        payload["version"] = existing.get("version")
-        payload["createdByUser"] = existing.get("createdByUser")
-        request("PUT", role_update_path(existing["id"]), payload, ok=(200,))
-    else:
-        request("POST", role_create_path(service_name), payload, ok=(200, 201))
-
-
 def build_platform_roles(config):
     result = []
     for role_key in sorted(config.get("platformRoles", {})):
@@ -443,32 +380,6 @@ def build_platform_roles(config):
             }
         )
     return result
-
-
-def build_exception_roles(config, base_roles):
-    base_roles_by_key = {role["key"]: role for role in base_roles}
-    exception_roles = []
-    for raw_exception in config.get("platformRoleExceptions", []):
-        exception = raw_exception or {}
-        base_role = base_roles_by_key.get(exception.get("platformRole"))
-        if not base_role:
-            continue
-        role_name = exception_role_name(
-            base_role["name"],
-            exception["username"],
-            exception["expiresAt"],
-        )
-        exception_roles.append(
-            {
-                "name": role_name,
-                "description": exception_role_description(base_role["name"], exception),
-                "users": [exception["username"]],
-                "groups": [],
-                "roles": [],
-                "targetRoleKey": base_role["key"],
-            }
-        )
-    return exception_roles
 
 
 def build_catalog_acl_policies(config):
@@ -617,81 +528,17 @@ def policy_principal_usernames(config, policies):
     return usernames
 
 
-def reconcile_roles(config):
-    service_name = config["ranger"]["serviceName"]
-    membership_source = str(config["ranger"].get("platformRoleMembershipSource", "git") or "git").lower()
-    if membership_source not in {"git", "ranger"}:
-        membership_source = "git"
-    base_roles = build_platform_roles(config)
-    base_roles_by_key = {role["key"]: role for role in base_roles}
+def purge_legacy_roles(config, service_name):
     existing_roles_by_name = {
         str(role.get("name", "")): role
         for role in list_roles()
         if str(role.get("name", "")).strip()
     }
-
-    for role in base_roles:
-        existing = existing_roles_by_name.get(role["name"])
-        effective_users = role["users"]
-        effective_groups = role["groups"]
-        if membership_source == "ranger" and existing:
-            preserve_users = should_preserve_ranger_membership(existing.get("users", []), role["users"])
-            preserve_groups = should_preserve_ranger_membership(existing.get("groups", []), role["groups"])
-            if preserve_users:
-                effective_users = existing.get("users", [])
-            if preserve_groups:
-                effective_groups = existing.get("groups", [])
-            if not preserve_users or not preserve_groups:
-                print(
-                    "Reset Ranger role membership to the seeded baseline for "
-                    f"{role['name']} because the live role no longer contained the "
-                    "required approved members."
-                )
-        upsert_role(
-            service_name,
-            {
-                "name": role["name"],
-                "description": role["description"],
-                "users": effective_users,
-                "groups": effective_groups,
-                "roles": [],
-            },
-            existing=existing,
-        )
-        role["effectiveUsers"] = effective_users
-        role["effectiveGroups"] = effective_groups
-        print(f"Reconciled Ranger role: {role['name']}")
-
     for stale_role_name in normalize_names(config["ranger"].get("legacyManagedRoles", [])):
         if stale_role_name in existing_roles_by_name:
             detach_role_from_policies(service_name, stale_role_name)
             delete_role(service_name, stale_role_name)
             print(f"Deleted stale managed Ranger role: {stale_role_name}")
-
-    exception_roles = build_exception_roles(config, base_roles)
-    exception_names_by_target = {}
-    for role in exception_roles:
-        upsert_role(service_name, role)
-        exception_names_by_target.setdefault(role["targetRoleKey"], []).append(role["name"])
-        print(f"Reconciled Ranger exception role: {role['name']}")
-
-    for role in base_roles:
-        nested_role_names = [
-            base_roles_by_key[nested_role_key]["name"]
-            for nested_role_key in role.get("nestedRoleKeys", [])
-            if nested_role_key in base_roles_by_key
-        ]
-        nested_role_names.extend(exception_names_by_target.get(role["key"], []))
-        upsert_role(
-            service_name,
-            {
-                "name": role["name"],
-                "description": role["description"],
-                "users": role.get("effectiveUsers", role["users"]),
-                "groups": role.get("effectiveGroups", role["groups"]),
-                "roles": nested_role_names,
-            },
-        )
 
 
 def filter_user_from_role_members(items, username):
@@ -906,7 +753,7 @@ def main():
     config = load_config()
     service_name = config["ranger"]["serviceName"]
     upsert_service(config)
-    reconcile_roles(config)
+    purge_legacy_roles(config, service_name)
 
     policies = []
     policies.extend(build_trino_baseline_policies(config))

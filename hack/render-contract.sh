@@ -191,6 +191,8 @@ assert_not_contains "${local_manifest}" "name: dlh-ranger-admin-usersync"
 assert_contains "${local_manifest}" "name: dlh-ranger-admin-keycloak-sync"
 assert_contains "${dev_manifest}" "name: dlh-ranger-admin-keycloak-sync"
 assert_contains "${prod_manifest}" "name: dlh-ranger-admin-keycloak-sync"
+assert_not_contains "${dev_manifest}" '"platformRoleMembershipSource"'
+assert_not_contains "${prod_manifest}" '"platformRoleMembershipSource"'
 assert_contains "${local_manifest}" "keycloak_ranger_sync.py"
 assert_not_contains "${local_manifest}" "keycloak_local_users.py"
 assert_not_contains "${local_manifest}" "RANGER_POSTGRES_PASSWORD"
@@ -456,6 +458,12 @@ expect_fail \
   "global.identity.accessModel.builtInRoles.platform-viewer.ranger is not supported. Keycloak role names are synced to Ranger exactly as-is." \
   -f "${DEV_VALUES}" \
   -f "${FIXTURE_DIR}/access-model-ranger-override.yaml"
+
+expect_fail_any \
+  "global.authorization.platformRoleMembershipSource is no longer supported. Keycloak is the source of truth for platform roles and role membership." \
+  -- \
+  -f "${DEV_VALUES}" \
+  -f "${FIXTURE_DIR}/ranger-membership-source.yaml"
 
 expect_fail \
   "global.authorization.platformRoleExceptions[0].approvalRef must be set." \

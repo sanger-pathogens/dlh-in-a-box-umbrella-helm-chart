@@ -259,20 +259,6 @@ def direct_ldap_usernames(config, configured_roles):
         if username:
             usernames.add(username)
 
-    membership_source = str((config.get("ranger") or {}).get("platformRoleMembershipSource", "git") or "git").lower()
-    if membership_source == "ranger":
-        service_name = str((config.get("ranger") or {}).get("serviceName") or "").strip()
-        for role in configured_roles:
-            if not role.get("manageable", True):
-                continue
-            current_role = get_role(service_name, role["name"])
-            if not current_role:
-                continue
-            for user in current_role.get("users", []) or []:
-                username = str((user or {}).get("name") or "").strip()
-                if username:
-                    usernames.add(username)
-
     usernames -= protected_usernames(config)
     service_username = str((config.get("ranger") or {}).get("serviceUsername") or "").strip()
     if service_username:
@@ -305,18 +291,6 @@ def desired_usernames(config, configured_roles, synced_ldap_users):
         ]:
             for item in policy.get(key, []) or []:
                 desired.update(normalize_names(item.get("users", [])))
-
-    membership_source = str((config.get("ranger") or {}).get("platformRoleMembershipSource", "git") or "git").lower()
-    if membership_source == "ranger":
-        service_name = str((config.get("ranger") or {}).get("serviceName") or "").strip()
-        for role in configured_roles:
-            current_role = get_role(service_name, role["name"])
-            if not current_role:
-                continue
-            for user in current_role.get("users", []) or []:
-                username = str((user or {}).get("name") or "").strip()
-                if username:
-                    desired.add(username)
 
     return desired
 

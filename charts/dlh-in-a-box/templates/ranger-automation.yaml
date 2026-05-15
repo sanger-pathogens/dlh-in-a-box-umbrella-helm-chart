@@ -1,7 +1,6 @@
 {{- $authorization := .Values.global.authorization | default dict -}}
 {{- $platformRoles := get $authorization "platformRoles" | default dict -}}
 {{- $platformRoleExceptions := get $authorization "platformRoleExceptions" | default (list) -}}
-{{- $platformRoleMembershipSource := default "git" (get $authorization "platformRoleMembershipSource") -}}
 {{- $ranger := get $authorization "ranger" | default dict -}}
 {{- $rangerTrino := get $ranger "trino" | default dict -}}
 {{- $exceptionRoleAudit := get $ranger "exceptionRoleAudit" | default dict -}}
@@ -75,7 +74,6 @@ data:
         "legacyManagedRoles" ($ranger.legacyManagedRoles | default (list))
         "legacyManagedPolicies" ($ranger.legacyManagedPolicies | default (list))
         "trinoEnabled" (and (default false $ranger.enabled) (default false $rangerTrino.enabled))
-        "platformRoleMembershipSource" $platformRoleMembershipSource
         "importCatalogAcls" $importCatalogAcls
         "bootstrapPolicies" $bootstrapPolicies
         "exceptionRoleAudit" (dict

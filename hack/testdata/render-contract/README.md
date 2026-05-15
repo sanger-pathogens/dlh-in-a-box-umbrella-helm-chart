@@ -85,6 +85,7 @@ These fixtures exercise the governance validation template:
 | `invalid-access-model-app.yaml` | unsupported app access key in the identity access model |
 | `access-model-unknown-role.yaml` | group-role mapping references an unknown access-model role |
 | `access-model-ranger-override.yaml` | access-model role attempts to override the exact Keycloak-to-Ranger role name |
+| `ranger-membership-source.yaml` | deprecated Ranger-owned platform role membership source is rejected |
 | `exception-missing-metadata.yaml` | platform role exception missing required approval metadata |
 
 ### Identity and environment failures

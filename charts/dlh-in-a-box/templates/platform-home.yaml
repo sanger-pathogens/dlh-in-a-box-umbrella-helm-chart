@@ -22,7 +22,6 @@
 {{- $authorization := get $global "authorization" | default dict -}}
 {{- $platformRoles := get $authorization "platformRoles" | default dict -}}
 {{- $platformRoleExceptions := get $authorization "platformRoleExceptions" | default (list) -}}
-{{- $platformRoleMembershipSource := default "git" (get $authorization "platformRoleMembershipSource") -}}
 {{- $ranger := get $authorization "ranger" | default dict -}}
 {{- $rangerAdmin := get $ranger "admin" | default dict -}}
 {{- $usersyncEnabled := dig "usersync" "enabled" true $ranger -}}
@@ -55,7 +54,7 @@
 {{- $metaThemeColor := default "#1f5f7a" (get $theme "metaThemeColor") -}}
 {{- $fontBodyFamily := default "system-ui, -apple-system, BlinkMacSystemFont, \"Segoe UI\", sans-serif" (get $themeFonts "bodyFamily") -}}
 {{- $fontHeadingFamily := default "Georgia, \"Times New Roman\", serif" (get $themeFonts "headingFamily") -}}
-{{- $accessControlNotice := "Access Control is disabled in Keycloak local-user mode. Use Keycloak Admin for standalone app-group changes; direct-user Ranger platform-role membership is projected back into the matching Keycloak role and browser app groups." -}}
+{{- $accessControlNotice := "Access Control is read-only because Keycloak owns platform roles and role membership. Use Keycloak Admin to change routine role membership." -}}
 {{- $portalLaunchers := dict -}}
 {{- range $launcherName := keys $launchers | sortAlpha -}}
   {{- $launcher := get $launchers $launcherName | default dict -}}
@@ -427,7 +426,7 @@
     "enabled" (default false $ranger.enabled)
     "browserUrl" $rangerBrowserUrl
     "usersyncEnabled" $usersyncEnabled
-    "membershipSource" $platformRoleMembershipSource
+    "membershipSource" "keycloak"
     "directoryMode" $directoryMode
   )
   "ldap" (dict
@@ -1560,7 +1559,7 @@ data:
       if (state.adminStatus.membershipSource !== "ranger") {
         setRoleManagementMessage(
           "warning",
-          `Live access-control edits are disabled because <code>global.authorization.platformRoleMembershipSource</code> is set to <code>${escapeHtml(state.adminStatus.membershipSource)}</code>. Switch it to <code>ranger</code> to make portal edits persist through reconciliation.`,
+          `Live access-control edits are disabled because Keycloak owns platform role membership. Current source: <code>${escapeHtml(state.adminStatus.membershipSource)}</code>. Use Keycloak Admin for routine role changes.`,
         );
         return;
       }
@@ -3988,7 +3987,7 @@ data:
 
     def access_control_status():
         directory = directory_status()
-        membership_source = str(CONFIG.get("ranger", {}).get("membershipSource", "git") or "git").lower()
+        membership_source = str(CONFIG.get("ranger", {}).get("membershipSource", "keycloak") or "keycloak").lower()
         usersync_enabled = bool(CONFIG.get("ranger", {}).get("usersyncEnabled"))
         return {
             "adminEnabled": True,
@@ -4042,9 +4041,9 @@ data:
 
 
     def update_role_membership(role_key, kind, name, add_member):
-        membership_source = str(CONFIG.get("ranger", {}).get("membershipSource", "git") or "git").lower()
+        membership_source = str(CONFIG.get("ranger", {}).get("membershipSource", "keycloak") or "keycloak").lower()
         if membership_source != "ranger":
-            raise ApiError(409, "Live access-control edits are disabled until platformRoleMembershipSource is set to ranger.")
+            raise ApiError(409, "Live access-control edits are disabled because Keycloak owns platform role membership.")
         if kind == "group" and not bool(CONFIG.get("ranger", {}).get("usersyncEnabled")):
             raise ApiError(409, "LDAP group assignment is unavailable until LDAP and Ranger usersync are enabled.")
         principal = str(name or "").strip()
@@ -4068,7 +4067,7 @@ data:
     def create_exception(role_key, payload, profile):
         status = access_control_status()
         if status["membershipSource"] != "ranger":
-            raise ApiError(409, "Live access-control edits are disabled until platformRoleMembershipSource is set to ranger.")
+            raise ApiError(409, "Direct-user exceptions are disabled because Keycloak owns platform role membership.")
         if not status["exceptionSupportEnabled"]:
             raise ApiError(503, "Direct-user exceptions are unavailable because state storage is not configured.")
         user = lookup_directory_principal("user", payload.get("username"))
@@ -4135,7 +4134,7 @@ data:
     def update_exception(role_key, exception_id, payload, profile):
         status = access_control_status()
         if status["membershipSource"] != "ranger":
-            raise ApiError(409, "Live access-control edits are disabled until platformRoleMembershipSource is set to ranger.")
+            raise ApiError(409, "Direct-user exceptions are disabled because Keycloak owns platform role membership.")
         if not status["exceptionSupportEnabled"]:
             raise ApiError(503, "Direct-user exceptions are unavailable because state storage is not configured.")
         reason = str(payload.get("reason") or "").strip()
@@ -4241,7 +4240,7 @@ data:
                         self,
                         200,
                         {
-                            "membershipSource": str(CONFIG.get("ranger", {}).get("membershipSource", "git") or "git"),
+                            "membershipSource": str(CONFIG.get("ranger", {}).get("membershipSource", "keycloak") or "keycloak"),
                             "roles": list_platform_roles(),
                         },
                     )
