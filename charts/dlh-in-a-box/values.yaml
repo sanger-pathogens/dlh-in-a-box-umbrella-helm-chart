@@ -438,6 +438,13 @@ keycloak:
               {{- else }}
               description: {{ printf "Built-in platform role %s" $roleKey | quote }}
               {{- end }}
+              {{- if eq $roleKey "platform-admin" }}
+              composite: true
+              composites:
+                client:
+                  realm-management:
+                    - realm-admin
+              {{- end }}
           {{- end }}
           {{- if gt (len $accessModelClientRoleApps) 0 }}
           client:
