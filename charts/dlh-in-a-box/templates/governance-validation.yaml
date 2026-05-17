@@ -58,14 +58,17 @@
     {{- $classification := default "" $governance.classification -}}
     {{- $sharingStatus := default "" $governance.sharingStatus -}}
     {{- $irbStatus := default "" $governance.irbStatus -}}
-    {{- $authorizedGroups := get $catalog "authorizedGroups" | default dict -}}
+    {{- if hasKey $catalog "authorizedGroups" -}}
+      {{- fail (printf "global.dataCatalogs.%s.authorizedGroups is no longer supported. Use authorizedRoles with Keycloak platform role names from global.identity.accessModel." $catalogName) -}}
+    {{- end -}}
+    {{- $authorizedRoles := get $catalog "authorizedRoles" | default dict -}}
     {{- $authorizedUsers := get $catalog "authorizedUsers" | default dict -}}
-    {{- $groupRead := get $authorizedGroups "read" | default (list) -}}
-    {{- $groupWrite := get $authorizedGroups "write" | default (list) -}}
+    {{- $roleRead := get $authorizedRoles "read" | default (list) -}}
+    {{- $roleWrite := get $authorizedRoles "write" | default (list) -}}
     {{- $userRead := get $authorizedUsers "read" | default (list) -}}
     {{- $userWrite := get $authorizedUsers "write" | default (list) -}}
-    {{- $allGroups := concat $groupRead $groupWrite -}}
-    {{- $allSubjects := concat $allGroups (concat $userRead $userWrite) -}}
+    {{- $allRoles := concat $roleRead $roleWrite -}}
+    {{- $allSubjects := concat $allRoles (concat $userRead $userWrite) -}}
     {{- $hasWildcard := false -}}
     {{- range $subject := $allSubjects -}}
       {{- if eq (toString $subject) "*" -}}
@@ -123,8 +126,8 @@
       {{- if $hasWildcard -}}
         {{- fail (printf "global.dataCatalogs.%s uses wildcard access but governance.classification=%s requires explicit allowlists." $catalogName $classification) -}}
       {{- end -}}
-      {{- if and $importCatalogAcls (eq (len $allGroups) 0) (not $hasCatalogScopedPolicy) -}}
-        {{- fail (printf "global.dataCatalogs.%s must declare authorizedGroups for migration import or define an explicit Ranger bootstrap policy for the catalog." $catalogName) -}}
+      {{- if and $importCatalogAcls (eq (len $allRoles) 0) (not $hasCatalogScopedPolicy) -}}
+        {{- fail (printf "global.dataCatalogs.%s must declare authorizedRoles for migration import or define an explicit Ranger bootstrap policy for the catalog." $catalogName) -}}
       {{- end -}}
       {{- if and (not $importCatalogAcls) (not $hasCatalogScopedPolicy) -}}
         {{- fail (printf "global.dataCatalogs.%s requires an explicit Ranger bootstrap policy because authorization.ranger.importCatalogAcls=false." $catalogName) -}}

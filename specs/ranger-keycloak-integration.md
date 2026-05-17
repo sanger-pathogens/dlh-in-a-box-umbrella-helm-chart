@@ -230,7 +230,7 @@ The infra overlays currently have:
 - JupyterHub access changed from deployment groups to platform roles
 - DataHub group-provisioning values removed
 - direct Ranger database sync removed from the development Keycloak-to-Ranger path
-- `sync_keycloak_local_users_to_ranger.sh` retained only as a wrapper that triggers the chart-managed sync CronJob
+- `sync_keycloak_to_ranger.sh` retained only as a wrapper that triggers the chart-managed sync CronJob
 
 ## Remaining Implementation Steps
 

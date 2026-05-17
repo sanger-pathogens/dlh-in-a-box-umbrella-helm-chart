@@ -87,6 +87,7 @@ These fixtures exercise the governance validation template:
 | `access-model-ranger-override.yaml` | access-model role attempts to override the exact Keycloak-to-Ranger role name |
 | `oauth2-proxy-allowed-groups.yaml` | deprecated oauth2-proxy `allowedGroups` client setting is rejected |
 | `platform-home-required-groups.yaml` | deprecated Platform Home launcher `requiredGroups` setting is rejected |
+| `catalog-authorized-groups.yaml` | deprecated catalog `authorizedGroups` ACL setting is rejected |
 | `ranger-membership-source.yaml` | deprecated Ranger-owned platform role membership source is rejected |
 | `exception-missing-metadata.yaml` | platform role exception missing required approval metadata |
 

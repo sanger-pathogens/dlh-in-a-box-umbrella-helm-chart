@@ -492,6 +492,11 @@ expect_fail \
   -f "${FIXTURE_DIR}/platform-home-required-groups.yaml"
 
 expect_fail \
+  "global.dataCatalogs.redcap.authorizedGroups is no longer supported. Use authorizedRoles with Keycloak platform role names from global.identity.accessModel." \
+  -f "${DEV_VALUES}" \
+  -f "${FIXTURE_DIR}/catalog-authorized-groups.yaml"
+
+expect_fail \
   "jupyterhub.hub.extraEnv.JUPYTERHUB_ALLOWED_GROUP is no longer supported. Use JUPYTERHUB_ROLES_CLAIM, JUPYTERHUB_ALLOWED_ROLES, and JUPYTERHUB_ADMIN_ROLES." \
   -f "${DEV_VALUES}" \
   -f "${FIXTURE_DIR}/jupyterhub-group-env.yaml"

@@ -1070,8 +1070,8 @@
                   "description": "Logical catalog type used by the local Trino and Hive composition logic.",
                   "enum": ["deltaLake", "hive"]
                 },
-                "authorizedGroups": {
-                  "description": "Preferred catalog-level group access lists used by generated Trino access rules.",
+                "authorizedRoles": {
+                  "description": "Preferred catalog-level role access lists used by generated Trino access rules and Ranger catalog ACL import.",
                   "$ref": "#/definitions/catalogAcl"
                 },
                 "authorizedUsers": {
