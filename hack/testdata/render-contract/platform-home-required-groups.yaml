@@ -1,0 +1,5 @@
+platformHome:
+  launchers:
+    vault:
+      requiredGroups:
+        - admins

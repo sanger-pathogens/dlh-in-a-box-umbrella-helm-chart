@@ -304,15 +304,13 @@ This describes the data sources the platform should expose. It is the seed for:
 - governance checks
 - imported or bootstrapped access rules
 
-### `global.authorization.platformRoles`
+### `global.identity.accessModel`
 
-These are the durable named roles the platform cares about.
+This is the durable role catalog the platform cares about.
 
-They are used to describe:
-
-- who should have which app access
-- which directory groups map to those roles
-- which Ranger roles should exist
+It defines Keycloak platform roles, app access, and deployment-owned
+group-to-role mappings. Ranger receives the same role names from Keycloak; the
+chart no longer supports `global.authorization.platformRoles`.
 
 ### `global.authorization.platformRoleExceptions`
 

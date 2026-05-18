@@ -1,0 +1,3 @@
+global:
+  authorization:
+    platformRoleMembershipSource: ranger

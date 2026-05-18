@@ -1,0 +1,7 @@
+global:
+  identity:
+    accessModel:
+      groupRoleMappings:
+        principal-investigator:
+          roles:
+            - missing-role

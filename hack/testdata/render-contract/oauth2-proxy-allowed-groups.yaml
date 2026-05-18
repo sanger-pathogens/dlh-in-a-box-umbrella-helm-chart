@@ -3,4 +3,5 @@ global:
     external:
       clients:
         cloudbeaverProxy:
-          allowedGroups: []
+          allowedGroups:
+            - admins

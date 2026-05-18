@@ -190,60 +190,72 @@ app.kubernetes.io/managed-by: {{ .Release.Service }}
 {{- printf "%s-cloudbeaver" .Release.Name -}}
 {{- end -}}
 
-{{- define "dlh-in-a-box.group.app" -}}
-{{- $root := .root -}}
-{{- $name := .name -}}
-{{- $identity := $root.Values.global.identity | default dict -}}
-{{- $conventions := get $identity "groupConventions" | default dict -}}
-{{- printf "%s%s" (default "platform-app-" $conventions.appAccessPrefix) $name -}}
-{{- end -}}
-
-{{- define "dlh-in-a-box.group.role" -}}
-{{- $root := .root -}}
-{{- $name := .name -}}
-{{- $identity := $root.Values.global.identity | default dict -}}
-{{- $conventions := get $identity "groupConventions" | default dict -}}
-{{- printf "%s%s" (default "platform-role-" $conventions.rolePrefix) $name -}}
-{{- end -}}
-
 {{- define "dlh-in-a-box.identity.directoryMode" -}}
 {{- $identity := .Values.global.identity | default dict -}}
 {{- $directory := get $identity "directory" | default dict -}}
 {{- default "externalLdap" $directory.mode -}}
 {{- end -}}
 
+{{- define "dlh-in-a-box.identity.accessModelRolesJson" -}}
+{{- $identity := .Values.global.identity | default dict -}}
+{{- $accessModel := get $identity "accessModel" | default dict -}}
+{{- $roles := dict -}}
+{{- $builtinRoles := get $accessModel "builtinRoles" | default dict -}}
+{{- range $roleKey := list "platform-admin" "platform-user" "platform-viewer" -}}
+  {{- $role := get $builtinRoles $roleKey | default dict -}}
+  {{- $_ := set $roles $roleKey $role -}}
+{{- end -}}
+{{- range $roleKey, $role := get $accessModel "additionalRoles" | default dict -}}
+    {{- $roleEnabled := true -}}
+    {{- if hasKey $role "enabled" -}}
+      {{- $roleEnabled = get $role "enabled" -}}
+    {{- end -}}
+    {{- if $roleEnabled -}}
+      {{- $_ := set $roles $roleKey $role -}}
+    {{- end -}}
+{{- end -}}
+{{- $roles | toJson -}}
+{{- end -}}
+
+{{- define "dlh-in-a-box.identity.accessModelAppClientsJson" -}}
+{{- $global := .Values.global | default dict -}}
+{{- $identity := get $global "identity" | default dict -}}
+{{- $external := get $identity "external" | default dict -}}
+{{- $clients := get $external "clients" | default dict -}}
+{{- $appClients := dict -}}
+{{- $superset := get $clients "superset" | default dict -}}
+{{- if and (default false (get $superset "enabled")) (get $superset "clientId") -}}
+  {{- $_ := set $appClients "superset" $superset.clientId -}}
+{{- end -}}
+{{- $datahub := get $clients "datahub" | default dict -}}
+{{- if and (default false (get $datahub "enabled")) (get $datahub "clientId") -}}
+  {{- $_ := set $appClients "datahub" $datahub.clientId -}}
+{{- end -}}
+{{- $trino := get $clients "trino" | default dict -}}
+{{- if and (default false (get $trino "enabled")) (get $trino "clientId") -}}
+  {{- $_ := set $appClients "trinoUi" $trino.clientId -}}
+{{- end -}}
+{{- $jupyterhub := get $clients "jupyterhub" | default dict -}}
+{{- if and (default false (get $jupyterhub "enabled")) (get $jupyterhub "clientId") -}}
+  {{- $_ := set $appClients "jupyterhub" $jupyterhub.clientId -}}
+{{- end -}}
+{{- $cloudbeaver := get $clients "cloudbeaverProxy" | default dict -}}
+{{- if and (default false (get $cloudbeaver "enabled")) (get $cloudbeaver "clientId") -}}
+  {{- $_ := set $appClients "cloudbeaver" $cloudbeaver.clientId -}}
+{{- end -}}
+{{- $prefect := get $clients "prefectProxy" | default dict -}}
+{{- if and (default false (get $prefect "enabled")) (get $prefect "clientId") -}}
+  {{- $_ := set $appClients "prefect" $prefect.clientId -}}
+{{- end -}}
+{{- $ranger := get $clients "rangerProxy" | default dict -}}
+{{- if and (default false (get $ranger "enabled")) (get $ranger "clientId") -}}
+  {{- $_ := set $appClients "ranger" $ranger.clientId -}}
+{{- end -}}
+{{- $appClients | toJson -}}
+{{- end -}}
+
 {{- define "dlh-in-a-box.identity.keycloakManagedGroupsJson" -}}
-{{- $authorization := .Values.global.authorization | default dict -}}
-{{- $platformRoles := get $authorization "platformRoles" | default dict -}}
-{{- $groups := dict -}}
-{{- range $roleKey := keys $platformRoles | sortAlpha -}}
-  {{- $role := get $platformRoles $roleKey | default dict -}}
-  {{- $apps := get $role "apps" | default dict -}}
-  {{- $_ := set $groups (include "dlh-in-a-box.group.role" (dict "root" $ "name" $roleKey)) true -}}
-  {{- if default false (get $apps "superset") -}}
-    {{- $_ := set $groups (include "dlh-in-a-box.group.app" (dict "root" $ "name" "superset")) true -}}
-  {{- end -}}
-  {{- if default false (get $apps "datahub") -}}
-    {{- $_ := set $groups (include "dlh-in-a-box.group.app" (dict "root" $ "name" "datahub")) true -}}
-  {{- end -}}
-  {{- if default false (get $apps "trinoUi") -}}
-    {{- $_ := set $groups (include "dlh-in-a-box.group.app" (dict "root" $ "name" "trino")) true -}}
-  {{- end -}}
-  {{- if default false (get $apps "jupyterhub") -}}
-    {{- $_ := set $groups (include "dlh-in-a-box.group.app" (dict "root" $ "name" "jupyterhub")) true -}}
-  {{- end -}}
-  {{- if default false (get $apps "cloudbeaver") -}}
-    {{- $_ := set $groups (include "dlh-in-a-box.group.app" (dict "root" $ "name" "cloudbeaver")) true -}}
-  {{- end -}}
-  {{- if default false (get $apps "prefect") -}}
-    {{- $_ := set $groups (include "dlh-in-a-box.group.app" (dict "root" $ "name" "prefect")) true -}}
-  {{- end -}}
-{{- end -}}
-{{- $values := list -}}
-{{- range $groupName := keys $groups | sortAlpha -}}
-  {{- $values = append $values $groupName -}}
-{{- end -}}
-{{- $values | toJson -}}
+{{- list | toJson -}}
 {{- end -}}
 
 {{- define "dlh-in-a-box.identity.directory.url" -}}

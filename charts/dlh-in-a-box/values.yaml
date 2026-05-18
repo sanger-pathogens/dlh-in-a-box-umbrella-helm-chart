@@ -5,6 +5,32 @@ global:
   imagePullSecrets: []
   identity: &identity_defaults
     enabled: false
+    accessModel:
+      builtinRoles:
+        platform-admin:
+          enabled: true
+          appAccess:
+            superset: true
+            datahub: true
+            jupyterhub: true
+            cloudbeaver: true
+            prefect: true
+            ranger: true
+            trinoUi: true
+        platform-user:
+          enabled: true
+          appAccess:
+            superset: true
+            datahub: true
+            jupyterhub: true
+            cloudbeaver: true
+        platform-viewer:
+          enabled: true
+          appAccess:
+            superset: true
+            datahub: true
+      additionalRoles: {}
+      groupRoleMappings: {}
     provider:
       mode: externalOidc
       keycloak:
@@ -23,6 +49,7 @@ global:
         issuer: ""
         usernameClaim: email
         groupsClaim: groups
+        rolesClaim: platform_roles
         userMappingPattern: "([^@]+)"
         providerCaFile: ""
         scopes:
@@ -120,7 +147,6 @@ global:
           redirectUrl: ""
           redirectUris: []
           webOrigins: []
-          allowedGroups: []
           emailDomains:
             - "*"
           ingress:
@@ -139,7 +165,6 @@ global:
           redirectUrl: ""
           redirectUris: []
           webOrigins: []
-          allowedGroups: []
           emailDomains:
             - "*"
           ingress:
@@ -158,7 +183,6 @@ global:
           redirectUrl: ""
           redirectUris: []
           webOrigins: []
-          allowedGroups: []
           emailDomains:
             - "*"
           ingress:
@@ -211,14 +235,8 @@ global:
         allowInsecure: false
         syncGroupsToKeycloak: true
         hostAliases: []
-    groupConventions:
-      appAccessPrefix: platform-app-
-      rolePrefix: platform-role-
-      dataPrefix: platform-data-
   authorization: &authorization_defaults
-    platformRoles: {}
     platformRoleExceptions: []
-    platformRoleMembershipSource: git
     ranger:
       enabled: false
       serviceName: trino
@@ -361,6 +379,7 @@ keycloak:
           - email
           - roles
           - groups
+          - platform-access
         clientScopes:
           - name: groups
             protocol: openid-connect
@@ -380,10 +399,71 @@ keycloak:
                   introspection.token.claim: "true"
                   claim.name: {{ .Values.global.identity.external.oidc.groupsClaim | quote }}
                   jsonType.label: String
+          - name: platform-access
+            protocol: openid-connect
+            attributes:
+              include.in.token.scope: "true"
+              display.on.consent.screen: "false"
+            protocolMappers:
+              - name: platform-realm-roles
+                protocol: openid-connect
+                protocolMapper: oidc-usermodel-realm-role-mapper
+                consentRequired: false
+                config:
+                  multivalued: "true"
+                  id.token.claim: "true"
+                  access.token.claim: "true"
+                  userinfo.token.claim: "true"
+                  introspection.token.claim: "true"
+                  claim.name: {{ default "platform_roles" .Values.global.identity.external.oidc.rolesClaim | quote }}
+                  jsonType.label: String
+        {{- $accessModelRoles := fromJson (include "dlh-in-a-box.identity.accessModelRolesJson" $) }}
+        {{- $accessModelAppClients := fromJson (include "dlh-in-a-box.identity.accessModelAppClientsJson" $) }}
+        {{- $accessModelClientRoleApps := dict }}
+        {{- range $roleKey, $role := $accessModelRoles }}
+          {{- range $appName, $enabled := get $role "appAccess" | default dict }}
+            {{- if and $enabled (hasKey $accessModelAppClients $appName) }}
+              {{- $_ := set $accessModelClientRoleApps $appName true }}
+            {{- end }}
+          {{- end }}
+        {{- end }}
+        {{- if gt (len $accessModelRoles) 0 }}
+        roles:
+          realm:
+          {{- range $roleKey := keys $accessModelRoles | sortAlpha }}
+            {{- $role := get $accessModelRoles $roleKey | default dict }}
+            - name: {{ $roleKey | quote }}
+              {{- if get $role "description" }}
+              description: {{ get $role "description" | quote }}
+              {{- else }}
+              description: {{ printf "Built-in platform role %s" $roleKey | quote }}
+              {{- end }}
+              {{- if eq $roleKey "platform-admin" }}
+              composite: true
+              composites:
+                client:
+                  realm-management:
+                    - realm-admin
+              {{- end }}
+          {{- end }}
+          {{- if gt (len $accessModelClientRoleApps) 0 }}
+          client:
+          {{- range $appName := keys $accessModelClientRoleApps | sortAlpha }}
+            {{- $clientId := get $accessModelAppClients $appName }}
+            {{ $clientId | quote }}:
+              - name: access
+                description: {{ printf "Browser access entitlement for %s" $appName | quote }}
+          {{- end }}
+        {{- end }}
+        {{- end }}
         {{- $bootstrapUsers := default (list) .Values.global.identity.provider.keycloak.bootstrapUsers }}
+        {{- $accessModelGroupRoleMappings := get (.Values.global.identity.accessModel | default dict) "groupRoleMappings" | default dict }}
         {{- $managedGroups := fromJsonArray (include "dlh-in-a-box.identity.keycloakManagedGroupsJson" $) }}
         {{- $seededGroups := dict }}
         {{- range $groupName := $managedGroups }}
+          {{- $_ := set $seededGroups (toString $groupName) true }}
+        {{- end }}
+        {{- range $groupName, $_ := $accessModelGroupRoleMappings }}
           {{- $_ := set $seededGroups (toString $groupName) true }}
         {{- end }}
         {{- range $user := $bootstrapUsers }}
@@ -395,6 +475,30 @@ keycloak:
         groups:
         {{- range $groupName := keys $seededGroups | sortAlpha }}
           - name: {{ $groupName | quote }}
+            {{- if hasKey $accessModelGroupRoleMappings $groupName }}
+            {{- $mapping := get $accessModelGroupRoleMappings $groupName | default dict }}
+            {{- $mappedRoles := get $mapping "roles" | default list }}
+            realmRoles:
+            {{- range $roleName := $mappedRoles }}
+              - {{ $roleName | quote }}
+            {{- end }}
+            {{- $groupClientRoles := dict }}
+            {{- range $roleName := $mappedRoles }}
+              {{- $role := get $accessModelRoles (toString $roleName) | default dict }}
+              {{- range $appName, $enabled := get $role "appAccess" | default dict }}
+                {{- if and $enabled (hasKey $accessModelAppClients $appName) }}
+                  {{- $_ := set $groupClientRoles (get $accessModelAppClients $appName) true }}
+                {{- end }}
+              {{- end }}
+            {{- end }}
+            {{- if gt (len $groupClientRoles) 0 }}
+            clientRoles:
+            {{- range $clientId := keys $groupClientRoles | sortAlpha }}
+              {{ $clientId | quote }}:
+                - access
+            {{- end }}
+            {{- end }}
+            {{- end }}
         {{- end }}
         {{- end }}
         {{- if gt (len $bootstrapUsers) 0 }}
@@ -463,7 +567,7 @@ keycloak:
               - profile
               - email
               - roles
-              - groups
+              - platform-access
         {{- end }}
         {{- if .Values.global.identity.external.clients.trinoDirectGrant.enabled }}
           - clientId: {{ .Values.global.identity.external.clients.trinoDirectGrant.clientId | quote }}
@@ -479,7 +583,7 @@ keycloak:
               - profile
               - email
               - roles
-              - groups
+              - platform-access
             protocolMappers:
               - name: trino-audience
                 protocol: openid-connect
@@ -514,7 +618,7 @@ keycloak:
               - profile
               - email
               - roles
-              - groups
+              - platform-access
         {{- end }}
         {{- if .Values.global.identity.external.clients.datahub.enabled }}
           - clientId: {{ .Values.global.identity.external.clients.datahub.clientId | quote }}
@@ -539,7 +643,7 @@ keycloak:
               - profile
               - email
               - roles
-              - groups
+              - platform-access
         {{- end }}
         {{- if .Values.global.identity.external.clients.platformHome.enabled }}
           - clientId: {{ .Values.global.identity.external.clients.platformHome.clientId | quote }}
@@ -563,7 +667,7 @@ keycloak:
               - profile
               - email
               - roles
-              - groups
+              - platform-access
         {{- end }}
         {{- if .Values.global.identity.external.clients.minio.enabled }}
           - clientId: {{ .Values.global.identity.external.clients.minio.clientId | quote }}
@@ -588,7 +692,7 @@ keycloak:
               - profile
               - email
               - roles
-              - groups
+              - platform-access
             protocolMappers:
               - name: minio-policy
                 protocol: openid-connect
@@ -627,6 +731,7 @@ keycloak:
               - email
               - roles
               - groups
+              - platform-access
         {{- end }}
         {{- if .Values.global.identity.external.clients.headlamp.enabled }}
           - clientId: {{ .Values.global.identity.external.clients.headlamp.clientId | quote }}
@@ -652,6 +757,7 @@ keycloak:
               - email
               - roles
               - groups
+              - platform-access
         {{- end }}
         {{- if .Values.global.identity.external.clients.jupyterhub.enabled }}
           - clientId: {{ .Values.global.identity.external.clients.jupyterhub.clientId | quote }}
@@ -676,7 +782,7 @@ keycloak:
               - profile
               - email
               - roles
-              - groups
+              - platform-access
             {{- if .Values.global.identity.external.clients.trino.enabled }}
             protocolMappers:
               - name: trino-audience
@@ -714,6 +820,7 @@ keycloak:
               - email
               - roles
               - groups
+              - platform-access
         {{- end }}
         {{- if .Values.global.identity.external.clients.rangerProxy.enabled }}
           - clientId: {{ .Values.global.identity.external.clients.rangerProxy.clientId | quote }}
@@ -739,6 +846,7 @@ keycloak:
               - email
               - roles
               - groups
+              - platform-access
         {{- end }}
         {{- if .Values.global.identity.external.clients.prefectProxy.enabled }}
           - clientId: {{ .Values.global.identity.external.clients.prefectProxy.clientId | quote }}
@@ -764,6 +872,7 @@ keycloak:
               - email
               - roles
               - groups
+              - platform-access
         {{- end }}
         {{- if .Values.global.identity.external.clients.prefectAutomation.enabled }}
           - clientId: {{ .Values.global.identity.external.clients.prefectAutomation.clientId | quote }}
@@ -781,6 +890,7 @@ keycloak:
               - email
               - roles
               - groups
+              - platform-access
             protocolMappers:
               - name: prefect-automation-audience
                 protocol: openid-connect
@@ -806,6 +916,7 @@ keycloak:
               - email
               - roles
               - groups
+              - platform-access
             protocolMappers:
               - name: prefect-direct-grant-audience
                 protocol: openid-connect
@@ -1049,9 +1160,9 @@ jupyterhub:
       JUPYTERHUB_OAUTH_CALLBACK_URL: ""
       JUPYTERHUB_CLIENT_ID: ""
       JUPYTERHUB_CLIENT_SECRET: ""
-      JUPYTERHUB_GROUPS_CLAIM: platform_groups
-      JUPYTERHUB_ALLOWED_GROUP: platform-app-jupyterhub
-      JUPYTERHUB_ADMIN_GROUP: platform-role-platform-admin
+      JUPYTERHUB_ROLES_CLAIM: platform_roles
+      JUPYTERHUB_ALLOWED_ROLES: ""
+      JUPYTERHUB_ADMIN_ROLES: ""
       JUPYTERHUB_USERNAME_CLAIM: preferred_username
       JUPYTERHUB_LOGIN_SERVICE: Keycloak
     extraConfig:
@@ -1062,14 +1173,19 @@ jupyterhub:
         def _env(name, default=""):
             return os.environ.get(name, default).strip()
 
-        def _group_list(auth_state):
+        def _claim_list(auth_state, claim_name):
             auth_state = auth_state or {}
             oauth_user = auth_state.get("oauth_user") or {}
-            groups_claim = _env("JUPYTERHUB_GROUPS_CLAIM", "groups")
-            groups = oauth_user.get(groups_claim) or oauth_user.get("groups") or []
-            if isinstance(groups, str):
-                groups = [groups]
-            return [group for group in groups if isinstance(group, str) and group]
+            values = oauth_user.get(claim_name) or []
+            if isinstance(values, str):
+                values = [values]
+            return [value for value in values if isinstance(value, str) and value]
+
+        def _role_list(auth_state):
+            return _claim_list(auth_state, _env("JUPYTERHUB_ROLES_CLAIM", "platform_roles"))
+
+        def _csv_set(name):
+            return {value.strip() for value in _env(name).split(",") if value.strip()}
 
         c.GenericOAuthenticator.client_id = _env("JUPYTERHUB_CLIENT_ID")
         c.GenericOAuthenticator.client_secret = _env("JUPYTERHUB_CLIENT_SECRET")
@@ -1079,32 +1195,31 @@ jupyterhub:
         c.GenericOAuthenticator.oauth_callback_url = _env("JUPYTERHUB_OAUTH_CALLBACK_URL")
         c.GenericOAuthenticator.login_service = _env("JUPYTERHUB_LOGIN_SERVICE", "Keycloak")
         c.GenericOAuthenticator.username_claim = _env("JUPYTERHUB_USERNAME_CLAIM", "preferred_username")
-        c.GenericOAuthenticator.scope = ["openid", "profile", "email", "groups"]
+        c.GenericOAuthenticator.scope = ["openid", "profile", "email"]
         c.GenericOAuthenticator.manage_groups = True
-        c.GenericOAuthenticator.auth_state_groups_key = _group_list
+        c.GenericOAuthenticator.auth_state_groups_key = _role_list
         c.GenericOAuthenticator.refresh_pre_spawn = True
         c.Authenticator.enable_auth_state = True
         c.Authenticator.auth_refresh_age = 300
         c.GenericOAuthenticator.allow_all = False
 
-        allowed_group = _env("JUPYTERHUB_ALLOWED_GROUP")
-        if allowed_group:
-            c.GenericOAuthenticator.allowed_groups = {allowed_group}
+        allowed_roles = _csv_set("JUPYTERHUB_ALLOWED_ROLES")
+        if allowed_roles:
+            c.GenericOAuthenticator.allowed_groups = allowed_roles
 
-        admin_group = _env("JUPYTERHUB_ADMIN_GROUP")
-        if admin_group:
-            c.GenericOAuthenticator.admin_groups = {admin_group}
+        admin_roles = _csv_set("JUPYTERHUB_ADMIN_ROLES")
+        if admin_roles:
+            c.GenericOAuthenticator.admin_groups = admin_roles
       20-spawn-env.py: |
         import os
 
-        def _group_list(auth_state):
+        def _claim_list(auth_state, claim_name):
             auth_state = auth_state or {}
             oauth_user = auth_state.get("oauth_user") or {}
-            groups_claim = os.environ.get("JUPYTERHUB_GROUPS_CLAIM", "groups")
-            groups = oauth_user.get(groups_claim) or oauth_user.get("groups") or []
-            if isinstance(groups, str):
-                groups = [groups]
-            return [group for group in groups if isinstance(group, str) and group]
+            values = oauth_user.get(claim_name) or []
+            if isinstance(values, str):
+                values = [values]
+            return [value for value in values if isinstance(value, str) and value]
 
         async def _inject_platform_identity(spawner):
             auth_state = await spawner.user.get_auth_state()
@@ -1116,14 +1231,15 @@ jupyterhub:
             username = oauth_user.get(username_claim) or spawner.user.name
             access_token = auth_state.get("access_token") or ""
             refresh_token = auth_state.get("refresh_token") or ""
-            groups = _group_list(auth_state)
+            roles_claim = os.environ.get("JUPYTERHUB_ROLES_CLAIM", "platform_roles")
+            roles = _claim_list(auth_state, roles_claim)
 
             spawner.environment.update(
                 {
                     "KEYCLOAK_ACCESS_TOKEN": access_token,
                     "KEYCLOAK_REFRESH_TOKEN": refresh_token,
                     "KEYCLOAK_USERNAME": username,
-                    "PLATFORM_GROUPS": ",".join(sorted(groups)),
+                    "PLATFORM_ROLES": ",".join(sorted(roles)),
                     "TRINO_ACCESS_TOKEN": access_token,
                     "TRINO_USER": username,
                 }
@@ -1392,7 +1508,7 @@ prefect-auth-proxy:
     # keys `client-id`, `client-secret`, and `cookie-secret`.
     existingSecret: ""
     configFile: |-
-      provider = "oidc"
+      provider = "keycloak-oidc"
       oidc_issuer_url = "{{ include "dlh-in-a-box.identity.issuer" $ }}"
       skip_oidc_discovery = true
       login_url = "{{ include "dlh-in-a-box.identity.authorizeUrl" $ }}"
@@ -1401,7 +1517,7 @@ prefect-auth-proxy:
       profile_url = "{{ include "dlh-in-a-box.identity.internalUserInfoUrl" $ }}"
       scope = "{{ join " " .Values.global.identity.external.oidc.scopes }}"
       email_domains = [{{- range $index, $domain := .Values.global.identity.external.clients.prefectProxy.emailDomains }}{{ if $index }}, {{ end }}{{ $domain | quote }}{{- end }}]
-      allowed_groups = [{{- range $index, $group := .Values.global.identity.external.clients.prefectProxy.allowedGroups }}{{ if $index }}, {{ end }}{{ $group | quote }}{{- end }}]
+      allowed_roles = [{{ printf "%s:access" .Values.global.identity.external.clients.prefectProxy.clientId | quote }}]
       oidc_groups_claim = "{{ .Values.global.identity.external.oidc.groupsClaim }}"
       redirect_url = "{{ .Values.global.identity.external.clients.prefectProxy.redirectUrl }}"
       skip_provider_button = true
@@ -1437,7 +1553,7 @@ cloudbeaver-auth-proxy:
     # keys `client-id`, `client-secret`, and `cookie-secret`.
     existingSecret: ""
     configFile: |-
-      provider = "oidc"
+      provider = "keycloak-oidc"
       oidc_issuer_url = "{{ include "dlh-in-a-box.identity.issuer" $ }}"
       skip_oidc_discovery = true
       login_url = "{{ include "dlh-in-a-box.identity.authorizeUrl" $ }}"
@@ -1446,7 +1562,7 @@ cloudbeaver-auth-proxy:
       profile_url = "{{ include "dlh-in-a-box.identity.internalUserInfoUrl" $ }}"
       scope = "{{ join " " .Values.global.identity.external.oidc.scopes }}"
       email_domains = [{{- range $index, $domain := .Values.global.identity.external.clients.cloudbeaverProxy.emailDomains }}{{ if $index }}, {{ end }}{{ $domain | quote }}{{- end }}]
-      allowed_groups = [{{- range $index, $group := .Values.global.identity.external.clients.cloudbeaverProxy.allowedGroups }}{{ if $index }}, {{ end }}{{ $group | quote }}{{- end }}]
+      allowed_roles = [{{ printf "%s:access" .Values.global.identity.external.clients.cloudbeaverProxy.clientId | quote }}]
       oidc_groups_claim = "{{ .Values.global.identity.external.oidc.groupsClaim }}"
       redirect_url = "{{ .Values.global.identity.external.clients.cloudbeaverProxy.redirectUrl }}"
       skip_provider_button = true
@@ -1483,7 +1599,7 @@ ranger-auth-proxy:
       {{- index .data $secretKey | b64dec -}}
       {{- end -}}
     configFile: |-
-      provider = "oidc"
+      provider = "keycloak-oidc"
       oidc_issuer_url = "{{ include "dlh-in-a-box.identity.issuer" $ }}"
       skip_oidc_discovery = true
       login_url = "{{ include "dlh-in-a-box.identity.authorizeUrl" $ }}"
@@ -1492,7 +1608,7 @@ ranger-auth-proxy:
       profile_url = "{{ include "dlh-in-a-box.identity.internalUserInfoUrl" $ }}"
       scope = "{{ join " " .Values.global.identity.external.oidc.scopes }}"
       email_domains = [{{- range $index, $domain := .Values.global.identity.external.clients.rangerProxy.emailDomains }}{{ if $index }}, {{ end }}{{ $domain | quote }}{{- end }}]
-      allowed_groups = [{{- range $index, $group := .Values.global.identity.external.clients.rangerProxy.allowedGroups }}{{ if $index }}, {{ end }}{{ $group | quote }}{{- end }}]
+      allowed_roles = [{{ printf "%s:access" .Values.global.identity.external.clients.rangerProxy.clientId | quote }}]
       oidc_groups_claim = "{{ .Values.global.identity.external.oidc.groupsClaim }}"
       redirect_url = "{{ .Values.global.identity.external.clients.rangerProxy.redirectUrl }}"
       skip_provider_button = true
@@ -1520,12 +1636,6 @@ minio:
 
 datahub:
   enabled: false
-  auth:
-    groupProvisioning:
-      enabled: false
-      groupsClaim: ""
-      viewers: []
-      editors: []
   # Upstream DataHub chart values should be set directly under this key.
   # Example:
   # datahub-frontend:
@@ -1550,11 +1660,9 @@ superset:
   enabled: false
   auth:
     roleMappings:
-      Gamma:
-        - platform-app-superset
+      Gamma: []
       Alpha: []
-      Admin:
-        - platform-role-data-engineer
+      Admin: []
   image:
     repository: apache/superset
   bootstrapScript: |
@@ -1600,11 +1708,11 @@ superset:
       AUTH_ROLES_SYNC_AT_LOGIN = True
       AUTH_USER_REGISTRATION = True
       AUTH_USER_REGISTRATION_ROLE = "Gamma"
-      GROUPS_CLAIM = {{ .Values.global.identity.external.oidc.groupsClaim | quote }}
+      ROLES_CLAIM = {{ default "platform_roles" .Values.global.identity.external.oidc.rolesClaim | quote }}
       AUTH_ROLES_MAPPING = {
-      {{- range $role, $groups := .Values.auth.roleMappings }}
-        {{- range $group := $groups }}
-        {{ $group | quote }}: ["{{ $role }}"],
+      {{- range $supersetRole, $platformRoles := .Values.auth.roleMappings }}
+        {{- range $platformRole := $platformRoles }}
+        {{ $platformRole | quote }}: ["{{ $supersetRole }}"],
         {{- end }}
       {{- end }}
       }
@@ -1619,7 +1727,7 @@ superset:
                   "client_secret": os.environ.get("OAUTH_CLIENT_SECRET"),
                   "api_base_url": {{ include "dlh-in-a-box.identity.internalApiBaseUrl" $ | quote }},
                   "client_kwargs": {
-                      "scope": {{ join " " .Values.global.identity.external.oidc.scopes | quote }},
+                      "scope": "openid profile email",
                       "verify_signature": False,
                   },
                   "access_token_url": {{ include "dlh-in-a-box.identity.internalAccessTokenUrl" $ | quote }},
@@ -1647,7 +1755,7 @@ superset:
                           "first_name": claims.get("given_name", ""),
                           "last_name": claims.get("family_name", ""),
                           "email": claims.get("email", ""),
-                          "role_keys": claims.get(GROUPS_CLAIM) or claims.get("groups", []),
+                          "role_keys": claims.get(ROLES_CLAIM) or [],
                       }
               return super().oauth_user_info(provider, response)
 

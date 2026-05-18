@@ -3,40 +3,15 @@
 {{- $environment := default "" $global.environment -}}
 {{- $catalogs := $global.dataCatalogs | default dict -}}
 {{- $authorization := $global.authorization | default dict -}}
-{{- $platformRoles := get $authorization "platformRoles" | default dict -}}
 {{- $platformRoleExceptions := get $authorization "platformRoleExceptions" | default (list) -}}
 {{- $ranger := get $authorization "ranger" | default dict -}}
 {{- $bootstrapPolicies := get $ranger "bootstrapPolicies" | default (dig "bootstrap" "policies" (list) $ranger) -}}
 {{- $importCatalogAcls := default false $ranger.importCatalogAcls -}}
-{{- $supportedPlatformApps := list "superset" "datahub" "trinoUi" "jupyterhub" "cloudbeaver" "prefect" -}}
+{{- $accessModelRoles := fromJson (include "dlh-in-a-box.identity.accessModelRolesJson" .) -}}
 {{- $platformRoleKeys := dict -}}
-{{- $platformRoleNames := dict -}}
 
-{{- range $roleKey, $_ := $platformRoles -}}
+{{- range $roleKey, $_ := $accessModelRoles -}}
   {{- $_ := set $platformRoleKeys $roleKey true -}}
-{{- end -}}
-
-{{- range $roleKey, $role := $platformRoles -}}
-  {{- if not (trim (default "" (get $role "description"))) -}}
-    {{- fail (printf "global.authorization.platformRoles.%s.description must be set." $roleKey) -}}
-  {{- end -}}
-  {{- $members := get $role "members" | default dict -}}
-  {{- $apps := get $role "apps" | default dict -}}
-  {{- range $appName, $_ := $apps -}}
-    {{- if not (has $appName $supportedPlatformApps) -}}
-      {{- fail (printf "global.authorization.platformRoles.%s.apps.%s is not supported. Allowed app entitlements are superset, datahub, trinoUi, jupyterhub, cloudbeaver, and prefect." $roleKey $appName) -}}
-    {{- end -}}
-  {{- end -}}
-  {{- range $nestedRole := get $members "nestedRoles" | default (list) -}}
-    {{- if not (hasKey $platformRoleKeys (toString $nestedRole)) -}}
-      {{- fail (printf "global.authorization.platformRoles.%s.members.nestedRoles references unknown platform role %s." $roleKey $nestedRole) -}}
-    {{- end -}}
-  {{- end -}}
-  {{- $rangerRoleName := default $roleKey (dig "ranger" "roleName" "" $role) -}}
-  {{- if hasKey $platformRoleNames $rangerRoleName -}}
-    {{- fail (printf "global.authorization.platformRoles.%s resolves to Ranger role name %s, but that Ranger role name is already used by another platform role." $roleKey $rangerRoleName) -}}
-  {{- end -}}
-  {{- $_ := set $platformRoleNames $rangerRoleName true -}}
 {{- end -}}
 
 {{- if and (gt (len $platformRoleExceptions) 0) (not (default false $ranger.enabled)) -}}
@@ -83,14 +58,17 @@
     {{- $classification := default "" $governance.classification -}}
     {{- $sharingStatus := default "" $governance.sharingStatus -}}
     {{- $irbStatus := default "" $governance.irbStatus -}}
-    {{- $authorizedGroups := get $catalog "authorizedGroups" | default dict -}}
+    {{- if hasKey $catalog "authorizedGroups" -}}
+      {{- fail (printf "global.dataCatalogs.%s.authorizedGroups is no longer supported. Use authorizedRoles with Keycloak platform role names from global.identity.accessModel." $catalogName) -}}
+    {{- end -}}
+    {{- $authorizedRoles := get $catalog "authorizedRoles" | default dict -}}
     {{- $authorizedUsers := get $catalog "authorizedUsers" | default dict -}}
-    {{- $groupRead := get $authorizedGroups "read" | default (list) -}}
-    {{- $groupWrite := get $authorizedGroups "write" | default (list) -}}
+    {{- $roleRead := get $authorizedRoles "read" | default (list) -}}
+    {{- $roleWrite := get $authorizedRoles "write" | default (list) -}}
     {{- $userRead := get $authorizedUsers "read" | default (list) -}}
     {{- $userWrite := get $authorizedUsers "write" | default (list) -}}
-    {{- $allGroups := concat $groupRead $groupWrite -}}
-    {{- $allSubjects := concat $allGroups (concat $userRead $userWrite) -}}
+    {{- $allRoles := concat $roleRead $roleWrite -}}
+    {{- $allSubjects := concat $allRoles (concat $userRead $userWrite) -}}
     {{- $hasWildcard := false -}}
     {{- range $subject := $allSubjects -}}
       {{- if eq (toString $subject) "*" -}}
@@ -148,8 +126,8 @@
       {{- if $hasWildcard -}}
         {{- fail (printf "global.dataCatalogs.%s uses wildcard access but governance.classification=%s requires explicit allowlists." $catalogName $classification) -}}
       {{- end -}}
-      {{- if and $importCatalogAcls (eq (len $allGroups) 0) (not $hasCatalogScopedPolicy) -}}
-        {{- fail (printf "global.dataCatalogs.%s must declare authorizedGroups for migration import or define an explicit Ranger bootstrap policy for the catalog." $catalogName) -}}
+      {{- if and $importCatalogAcls (eq (len $allRoles) 0) (not $hasCatalogScopedPolicy) -}}
+        {{- fail (printf "global.dataCatalogs.%s must declare authorizedRoles for migration import or define an explicit Ranger bootstrap policy for the catalog." $catalogName) -}}
       {{- end -}}
       {{- if and (not $importCatalogAcls) (not $hasCatalogScopedPolicy) -}}
         {{- fail (printf "global.dataCatalogs.%s requires an explicit Ranger bootstrap policy because authorization.ranger.importCatalogAcls=false." $catalogName) -}}

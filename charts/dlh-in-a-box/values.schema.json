@@ -62,6 +62,75 @@
         "retentionNotes"
       ]
     },
+    "accessModel": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "builtinRoles": {
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/definitions/accessModelRole"
+          },
+          "properties": {
+            "platform-admin": {
+              "$ref": "#/definitions/accessModelRole"
+            },
+            "platform-user": {
+              "$ref": "#/definitions/accessModelRole"
+            },
+            "platform-viewer": {
+              "$ref": "#/definitions/accessModelRole"
+            }
+          }
+        },
+        "additionalRoles": {
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/definitions/accessModelRole"
+          }
+        },
+        "groupRoleMappings": {
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/definitions/accessModelGroupRoleMapping"
+          }
+        }
+      }
+    },
+    "accessModelRole": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "label": { "type": "string" },
+        "description": { "type": "string" },
+        "appAccess": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "superset": { "type": "boolean" },
+            "datahub": { "type": "boolean" },
+            "trinoUi": { "type": "boolean" },
+            "jupyterhub": { "type": "boolean" },
+            "cloudbeaver": { "type": "boolean" },
+            "prefect": { "type": "boolean" },
+            "ranger": { "type": "boolean" }
+          }
+        }
+      }
+    },
+    "accessModelGroupRoleMapping": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "roles": {
+          "type": "array",
+          "items": { "type": "string" },
+          "minItems": 1
+        }
+      },
+      "required": ["roles"]
+    },
     "identityContract": {
       "type": "object",
       "additionalProperties": true,
@@ -69,6 +138,10 @@
         "enabled": {
           "type": "boolean",
           "description": "Enable the shared external identity contract used by Trino and the optional UI integrations."
+        },
+        "accessModel": {
+          "$ref": "#/definitions/accessModel",
+          "description": "Keycloak-centered catalog of platform roles, app access, and deployment-owned group-to-role mappings."
         },
         "provider": {
           "type": "object",
@@ -143,6 +216,7 @@
                 "issuer": { "type": "string" },
                 "usernameClaim": { "type": "string" },
                 "groupsClaim": { "type": "string" },
+                "rolesClaim": { "type": "string" },
                 "userMappingPattern": { "type": "string" },
                 "providerCaFile": { "type": "string" },
                 "processForwardedHeaders": { "type": "boolean" },
@@ -433,10 +507,6 @@
                       "type": "array",
                       "items": { "type": "string" }
                     },
-                    "allowedGroups": {
-                      "type": "array",
-                      "items": { "type": "string" }
-                    },
                     "emailDomains": {
                       "type": "array",
                       "items": { "type": "string" }
@@ -520,10 +590,6 @@
                       "type": "array",
                       "items": { "type": "string" }
                     },
-                    "allowedGroups": {
-                      "type": "array",
-                      "items": { "type": "string" }
-                    },
                     "emailDomains": {
                       "type": "array",
                       "items": { "type": "string" }
@@ -575,10 +641,6 @@
                       "items": { "type": "string" }
                     },
                     "webOrigins": {
-                      "type": "array",
-                      "items": { "type": "string" }
-                    },
-                    "allowedGroups": {
                       "type": "array",
                       "items": { "type": "string" }
                     },
@@ -773,16 +835,6 @@
       "type": "object",
       "additionalProperties": true,
       "properties": {
-        "platformRoles": {
-          "type": "object",
-          "additionalProperties": {
-            "$ref": "#/definitions/platformRole"
-          }
-        },
-        "platformRoleMembershipSource": {
-          "type": "string",
-          "enum": ["git", "ranger"]
-        },
         "platformRoleExceptions": {
           "type": "array",
           "items": {
@@ -891,58 +943,6 @@
                 "auditMode": { "type": "string" }
               }
             }
-          }
-        }
-      }
-    },
-    "platformRole": {
-      "type": "object",
-      "additionalProperties": true,
-      "properties": {
-        "description": { "type": "string" },
-        "members": {
-          "type": "object",
-          "additionalProperties": true,
-          "properties": {
-            "directoryGroups": {
-              "type": "array",
-              "items": { "type": "string" }
-            },
-            "users": {
-              "type": "array",
-              "items": { "type": "string" }
-            },
-            "nestedRoles": {
-              "type": "array",
-              "items": { "type": "string" }
-            }
-          }
-        },
-        "apps": {
-          "type": "object",
-          "additionalProperties": false,
-          "properties": {
-            "superset": { "type": "boolean" },
-            "datahub": { "type": "boolean" },
-            "trinoUi": { "type": "boolean" },
-            "jupyterhub": { "type": "boolean" },
-            "cloudbeaver": { "type": "boolean" },
-            "prefect": { "type": "boolean" }
-          }
-        },
-        "ranger": {
-          "type": "object",
-          "additionalProperties": true,
-          "properties": {
-            "roleName": { "type": "string" }
-          }
-        },
-        "portal": {
-          "type": "object",
-          "additionalProperties": true,
-          "properties": {
-            "displayName": { "type": "string" },
-            "manageable": { "type": "boolean" }
           }
         }
       }
@@ -1070,8 +1070,8 @@
                   "description": "Logical catalog type used by the local Trino and Hive composition logic.",
                   "enum": ["deltaLake", "hive"]
                 },
-                "authorizedGroups": {
-                  "description": "Preferred catalog-level group access lists used by generated Trino access rules.",
+                "authorizedRoles": {
+                  "description": "Preferred catalog-level role access lists used by generated Trino access rules and Ranger catalog ACL import.",
                   "$ref": "#/definitions/catalogAcl"
                 },
                 "authorizedUsers": {
@@ -1558,25 +1558,7 @@
         "enabled": { "type": "boolean" },
         "auth": {
           "type": "object",
-          "additionalProperties": true,
-          "properties": {
-            "groupProvisioning": {
-              "type": "object",
-              "additionalProperties": true,
-              "properties": {
-                "enabled": { "type": "boolean" },
-                "groupsClaim": { "type": "string" },
-                "viewers": {
-                  "type": "array",
-                  "items": { "type": "string" }
-                },
-                "editors": {
-                  "type": "array",
-                  "items": { "type": "string" }
-                }
-              }
-            }
-          }
+          "additionalProperties": true
         }
       }
     },

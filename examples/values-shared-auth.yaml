@@ -6,6 +6,17 @@ global:
   domain: shared.example.org
   identity:
     enabled: true
+    accessModel:
+      groupRoleMappings:
+        admins:
+          roles:
+            - platform-admin
+        platform-data-default-ro:
+          roles:
+            - platform-viewer
+        platform-data-default-rw:
+          roles:
+            - platform-user
     provider:
       mode: externalOidc
     external:
@@ -58,7 +69,7 @@ global:
           webOrigins:
             - https://datahub.shared.example.org
           discoveryUri: https://login.example.org/realms/dlh/.well-known/openid-configuration
-          scope: openid profile email groups
+          scope: openid profile email
           userNameClaim: email
           userNameClaimRegex: "([^@]+)"
         cloudbeaverProxy:
@@ -73,9 +84,6 @@ global:
             - https://cloudbeaver.shared.example.org/oauth2/callback
           webOrigins:
             - https://cloudbeaver.shared.example.org
-          allowedGroups:
-            - platform-app-cloudbeaver
-            - platform-role-data-engineer
           emailDomains:
             - sanger.ac.uk
           ingress:
@@ -95,9 +103,6 @@ global:
             - https://prefect.shared.example.org/oauth2/callback
           webOrigins:
             - https://prefect.shared.example.org
-          allowedGroups:
-            - platform-app-prefect
-            - platform-role-data-engineer
           emailDomains:
             - sanger.ac.uk
     directory:
@@ -118,54 +123,16 @@ global:
         trustedCaExistingSecret: shared-ldap-ca
         trustedCaCertKey: ca.crt
         allowInsecure: false
-    groupConventions:
-      appAccessPrefix: platform-app-
-      rolePrefix: platform-role-
-      dataPrefix: platform-data-
   authorization:
-    platformRoles:
-      platform-admin:
-        description: Platform administrators with full browser access and broad Trino administration rights.
-        members:
-          directoryGroups:
-            - platform-role-platform-admin
-        apps:
-          superset: true
-          datahub: true
-          trinoUi: true
-          cloudbeaver: true
-          prefect: true
-      default-readonly-analyst:
-        description: Shared-environment read-only users for the default catalog.
-        members:
-          directoryGroups:
-            - platform-data-default-ro
-        apps:
-          superset: true
-          datahub: true
-          trinoUi: true
-          cloudbeaver: true
-          prefect: false
-      default-readwrite-engineer:
-        description: Shared-environment read-write operators for the default catalog.
-        members:
-          directoryGroups:
-            - platform-data-default-rw
-        apps:
-          superset: true
-          datahub: true
-          trinoUi: true
-          cloudbeaver: true
-          prefect: true
     platformRoleExceptions: []
     ranger:
       enabled: true
       serviceName: trino
       serviceUsername: trino
       serviceAdminGroups:
-        - platform-role-platform-admin
+        - admins
       superGroups:
-        - platform-role-platform-admin
+        - admins
       useRangerGroups: false
       admin:
         browserUrl: https://ranger.shared.example.org
@@ -182,8 +149,8 @@ global:
             - groups: []
               users: []
               roles:
-                - default-readonly-analyst
-                - default-readwrite-engineer
+                - platform-viewer
+                - platform-user
               accesses:
                 - type: select
                   isAllowed: true
@@ -206,7 +173,7 @@ global:
             - groups: []
               users: []
               roles:
-                - default-readwrite-engineer
+                - platform-user
               accesses:
                 - type: select
                   isAllowed: true
@@ -330,14 +297,6 @@ minio:
 
 datahub:
   enabled: true
-  auth:
-    groupProvisioning:
-      enabled: true
-      groupsClaim: groups
-      viewers:
-        - platform-data-default-ro
-      editors:
-        - platform-data-default-rw
   datahub-frontend:
     ingress:
       enabled: true
@@ -357,7 +316,7 @@ datahub:
         secretRef: datahub-oidc-client
         secretKey: clientSecret
       discoveryUri: https://login.example.org/realms/dlh/.well-known/openid-configuration
-      scope: openid profile email groups
+      scope: openid profile email
       user_name_claim: email
       user_name_claim_regex: "([^@]+)"
 
