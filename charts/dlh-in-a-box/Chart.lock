@@ -41,6 +41,9 @@ dependencies:
 - name: jupyterhub
   repository: https://jupyterhub.github.io/helm-chart
   version: 4.3.3
+- name: postgresql
+  repository: https://charts.bitnami.com/bitnami
+  version: 14.3.3
 - name: hive
   repository: file://charts/hive
   version: 0.1.0
@@ -50,5 +53,5 @@ dependencies:
 - name: postgresql
   repository: https://charts.bitnami.com/bitnami
   version: 14.3.3
-digest: sha256:af3b55bd68a900036665015c1c0e287d4f5ceb0c227e00f5f1afc4e7160404be
-generated: "2026-04-15T17:00:04.625342+01:00"
+digest: sha256:5d41ce19cca7f6f1d229e97859ca44ebdb6c6f05cc575629d63bceccbfca064f
+generated: "2026-05-18T12:23:24.909635+01:00"

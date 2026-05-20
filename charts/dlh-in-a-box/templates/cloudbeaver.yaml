@@ -208,6 +208,8 @@ metadata:
     app.kubernetes.io/component: cloudbeaver
 spec:
   replicas: 1
+  strategy:
+    {{- toYaml (default (dict "type" "Recreate") .Values.cloudbeaver.strategy) | nindent 4 }}
   selector:
     matchLabels:
       app.kubernetes.io/instance: {{ .Release.Name }}

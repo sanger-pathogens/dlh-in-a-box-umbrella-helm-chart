@@ -1306,6 +1306,60 @@
         }
       }
     },
+    "sharedPostgresql": {
+      "description": "Optional shared PostgreSQL dependency plus chart-owned provisioning for app databases and users.",
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "nameOverride": { "type": "string" },
+        "auth": {
+          "type": "object",
+          "additionalProperties": true,
+          "properties": {
+            "existingSecret": { "type": "string" }
+          }
+        },
+        "provisioning": {
+          "type": "object",
+          "additionalProperties": true,
+          "properties": {
+            "enabled": { "type": "boolean" },
+            "backoffLimit": { "type": "integer", "minimum": 0 },
+            "adminSecret": {
+              "type": "object",
+              "additionalProperties": true,
+              "properties": {
+                "name": { "type": "string" },
+                "passwordKey": { "type": "string" }
+              }
+            },
+            "databases": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": true,
+                "properties": {
+                  "name": { "type": "string" },
+                  "database": { "type": "string" },
+                  "username": { "type": "string" },
+                  "secretName": { "type": "string" },
+                  "passwordKey": { "type": "string" }
+                },
+                "required": ["name", "database", "username", "secretName"]
+              }
+            }
+          }
+        },
+        "migration": {
+          "type": "object",
+          "additionalProperties": true,
+          "properties": {
+            "allowBundledPostgresql": { "type": "boolean" }
+          }
+        }
+      }
+    },
     "jupyterhub": {
       "description": "Pass-through values for the optional JupyterHub dependency plus the top-level enablement flag.",
       "type": "object",
@@ -1335,6 +1389,10 @@
           "properties": {
             "port": { "type": "integer", "minimum": 1 }
           }
+        },
+        "strategy": {
+          "type": "object",
+          "additionalProperties": true
         },
         "workspace": {
           "type": "object",
@@ -1425,7 +1483,10 @@
     "rangerPostgresql": {
       "description": "Pass-through values for the Ranger PostgreSQL dependency.",
       "type": "object",
-      "additionalProperties": true
+      "additionalProperties": true,
+      "properties": {
+        "enabled": { "type": "boolean" }
+      }
     },
     "prefect": {
       "description": "Feature toggles for the Prefect server and worker subcomponents.",
@@ -1597,6 +1658,7 @@
             "host": { "type": "string" },
             "port": { "type": "string" },
             "username": { "type": "string" },
+            "createDatabase": { "type": "boolean" },
             "password": { "type": "string" },
             "existingSecret": { "type": "string" }
           }
@@ -1641,6 +1703,7 @@
       "type": "object",
       "additionalProperties": true,
       "properties": {
+        "enabled": { "type": "boolean" },
         "nameOverride": { "type": "string" }
       }
     }

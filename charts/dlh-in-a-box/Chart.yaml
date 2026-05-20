@@ -121,6 +121,12 @@ dependencies:
     repository: https://jupyterhub.github.io/helm-chart
     condition: jupyterhub.enabled
 
+  - name: postgresql
+    alias: sharedPostgresql
+    version: "14.3.3"
+    repository: https://charts.bitnami.com/bitnami
+    condition: sharedPostgresql.enabled
+
   - name: hive
     version: "0.1.0"
     repository: file://charts/hive
@@ -130,10 +136,10 @@ dependencies:
     alias: rangerPostgresql
     version: "14.3.3"
     repository: https://charts.bitnami.com/bitnami
-    condition: authorization.ranger.enabled,authorization.ranger.postgresql.enabled
+    condition: rangerPostgresql.enabled
 
   - name: postgresql
     alias: hivePostgresql
     version: "14.3.3"
     repository: https://charts.bitnami.com/bitnami
-    condition: hive.enabled
+    condition: hivePostgresql.enabled

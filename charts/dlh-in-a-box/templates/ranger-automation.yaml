@@ -125,6 +125,8 @@ data:
     import json
     import os
     import re
+    import secrets
+    import string
     import time
     import urllib.error
     import urllib.parse
@@ -393,6 +395,15 @@ data:
         return None
 
 
+    def search_users(username):
+        username = str(username or "").strip()
+        if not username:
+            return []
+        encoded = urllib.parse.quote(username, safe="")
+        payload = request("GET", f"/service/xusers/users?name={encoded}", ok=(200,)) or {}
+        return payload.get("vXUsers", []) or []
+
+
     def build_external_user(username, first_name="", last_name="", email_address=""):
         username = str(username or "").strip()
         first_name = str(first_name or "").strip() or username
@@ -411,26 +422,60 @@ data:
         }
 
 
-    def ensure_users_exist(usernames):
-        existing_usernames = {
-            str(user.get("name", "")).strip()
-            for user in list_users()
-            if str(user.get("name", "")).strip()
-        }
-        missing = [
-            build_external_user(username)
-            for username in normalize_names(usernames)
-            if username not in existing_usernames
-        ]
-        if not missing:
-            return
-        request(
-            "POST",
-            "/service/xusers/ugsync/users",
-            {"vXUsers": missing},
-            ok=(200, 201),
-        )
-        print("Seeded Ranger users: " + ", ".join(sorted(user["name"] for user in missing)))
+    def placeholder_password():
+        alphabet = string.ascii_letters + string.digits
+        return "Tmp" + "".join(secrets.choice(alphabet) for _ in range(14)) + "Aa1"
+
+
+    def build_local_user(username, first_name="", last_name="", email_address=""):
+        user = build_external_user(username, first_name, last_name, email_address)
+        user["password"] = placeholder_password()
+        user.pop("userSource", None)
+        user.pop("syncSource", None)
+        return user
+
+
+    def protected_usernames(config):
+        ranger_cfg = config.get("ranger") or {}
+        protected = {"admin", "rangerusersync", "rangertagsync"}
+        protected.update(normalize_names(ranger_cfg.get("serviceAdminUsers", [])))
+        protected.update(normalize_names(ranger_cfg.get("superUsers", [])))
+        return {username for username in protected if username}
+
+
+    def ensure_users_exist(usernames, protected=()):
+        protected = set(protected or [])
+        created = []
+        for username in normalize_names(usernames):
+            if username in protected:
+                continue
+            if get_user(username) or search_users(username):
+                continue
+            user = build_external_user(username)
+            try:
+                request(
+                    "POST",
+                    "/service/xusers/ugsync/users",
+                    {"vXUsers": [user]},
+                    ok=(200, 201),
+                )
+            except urllib.error.HTTPError:
+                if get_user(username) or search_users(username):
+                    continue
+                try:
+                    request(
+                        "POST",
+                        "/service/xusers/users",
+                        build_local_user(username),
+                        ok=(200, 201),
+                    )
+                except urllib.error.HTTPError:
+                    if get_user(username) or search_users(username):
+                        continue
+                    raise
+            created.append(user["name"])
+        if created:
+            print("Seeded Ranger users: " + ", ".join(sorted(created)))
 
 
     def exception_role_name(base_role_name, username, expires_at):
@@ -969,7 +1014,7 @@ data:
         for raw_policy in config["ranger"].get("bootstrapPolicies", []):
             policies.append(normalize_policy(raw_policy, service_name))
 
-        ensure_users_exist(policy_principal_usernames(config, policies))
+        ensure_users_exist(policy_principal_usernames(config, policies), protected_usernames(config))
         purge_legacy_users(config, service_name)
         purge_legacy_groups(config)
         purge_legacy_policies(config, service_name)

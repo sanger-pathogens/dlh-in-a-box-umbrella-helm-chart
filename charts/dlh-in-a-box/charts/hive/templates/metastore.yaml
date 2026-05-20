@@ -38,6 +38,7 @@ spec:
         app: {{ include "hive.fullname" $ }}-{{ $safeCatalog }}-metastore
     spec:
       initContainers:
+        {{- if $.Values.postgres.createDatabase }}
         - name: create-db-{{ $safeCatalog }}
           image: postgres:15
           command: ["/bin/sh", "-c"]
@@ -89,6 +90,7 @@ spec:
                 configMapKeyRef:
                   name: {{ include "hive.fullname" $ }}-init-config
                   key: POSTGRES_PORT
+        {{- end }}
         - name: init-schema-{{ $safeCatalog }}
           image: "{{ $.Values.schemainit.image.registry }}/{{ $.Values.schemainit.image.repository }}:{{ $.Values.schemainit.image.tag }}"
           command: ["/bin/sh", "-c"]

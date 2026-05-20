@@ -22,6 +22,7 @@ spec:
         catalog: {{ $catalogName }}
     spec:
       restartPolicy: Never
+      {{- if $.Values.postgres.createDatabase }}
       initContainers:
         - name: create-db-{{ $safeCatalog }}
           image: postgres:15
@@ -67,6 +68,7 @@ spec:
                 configMapKeyRef:
                   name: {{ include "hive.fullname" $ }}-init-config
                   key: POSTGRES_PORT
+      {{- end }}
       containers:
         - name: hive-schema-init-{{ $safeCatalog }}
           image: "{{ $.Values.schemainit.image.registry }}/{{ $.Values.schemainit.image.repository }}:{{ $.Values.schemainit.image.tag }}"

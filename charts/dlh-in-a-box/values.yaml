@@ -306,6 +306,68 @@ global:
   # Data catalogs configuration (used to generate Hive metastores and Trino catalogs)
   dataCatalogs: {}
 
+sharedPostgresql:
+  enabled: false
+  nameOverride: shared-postgresql
+  image:
+    repository: bitnamilegacy/postgresql
+    tag: 17.6.0-debian-12-r0
+  auth:
+    enablePostgresUser: true
+    existingSecret: dlh-shared-postgresql
+    secretKeys:
+      adminPasswordKey: postgres-password
+  primary:
+    extendedConfiguration: |-
+      password_encryption = md5
+    persistence:
+      enabled: true
+      size: 100Gi
+  provisioning:
+    enabled: true
+    backoffLimit: 6
+    image:
+      registry: docker.io
+      repository: postgres
+      tag: "15"
+      pullPolicy: IfNotPresent
+    adminSecret:
+      name: dlh-shared-postgresql
+      passwordKey: postgres-password
+    databases:
+      - name: keycloak
+        database: bitnami_keycloak
+        username: bn_keycloak
+        secretName: dlh-keycloak-postgresql
+        passwordKey: password
+      - name: ranger
+        database: ranger
+        username: rangeradmin
+        secretName: dlh-ranger-postgresql
+        passwordKey: password
+      - name: hive-redcap
+        database: redcap
+        username: hive
+        secretName: dlh-hive-metastore-postgres
+        passwordKey: password
+      - name: superset
+        database: superset
+        username: superset
+        secretName: dlh-superset-runtime-env
+        passwordKey: DB_PASS
+      - name: prefect
+        database: server
+        username: prefect
+        secretName: dlh-prefect-postgresql
+        passwordKey: password
+      - name: jupyterhub
+        database: jupyterhub
+        username: jupyterhub
+        secretName: dlh-jupyterhub-postgresql
+        passwordKey: password
+  migration:
+    allowBundledPostgresql: false
+
 trino:
   enabled: true
   accessControl:
@@ -1274,6 +1336,8 @@ cloudbeaver:
     pullPolicy: IfNotPresent
   service:
     port: 8978
+  strategy:
+    type: Recreate
   workspace:
     persistence:
       enabled: false
@@ -1319,6 +1383,7 @@ cloudbeaver:
     secretManagerEnabled: false
 
 rangerPostgresql:
+  enabled: false
   nameOverride: ranger-postgresql
   image:
     repository: bitnamilegacy/postgresql
@@ -1378,6 +1443,7 @@ prefect-auth-proxy:
       allowed_groups = [{{- range $index, $group := .Values.global.identity.external.clients.prefectProxy.allowedGroups }}{{ if $index }}, {{ end }}{{ $group | quote }}{{- end }}]
       oidc_groups_claim = "{{ .Values.global.identity.external.oidc.groupsClaim }}"
       redirect_url = "{{ .Values.global.identity.external.clients.prefectProxy.redirectUrl }}"
+      approval_prompt = "auto"
       skip_provider_button = true
       cookie_secure = {{ hasPrefix "https://" .Values.global.identity.external.clients.prefectProxy.redirectUrl }}
       # Use a distinct oauth2-proxy cookie per app so localhost tunnel access
@@ -1423,6 +1489,7 @@ cloudbeaver-auth-proxy:
       allowed_groups = [{{- range $index, $group := .Values.global.identity.external.clients.cloudbeaverProxy.allowedGroups }}{{ if $index }}, {{ end }}{{ $group | quote }}{{- end }}]
       oidc_groups_claim = "{{ .Values.global.identity.external.oidc.groupsClaim }}"
       redirect_url = "{{ .Values.global.identity.external.clients.cloudbeaverProxy.redirectUrl }}"
+      approval_prompt = "auto"
       skip_provider_button = true
       cookie_secure = {{ hasPrefix "https://" .Values.global.identity.external.clients.cloudbeaverProxy.redirectUrl }}
       # Use a distinct oauth2-proxy cookie per app so localhost tunnel access
@@ -1469,6 +1536,7 @@ ranger-auth-proxy:
       allowed_groups = [{{- range $index, $group := .Values.global.identity.external.clients.rangerProxy.allowedGroups }}{{ if $index }}, {{ end }}{{ $group | quote }}{{- end }}]
       oidc_groups_claim = "{{ .Values.global.identity.external.oidc.groupsClaim }}"
       redirect_url = "{{ .Values.global.identity.external.clients.rangerProxy.redirectUrl }}"
+      approval_prompt = "auto"
       skip_provider_button = true
       cookie_secure = {{ hasPrefix "https://" .Values.global.identity.external.clients.rangerProxy.redirectUrl }}
       cookie_name = "_oauth2_proxy_ranger"
@@ -1651,6 +1719,7 @@ hive:
     host: ""
     port: "5432"
     username: ""
+    createDatabase: true
     # Do not commit real database passwords in tracked values files.
     password: ""
     existingSecret: ""
@@ -1677,4 +1746,5 @@ vault:
       timeoutSeconds: 5
 
 hivePostgresql:
+  enabled: false
   nameOverride: hive-postgresql

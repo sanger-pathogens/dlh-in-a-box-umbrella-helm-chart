@@ -1,0 +1,40 @@
+{{- $sharedPostgresql := .Values.sharedPostgresql | default dict -}}
+{{- if $sharedPostgresql.enabled -}}
+{{- $migration := get $sharedPostgresql "migration" | default dict -}}
+{{- $allowBundledPostgresql := default false (get $migration "allowBundledPostgresql") -}}
+{{- $keycloakValues := get .Values "keycloak" | default dict -}}
+{{- $prefectServerValues := get .Values "prefectServer" | default dict -}}
+{{- $supersetValues := get .Values "superset" | default dict -}}
+{{- $keycloakPostgresql := get $keycloakValues "postgresql" | default dict -}}
+{{- $prefectPostgresql := get $prefectServerValues "postgresql" | default dict -}}
+{{- $supersetPostgresql := get $supersetValues "postgresql" | default dict -}}
+{{- $rangerPostgresql := get .Values "rangerPostgresql" | default dict -}}
+{{- $hivePostgresql := get .Values "hivePostgresql" | default dict -}}
+{{- $keycloakPostgresqlEnabled := true -}}
+{{- $prefectPostgresqlEnabled := true -}}
+{{- $supersetPostgresqlEnabled := true -}}
+{{- if hasKey $keycloakPostgresql "enabled" -}}
+{{- $keycloakPostgresqlEnabled = $keycloakPostgresql.enabled -}}
+{{- end -}}
+{{- if hasKey $prefectPostgresql "enabled" -}}
+{{- $prefectPostgresqlEnabled = $prefectPostgresql.enabled -}}
+{{- end -}}
+{{- if hasKey $supersetPostgresql "enabled" -}}
+{{- $supersetPostgresqlEnabled = $supersetPostgresql.enabled -}}
+{{- end -}}
+{{- if and $keycloakPostgresqlEnabled (not $allowBundledPostgresql) -}}
+{{- fail "sharedPostgresql.enabled=true requires keycloak.postgresql.enabled=false." -}}
+{{- end -}}
+{{- if and $prefectPostgresqlEnabled (not $allowBundledPostgresql) -}}
+{{- fail "sharedPostgresql.enabled=true requires prefectServer.postgresql.enabled=false." -}}
+{{- end -}}
+{{- if and $supersetPostgresqlEnabled (not $allowBundledPostgresql) -}}
+{{- fail "sharedPostgresql.enabled=true requires superset.postgresql.enabled=false." -}}
+{{- end -}}
+{{- if and (default false (get $rangerPostgresql "enabled")) (not $allowBundledPostgresql) -}}
+{{- fail "sharedPostgresql.enabled=true requires rangerPostgresql.enabled=false." -}}
+{{- end -}}
+{{- if and (default false (get $hivePostgresql "enabled")) (not $allowBundledPostgresql) -}}
+{{- fail "sharedPostgresql.enabled=true requires hivePostgresql.enabled=false." -}}
+{{- end -}}
+{{- end -}}
