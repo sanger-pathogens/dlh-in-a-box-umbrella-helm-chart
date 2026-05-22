@@ -2278,12 +2278,21 @@ data:
         return {username: sorted(groups) for username, groups in projected.items()}
 
 
+    def managed_keycloak_projection_groups(config):
+        groups = set()
+        for role_key in sorted(config.get("platformRoles", {})):
+            groups.update(keycloak_role_projection_groups(config["platformRoles"][role_key] or {}, role_key))
+        return sorted(groups)
+
+
     def sync_projected_keycloak_groups(config, token, user, desired_groups):
         username = str(user.get("username") or "").strip()
         if not username:
             return False, False
 
         desired = normalize_names(desired_groups)
+        desired_set = set(desired)
+        managed_groups = set(managed_keycloak_projection_groups(config))
         existing_attributes = dict(user.get("attributes") or {})
         previous = normalize_names(existing_attributes.get("platformProjectedGroups", []))
         current_groups = keycloak_user_groups(config, token, user["id"])
@@ -2296,8 +2305,8 @@ data:
                 current_groups[group_name] = group_id
                 changed = True
 
-        for group_name in previous:
-            if group_name in desired:
+        for group_name in sorted(set(previous) | (managed_groups & set(current_groups))):
+            if group_name in desired_set:
                 continue
             group_id = current_groups.get(group_name) or keycloak_group_id(config, token, group_name)
             if not group_id:
