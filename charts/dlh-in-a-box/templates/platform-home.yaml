@@ -3436,6 +3436,32 @@ data:
         return f"/service/public/v2/api/roles/{role_id}?createNonExistUserGroup=true"
 
 
+    def protected_ranger_username(username):
+        username = str(username or "").strip()
+        return (
+            not username
+            or username in {"admin", "keyadmin", "rangerusersync", "rangertagsync", "trino", "{OWNER}", "{USER}"}
+            or username.endswith("-service")
+            or username.startswith("service-account-")
+        )
+
+
+    def ranger_users(username):
+        encoded = urllib.parse.quote(str(username or "").strip(), safe="")
+        payload = ranger_request("GET", f"/service/xusers/users?name={encoded}", ok=(200,)) or {}
+        users = payload.get("vXUsers") or []
+        return users if isinstance(users, list) else []
+
+
+    def delete_ranger_user(user_id):
+        ranger_request(
+            "DELETE",
+            f"/service/xusers/secure/users/id/{urllib.parse.quote(str(user_id), safe='')}?forceDelete=true",
+            ok=(200, 204, 404),
+            parse_json=False,
+        )
+
+
     def attr_value(entry, name):
         try:
             return str(entry[name].value or "").strip()
@@ -3873,6 +3899,61 @@ data:
         return None
 
 
+    def role_references_user(username):
+        target = str(username or "").strip()
+        if not target:
+            return False
+        for role in list_roles():
+            if target in extract_member_names(role.get("users", [])):
+                return True
+        return False
+
+
+    def policy_item_references_user(item, username):
+        return username in [str(user).strip() for user in (item or {}).get("users", []) if str(user).strip()]
+
+
+    def policy_references_user(username):
+        target = str(username or "").strip()
+        if not target:
+            return False
+        payload = ranger_request("GET", "/service/plugins/policies", ok=(200,)) or {}
+        policies = payload.get("policies") or []
+        if not isinstance(policies, list):
+            return False
+        policy_item_keys = [
+            "policyItems",
+            "denyPolicyItems",
+            "allowExceptions",
+            "denyExceptions",
+            "dataMaskPolicyItems",
+            "rowFilterPolicyItems",
+        ]
+        for policy in policies:
+            for key in policy_item_keys:
+                for item in policy.get(key, []) or []:
+                    if policy_item_references_user(item, target):
+                        return True
+        return False
+
+
+    def prune_unreferenced_ranger_user(username):
+        username = str(username or "").strip()
+        ranger_cfg = CONFIG.get("ranger", {}) if isinstance(CONFIG.get("ranger"), dict) else {}
+        if bool(ranger_cfg.get("usersyncEnabled")) or protected_ranger_username(username):
+            return 0
+        if role_references_user(username) or policy_references_user(username):
+            return 0
+        deleted = 0
+        for user in ranger_users(username):
+            user_id = user.get("id")
+            if not user_id:
+                continue
+            delete_ranger_user(user_id)
+            deleted += 1
+        return deleted
+
+
     def role_view(role_entry, live_role, state_document):
         active_exceptions = role_exceptions(state_document, role_entry.get("key"))
         declared_users = extract_member_names(role_entry.get("users", []))
@@ -4095,6 +4176,8 @@ data:
         }
         ranger_request("PUT", role_update_path(existing["id"]), payload, ok=(200,))
         refreshed = get_role_by_name(role_entry.get("name") or role_entry.get("key"))
+        if kind == "user" and not add_member:
+            prune_unreferenced_ranger_user(principal)
         return role_view(role_entry, refreshed, load_state_document())
 
 

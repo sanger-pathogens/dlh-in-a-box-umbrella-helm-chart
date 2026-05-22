@@ -1824,16 +1824,146 @@ data:
             raise
 
 
+    def transient_validation_username(username, email=""):
+        username = str(username or "").strip()
+        email = str(email or "").strip()
+        return (
+            username.startswith("codex-")
+            or username.endswith("-test-sync")
+            or email.endswith(".example.invalid")
+        )
+
+
     def should_sync_user(username, email, enabled):
         if not enabled:
             return False
         if username in {"admin", "trino-admin"}:
             return False
-        if username.startswith("codex-smoke-") or username.endswith("-service"):
+        if username.endswith("-service") or username.startswith("service-account-"):
             return False
-        if email.endswith(".example.invalid"):
+        if transient_validation_username(username, email):
             return False
         return True
+
+
+    def protected_principal_names(config):
+        ranger = config.get("ranger") or {}
+        protected = {
+            "admin",
+            "keyadmin",
+            "rangerusersync",
+            "rangertagsync",
+            "trino",
+            "{OWNER}",
+            "{USER}",
+        }
+        service_username = str(ranger.get("serviceUsername") or "").strip()
+        if service_username:
+            protected.add(service_username)
+        for key in ("serviceAdminUsers", "superUsers"):
+            protected.update(normalize_names(ranger.get(key, [])))
+        return protected
+
+
+    def prune_stale_ranger_principals(config, active_keycloak_usernames):
+        ranger_db = config["rangerPostgresql"]
+        active = set(normalize_names(active_keycloak_usernames))
+        protected = protected_principal_names(config)
+        candidates = set()
+
+        with psycopg.connect(
+            host=ranger_db["host"],
+            port=int(ranger_db.get("port", 5432)),
+            dbname=ranger_db["database"],
+            user=ranger_db["username"],
+            password=RANGER_POSTGRES_PASSWORD,
+        ) as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    select user_name, coalesce(descr, ''), coalesce(sync_source, '')
+                      from x_user
+                    """
+                )
+                for username, descr, sync_source in cur.fetchall():
+                    username = str(username or "").strip()
+                    if not username or username in protected:
+                        continue
+                    if (
+                        transient_validation_username(username, "")
+                        or transient_validation_username(username, str(descr or ""))
+                        or (str(sync_source or "") == "KEYCLOAK_LOCAL" and username not in active)
+                    ):
+                        candidates.add(username)
+
+                cur.execute(
+                    """
+                    select login_id, coalesce(email, ''), coalesce(sync_source, '')
+                      from x_portal_user
+                    """
+                )
+                for username, email, sync_source in cur.fetchall():
+                    username = str(username or "").strip()
+                    if not username or username in protected:
+                        continue
+                    if (
+                        transient_validation_username(username, str(email or ""))
+                        or (str(sync_source or "") == "KEYCLOAK_LOCAL" and username not in active)
+                    ):
+                        candidates.add(username)
+
+                pruned = []
+                blocked = []
+                for username in sorted(candidates):
+                    cur.execute(
+                        """
+                        select id
+                          from x_user
+                         where user_name = %s
+                         order by id
+                        """,
+                        (username,),
+                    )
+                    user_ids = [row[0] for row in cur.fetchall()]
+                    if user_ids:
+                        cur.execute(
+                            """
+                            select
+                                (select count(*) from x_role_ref_user where user_id = any(%s) or user_name = %s)
+                              + (select count(*) from x_policy_ref_user where user_id = any(%s) or user_name = %s)
+                              + (select count(*) from x_policy_item_user_perm where user_id = any(%s))
+                            """,
+                            (user_ids, username, user_ids, username, user_ids),
+                        )
+                        if int(cur.fetchone()[0] or 0) > 0:
+                            blocked.append(username)
+                            continue
+
+                    cur.execute(
+                        """
+                        delete from x_portal_user_role
+                         where user_id in (
+                            select id from x_portal_user where login_id = %s
+                         )
+                        """,
+                        (username,),
+                    )
+                    cur.execute("delete from x_portal_user where login_id = %s", (username,))
+                    cur.execute("delete from x_user where user_name = %s", (username,))
+                    if cur.rowcount or username in candidates:
+                        pruned.append(username)
+
+            conn.commit()
+
+        if blocked:
+            print(
+                "Skipped stale Ranger principal pruning for referenced users: "
+                + ", ".join(blocked),
+                file=sys.stderr,
+            )
+        if pruned:
+            print("Pruned stale Ranger validation/local-user principals: " + ", ".join(pruned))
+        return len(pruned)
 
 
     def normalize_keycloak_user(config, token, user):
@@ -2374,6 +2504,7 @@ data:
         projected_group_updates = 0
         projected_group_logouts = 0
         users_by_username = {}
+        active_keycloak_usernames = set()
 
         for user in users:
             username = (user.get("username") or "").strip()
@@ -2381,6 +2512,8 @@ data:
             enabled = bool(user.get("enabled", True))
             first_name = (user.get("firstName") or username or "").strip()
             last_name = (user.get("lastName") or "User").strip()
+            if username:
+                active_keycloak_usernames.add(username)
             if not username or not should_sync_user(username, email, enabled):
                 continue
             users_by_username[username] = user
@@ -2418,12 +2551,15 @@ data:
             if logged_out:
                 projected_group_logouts += 1
 
+        pruned_count = prune_stale_ranger_principals(config, active_keycloak_usernames)
+
         print(
             "Ensured "
             f"{synced_count} eligible Keycloak-local users are mirrored into Ranger "
             f"({created_count} Ranger API users created, {normalized_count} Keycloak accounts normalized, "
             f"{logged_out_count} stale Keycloak sessions cleared, {projected_group_updates} Keycloak role/app "
-            f"group projections refreshed, {projected_group_logouts} additional projected-group logouts issued)."
+            f"group projections refreshed, {projected_group_logouts} additional projected-group logouts issued, "
+            f"{pruned_count} stale Ranger validation/local-user principals pruned)."
         )
 
 
