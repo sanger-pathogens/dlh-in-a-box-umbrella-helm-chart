@@ -4,7 +4,7 @@
 {{- $apiPort := default 18080 (dig "api" "port" 18080 .Values.platformHome) -}}
 {{- $platformHomeValues := .Values.platformHome | default dict -}}
 {{- $launchers := get $platformHomeValues "launchers" | default dict -}}
-{{- $keycloakBrowserBaseUrl := trimSuffix "/" (default "" (get $platformHomeValues "keycloakBrowserBaseUrl")) -}}
+{{- $keycloakBrowserBaseUrl := trimSuffix "/" (default (include "dlh-in-a-box.keycloak.browserBaseUrl" .) (get $platformHomeValues "keycloakBrowserBaseUrl")) -}}
 {{- $branding := .Values.platformHome.branding | default dict -}}
 {{- $theme := get $platformHomeValues "theme" | default dict -}}
 {{- $themeColors := get $theme "colors" | default dict -}}
@@ -189,11 +189,15 @@
 {{- end -}}
 {{- if $rangerBrowserUrl -}}
   {{- $toolMeta := get $itemMeta "ranger-admin" | default dict -}}
+  {{- if not (hasKey $portalLaunchers "ranger-admin") -}}
+    {{- $_ := set $portalLaunchers "ranger-admin" (dict "mode" "redirect" "path" "/launch/ranger-admin" "targetUrl" $rangerBrowserUrl "requiredGroups" (list $adminRequiredGroup)) -}}
+  {{- end -}}
+  {{- $rangerAdminLaunch := get $portalLaunchers "ranger-admin" | default dict -}}
   {{- $adminTools = append $adminTools (dict
     "id" "ranger-admin"
     "name" "Ranger Admin"
     "summary" "Manage Trino access policies"
-    "url" $rangerBrowserUrl
+    "url" (default "/launch/ranger-admin" (get $rangerAdminLaunch "path"))
     "icon" "RA"
     "iconText" (default "RA" (get $toolMeta "iconText"))
     "iconUrl" (default "" (get $toolMeta "iconUrl"))
@@ -205,11 +209,16 @@
 {{- end -}}
 {{- if $keycloakBrowserBaseUrl -}}
   {{- $toolMeta := get $itemMeta "keycloak-admin" | default dict -}}
+  {{- $keycloakAdminTargetUrl := printf "%s/admin/%s/console/" $keycloakBrowserBaseUrl (include "dlh-in-a-box.keycloak.realm" .) -}}
+  {{- if not (hasKey $portalLaunchers "keycloak-admin") -}}
+    {{- $_ := set $portalLaunchers "keycloak-admin" (dict "mode" "redirect" "path" "/launch/keycloak-admin" "targetUrl" $keycloakAdminTargetUrl "requiredGroups" (list $adminRequiredGroup)) -}}
+  {{- end -}}
+  {{- $keycloakAdminLaunch := get $portalLaunchers "keycloak-admin" | default dict -}}
   {{- $adminTools = append $adminTools (dict
     "id" "keycloak-admin"
     "name" "Keycloak Admin"
     "summary" "Identity realm, groups, and OIDC client configuration"
-    "url" (printf "%s/admin/%s/console/" $keycloakBrowserBaseUrl (include "dlh-in-a-box.keycloak.realm" .))
+    "url" (default "/launch/keycloak-admin" (get $keycloakAdminLaunch "path"))
     "icon" "KC"
     "iconText" (default "KC" (get $toolMeta "iconText"))
     "iconUrl" (default "" (get $toolMeta "iconUrl"))
@@ -221,11 +230,16 @@
 {{- end -}}
 {{- if default false (dig "trino" "enabled" false $clients) -}}
   {{- $toolMeta := get $itemMeta "trino" | default dict -}}
+  {{- $trinoTargetUrl := first (default (list) (dig "trino" "webOrigins" list $clients)) -}}
+  {{- if not (hasKey $portalLaunchers "trino") -}}
+    {{- $_ := set $portalLaunchers "trino" (dict "mode" "redirect" "path" "/launch/trino" "targetUrl" $trinoTargetUrl "requiredGroups" (list $adminRequiredGroup)) -}}
+  {{- end -}}
+  {{- $trinoLaunch := get $portalLaunchers "trino" | default dict -}}
   {{- $adminTools = append $adminTools (dict
     "id" "trino"
     "name" "Trino UI"
     "summary" "Inspect running and completed queries"
-    "url" (first (default (list) (dig "trino" "webOrigins" list $clients)))
+    "url" (default "/launch/trino" (get $trinoLaunch "path"))
     "icon" "TR"
     "iconText" (default "TR" (get $toolMeta "iconText"))
     "iconUrl" (default "" (get $toolMeta "iconUrl"))
@@ -237,12 +251,17 @@
 {{- end -}}
 {{- range $tool := (get $platformHomeValues "adminTools" | default (list)) -}}
   {{- $toolId := default "" (get $tool "id") -}}
+  {{- $toolUrl := default "" (get $tool "url") -}}
   {{- $toolMeta := get $itemMeta $toolId | default dict -}}
+  {{- if and $toolId $toolUrl (not (hasKey $portalLaunchers $toolId)) -}}
+    {{- $_ := set $portalLaunchers $toolId (dict "mode" "redirect" "path" (printf "/launch/%s" $toolId) "targetUrl" $toolUrl "requiredGroups" (list $adminRequiredGroup)) -}}
+  {{- end -}}
+  {{- $toolLaunch := get $portalLaunchers $toolId | default dict -}}
   {{- $adminTools = append $adminTools (dict
     "id" $toolId
     "name" (default "" (get $tool "name"))
     "summary" (default "" (get $tool "summary"))
-    "url" (default "" (get $tool "url"))
+    "url" (default $toolUrl (get $toolLaunch "path"))
     "icon" (default "" (get $tool "icon"))
     "iconText" (default (default "" (get $toolMeta "iconText")) (default "" (get $tool "icon")))
     "iconUrl" (default (default "" (get $toolMeta "iconUrl")) (default "" (get $tool "iconUrl")))
@@ -256,12 +275,18 @@
 {{- if and .Values.superset.enabled (default false (dig "superset" "enabled" false $clients)) -}}
   {{- $supersetOrigin := trimSuffix "/" (first (default (list) (dig "superset" "webOrigins" list $clients))) -}}
   {{- $supersetProvider := default "keycloak" (dig "superset" "providerName" "" $clients) -}}
+  {{- $supersetTargetUrl := printf "%s/login/%s" $supersetOrigin $supersetProvider -}}
+  {{- $supersetRequiredGroups := uniq (concat (list (include "dlh-in-a-box.group.app" (dict "root" . "name" "superset"))) (get $appRoleGroups "superset")) -}}
+  {{- if not (hasKey $portalLaunchers "superset") -}}
+    {{- $_ := set $portalLaunchers "superset" (dict "mode" "redirect" "path" "/launch/superset" "targetUrl" $supersetTargetUrl "requiredGroups" $supersetRequiredGroups) -}}
+  {{- end -}}
+  {{- $supersetLaunch := get $portalLaunchers "superset" | default dict -}}
   {{- $appMeta := get $itemMeta "superset" | default dict -}}
   {{- $apps = append $apps (dict
     "id" "superset"
     "name" "Superset"
     "summary" "Dashboards and visual analysis"
-    "url" (printf "%s/login/%s" $supersetOrigin $supersetProvider)
+    "url" (default "/launch/superset" (get $supersetLaunch "path"))
     "group" "Analysis"
     "icon" "SU"
     "iconText" (default "SU" (get $appMeta "iconText"))
@@ -269,16 +294,22 @@
     "iconAlt" (default "Superset logo" (get $appMeta "iconAlt"))
     "iconBackground" (default "" (get $appMeta "iconBackground"))
     "health" (get $appMeta "health" | default dict)
-    "requiredGroups" (uniq (concat (list (include "dlh-in-a-box.group.app" (dict "root" . "name" "superset"))) (get $appRoleGroups "superset")))
+    "requiredGroups" $supersetRequiredGroups
   ) -}}
 {{- end -}}
 {{- if and .Values.datahub.enabled (default false (dig "datahub" "enabled" false $clients)) -}}
+  {{- $datahubTargetUrl := first (default (list) (dig "datahub" "webOrigins" list $clients)) -}}
+  {{- $datahubRequiredGroups := uniq (concat (list (include "dlh-in-a-box.group.app" (dict "root" . "name" "datahub"))) (get $appRoleGroups "datahub")) -}}
+  {{- if not (hasKey $portalLaunchers "datahub") -}}
+    {{- $_ := set $portalLaunchers "datahub" (dict "mode" "redirect" "path" "/launch/datahub" "targetUrl" $datahubTargetUrl "requiredGroups" $datahubRequiredGroups) -}}
+  {{- end -}}
+  {{- $datahubLaunch := get $portalLaunchers "datahub" | default dict -}}
   {{- $appMeta := get $itemMeta "datahub" | default dict -}}
   {{- $apps = append $apps (dict
     "id" "datahub"
     "name" "DataHub"
     "summary" "Catalog and discover datasets"
-    "url" (first (default (list) (dig "datahub" "webOrigins" list $clients)))
+    "url" (default "/launch/datahub" (get $datahubLaunch "path"))
     "group" "Data Access"
     "icon" "DH"
     "iconText" (default "DH" (get $appMeta "iconText"))
@@ -286,12 +317,16 @@
     "iconAlt" (default "DataHub logo" (get $appMeta "iconAlt"))
     "iconBackground" (default "" (get $appMeta "iconBackground"))
     "health" (get $appMeta "health" | default dict)
-    "requiredGroups" (uniq (concat (list (include "dlh-in-a-box.group.app" (dict "root" . "name" "datahub"))) (get $appRoleGroups "datahub")))
+    "requiredGroups" $datahubRequiredGroups
   ) -}}
 {{- end -}}
 {{- if and .Values.jupyterhub.enabled (default false (dig "jupyterhub" "enabled" false $clients)) -}}
   {{- $appMeta := get $itemMeta "jupyterhub" | default dict -}}
   {{- $jupyterhubOrigin := trimSuffix "/" (first (default (list) (dig "jupyterhub" "webOrigins" list $clients))) -}}
+  {{- $jupyterhubRequiredGroups := uniq (concat (list (include "dlh-in-a-box.group.app" (dict "root" . "name" "jupyterhub"))) (get $appRoleGroups "jupyterhub")) -}}
+  {{- if not (hasKey $portalLaunchers "jupyterhub") -}}
+    {{- $_ := set $portalLaunchers "jupyterhub" (dict "mode" "redirect" "path" "/launch/jupyterhub" "targetUrl" $jupyterhubOrigin "requiredGroups" $jupyterhubRequiredGroups) -}}
+  {{- end -}}
   {{- $jupyterhubLaunch := get $portalLaunchers "jupyterhub" | default dict -}}
   {{- $apps = append $apps (dict
     "id" "jupyterhub"
@@ -305,17 +340,23 @@
     "iconAlt" (default "JupyterHub logo" (get $appMeta "iconAlt"))
     "iconBackground" (default "" (get $appMeta "iconBackground"))
     "health" (get $appMeta "health" | default dict)
-    "requiredGroups" (uniq (concat (list (include "dlh-in-a-box.group.app" (dict "root" . "name" "jupyterhub"))) (get $appRoleGroups "jupyterhub")))
+    "requiredGroups" $jupyterhubRequiredGroups
   ) -}}
 {{- end -}}
 {{- if default false (dig "prefectProxy" "enabled" false $clients) -}}
   {{- $prefectOrigin := trimSuffix "/" (first (default (list) (dig "prefectProxy" "webOrigins" list $clients))) -}}
+  {{- $prefectTargetUrl := printf "%s/oauth2/start?rd=%s" $prefectOrigin (urlquery "/") -}}
+  {{- $prefectRequiredGroups := uniq (concat (list (include "dlh-in-a-box.group.app" (dict "root" . "name" "prefect"))) (get $appRoleGroups "prefect")) -}}
+  {{- if not (hasKey $portalLaunchers "prefect") -}}
+    {{- $_ := set $portalLaunchers "prefect" (dict "mode" "redirect" "path" "/launch/prefect" "targetUrl" $prefectTargetUrl "requiredGroups" $prefectRequiredGroups) -}}
+  {{- end -}}
+  {{- $prefectLaunch := get $portalLaunchers "prefect" | default dict -}}
   {{- $appMeta := get $itemMeta "prefect" | default dict -}}
   {{- $apps = append $apps (dict
     "id" "prefect"
     "name" "Prefect"
     "summary" "Monitor scheduled and running flows"
-    "url" (printf "%s/oauth2/start?rd=%s" $prefectOrigin (urlquery "/"))
+    "url" (default "/launch/prefect" (get $prefectLaunch "path"))
     "group" "Workflows"
     "icon" "PF"
     "iconText" (default "PF" (get $appMeta "iconText"))
@@ -323,17 +364,23 @@
     "iconAlt" (default "Prefect logo" (get $appMeta "iconAlt"))
     "iconBackground" (default "" (get $appMeta "iconBackground"))
     "health" (get $appMeta "health" | default dict)
-    "requiredGroups" (uniq (concat (list (include "dlh-in-a-box.group.app" (dict "root" . "name" "prefect"))) (get $appRoleGroups "prefect")))
+    "requiredGroups" $prefectRequiredGroups
   ) -}}
 {{- end -}}
 {{- if and .Values.cloudbeaver.enabled (default false (dig "cloudbeaverProxy" "enabled" false $clients)) -}}
   {{- $cloudbeaverOrigin := trimSuffix "/" (first (default (list) (dig "cloudbeaverProxy" "webOrigins" list $clients))) -}}
+  {{- $cloudbeaverTargetUrl := printf "%s/oauth2/start?rd=%s" $cloudbeaverOrigin (urlquery "/") -}}
+  {{- $cloudbeaverRequiredGroups := uniq (concat (list (include "dlh-in-a-box.group.app" (dict "root" . "name" "cloudbeaver"))) (get $appRoleGroups "cloudbeaver")) -}}
+  {{- if not (hasKey $portalLaunchers "cloudbeaver") -}}
+    {{- $_ := set $portalLaunchers "cloudbeaver" (dict "mode" "redirect" "path" "/launch/cloudbeaver" "targetUrl" $cloudbeaverTargetUrl "requiredGroups" $cloudbeaverRequiredGroups) -}}
+  {{- end -}}
+  {{- $cloudbeaverLaunch := get $portalLaunchers "cloudbeaver" | default dict -}}
   {{- $appMeta := get $itemMeta "cloudbeaver" | default dict -}}
   {{- $apps = append $apps (dict
     "id" "cloudbeaver"
     "name" "CloudBeaver"
     "summary" "Browser SQL workspace"
-    "url" (printf "%s/oauth2/start?rd=%s" $cloudbeaverOrigin (urlquery "/"))
+    "url" (default "/launch/cloudbeaver" (get $cloudbeaverLaunch "path"))
     "group" "Data Access"
     "icon" "CB"
     "iconText" (default "CB" (get $appMeta "iconText"))
@@ -341,7 +388,7 @@
     "iconAlt" (default "CloudBeaver logo" (get $appMeta "iconAlt"))
     "iconBackground" (default "" (get $appMeta "iconBackground"))
     "health" (get $appMeta "health" | default dict)
-    "requiredGroups" (uniq (concat (list (include "dlh-in-a-box.group.app" (dict "root" . "name" "cloudbeaver"))) (get $appRoleGroups "cloudbeaver")))
+    "requiredGroups" $cloudbeaverRequiredGroups
   ) -}}
 {{- end -}}
 {{- $healthItems := list -}}
