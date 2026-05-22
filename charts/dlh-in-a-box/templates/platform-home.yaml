@@ -3371,6 +3371,8 @@ data:
                 raise ApiError(502, "Vault did not return a wrapped login token.")
             parsed_target = urllib.parse.urlparse(target_url)
             existing_query = urllib.parse.parse_qsl(parsed_target.query, keep_blank_values=True)
+            if not any(key == "with" for key, _ in existing_query):
+                existing_query.append(("with", "token"))
             existing_query.append(("wrapped_token", wrap_token))
             launched_url = urllib.parse.urlunparse(
                 parsed_target._replace(query=urllib.parse.urlencode(existing_query))
