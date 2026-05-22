@@ -1636,6 +1636,14 @@ data:
         return;
       }
       setPortalNotice("info", `Opening ${escapeHtml(humanizeSlug(target))}...`);
+      try {
+        await state.keycloak.updateToken(-1);
+      } catch (error) {
+        const redirectUri = `${window.location.origin}/launch/${encodeURIComponent(target)}`;
+        setLoginPending("Redirecting...");
+        await state.keycloak.login({ redirectUri });
+        return;
+      }
       const payload = await apiRequest(`/api/launch/${encodeURIComponent(target)}`);
       const targetUrl = String(payload?.url || "").trim();
       const launchMode = String(payload?.mode || "redirect").trim().toLowerCase();
