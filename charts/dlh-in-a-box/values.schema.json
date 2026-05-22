@@ -95,6 +95,18 @@
                     "requireEmailVerification": { "type": "boolean" }
                   }
                 },
+                "adminClientRoles": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "properties": {
+                    "enabled": { "type": "boolean" },
+                    "clientId": { "type": "string" },
+                    "roles": {
+                      "type": "array",
+                      "items": { "type": "string" }
+                    }
+                  }
+                },
                 "configCliEnvExistingSecret": { "type": "string" },
                 "bootstrapUsers": {
                   "type": "array",

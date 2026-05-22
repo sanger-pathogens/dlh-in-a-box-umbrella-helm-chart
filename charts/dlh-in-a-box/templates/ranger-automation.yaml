@@ -110,6 +110,12 @@ data:
           "adminUrl" (include "dlh-in-a-box.keycloak.internalBaseUrl" .)
           "adminUsername" (default "admin" .Values.keycloak.auth.adminUser)
           "requireEmailVerification" (default false (dig "provider" "keycloak" "registration" "requireEmailVerification" false $identity))
+          "adminClientRoles" (dict
+            "enabled" (default true (dig "provider" "keycloak" "adminClientRoles" "enabled" true $identity))
+            "platformAdminGroup" (include "dlh-in-a-box.group.role" (dict "root" . "name" "platform-admin"))
+            "clientId" (default "realm-management" (dig "provider" "keycloak" "adminClientRoles" "clientId" "realm-management" $identity))
+            "roles" (default (list "realm-admin") (dig "provider" "keycloak" "adminClientRoles" "roles" (list "realm-admin") $identity))
+          )
         )
       )
       "rangerPostgresql" (dict
@@ -2331,6 +2337,72 @@ data:
         }
 
 
+    def keycloak_client_uuid(config, token, client_id):
+        realm = config["identity"]["keycloak"]["realm"]
+        clients = keycloak_request(
+            config,
+            token,
+            "GET",
+            f"/admin/realms/{realm}/clients?clientId={urllib.parse.quote(client_id)}&max=2",
+            ok=(200,),
+        ) or []
+        for client in clients:
+            if str(client.get("clientId", "")).strip() == client_id:
+                return str(client.get("id", "")).strip()
+        return ""
+
+
+    def keycloak_client_role(config, token, client_uuid, role_name):
+        realm = config["identity"]["keycloak"]["realm"]
+        return keycloak_request(
+            config,
+            token,
+            "GET",
+            f"/admin/realms/{realm}/clients/{client_uuid}/roles/{urllib.parse.quote(role_name)}",
+            ok=(200,),
+        )
+
+
+    def keycloak_user_client_roles(config, token, user_id, client_uuid):
+        realm = config["identity"]["keycloak"]["realm"]
+        roles = keycloak_request(
+            config,
+            token,
+            "GET",
+            f"/admin/realms/{realm}/users/{user_id}/role-mappings/clients/{client_uuid}",
+            ok=(200,),
+        ) or []
+        return {
+            str(role.get("name", "")).strip(): role
+            for role in roles
+            if str(role.get("name", "")).strip()
+        }
+
+
+    def add_keycloak_user_client_role(config, token, user_id, client_uuid, role):
+        realm = config["identity"]["keycloak"]["realm"]
+        keycloak_request(
+            config,
+            token,
+            "POST",
+            f"/admin/realms/{realm}/users/{user_id}/role-mappings/clients/{client_uuid}",
+            [role],
+            ok=(204,),
+        )
+
+
+    def remove_keycloak_user_client_role(config, token, user_id, client_uuid, role):
+        realm = config["identity"]["keycloak"]["realm"]
+        keycloak_request(
+            config,
+            token,
+            "DELETE",
+            f"/admin/realms/{realm}/users/{user_id}/role-mappings/clients/{client_uuid}",
+            [role],
+            ok=(204,),
+        )
+
+
     def ensure_keycloak_group_membership(config, token, user_id, group_id):
         realm = config["identity"]["keycloak"]["realm"]
         keycloak_request(
@@ -2480,6 +2552,65 @@ data:
         return changed, logged_out
 
 
+    def managed_keycloak_client_roles(config):
+        admin_roles = ((config.get("identity") or {}).get("keycloak") or {}).get("adminClientRoles") or {}
+        if not bool(admin_roles.get("enabled", True)):
+            return {}
+        client_id = str(admin_roles.get("clientId") or "realm-management").strip()
+        roles = normalize_names(admin_roles.get("roles") or ["realm-admin"])
+        if not client_id or not roles:
+            return {}
+        return {client_id: roles}
+
+
+    def desired_keycloak_client_roles(config, desired_groups):
+        admin_roles = ((config.get("identity") or {}).get("keycloak") or {}).get("adminClientRoles") or {}
+        platform_admin_group = str(admin_roles.get("platformAdminGroup") or "platform-role-platform-admin").strip()
+        if platform_admin_group not in set(normalize_names(desired_groups)):
+            return {}
+        return managed_keycloak_client_roles(config)
+
+
+    def sync_projected_keycloak_client_roles(config, token, user, desired_groups):
+        username = str(user.get("username") or "").strip()
+        if not username:
+            return False, False
+
+        desired = desired_keycloak_client_roles(config, desired_groups)
+        managed = managed_keycloak_client_roles(config)
+        changed = False
+
+        for client_id in sorted(set(desired) | set(managed)):
+            client_uuid = keycloak_client_uuid(config, token, client_id)
+            if not client_uuid:
+                raise RuntimeError(f"Failed to find Keycloak client {client_id}")
+            current_roles = keycloak_user_client_roles(config, token, user["id"], client_uuid)
+            desired_roles = set(desired.get(client_id, []))
+            managed_roles = set(managed.get(client_id, []))
+
+            for role_name in sorted(desired_roles - set(current_roles)):
+                role = keycloak_client_role(config, token, client_uuid, role_name)
+                add_keycloak_user_client_role(config, token, user["id"], client_uuid, role)
+                changed = True
+
+            for role_name in sorted((managed_roles & set(current_roles)) - desired_roles):
+                remove_keycloak_user_client_role(config, token, user["id"], client_uuid, current_roles[role_name])
+                changed = True
+
+        logged_out = False
+        if changed:
+            try:
+                keycloak_logout_user(config, token, user["id"])
+                logged_out = True
+            except Exception as exc:
+                print(
+                    f"WARNING: projected Keycloak admin roles for {username} but failed to clear stale sessions: {exc}",
+                    file=sys.stderr,
+                )
+
+        return changed, logged_out
+
+
     def sync():
         config = load_config()
         if config["identity"].get("directoryMode") != "keycloakLocal":
@@ -2503,6 +2634,8 @@ data:
         logged_out_count = 0
         projected_group_updates = 0
         projected_group_logouts = 0
+        projected_client_role_updates = 0
+        projected_client_role_logouts = 0
         users_by_username = {}
         active_keycloak_usernames = set()
 
@@ -2541,6 +2674,11 @@ data:
                 projected_group_updates += 1
             if logged_out:
                 projected_group_logouts += 1
+            changed, logged_out = sync_projected_keycloak_client_roles(config, token, user, desired_groups)
+            if changed:
+                projected_client_role_updates += 1
+            if logged_out:
+                projected_client_role_logouts += 1
 
         for username, user in users_by_username.items():
             if username in projected_groups_by_user:
@@ -2550,6 +2688,11 @@ data:
                 projected_group_updates += 1
             if logged_out:
                 projected_group_logouts += 1
+            changed, logged_out = sync_projected_keycloak_client_roles(config, token, user, [])
+            if changed:
+                projected_client_role_updates += 1
+            if logged_out:
+                projected_client_role_logouts += 1
 
         pruned_count = prune_stale_ranger_principals(config, active_keycloak_usernames)
 
@@ -2559,6 +2702,8 @@ data:
             f"({created_count} Ranger API users created, {normalized_count} Keycloak accounts normalized, "
             f"{logged_out_count} stale Keycloak sessions cleared, {projected_group_updates} Keycloak role/app "
             f"group projections refreshed, {projected_group_logouts} additional projected-group logouts issued, "
+            f"{projected_client_role_updates} Keycloak admin client-role projections refreshed, "
+            f"{projected_client_role_logouts} additional admin-role logouts issued, "
             f"{pruned_count} stale Ranger validation/local-user principals pruned)."
         )
 

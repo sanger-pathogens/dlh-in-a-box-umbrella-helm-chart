@@ -16,6 +16,11 @@ global:
         registration:
           enabled: false
           requireEmailVerification: true
+        adminClientRoles:
+          enabled: true
+          clientId: realm-management
+          roles:
+            - realm-admin
         configCliEnvExistingSecret: dlh-keycloak-config-cli-env
         bootstrapUsers: []
     external:
