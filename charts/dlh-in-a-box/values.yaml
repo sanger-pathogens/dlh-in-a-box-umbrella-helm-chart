@@ -1404,6 +1404,13 @@ prefect:
     enabled: true
   authProxy:
     enabled: false
+  jobRunner:
+    enabled: false
+    serviceAccount:
+      create: true
+      name: prefect-job-runner
+      annotations: {}
+      imagePullSecrets: []
 
 # Upstream Prefect chart values can be passed directly via these aliases.
 prefectServer:

@@ -1512,6 +1512,29 @@
           "properties": {
             "enabled": { "type": "boolean" }
           }
+        },
+        "jobRunner": {
+          "type": "object",
+          "additionalProperties": true,
+          "properties": {
+            "enabled": { "type": "boolean" },
+            "serviceAccount": {
+              "type": "object",
+              "additionalProperties": true,
+              "properties": {
+                "create": { "type": "boolean" },
+                "name": { "type": "string" },
+                "annotations": {
+                  "type": "object",
+                  "additionalProperties": true
+                },
+                "imagePullSecrets": {
+                  "type": "array",
+                  "items": { "type": "string" }
+                }
+              }
+            }
+          }
         }
       }
     },

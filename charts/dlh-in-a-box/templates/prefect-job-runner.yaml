@@ -1,0 +1,25 @@
+{{- $prefect := .Values.prefect | default dict -}}
+{{- $jobRunner := get $prefect "jobRunner" | default dict -}}
+{{- $serviceAccount := get $jobRunner "serviceAccount" | default dict -}}
+{{- $prefectEnabled := default true (get $prefect "enabled") -}}
+{{- $jobRunnerEnabled := default false (get $jobRunner "enabled") -}}
+{{- $serviceAccountCreate := default true (get $serviceAccount "create") -}}
+{{- if and $prefectEnabled $jobRunnerEnabled $serviceAccountCreate }}
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: {{ default "prefect-job-runner" (get $serviceAccount "name") | quote }}
+  labels:
+{{ include "dlh-in-a-box.labels" . | indent 4 }}
+    app.kubernetes.io/component: prefect-job-runner
+  {{- with (get $serviceAccount "annotations") }}
+  annotations:
+{{ toYaml . | indent 4 }}
+  {{- end }}
+{{- with (get $serviceAccount "imagePullSecrets") }}
+imagePullSecrets:
+  {{- range . }}
+  - name: {{ . | quote }}
+  {{- end }}
+{{- end }}
+{{- end }}
