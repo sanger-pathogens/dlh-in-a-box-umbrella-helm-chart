@@ -1226,6 +1226,7 @@ jupyterhub:
           EXAMPLES_DIR="${HOME_DIR}/examples"
           NOTEBOOK_SOURCE="/etc/dlh-jupyterhub/notebooks/ICDDRB_Trino_Demo.ipynb"
           NOTEBOOK_TARGET="${EXAMPLES_DIR}/ICDDRB_Trino_Demo.ipynb"
+          NOTEBOOK_MARKER="${EXAMPLES_DIR}/.ICDDRB_Trino_Demo.ipynb.managed-sha256"
           VENV_DIR="${HOME_DIR}/.cache/dlh-trino-demo/venv"
           VERSION_MARKER="${VENV_DIR}/.trino-client-version"
           TRINO_CLIENT_VERSION="${DLH_TRINO_PYTHON_CLIENT_VERSION:-0.337.0}"
@@ -1246,8 +1247,33 @@ jupyterhub:
 
           "${VENV_DIR}/bin/python" -m ipykernel install --user --name dlh-trino-demo --display-name "Python 3 (Trino Demo)" >/dev/null 2>&1 || true
 
-          if [ -f "${NOTEBOOK_SOURCE}" ] && [ ! -f "${NOTEBOOK_TARGET}" ]; then
-            cp "${NOTEBOOK_SOURCE}" "${NOTEBOOK_TARGET}"
+          file_sha256() {
+            NOTEBOOK_HASH_PATH="$1" "${VENV_DIR}/bin/python" - <<'PY'
+          import hashlib
+          import os
+
+          digest = hashlib.sha256()
+          with open(os.environ["NOTEBOOK_HASH_PATH"], "rb") as handle:
+              for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+                  digest.update(chunk)
+          print(digest.hexdigest())
+          PY
+          }
+
+          if [ -f "${NOTEBOOK_SOURCE}" ]; then
+            NOTEBOOK_HASH="$(file_sha256 "${NOTEBOOK_SOURCE}")"
+            CURRENT_MARKER="$(cat "${NOTEBOOK_MARKER}" 2>/dev/null || true)"
+
+            if [ ! -f "${NOTEBOOK_TARGET}" ]; then
+              cp "${NOTEBOOK_SOURCE}" "${NOTEBOOK_TARGET}"
+              printf '%s' "${NOTEBOOK_HASH}" > "${NOTEBOOK_MARKER}"
+            elif [ "${CURRENT_MARKER}" != "${NOTEBOOK_HASH}" ]; then
+              if [ -z "${CURRENT_MARKER}" ] || [ "$(file_sha256 "${NOTEBOOK_TARGET}")" != "${CURRENT_MARKER}" ]; then
+                cp "${NOTEBOOK_TARGET}" "${NOTEBOOK_TARGET}.pre-managed-$(date +%Y%m%d%H%M%S).bak"
+              fi
+              cp "${NOTEBOOK_SOURCE}" "${NOTEBOOK_TARGET}"
+              printf '%s' "${NOTEBOOK_HASH}" > "${NOTEBOOK_MARKER}"
+            fi
           fi
 
           exec jupyterhub-singleuser
@@ -1297,6 +1323,9 @@ jupyterhub:
                   "    raise RuntimeError(\"TRINO_HOST is not configured for this notebook server.\")\n",
                   "\n",
                   "session = requests.Session()\n",
+                  "session.verify = verify_tls\n",
+                  "if not verify_tls:\n",
+                  "    requests.packages.urllib3.disable_warnings()\n",
                   "session.headers[\"Authorization\"] = f\"Bearer {token}\"\n",
                   "\n",
                   "conn = connect(\n",
