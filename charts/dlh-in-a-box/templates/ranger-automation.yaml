@@ -615,6 +615,40 @@ data:
         return result
 
 
+    def platform_role_group_map(config):
+        mapping = {}
+        for role in build_platform_roles(config):
+            for group_name in normalize_names(role.get("groups", [])):
+                mapping.setdefault(group_name, set()).add(role["name"])
+            mapping.setdefault(f"platform-role-{role['key']}", set()).add(role["name"])
+        return {group: sorted(role_names) for group, role_names in mapping.items()}
+
+
+    def role_names_for_groups(config, groups):
+        mapping = platform_role_group_map(config)
+        role_names = []
+        for group_name in normalize_names(groups):
+            role_names.extend(mapping.get(group_name, []))
+        return normalize_names(role_names)
+
+
+    def add_platform_roles_to_policy_items(config, policy):
+        for item_key in (
+            "policyItems",
+            "denyPolicyItems",
+            "allowExceptions",
+            "denyExceptions",
+            "dataMaskPolicyItems",
+            "rowFilterPolicyItems",
+        ):
+            for item in policy.get(item_key, []) or []:
+                item["roles"] = normalize_names(
+                    (item.get("roles", []) or [])
+                    + role_names_for_groups(config, item.get("groups", []) or [])
+                )
+        return policy
+
+
     def build_exception_roles(config, base_roles):
         base_roles_by_key = {role["key"]: role for role in base_roles}
         exception_roles = []
@@ -653,39 +687,33 @@ data:
         for catalog_name, catalog in config.get("catalogs", {}).items():
             groups_acl = catalog.get("authorizedGroups", {}) or {}
             users_acl = catalog.get("authorizedUsers", {}) or {}
-            read_item = access_item(users_acl.get("read", []), groups_acl.get("read", []), [], read_accesses)
-            write_item = access_item(users_acl.get("write", []), groups_acl.get("write", []), [], write_accesses)
+            read_item = access_item(
+                users_acl.get("read", []),
+                groups_acl.get("read", []),
+                role_names_for_groups(config, groups_acl.get("read", [])),
+                read_accesses,
+            )
+            write_item = access_item(
+                users_acl.get("write", []),
+                groups_acl.get("write", []),
+                role_names_for_groups(config, groups_acl.get("write", [])),
+                write_accesses,
+            )
 
-            if read_item:
-                policies.append(
-                    normalize_policy(
-                        {
-                            "name": f"{service_name}-{catalog_name}-read",
-                            "description": f"Imported read-only catalog policy for {catalog_name}.",
-                            "resources": {
-                                "catalog": catalog_name,
-                                "schema": "*",
-                                "table": "*",
-                                "column": "*",
-                            },
-                            "policyItems": [read_item],
-                        },
-                        service_name,
-                    )
-                )
-            if write_item:
+            policy_items = [item for item in (read_item, write_item) if item]
+            if policy_items:
                 policies.append(
                     normalize_policy(
                         {
                             "name": f"{service_name}-{catalog_name}-write",
-                            "description": f"Imported read-write catalog policy for {catalog_name}.",
+                            "description": f"Imported catalog access policy for {catalog_name}.",
                             "resources": {
                                 "catalog": catalog_name,
                                 "schema": "*",
                                 "table": "*",
                                 "column": "*",
                             },
-                            "policyItems": [write_item],
+                            "policyItems": policy_items,
                         },
                         service_name,
                     )
@@ -1019,6 +1047,7 @@ data:
         policies.extend(build_catalog_acl_policies(config))
         for raw_policy in config["ranger"].get("bootstrapPolicies", []):
             policies.append(normalize_policy(raw_policy, service_name))
+        policies = [add_platform_roles_to_policy_items(config, policy) for policy in policies]
 
         ensure_users_exist(policy_principal_usernames(config, policies), protected_usernames(config))
         purge_legacy_users(config, service_name)
@@ -1954,6 +1983,15 @@ data:
                         """,
                         (username,),
                     )
+                    cur.execute(
+                        """
+                        delete from x_user_module_perm
+                         where user_id in (
+                            select id from x_portal_user where login_id = %s
+                         )
+                        """,
+                        (username,),
+                    )
                     cur.execute("delete from x_portal_user where login_id = %s", (username,))
                     cur.execute("delete from x_user where user_name = %s", (username,))
                     if cur.rowcount or username in candidates:
@@ -2190,6 +2228,10 @@ data:
                          where user_id = any(%s)
                         """,
                         (user_id, duplicate_ids),
+                    )
+                    cur.execute(
+                        "delete from x_user_module_perm where user_id = any(%s)",
+                        (duplicate_ids,),
                     )
                     cur.execute(
                         "delete from x_portal_user where id = any(%s)",
