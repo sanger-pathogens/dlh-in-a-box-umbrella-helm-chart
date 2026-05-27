@@ -1,0 +1,11 @@
+prefect:
+  jobRunner:
+    enabled: true
+    serviceAccount:
+      name: prefect-job-runner
+    pullSecret:
+      create: true
+      name: prefect-job-runner-registry
+      server: ghcr.io
+      username: test-user
+      password: test-token

@@ -32,10 +32,27 @@
 {{- $trustedCaInitImageRepository := default "eclipse-temurin" $trustedCaInitImage.repository -}}
 {{- $trustedCaInitImageTag := default "21-jdk" $trustedCaInitImage.tag -}}
 {{- $trustedCaInitImagePullPolicy := default "IfNotPresent" $trustedCaInitImage.pullPolicy -}}
-{{- $defaultUserTeam := include "dlh-in-a-box.group.app" (dict "root" . "name" "cloudbeaver") -}}
-{{- $adminTeam := include "dlh-in-a-box.group.role" (dict "root" . "name" "platform-admin") -}}
 {{- $global := .Values.global | default dict -}}
 {{- $identity := get $global "identity" | default dict -}}
+{{- $accessModel := get $identity "accessModel" | default dict -}}
+{{- $accessModelRoles := fromJson (include "dlh-in-a-box.identity.accessModelRolesJson" .) -}}
+{{- $groupRoleMappings := get $accessModel "groupRoleMappings" | default dict -}}
+{{- $cloudbeaverGroups := list -}}
+{{- $adminGroups := list -}}
+{{- range $groupName, $mapping := $groupRoleMappings -}}
+  {{- range $roleName := get ($mapping | default dict) "roles" | default (list) -}}
+    {{- $roleName = toString $roleName -}}
+    {{- $role := get $accessModelRoles $roleName | default dict -}}
+    {{- if default false (get (get $role "appAccess" | default dict) "cloudbeaver") -}}
+      {{- $cloudbeaverGroups = uniq (append $cloudbeaverGroups (toString $groupName)) -}}
+    {{- end -}}
+    {{- if eq $roleName "platform-admin" -}}
+      {{- $adminGroups = uniq (append $adminGroups (toString $groupName)) -}}
+    {{- end -}}
+  {{- end -}}
+{{- end -}}
+{{- $defaultUserTeam := default "" (first $cloudbeaverGroups) -}}
+{{- $adminTeam := default "" (first $adminGroups) -}}
 {{- $external := get $identity "external" | default dict -}}
 {{- $clients := get $external "clients" | default dict -}}
 {{- $cloudbeaverIdentity := get $clients "cloudbeaverProxy" | default dict -}}

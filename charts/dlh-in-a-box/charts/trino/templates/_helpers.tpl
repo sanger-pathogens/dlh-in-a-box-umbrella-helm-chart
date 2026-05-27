@@ -1,7 +1,7 @@
 {{/*
 Modified for dlh-in-a-box from the upstream Trino chart.
 Local changes add catalog generation and access-control helpers for
-umbrella-chart-driven data catalog composition, including group-based ACLs.
+umbrella-chart-driven data catalog composition, including role-based ACLs.
 */}}
 {{/* vim: set filetype=mustache: */}}
 {{/*
@@ -275,21 +275,21 @@ s3.path-style-access={{ $s3.pathStyleAccess }}
     {"catalog":"system","allow":"read-only"}
 {{- $first := false }}
 {{- range $catalogName, $catalog := $catalogs }}
-  {{- $authorizedGroups := get $catalog "authorizedGroups" | default (dict) }}
+  {{- $authorizedRoles := get $catalog "authorizedRoles" | default (dict) }}
   {{- $authorizedUsers := get $catalog "authorizedUsers" | default (dict) }}
-  {{- $groupWrite := get $authorizedGroups "write" | default (list) }}
-  {{- $groupRead := get $authorizedGroups "read" | default (list) }}
+  {{- $roleWrite := get $authorizedRoles "write" | default (list) }}
+  {{- $roleRead := get $authorizedRoles "read" | default (list) }}
   {{- $userWrite := get $authorizedUsers "write" | default (list) }}
   {{- $userRead := get $authorizedUsers "read" | default (list) }}
-  {{- range $group := $groupWrite }}
+  {{- range $role := $roleWrite }}
     {{- if not $first }},{{ end }}
-    {"group":"{{ $group }}","catalog":"{{ $catalogName }}","allow":"all"}
+    {"role":"{{ $role }}","catalog":"{{ $catalogName }}","allow":"all"}
     {{- $first = false }}
   {{- end }}
-  {{- range $group := $groupRead }}
-    {{- if not (has $group $groupWrite) }}
+  {{- range $role := $roleRead }}
+    {{- if not (has $role $roleWrite) }}
       {{- if not $first }},{{ end }}
-      {"group":"{{ $group }}","catalog":"{{ $catalogName }}","allow":"read-only"}
+      {"role":"{{ $role }}","catalog":"{{ $catalogName }}","allow":"read-only"}
       {{- $first = false }}
     {{- end }}
   {{- end }}

@@ -1,25 +1,79 @@
 {{- $prefect := .Values.prefect | default dict -}}
 {{- $jobRunner := get $prefect "jobRunner" | default dict -}}
+{{- if and (default false (get $prefect "enabled")) (default false (get $jobRunner "enabled")) -}}
 {{- $serviceAccount := get $jobRunner "serviceAccount" | default dict -}}
-{{- $prefectEnabled := default true (get $prefect "enabled") -}}
-{{- $jobRunnerEnabled := default false (get $jobRunner "enabled") -}}
-{{- $serviceAccountCreate := default true (get $serviceAccount "create") -}}
-{{- if and $prefectEnabled $jobRunnerEnabled $serviceAccountCreate }}
+{{- $pullSecret := get $jobRunner "pullSecret" | default dict -}}
+{{- $serviceAccountName := default "prefect-job-runner" (get $serviceAccount "name") -}}
+{{- $pullSecretName := default "prefect-job-runner-registry" (get $pullSecret "name") -}}
+{{- $pullSecretCreate := default false (get $pullSecret "create") -}}
+{{- $server := default "ghcr.io" (get $pullSecret "server") -}}
+{{- $username := "" -}}
+{{- $password := "" -}}
+{{- $auth := "" -}}
+{{- $entry := dict -}}
+{{- if $pullSecretCreate -}}
+{{- $username = required "prefect.jobRunner.pullSecret.username is required when prefect.jobRunner.pullSecret.create=true." (get $pullSecret "username") -}}
+{{- $password = required "prefect.jobRunner.pullSecret.password is required when prefect.jobRunner.pullSecret.create=true." (get $pullSecret "password") -}}
+{{- $auth = printf "%s:%s" $username $password | b64enc -}}
+{{- $entry = dict "username" $username "password" $password "auth" $auth -}}
+{{- end -}}
+{{- if $pullSecretCreate }}
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: {{ $pullSecretName | quote }}
+  namespace: {{ .Release.Namespace | quote }}
+  labels:
+    {{- include "dlh-in-a-box.labels" . | nindent 4 }}
+    app.kubernetes.io/component: prefect-job-runner
+    {{- with (get $pullSecret "labels") }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+  {{- with (get $pullSecret "annotations") }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+type: kubernetes.io/dockerconfigjson
+stringData:
+  .dockerconfigjson: {{ dict "auths" (dict $server $entry) | toJson | quote }}
+{{- end }}
+{{- $serviceAccountCreate := true -}}
+{{- if hasKey $serviceAccount "create" -}}
+{{- $serviceAccountCreate = get $serviceAccount "create" -}}
+{{- end -}}
+{{- if $serviceAccountCreate }}
+---
 apiVersion: v1
 kind: ServiceAccount
 metadata:
-  name: {{ default "prefect-job-runner" (get $serviceAccount "name") | quote }}
+  name: {{ $serviceAccountName | quote }}
+  namespace: {{ .Release.Namespace | quote }}
   labels:
-{{ include "dlh-in-a-box.labels" . | indent 4 }}
+    {{- include "dlh-in-a-box.labels" . | nindent 4 }}
     app.kubernetes.io/component: prefect-job-runner
+    {{- with (get $serviceAccount "labels") }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
   {{- with (get $serviceAccount "annotations") }}
   annotations:
-{{ toYaml . | indent 4 }}
+    {{- toYaml . | nindent 4 }}
   {{- end }}
-{{- with (get $serviceAccount "imagePullSecrets") }}
+automountServiceAccountToken: {{ default false (get $serviceAccount "automountServiceAccountToken") }}
+{{- $imagePullSecrets := list -}}
+{{- if $pullSecretCreate -}}
+{{- $imagePullSecrets = append $imagePullSecrets (dict "name" $pullSecretName) -}}
+{{- end -}}
+{{- range (default list (get $serviceAccount "imagePullSecrets")) -}}
+{{- if kindIs "string" . -}}
+{{- $imagePullSecrets = append $imagePullSecrets (dict "name" .) -}}
+{{- else -}}
+{{- $imagePullSecrets = append $imagePullSecrets . -}}
+{{- end -}}
+{{- end -}}
+{{- if $imagePullSecrets }}
 imagePullSecrets:
-  {{- range . }}
-  - name: {{ . | quote }}
-  {{- end }}
+  {{- toYaml $imagePullSecrets | nindent 2 }}
+{{- end }}
 {{- end }}
 {{- end }}

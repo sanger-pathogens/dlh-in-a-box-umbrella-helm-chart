@@ -1,0 +1,4 @@
+jupyterhub:
+  hub:
+    extraEnv:
+      JUPYTERHUB_ALLOWED_GROUP: data-analyst

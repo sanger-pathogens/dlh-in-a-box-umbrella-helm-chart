@@ -10,7 +10,7 @@ embedded dependency charts keep their own upstream licenses.
 
 | Material | Version or scope | License | Notes |
 | --- | --- | --- | --- |
-| Trino Helm chart | `0.34.0` | Apache-2.0 | Vendored locally and packaged as a dependency. Upstream Apache-2.0 text is included at `charts/trino/LICENSE`. Files modified for `dlh-in-a-box` contain prominent change notices. |
+| Trino Helm chart | `1.41.0` | Apache-2.0 | Vendored locally and packaged as a dependency. Upstream Apache-2.0 text is included at `charts/trino/LICENSE`. Files modified for `dlh-in-a-box` contain prominent change notices. |
 | Apache Superset Helm chart | `0.15.2` | Apache-2.0 | Packaged upstream chart archive. The chart bundles Bitnami PostgreSQL and Redis subcharts that stay covered by the Bitnami Apache-2.0 notices already documented here. |
 | Prefect Helm charts | `prefect-server` and `prefect-worker` `2025.12.31221620` | Apache-2.0 | Packaged upstream chart archives. These archives bundle Bitnami `common`, `postgresql`, and `redis` subcharts. |
 | oauth2-proxy Helm chart | `10.1.4` | MIT | Packaged upstream chart archive. Used to place self-hosted Prefect behind OIDC authentication in shared environments. The reproduced MIT license text is included at `third_party/oauth2-proxy/LICENSE`. |

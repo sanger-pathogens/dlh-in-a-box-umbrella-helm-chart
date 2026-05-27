@@ -57,6 +57,17 @@ assert_not_contains() {
   fi
 }
 
+assert_no_unresolved_helm_templates() {
+  local file="$1"
+
+  assert_not_contains "${file}" "{{ ."
+  assert_not_contains "${file}" "{{-"
+  assert_not_contains "${file}" "{{ include"
+  assert_not_contains "${file}" "{{ template"
+  assert_not_contains "${file}" "{{ tpl"
+  assert_not_contains "${file}" ".Values."
+}
+
 expect_fail() {
   local expected="$1"
   shift
@@ -133,12 +144,15 @@ prefect_automation_manifest="$(make_tmp_file)"
 render_manifest "${prefect_automation_manifest}" -f "${DEV_VALUES}" -f "${FIXTURE_DIR}/prefect-automation-enabled.yaml"
 prefect_direct_grant_manifest="$(make_tmp_file)"
 render_manifest "${prefect_direct_grant_manifest}" -f "${DEV_VALUES}" -f "${FIXTURE_DIR}/prefect-direct-grant-enabled.yaml"
+prefect_job_runner_manifest="$(make_tmp_file)"
+render_manifest "${prefect_job_runner_manifest}" --namespace dlh-dev -f "${DEV_VALUES}" -f "${FIXTURE_DIR}/prefect-job-runner-enabled.yaml"
 
-assert_not_contains "${default_manifest}" "{{"
-assert_not_contains "${local_manifest}" "{{"
-assert_not_contains "${dev_manifest}" "{{"
-assert_not_contains "${prod_manifest}" "{{"
-assert_not_contains "${shared_manifest}" "{{"
+assert_no_unresolved_helm_templates "${default_manifest}"
+assert_no_unresolved_helm_templates "${local_manifest}"
+assert_no_unresolved_helm_templates "${dev_manifest}"
+assert_no_unresolved_helm_templates "${prod_manifest}"
+assert_no_unresolved_helm_templates "${shared_manifest}"
+assert_no_unresolved_helm_templates "${prefect_job_runner_manifest}"
 
 assert_not_contains "${default_manifest}" "icddr,b"
 assert_not_contains "${default_manifest}" "icddrb.org"
@@ -160,13 +174,29 @@ assert_contains "${local_manifest}" "access-control.name=file"
 assert_contains "${local_manifest}" "registrationAllowed: true"
 assert_contains "${local_manifest}" "verifyEmail: false"
 assert_contains "${local_manifest}" "\"accessControlEnabled\": false"
-assert_contains "${local_manifest}" "platform-app-cloudbeaver"
-assert_contains "${local_manifest}" "platform-app-prefect"
+assert_not_contains "${local_manifest}" "platform-app-cloudbeaver"
+assert_not_contains "${local_manifest}" "platform-app-prefect"
+assert_contains "${local_manifest}" "name: platform-access"
+assert_contains "${local_manifest}" 'name: "platform-user"'
+assert_contains "${local_manifest}" 'name: "platform-viewer"'
+assert_contains "${local_manifest}" 'name: "admins"'
+assert_contains "${local_manifest}" 'name: "data-analyst"'
+assert_contains "${local_manifest}" 'name: "principal-investigator"'
+assert_contains "${local_manifest}" 'realmRoles:'
+assert_contains "${local_manifest}" 'clientRoles:'
 assert_contains "${local_manifest}" "trino-cli"
 assert_contains "${local_manifest}" "http-server.authentication.type=OAUTH2"
 assert_not_contains "${local_manifest}" "http-server.authentication.type=OAUTH2,PASSWORD"
 assert_not_contains "${local_manifest}" "name: dlh-ranger-admin-usersync"
-assert_contains "${local_manifest}" "name: dlh-ranger-admin-local-user-sync"
+assert_contains "${local_manifest}" "name: dlh-ranger-admin-keycloak-sync"
+assert_contains "${dev_manifest}" "name: dlh-ranger-admin-keycloak-sync"
+assert_contains "${prod_manifest}" "name: dlh-ranger-admin-keycloak-sync"
+assert_not_contains "${dev_manifest}" '"platformRoleMembershipSource"'
+assert_not_contains "${prod_manifest}" '"platformRoleMembershipSource"'
+assert_contains "${local_manifest}" "keycloak_ranger_sync.py"
+assert_not_contains "${local_manifest}" "keycloak_local_users.py"
+assert_not_contains "${local_manifest}" "RANGER_POSTGRES_PASSWORD"
+assert_not_contains "${local_manifest}" "psycopg[binary]"
 assert_contains "${dev_manifest}" "name: dlh-keycloak-config-cli-env"
 assert_contains "${prod_manifest}" "name: dlh-keycloak-config-cli-env"
 assert_contains "${prod_manifest}" "name: dlh-ranger-postgresql"
@@ -180,6 +210,16 @@ assert_contains "${dev_manifest}" "https://jupyterhub.dev.example.org/hub/oauth_
 assert_contains "${prod_manifest}" "https://jupyterhub.data-platform.example.org/hub/oauth_callback"
 assert_contains "${dev_manifest}" "Administration"
 assert_contains "${prod_manifest}" "Administration"
+assert_contains "${dev_manifest}" "\"rolesClaim\": \"platform_roles\""
+assert_contains "${prod_manifest}" "\"rolesClaim\": \"platform_roles\""
+assert_contains "${dev_manifest}" "\"requiredRoles\": ["
+assert_contains "${prod_manifest}" "\"requiredRoles\": ["
+assert_contains "${dev_manifest}" "OIDC_ROLES_CLAIM"
+assert_contains "${dev_manifest}" "PLATFORM_ADMIN_ROLES"
+assert_not_contains "${dev_manifest}" "\"requiredGroups\": ["
+assert_not_contains "${prod_manifest}" "\"requiredGroups\": ["
+assert_not_contains "${dev_manifest}" "OIDC_GROUPS_CLAIM"
+assert_not_contains "${dev_manifest}" "PLATFORM_ADMIN_GROUPS"
 assert_contains "${dev_manifest}" 'add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;'
 assert_contains "${prod_manifest}" 'add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;'
 assert_contains "${dev_manifest}" 'add_header X-Content-Type-Options "nosniff" always;'
@@ -201,8 +241,20 @@ assert_contains "${dev_manifest}" "https://trino.dev.example.org/oauth2/callback
 assert_contains "${prod_manifest}" "https://trino.data-platform.example.org/oauth2/callback"
 assert_contains "${dev_manifest}" "trino-cli"
 assert_contains "${prod_manifest}" "trino-cli"
-assert_contains "${dev_manifest}" "platform-app-jupyterhub"
-assert_contains "${prod_manifest}" "platform-app-jupyterhub"
+assert_not_contains "${dev_manifest}" "platform-app-jupyterhub"
+assert_not_contains "${prod_manifest}" "platform-app-jupyterhub"
+assert_not_contains "${dev_manifest}" "JUPYTERHUB_GROUPS_CLAIM"
+assert_not_contains "${prod_manifest}" "JUPYTERHUB_GROUPS_CLAIM"
+assert_not_contains "${dev_manifest}" "JUPYTERHUB_ALLOWED_GROUP"
+assert_not_contains "${prod_manifest}" "JUPYTERHUB_ALLOWED_GROUP"
+assert_not_contains "${dev_manifest}" "JUPYTERHUB_ADMIN_GROUP"
+assert_not_contains "${prod_manifest}" "JUPYTERHUB_ADMIN_GROUP"
+assert_contains "${dev_manifest}" "JUPYTERHUB_ROLES_CLAIM"
+assert_contains "${prod_manifest}" "JUPYTERHUB_ROLES_CLAIM"
+assert_contains "${dev_manifest}" "JUPYTERHUB_ALLOWED_ROLES"
+assert_contains "${prod_manifest}" "JUPYTERHUB_ALLOWED_ROLES"
+assert_contains "${dev_manifest}" "JUPYTERHUB_ADMIN_ROLES"
+assert_contains "${prod_manifest}" "JUPYTERHUB_ADMIN_ROLES"
 assert_contains "${dev_manifest}" "KC_JUPYTERHUB_CLIENT_SECRET"
 assert_contains "${prod_manifest}" "KC_JUPYTERHUB_CLIENT_SECRET"
 assert_contains "${dev_manifest}" "ICDDRB_Trino_Demo.ipynb"
@@ -220,10 +272,16 @@ assert_not_contains "${dev_manifest}" "access-control.name=ranger"
 assert_not_contains "${prod_manifest}" "access-control.name=ranger"
 assert_contains "${dev_manifest}" "access-control.name=file"
 assert_contains "${prod_manifest}" "access-control.name=file"
-assert_contains "${dev_manifest}" 'allowed_groups = [\"platform-app-prefect\", \"platform-role-platform-admin\"]'
-assert_contains "${prod_manifest}" 'allowed_groups = [\"platform-app-prefect\", \"platform-role-platform-admin\"]'
-assert_contains "${dev_manifest}" 'allowed_groups = [\"platform-app-cloudbeaver\", \"platform-role-platform-admin\"]'
-assert_contains "${prod_manifest}" 'allowed_groups = [\"platform-app-cloudbeaver\", \"platform-role-platform-admin\"]'
+assert_contains "${dev_manifest}" 'provider = \"keycloak-oidc\"'
+assert_contains "${prod_manifest}" 'provider = \"keycloak-oidc\"'
+assert_contains "${dev_manifest}" 'allowed_roles = [\"prefect:access\"]'
+assert_contains "${prod_manifest}" 'allowed_roles = [\"prefect:access\"]'
+assert_contains "${dev_manifest}" 'allowed_roles = [\"cloudbeaver:access\"]'
+assert_contains "${prod_manifest}" 'allowed_roles = [\"cloudbeaver:access\"]'
+assert_not_contains "${dev_manifest}" 'allowed_groups = [\"platform-app-prefect\", \"platform-role-platform-admin\"]'
+assert_not_contains "${prod_manifest}" 'allowed_groups = [\"platform-app-prefect\", \"platform-role-platform-admin\"]'
+assert_not_contains "${dev_manifest}" 'allowed_groups = [\"platform-app-cloudbeaver\", \"platform-role-platform-admin\"]'
+assert_not_contains "${prod_manifest}" 'allowed_groups = [\"platform-app-cloudbeaver\", \"platform-role-platform-admin\"]'
 assert_contains "${dev_manifest}" 'skip_oidc_discovery = true'
 assert_contains "${dev_manifest}" 'redeem_url = \"http://dlh-keycloak.'
 assert_contains "${dev_manifest}" '/realms/dlh/protocol/openid-connect/token\"'
@@ -250,7 +308,20 @@ assert_contains "${prefect_direct_grant_manifest}" "Prefect Direct Grant"
 assert_contains "${prefect_direct_grant_manifest}" "directAccessGrantsEnabled: true"
 assert_contains "${prefect_direct_grant_manifest}" "protocolMapper: oidc-audience-mapper"
 assert_not_contains "${prefect_direct_grant_manifest}" "KC_PREFECT_AUTOMATION_CLIENT_SECRET"
-assert_contains "${dev_manifest}" "\"platformRoles\": {"
+assert_contains "${prefect_job_runner_manifest}" "name: \"prefect-job-runner\""
+assert_contains "${prefect_job_runner_manifest}" "app.kubernetes.io/component: prefect-job-runner"
+assert_contains "${prefect_job_runner_manifest}" "automountServiceAccountToken: false"
+assert_contains "${prefect_job_runner_manifest}" "name: prefect-job-runner-registry"
+assert_contains "${prefect_job_runner_manifest}" "type: kubernetes.io/dockerconfigjson"
+assert_contains "${prefect_job_runner_manifest}" "ghcr.io"
+assert_contains "${prefect_job_runner_manifest}" "name: \"prefect-worker-base-job-template\""
+assert_contains "${prefect_job_runner_manifest}" "baseJobTemplate.json"
+assert_contains "${prefect_job_runner_manifest}" "\"serviceAccountName\": \"{{ service_account_name }}\""
+assert_contains "${prefect_job_runner_manifest}" "\"default\": \"dlh-dev\""
+assert_contains "${prefect_job_runner_manifest}" "\"default\": \"prefect-job-runner\""
+assert_contains "${prefect_job_runner_manifest}" "sync-base-job-template"
+assert_contains "${prefect_job_runner_manifest}" "prefect work-pool update"
+assert_contains "${dev_manifest}" "\"accessModel\": {"
 assert_contains "${dev_manifest}" "\"data-analyst\""
 assert_contains "${dev_manifest}" "\"principal-investigator\""
 assert_contains "${prod_manifest}" "\"platform-admin\""
@@ -276,11 +347,6 @@ expect_fail \
   "global.dataCatalogs.pii_smoke is restricted-identifiable and contains direct or quasi identifiers, so authorization.ranger.bootstrapPolicies must include a masking or row-filter policy for this catalog." \
   -f "${DEV_VALUES}" \
   -f "${FIXTURE_DIR}/missing-fine-grained-policy.yaml"
-
-expect_fail \
-  "global.identity.external.clients.prefectProxy.allowedGroups must be set in dev and prod so Prefect is not exposed to every authenticated user." \
-  -f "${DEV_VALUES}" \
-  -f "${FIXTURE_DIR}/prefect-missing-groups.yaml"
 
 expect_fail \
   "global.identity.external.clients.prefectAutomation.clientId is required when machine access for Prefect is enabled." \
@@ -316,11 +382,6 @@ expect_fail \
   "global.identity.external.clients.prefectAutomation.tokenAudience must match global.identity.external.clients.prefectDirectGrant.tokenAudience when both Prefect bearer-token clients are enabled." \
   -f examples/values-dev.yaml \
   -f "${FIXTURE_DIR}/prefect-token-audience-mismatch.yaml"
-
-expect_fail \
-  "global.identity.external.clients.cloudbeaverProxy.allowedGroups must be set in dev and prod so CloudBeaver is not exposed to every authenticated user." \
-  -f "${DEV_VALUES}" \
-  -f "${FIXTURE_DIR}/cloudbeaver-missing-groups.yaml"
 
 expect_fail \
   "global.identity.external.clients.platformHome.redirectUris must be set when bundled Keycloak manages the OIDC client." \
@@ -397,11 +458,59 @@ expect_fail \
   -f "${FIXTURE_DIR}/legacy-trino-authentication-type.yaml"
 
 expect_fail_any \
-  "global.authorization.platformRoles.platform-admin.apps: Additional property notARealApp is not allowed" \
-  "additional properties 'notARealApp' not allowed" \
+  "global.authorization.platformRoles is no longer supported. Define platform roles and group mappings under global.identity.accessModel." \
+  "global.authorization.platformRoles is no longer supported" \
   -- \
   -f "${DEV_VALUES}" \
   -f "${FIXTURE_DIR}/invalid-platform-role-app.yaml"
+
+expect_fail_any \
+  "global.identity.accessModel.builtinRoles.platform-admin.appAccess: Additional property notARealApp is not allowed" \
+  "additional properties 'notARealApp' not allowed" \
+  -- \
+  -f "${DEV_VALUES}" \
+  -f "${FIXTURE_DIR}/invalid-access-model-app.yaml"
+
+expect_fail \
+  "global.identity.accessModel.groupRoleMappings.principal-investigator.roles references unknown or disabled platform role missing-role." \
+  -f "${DEV_VALUES}" \
+  -f "${FIXTURE_DIR}/access-model-unknown-role.yaml"
+
+expect_fail \
+  "global.identity.accessModel.builtinRoles.platform-viewer.ranger is not supported. Keycloak role names are synced to Ranger exactly as-is." \
+  -f "${DEV_VALUES}" \
+  -f "${FIXTURE_DIR}/access-model-ranger-override.yaml"
+
+expect_fail \
+  "global.identity.external.clients.cloudbeaverProxy.allowedGroups is no longer supported. Browser access is derived from global.identity.accessModel appAccess and enforced with Keycloak client roles." \
+  -f "${DEV_VALUES}" \
+  -f "${FIXTURE_DIR}/oauth2-proxy-allowed-groups.yaml"
+
+expect_fail \
+  "platformHome.launchers.vault.requiredGroups is no longer supported. Use platformHome.launchers.vault.requiredRoles with Keycloak realm role names from global.identity.accessModel." \
+  -f "${DEV_VALUES}" \
+  -f "${FIXTURE_DIR}/platform-home-required-groups.yaml"
+
+expect_fail \
+  "global.dataCatalogs.redcap.authorizedGroups is no longer supported. Use authorizedRoles with Keycloak platform role names from global.identity.accessModel." \
+  -f "${DEV_VALUES}" \
+  -f "${FIXTURE_DIR}/catalog-authorized-groups.yaml"
+
+expect_fail \
+  "jupyterhub.hub.extraEnv.JUPYTERHUB_ALLOWED_GROUP is no longer supported. Use JUPYTERHUB_ROLES_CLAIM, JUPYTERHUB_ALLOWED_ROLES, and JUPYTERHUB_ADMIN_ROLES." \
+  -f "${DEV_VALUES}" \
+  -f "${FIXTURE_DIR}/jupyterhub-group-env.yaml"
+
+expect_fail \
+  "datahub.auth.groupProvisioning is no longer supported. DataHub browser access must not depend on OIDC group claims; use global.identity.accessModel roles and client roles." \
+  -f "${DEV_VALUES}" \
+  -f "${FIXTURE_DIR}/datahub-group-provisioning.yaml"
+
+expect_fail_any \
+  "global.authorization.platformRoleMembershipSource is no longer supported. Keycloak is the source of truth for platform roles and role membership." \
+  -- \
+  -f "${DEV_VALUES}" \
+  -f "${FIXTURE_DIR}/ranger-membership-source.yaml"
 
 expect_fail \
   "global.authorization.platformRoleExceptions[0].approvalRef must be set." \
