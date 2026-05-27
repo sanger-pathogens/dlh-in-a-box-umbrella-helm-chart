@@ -238,6 +238,16 @@ global:
       legacyManagedGroups: []
       legacyManagedRoles: []
       legacyManagedPolicies: []
+      cleanup:
+        enabled: true
+        dryRun: false
+        staleUsers: []
+        staleUserPatterns:
+          - "^codex-"
+          - "-test-sync$"
+        staleGroups: []
+        staleRoles: []
+        stalePolicies: []
       useRangerGroups: false
       postgresql:
         enabled: true

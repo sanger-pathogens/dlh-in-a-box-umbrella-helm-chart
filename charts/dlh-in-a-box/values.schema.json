@@ -793,7 +793,7 @@
         },
         "platformRoleMembershipSource": {
           "type": "string",
-          "enum": ["git", "ranger"]
+          "enum": ["git", "ranger", "keycloak"]
         },
         "platformRoleExceptions": {
           "type": "array",
@@ -839,6 +839,34 @@
             "legacyManagedPolicies": {
               "type": "array",
               "items": { "type": "string" }
+            },
+            "cleanup": {
+              "type": "object",
+              "additionalProperties": true,
+              "properties": {
+                "enabled": { "type": "boolean" },
+                "dryRun": { "type": "boolean" },
+                "staleUsers": {
+                  "type": "array",
+                  "items": { "type": "string" }
+                },
+                "staleUserPatterns": {
+                  "type": "array",
+                  "items": { "type": "string" }
+                },
+                "staleGroups": {
+                  "type": "array",
+                  "items": { "type": "string" }
+                },
+                "staleRoles": {
+                  "type": "array",
+                  "items": { "type": "string" }
+                },
+                "stalePolicies": {
+                  "type": "array",
+                  "items": { "type": "string" }
+                }
+              }
             },
             "useRangerGroups": { "type": "boolean" },
             "admin": {

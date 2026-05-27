@@ -72,6 +72,7 @@ data:
         "legacyManagedGroups" ($ranger.legacyManagedGroups | default (list))
         "legacyManagedRoles" ($ranger.legacyManagedRoles | default (list))
         "legacyManagedPolicies" ($ranger.legacyManagedPolicies | default (list))
+        "cleanup" ($ranger.cleanup | default dict)
         "platformRoleMembershipSource" $platformRoleMembershipSource
         "importCatalogAcls" $importCatalogAcls
         "bootstrapPolicies" $bootstrapPolicies
@@ -602,6 +603,7 @@ data:
             raw_role = config["platformRoles"][role_key] or {}
             members = raw_role.get("members", {}) or {}
             ranger_cfg = raw_role.get("ranger", {}) or {}
+            portal_cfg = raw_role.get("portal", {}) or {}
             result.append(
                 {
                     "key": role_key,
@@ -610,6 +612,7 @@ data:
                     "users": normalize_names(members.get("users", [])),
                     "groups": normalize_names(members.get("directoryGroups", [])),
                     "nestedRoleKeys": normalize_names(members.get("nestedRoles", [])),
+                    "manageable": bool(portal_cfg.get("manageable", True)),
                 }
             )
         return result
@@ -633,6 +636,7 @@ data:
 
 
     def add_platform_roles_to_policy_items(config, policy):
+        use_ranger_groups = bool((config.get("ranger") or {}).get("useRangerGroups", False))
         for item_key in (
             "policyItems",
             "denyPolicyItems",
@@ -646,6 +650,8 @@ data:
                     (item.get("roles", []) or [])
                     + role_names_for_groups(config, item.get("groups", []) or [])
                 )
+                if not use_ranger_groups:
+                    item["groups"] = []
         return policy
 
 
@@ -755,7 +761,7 @@ data:
     def reconcile_roles(config):
         service_name = config["ranger"]["serviceName"]
         membership_source = str(config["ranger"].get("platformRoleMembershipSource", "git") or "git").lower()
-        if membership_source not in {"git", "ranger"}:
+        if membership_source not in {"git", "ranger", "keycloak"}:
             membership_source = "git"
         base_roles = build_platform_roles(config)
         base_roles_by_key = {role["key"]: role for role in base_roles}
@@ -769,6 +775,9 @@ data:
             existing = existing_roles_by_name.get(role["name"])
             effective_users = role["users"]
             effective_groups = role["groups"]
+            if membership_source == "keycloak" and role.get("manageable", True):
+                effective_users = existing.get("users", []) if existing else []
+                effective_groups = []
             if membership_source == "ranger" and existing:
                 preserve_users = should_preserve_ranger_membership(existing.get("users", []), role["users"])
                 preserve_groups = should_preserve_ranger_membership(existing.get("groups", []), role["groups"])
@@ -797,8 +806,11 @@ data:
             role["effectiveGroups"] = effective_groups
             print(f"Reconciled Ranger role: {role['name']}")
 
-        for stale_role_name in normalize_names(config["ranger"].get("legacyManagedRoles", [])):
+        for stale_role_name in cleanup_names(config, "legacyManagedRoles", "staleRoles"):
             if stale_role_name in existing_roles_by_name:
+                if cleanup_dry_run(config):
+                    print(f"DRY RUN: would delete stale managed Ranger role: {stale_role_name}")
+                    continue
                 detach_role_from_policies(service_name, stale_role_name)
                 delete_role(service_name, stale_role_name)
                 print(f"Deleted stale managed Ranger role: {stale_role_name}")
@@ -915,6 +927,92 @@ data:
                 print(f"Deleted stale Ranger policy with no remaining principals: {policy['name']}")
 
 
+    def filter_group_from_role_members(items, group_name):
+        filtered = []
+        removed = False
+        for item in items or []:
+            name = str(item.get("name", "")).strip() if isinstance(item, dict) else str(item).strip()
+            if name == group_name:
+                removed = True
+                continue
+            filtered.append(item)
+        return filtered, removed
+
+
+    def detach_group_from_roles(service_name, group_name):
+        for role in list_roles():
+            filtered_groups, removed = filter_group_from_role_members(role.get("groups", []), group_name)
+            if not removed:
+                continue
+            payload = {
+                "id": role["id"],
+                "guid": role.get("guid"),
+                "version": role.get("version"),
+                "createdByUser": role.get("createdByUser"),
+                "name": role["name"],
+                "description": role.get("description", ""),
+                "isEnabled": bool(role.get("isEnabled", True)),
+                "users": normalize_role_members(role.get("users", [])),
+                "groups": normalize_role_members(filtered_groups),
+                "roles": normalize_role_members(role.get("roles", [])),
+            }
+            request("PUT", role_update_path(role["id"]), payload, ok=(200,))
+            print(f"Detached stale group {group_name} from Ranger role: {role['name']}")
+
+
+    def filter_group_from_policy_items(items, group_name):
+        filtered_items = []
+        removed = False
+        for item in items or []:
+            updated_item = dict(item)
+            groups = normalize_names(name for name in item.get("groups", []) if str(name) != group_name)
+            removed = removed or len(groups) != len(item.get("groups", []) or [])
+            updated_item["users"] = normalize_names(item.get("users", []))
+            updated_item["groups"] = groups
+            updated_item["roles"] = normalize_names(item.get("roles", []))
+            if updated_item["users"] or updated_item["groups"] or updated_item["roles"]:
+                filtered_items.append(updated_item)
+        return filtered_items, removed
+
+
+    def detach_group_from_policies(service_name, group_name):
+        for policy in list_policies(service_name):
+            updated_policy = dict(policy)
+            removed = False
+            for key in [
+                "policyItems",
+                "denyPolicyItems",
+                "allowExceptions",
+                "denyExceptions",
+                "dataMaskPolicyItems",
+                "rowFilterPolicyItems",
+            ]:
+                filtered_items, key_removed = filter_group_from_policy_items(policy.get(key, []), group_name)
+                updated_policy[key] = filtered_items
+                removed = removed or key_removed
+
+            if not removed:
+                continue
+
+            has_principals = any(
+                updated_policy.get(key)
+                for key in [
+                    "policyItems",
+                    "denyPolicyItems",
+                    "allowExceptions",
+                    "denyExceptions",
+                    "dataMaskPolicyItems",
+                    "rowFilterPolicyItems",
+                ]
+            )
+            if has_principals:
+                request("PUT", policy_path(policy["id"]), updated_policy, ok=(200,))
+                print(f"Detached stale group {group_name} from Ranger policy: {policy['name']}")
+            else:
+                request("DELETE", policy_path(policy["id"]), ok=(204, 404))
+                print(f"Deleted stale Ranger policy with no remaining principals: {policy['name']}")
+
+
     def delete_user_by_name(username):
         user = get_user(username)
         if not user:
@@ -928,8 +1026,60 @@ data:
         print(f"Deleted stale Ranger user: {username}")
 
 
+    def cleanup_config(config):
+        cleanup = (config.get("ranger") or {}).get("cleanup") or {}
+        if not bool(cleanup.get("enabled", True)):
+            return {"enabled": False, "dryRun": False}
+        return cleanup
+
+
+    def cleanup_dry_run(config):
+        return bool(cleanup_config(config).get("dryRun", False))
+
+
+    def cleanup_names(config, legacy_key, cleanup_key):
+        ranger_cfg = config.get("ranger") or {}
+        cleanup = cleanup_config(config)
+        names = normalize_names(ranger_cfg.get(legacy_key, []))
+        if cleanup.get("enabled", True):
+            names = normalize_names(names + normalize_names(cleanup.get(cleanup_key, [])))
+        return names
+
+
+    def cleanup_user_matches_patterns(config, username):
+        cleanup = cleanup_config(config)
+        if not cleanup.get("enabled", True):
+            return False
+        username = str(username or "").strip()
+        if not username:
+            return False
+        for pattern in normalize_names(cleanup.get("staleUserPatterns", [])):
+            try:
+                if re.search(pattern, username):
+                    return True
+            except re.error:
+                print(f"WARNING: invalid Ranger cleanup staleUserPattern ignored: {pattern}", file=sys.stderr)
+        return False
+
+
+    def cleanup_user_names(config):
+        names = set(cleanup_names(config, "legacyManagedUsers", "staleUsers"))
+        if cleanup_config(config).get("enabled", True):
+            names.update(
+                str(user.get("name", "")).strip()
+                for user in list_users()
+                if cleanup_user_matches_patterns(config, user.get("name", ""))
+            )
+        names.difference_update(protected_usernames(config))
+        return sorted(name for name in names if name)
+
+
     def purge_legacy_users(config, service_name):
-        for username in normalize_names(config["ranger"].get("legacyManagedUsers", [])):
+        dry_run = cleanup_dry_run(config)
+        for username in cleanup_user_names(config):
+            if dry_run:
+                print(f"DRY RUN: would delete stale Ranger user: {username}")
+                continue
             detach_user_from_roles(service_name, username)
             detach_user_from_policies(service_name, username)
             delete_user_by_name(username)
@@ -946,15 +1096,21 @@ data:
             return
         request(
             "DELETE",
-            f"/service/xusers/groups/{existing['id']}",
+            f"/service/xusers/secure/groups/id/{existing['id']}?forceDelete=true",
             ok=(200, 204, 404),
             parse_json=False,
         )
         print(f"Deleted stale Ranger group: {group_name}")
 
 
-    def purge_legacy_groups(config):
-        for group_name in normalize_names(config["ranger"].get("legacyManagedGroups", [])):
+    def purge_legacy_groups(config, service_name):
+        dry_run = cleanup_dry_run(config)
+        for group_name in cleanup_names(config, "legacyManagedGroups", "staleGroups"):
+            if dry_run:
+                print(f"DRY RUN: would delete stale Ranger group: {group_name}")
+                continue
+            detach_group_from_roles(service_name, group_name)
+            detach_group_from_policies(service_name, group_name)
             delete_group_by_name(group_name)
 
 
@@ -976,7 +1132,11 @@ data:
 
 
     def purge_legacy_policies(config, service_name):
-        for policy_name in normalize_names(config["ranger"].get("legacyManagedPolicies", [])):
+        dry_run = cleanup_dry_run(config)
+        for policy_name in cleanup_names(config, "legacyManagedPolicies", "stalePolicies"):
+            if dry_run:
+                print(f"DRY RUN: would delete stale Ranger policy: {policy_name}")
+                continue
             delete_policy_by_name(service_name, policy_name)
 
 
@@ -1051,7 +1211,7 @@ data:
 
         ensure_users_exist(policy_principal_usernames(config, policies), protected_usernames(config))
         purge_legacy_users(config, service_name)
-        purge_legacy_groups(config)
+        purge_legacy_groups(config, service_name)
         purge_legacy_policies(config, service_name)
 
         for policy in policies:
@@ -1859,24 +2019,49 @@ data:
             raise
 
 
-    def transient_validation_username(username, email=""):
+    def cleanup_config(config):
+        return ((config.get("ranger") or {}).get("cleanup") or {})
+
+
+    def configured_stale_username(config, username, email=""):
+        cleanup = cleanup_config(config)
+        if not bool(cleanup.get("enabled", True)):
+            return False
+        username = str(username or "").strip()
+        email = str(email or "").strip()
+        stale_users = set(normalize_names(cleanup.get("staleUsers", [])))
+        if username and username in stale_users:
+            return True
+        for pattern in normalize_names(cleanup.get("staleUserPatterns", [])):
+            try:
+                if username and re.search(pattern, username):
+                    return True
+                if email and re.search(pattern, email):
+                    return True
+            except re.error:
+                print(f"WARNING: invalid Ranger cleanup staleUserPattern ignored: {pattern}", file=sys.stderr)
+        return False
+
+
+    def transient_validation_username(config, username, email=""):
         username = str(username or "").strip()
         email = str(email or "").strip()
         return (
             username.startswith("codex-")
             or username.endswith("-test-sync")
             or email.endswith(".example.invalid")
+            or configured_stale_username(config, username, email)
         )
 
 
-    def should_sync_user(username, email, enabled):
+    def should_sync_user(config, username, email, enabled):
         if not enabled:
             return False
         if username in {"admin", "trino-admin"}:
             return False
         if username.endswith("-service") or username.startswith("service-account-"):
             return False
-        if transient_validation_username(username, email):
+        if transient_validation_username(config, username, email):
             return False
         return True
 
@@ -1889,8 +2074,6 @@ data:
             "rangerusersync",
             "rangertagsync",
             "trino",
-            "{OWNER}",
-            "{USER}",
         }
         service_username = str(ranger.get("serviceUsername") or "").strip()
         if service_username:
@@ -1925,8 +2108,8 @@ data:
                     if not username or username in protected:
                         continue
                     if (
-                        transient_validation_username(username, "")
-                        or transient_validation_username(username, str(descr or ""))
+                        transient_validation_username(config, username, "")
+                        or transient_validation_username(config, username, str(descr or ""))
                         or (str(sync_source or "") == "KEYCLOAK_LOCAL" and username not in active)
                     ):
                         candidates.add(username)
@@ -1942,10 +2125,15 @@ data:
                     if not username or username in protected:
                         continue
                     if (
-                        transient_validation_username(username, str(email or ""))
+                        transient_validation_username(config, username, str(email or ""))
                         or (str(sync_source or "") == "KEYCLOAK_LOCAL" and username not in active)
                     ):
                         candidates.add(username)
+
+                if cleanup_config(config).get("dryRun", False):
+                    if candidates:
+                        print("DRY RUN: would prune stale Ranger validation/local-user principals: " + ", ".join(sorted(candidates)))
+                    return len(candidates)
 
                 pruned = []
                 blocked = []
@@ -2322,6 +2510,50 @@ data:
         return None
 
 
+    def role_create_path():
+        return "/service/public/v2/api/roles?createNonExistUserGroup=true"
+
+
+    def role_update_path(role_id):
+        return f"/service/public/v2/api/roles/{role_id}?createNonExistUserGroup=true"
+
+
+    def normalize_role_members(items):
+        members = {}
+        for item in items or []:
+            if isinstance(item, dict):
+                name = str(item.get("name", "")).strip()
+                is_admin = bool(item.get("isAdmin", False))
+            else:
+                name = str(item).strip()
+                is_admin = False
+            if not name:
+                continue
+            current = members.get(name)
+            members[name] = {"name": name, "isAdmin": is_admin or bool(current and current.get("isAdmin"))}
+        return [members[name] for name in sorted(members)]
+
+
+    def upsert_ranger_role_membership(role_name, description, users, groups=None, nested_roles=None):
+        existing = get_role(role_name)
+        payload = {
+            "name": role_name,
+            "description": description or (existing or {}).get("description", ""),
+            "isEnabled": True,
+            "users": normalize_role_members(users),
+            "groups": normalize_role_members(groups or []),
+            "roles": normalize_role_members(nested_roles if nested_roles is not None else (existing or {}).get("roles", [])),
+        }
+        if existing:
+            payload["id"] = existing["id"]
+            payload["guid"] = existing.get("guid")
+            payload["version"] = existing.get("version")
+            payload["createdByUser"] = existing.get("createdByUser")
+            ranger_request("PUT", role_update_path(existing["id"]), payload, ok=(200,))
+        else:
+            ranger_request("POST", role_create_path(), payload, ok=(200, 201))
+
+
     def keycloak_group_id(config, token, group_name):
         realm = config["identity"]["keycloak"]["realm"]
         groups = keycloak_request(
@@ -2377,6 +2609,50 @@ data:
             for group in groups
             if str(group.get("name", "")).strip() and str(group.get("id", "")).strip()
         }
+
+
+    def keycloak_group_members(config, token, group_name):
+        group_id = ensure_keycloak_group(config, token, group_name)
+        realm = config["identity"]["keycloak"]["realm"]
+        members = keycloak_request(
+            config,
+            token,
+            "GET",
+            f"/admin/realms/{realm}/groups/{group_id}/members?max=1000",
+            ok=(200,),
+        ) or []
+        return [
+            member
+            for member in members
+            if str(member.get("username", "")).strip()
+        ]
+
+
+    def keycloak_group_members_by_id(config, token, group_id):
+        realm = config["identity"]["keycloak"]["realm"]
+        members = keycloak_request(
+            config,
+            token,
+            "GET",
+            f"/admin/realms/{realm}/groups/{group_id}/members?max=1000",
+            ok=(200,),
+        ) or []
+        return [
+            member
+            for member in members
+            if str(member.get("username", "")).strip()
+        ]
+
+
+    def delete_keycloak_group(config, token, group_id):
+        realm = config["identity"]["keycloak"]["realm"]
+        keycloak_request(
+            config,
+            token,
+            "DELETE",
+            f"/admin/realms/{realm}/groups/{group_id}",
+            ok=(204, 404),
+        )
 
 
     def keycloak_client_uuid(config, token, client_id):
@@ -2478,10 +2754,22 @@ data:
         )
 
 
-    def keycloak_role_projection_groups(raw_role, role_key):
+    def role_is_keycloak_managed(raw_role):
+        portal = (raw_role or {}).get("portal") or {}
+        return bool(portal.get("manageable", True))
+
+
+    def keycloak_role_membership_groups(raw_role, role_key):
         members = (raw_role or {}).get("members") or {}
-        apps = (raw_role or {}).get("apps") or {}
         groups = set(normalize_names(members.get("directoryGroups", [])))
+        if not groups:
+            groups.add(f"platform-role-{role_key}")
+        return sorted(groups)
+
+
+    def keycloak_role_app_groups(raw_role):
+        apps = (raw_role or {}).get("apps") or {}
+        groups = set()
         app_group_names = {
             "superset": "platform-app-superset",
             "datahub": "platform-app-datahub",
@@ -2493,9 +2781,14 @@ data:
         for app_key, group_name in app_group_names.items():
             if bool(apps.get(app_key)):
                 groups.add(group_name)
-        if not groups:
-            groups.add(f"platform-role-{role_key}")
         return sorted(groups)
+
+
+    def keycloak_role_projection_groups(raw_role, role_key):
+        return sorted(
+            set(keycloak_role_membership_groups(raw_role, role_key))
+            | set(keycloak_role_app_groups(raw_role))
+        )
 
 
     def projected_keycloak_groups(config):
@@ -2519,6 +2812,194 @@ data:
                     continue
                 projected.setdefault(username, set()).update(projected_groups)
 
+        return {username: sorted(groups) for username, groups in projected.items()}
+
+
+    def ranger_role_name(raw_role, role_key):
+        return str(((raw_role or {}).get("ranger") or {}).get("roleName") or role_key).strip()
+
+
+    def sync_seed_keycloak_role_memberships(config, token, users_by_username):
+        membership_source = str((config.get("ranger") or {}).get("platformRoleMembershipSource", "git") or "git").lower()
+        if membership_source != "keycloak":
+            return 0, 0
+
+        updated = 0
+        missing = 0
+        for role_key in sorted(config.get("platformRoles", {})):
+            raw_role = config["platformRoles"][role_key] or {}
+            if not role_is_keycloak_managed(raw_role):
+                continue
+            role_groups = keycloak_role_membership_groups(raw_role, role_key)
+            seed_users = normalize_names(((raw_role.get("members") or {}).get("users") or []))
+            for group_name in role_groups:
+                ensure_keycloak_group(config, token, group_name)
+            for username in seed_users:
+                user = users_by_username.get(username)
+                if not user:
+                    print(
+                        f"WARNING: configured seed user {username} for {role_key} was not found as an eligible Keycloak-local user.",
+                        file=sys.stderr,
+                    )
+                    missing += 1
+                    continue
+                current_groups = keycloak_user_groups(config, token, user["id"])
+                user_changed = False
+                for group_name in role_groups:
+                    if group_name in current_groups:
+                        continue
+                    group_id = ensure_keycloak_group(config, token, group_name)
+                    ensure_keycloak_group_membership(config, token, user["id"], group_id)
+                    user_changed = True
+                    updated += 1
+                if user_changed:
+                    try:
+                        keycloak_logout_user(config, token, user["id"])
+                    except Exception as exc:
+                        print(
+                            f"WARNING: seeded Keycloak role groups for {username} but failed to clear stale sessions: {exc}",
+                            file=sys.stderr,
+                        )
+        return updated, missing
+
+
+    def legacy_keycloak_group_role_targets(config):
+        targets = {}
+        cleanup = cleanup_config(config)
+        legacy_groups = set(normalize_names((config.get("ranger") or {}).get("legacyManagedGroups", [])))
+        legacy_groups.update(normalize_names(cleanup.get("staleGroups", [])))
+        if "admins" in legacy_groups:
+            targets["admins"] = "platform-admin"
+        for group_name in legacy_groups:
+            if group_name in config.get("platformRoles", {}):
+                targets[group_name] = group_name
+        return {
+            group_name: role_key
+            for group_name, role_key in targets.items()
+            if role_key in config.get("platformRoles", {})
+        }
+
+
+    def migrate_legacy_keycloak_groups(config, token, users_by_username):
+        membership_source = str((config.get("ranger") or {}).get("platformRoleMembershipSource", "git") or "git").lower()
+        if membership_source != "keycloak":
+            return 0, 0, 0
+
+        cleanup = cleanup_config(config)
+        cleanup_enabled = bool(cleanup.get("enabled", True))
+        dry_run = bool(cleanup.get("dryRun", False))
+        migrated_memberships = 0
+        removed_groups = 0
+        missing_users = 0
+
+        for legacy_group, role_key in sorted(legacy_keycloak_group_role_targets(config).items()):
+            legacy_group_id = keycloak_group_id(config, token, legacy_group)
+            if not legacy_group_id:
+                continue
+            raw_role = config["platformRoles"][role_key] or {}
+            role_group_ids = {
+                group_name: ensure_keycloak_group(config, token, group_name)
+                for group_name in keycloak_role_membership_groups(raw_role, role_key)
+            }
+            migrated_user_ids = set()
+            for member in keycloak_group_members_by_id(config, token, legacy_group_id):
+                username = str(member.get("username") or "").strip()
+                user = users_by_username.get(username)
+                if not user:
+                    missing_users += 1
+                    continue
+                current_groups = keycloak_user_groups(config, token, user["id"])
+                changed = False
+                for group_name, group_id in role_group_ids.items():
+                    if group_name in current_groups:
+                        continue
+                    if dry_run:
+                        print(
+                            f"DRY RUN: would migrate Keycloak user {username} from legacy group {legacy_group} "
+                            f"to {group_name}."
+                        )
+                        continue
+                    ensure_keycloak_group_membership(config, token, user["id"], group_id)
+                    changed = True
+                    migrated_memberships += 1
+                if changed:
+                    migrated_user_ids.add(user["id"])
+
+            for user_id in migrated_user_ids:
+                try:
+                    keycloak_logout_user(config, token, user_id)
+                except Exception as exc:
+                    print(
+                        f"WARNING: migrated legacy Keycloak group {legacy_group} membership but failed to clear "
+                        f"stale sessions for user {user_id}: {exc}",
+                        file=sys.stderr,
+                    )
+
+            if cleanup_enabled:
+                if dry_run:
+                    print(f"DRY RUN: would delete legacy Keycloak group {legacy_group}.")
+                else:
+                    delete_keycloak_group(config, token, legacy_group_id)
+                    removed_groups += 1
+
+        return migrated_memberships, removed_groups, missing_users
+
+
+    def keycloak_role_members_by_role(config, token, users_by_username):
+        desired = {}
+        for role_key in sorted(config.get("platformRoles", {})):
+            raw_role = config["platformRoles"][role_key] or {}
+            if not role_is_keycloak_managed(raw_role):
+                continue
+            members = set()
+            for group_name in keycloak_role_membership_groups(raw_role, role_key):
+                for member in keycloak_group_members(config, token, group_name):
+                    username = str(member.get("username") or "").strip()
+                    if not username:
+                        continue
+                    user = users_by_username.get(username)
+                    if not user:
+                        continue
+                    if not should_sync_user(config, username, str(user.get("email") or ""), bool(user.get("enabled", True))):
+                        continue
+                    members.add(username)
+            desired[role_key] = sorted(members)
+        return desired
+
+
+    def sync_ranger_roles_from_keycloak(config, desired_role_members):
+        membership_source = str((config.get("ranger") or {}).get("platformRoleMembershipSource", "git") or "git").lower()
+        if membership_source != "keycloak":
+            return 0
+
+        updated = 0
+        for role_key in sorted(config.get("platformRoles", {})):
+            raw_role = config["platformRoles"][role_key] or {}
+            if not role_is_keycloak_managed(raw_role):
+                continue
+            role_name = ranger_role_name(raw_role, role_key)
+            if not role_name:
+                continue
+            desired_users = desired_role_members.get(role_key, [])
+            upsert_ranger_role_membership(
+                role_name,
+                str(raw_role.get("description") or ""),
+                desired_users,
+                groups=[],
+            )
+            updated += 1
+        return updated
+
+
+    def projected_keycloak_groups_from_keycloak_roles(config, desired_role_members):
+        projected = {}
+        for role_key in sorted(config.get("platformRoles", {})):
+            raw_role = config["platformRoles"][role_key] or {}
+            if not role_is_keycloak_managed(raw_role):
+                continue
+            projected_groups = keycloak_role_projection_groups(raw_role, role_key)
+            for username in desired_role_members.get(role_key, []):
+                projected.setdefault(username, set()).update(projected_groups)
         return {username: sorted(groups) for username, groups in projected.items()}
 
 
@@ -2562,9 +3043,11 @@ data:
         if previous != desired:
             updated_user = dict(user)
             updated_attributes = dict(existing_attributes)
+            membership_source = str((config.get("ranger") or {}).get("platformRoleMembershipSource", "git") or "git").lower()
+            projection_source = "keycloak-platform-role-groups" if membership_source == "keycloak" else "ranger-platform-roles"
             if desired:
                 updated_attributes["platformProjectedGroups"] = desired
-                updated_attributes["platformProjectedGroupsSource"] = ["ranger-platform-roles"]
+                updated_attributes["platformProjectedGroupsSource"] = [projection_source]
             else:
                 updated_attributes.pop("platformProjectedGroups", None)
                 updated_attributes.pop("platformProjectedGroupsSource", None)
@@ -2678,8 +3161,15 @@ data:
         projected_group_logouts = 0
         projected_client_role_updates = 0
         projected_client_role_logouts = 0
+        seeded_role_group_updates = 0
+        seeded_role_group_missing = 0
+        legacy_keycloak_group_migrations = 0
+        legacy_keycloak_groups_removed = 0
+        legacy_keycloak_group_missing_users = 0
+        ranger_role_membership_updates = 0
         users_by_username = {}
         active_keycloak_usernames = set()
+        membership_source = str((config.get("ranger") or {}).get("platformRoleMembershipSource", "git") or "git").lower()
 
         for user in users:
             username = (user.get("username") or "").strip()
@@ -2689,7 +3179,7 @@ data:
             last_name = (user.get("lastName") or "User").strip()
             if username:
                 active_keycloak_usernames.add(username)
-            if not username or not should_sync_user(username, email, enabled):
+            if not username or not should_sync_user(config, username, email, enabled):
                 continue
             users_by_username[username] = user
 
@@ -2705,7 +3195,22 @@ data:
             sync_ranger_sql(config, username, first_name, last_name, email)
             synced_count += 1
 
-        projected_groups_by_user = projected_keycloak_groups(config)
+        if membership_source == "keycloak":
+            seeded_role_group_updates, seeded_role_group_missing = sync_seed_keycloak_role_memberships(
+                config,
+                token,
+                users_by_username,
+            )
+            (
+                legacy_keycloak_group_migrations,
+                legacy_keycloak_groups_removed,
+                legacy_keycloak_group_missing_users,
+            ) = migrate_legacy_keycloak_groups(config, token, users_by_username)
+            desired_role_members = keycloak_role_members_by_role(config, token, users_by_username)
+            ranger_role_membership_updates = sync_ranger_roles_from_keycloak(config, desired_role_members)
+            projected_groups_by_user = projected_keycloak_groups_from_keycloak_roles(config, desired_role_members)
+        else:
+            projected_groups_by_user = projected_keycloak_groups(config)
 
         for username, desired_groups in projected_groups_by_user.items():
             user = users_by_username.get(username)
@@ -2746,6 +3251,12 @@ data:
             f"group projections refreshed, {projected_group_logouts} additional projected-group logouts issued, "
             f"{projected_client_role_updates} Keycloak admin client-role projections refreshed, "
             f"{projected_client_role_logouts} additional admin-role logouts issued, "
+            f"{seeded_role_group_updates} seeded Keycloak role memberships ensured, "
+            f"{seeded_role_group_missing} configured seed users missing, "
+            f"{legacy_keycloak_group_migrations} legacy Keycloak group memberships migrated, "
+            f"{legacy_keycloak_groups_removed} legacy Keycloak groups removed, "
+            f"{legacy_keycloak_group_missing_users} legacy Keycloak group members skipped, "
+            f"{ranger_role_membership_updates} Ranger roles reconciled from Keycloak, "
             f"{pruned_count} stale Ranger validation/local-user principals pruned)."
         )
 

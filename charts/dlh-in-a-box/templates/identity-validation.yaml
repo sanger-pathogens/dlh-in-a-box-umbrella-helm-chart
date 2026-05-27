@@ -22,6 +22,7 @@
 {{- $prefectDirectGrantIdentity := get $clients "prefectDirectGrant" | default dict -}}
 {{- $authorization := $global.authorization | default dict -}}
 {{- $ranger := get $authorization "ranger" | default dict -}}
+{{- $platformRoleMembershipSource := default "git" (get $authorization "platformRoleMembershipSource") -}}
 {{- $datahubValues := .Values.datahub | default dict -}}
 {{- $datahubFrontend := get $datahubValues "datahub-frontend" | default dict -}}
 {{- $datahubFrontendIngress := get $datahubFrontend "ingress" | default dict -}}
@@ -126,6 +127,12 @@
 {{- end -}}
 {{- if and (default false $identity.enabled) $keycloakLocalMode (default false $ranger.enabled) (dig "usersync" "enabled" true $ranger) -}}
 {{- fail "global.authorization.ranger.usersync.enabled must be false when global.identity.directory.mode=keycloakLocal." -}}
+{{- end -}}
+{{- if and (eq $platformRoleMembershipSource "keycloak") (not $keycloakLocalMode) -}}
+{{- fail "global.authorization.platformRoleMembershipSource=keycloak requires global.identity.directory.mode=keycloakLocal." -}}
+{{- end -}}
+{{- if and (eq $platformRoleMembershipSource "keycloak") (default false $ranger.enabled) (not (dig "localUserSync" "enabled" true $ranger)) -}}
+{{- fail "global.authorization.platformRoleMembershipSource=keycloak requires global.authorization.ranger.localUserSync.enabled=true." -}}
 {{- end -}}
 {{- if and (default false (get $trinoDirectGrantIdentity "enabled")) (not (default false (get $trinoIdentity "enabled"))) -}}
 {{- fail "global.identity.external.clients.trinoDirectGrant.enabled requires global.identity.external.clients.trino.enabled=true." -}}
