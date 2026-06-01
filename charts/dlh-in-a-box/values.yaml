@@ -30,7 +30,6 @@ global:
             superset: true
             datahub: true
       additionalRoles: {}
-      groupRoleMappings: {}
     provider:
       mode: externalOidc
       keycloak:
@@ -61,7 +60,6 @@ global:
           - openid
           - profile
           - email
-          - groups
         processForwardedHeaders: true
       clients:
         trino:
@@ -209,7 +207,7 @@ global:
           clientId: ""
           tokenAudience: prefect-api
     directory:
-      mode: externalLdap
+      mode: keycloakLocal
       ldap:
         enabled: false
         url: ""
@@ -285,6 +283,12 @@ global:
         adminPasswordKey: rangerAdminPassword
         usersyncPasswordKey: rangerUsersyncPassword
         tagsyncPasswordKey: rangerTagsyncPassword
+        passwordReconcile:
+          enabled: true
+          image:
+            repository: postgres
+            tag: "15"
+            pullPolicy: IfNotPresent
       usersync:
         enabled: true
         image:
@@ -292,7 +296,7 @@ global:
           tag: 3.12-slim
           pullPolicy: IfNotPresent
         schedule: "*/15 * * * *"
-        syncSource: LDAP
+        syncSource: KEYCLOAK_LOCAL
       localUserSync:
         enabled: true
         image:
@@ -455,7 +459,6 @@ keycloak:
           - profile
           - email
           - roles
-          - groups
           - platform-access
         clientScopes:
           - name: groups
@@ -509,18 +512,31 @@ keycloak:
           realm:
           {{- range $roleKey := keys $accessModelRoles | sortAlpha }}
             {{- $role := get $accessModelRoles $roleKey | default dict }}
+            {{- $roleClientComposites := dict }}
+            {{- range $appName, $enabled := get $role "appAccess" | default dict }}
+              {{- if and $enabled (hasKey $accessModelAppClients $appName) }}
+                {{- $_ := set $roleClientComposites (get $accessModelAppClients $appName) (list "access") }}
+              {{- end }}
+            {{- end }}
+            {{- if eq $roleKey "platform-admin" }}
+              {{- $_ := set $roleClientComposites "realm-management" (list "realm-admin") }}
+            {{- end }}
             - name: {{ $roleKey | quote }}
               {{- if get $role "description" }}
               description: {{ get $role "description" | quote }}
               {{- else }}
               description: {{ printf "Built-in platform role %s" $roleKey | quote }}
               {{- end }}
-              {{- if eq $roleKey "platform-admin" }}
+              {{- if gt (len $roleClientComposites) 0 }}
               composite: true
               composites:
                 client:
-                  realm-management:
-                    - realm-admin
+                  {{- range $clientId := keys $roleClientComposites | sortAlpha }}
+                  {{ $clientId | quote }}:
+                    {{- range $clientRole := get $roleClientComposites $clientId }}
+                    - {{ $clientRole | quote }}
+                    {{- end }}
+                  {{- end }}
               {{- end }}
           {{- end }}
           {{- if gt (len $accessModelClientRoleApps) 0 }}
@@ -534,13 +550,9 @@ keycloak:
         {{- end }}
         {{- end }}
         {{- $bootstrapUsers := default (list) .Values.global.identity.provider.keycloak.bootstrapUsers }}
-        {{- $accessModelGroupRoleMappings := get (.Values.global.identity.accessModel | default dict) "groupRoleMappings" | default dict }}
         {{- $managedGroups := fromJsonArray (include "dlh-in-a-box.identity.keycloakManagedGroupsJson" $) }}
         {{- $seededGroups := dict }}
         {{- range $groupName := $managedGroups }}
-          {{- $_ := set $seededGroups (toString $groupName) true }}
-        {{- end }}
-        {{- range $groupName, $_ := $accessModelGroupRoleMappings }}
           {{- $_ := set $seededGroups (toString $groupName) true }}
         {{- end }}
         {{- range $user := $bootstrapUsers }}
@@ -552,30 +564,6 @@ keycloak:
         groups:
         {{- range $groupName := keys $seededGroups | sortAlpha }}
           - name: {{ $groupName | quote }}
-            {{- if hasKey $accessModelGroupRoleMappings $groupName }}
-            {{- $mapping := get $accessModelGroupRoleMappings $groupName | default dict }}
-            {{- $mappedRoles := get $mapping "roles" | default list }}
-            realmRoles:
-            {{- range $roleName := $mappedRoles }}
-              - {{ $roleName | quote }}
-            {{- end }}
-            {{- $groupClientRoles := dict }}
-            {{- range $roleName := $mappedRoles }}
-              {{- $role := get $accessModelRoles (toString $roleName) | default dict }}
-              {{- range $appName, $enabled := get $role "appAccess" | default dict }}
-                {{- if and $enabled (hasKey $accessModelAppClients $appName) }}
-                  {{- $_ := set $groupClientRoles (get $accessModelAppClients $appName) true }}
-                {{- end }}
-              {{- end }}
-            {{- end }}
-            {{- if gt (len $groupClientRoles) 0 }}
-            clientRoles:
-            {{- range $clientId := keys $groupClientRoles | sortAlpha }}
-              {{ $clientId | quote }}:
-                - access
-            {{- end }}
-            {{- end }}
-            {{- end }}
         {{- end }}
         {{- end }}
         {{- if gt (len $bootstrapUsers) 0 }}
@@ -807,7 +795,6 @@ keycloak:
               - profile
               - email
               - roles
-              - groups
               - platform-access
         {{- end }}
         {{- if .Values.global.identity.external.clients.headlamp.enabled }}
@@ -833,7 +820,6 @@ keycloak:
               - profile
               - email
               - roles
-              - groups
               - platform-access
         {{- end }}
         {{- if .Values.global.identity.external.clients.jupyterhub.enabled }}
@@ -896,7 +882,6 @@ keycloak:
               - profile
               - email
               - roles
-              - groups
               - platform-access
         {{- end }}
         {{- if .Values.global.identity.external.clients.rangerProxy.enabled }}
@@ -922,7 +907,6 @@ keycloak:
               - profile
               - email
               - roles
-              - groups
               - platform-access
         {{- end }}
         {{- if .Values.global.identity.external.clients.prefectProxy.enabled }}
@@ -948,7 +932,6 @@ keycloak:
               - profile
               - email
               - roles
-              - groups
               - platform-access
         {{- end }}
         {{- if .Values.global.identity.external.clients.prefectAutomation.enabled }}
@@ -966,7 +949,6 @@ keycloak:
               - profile
               - email
               - roles
-              - groups
               - platform-access
             protocolMappers:
               - name: prefect-automation-audience
@@ -992,7 +974,6 @@ keycloak:
               - profile
               - email
               - roles
-              - groups
               - platform-access
             protocolMappers:
               - name: prefect-direct-grant-audience
@@ -1236,7 +1217,8 @@ jupyterhub:
       JUPYTERHUB_INTERNAL_USERDATA_URL: ""
       JUPYTERHUB_OAUTH_CALLBACK_URL: ""
       JUPYTERHUB_CLIENT_ID: ""
-      JUPYTERHUB_CLIENT_SECRET: ""
+      JUPYTERHUB_CLIENT_SECRET:
+        value: ""
       JUPYTERHUB_ROLES_CLAIM: platform_roles
       JUPYTERHUB_ALLOWED_ROLES: ""
       JUPYTERHUB_ADMIN_ROLES: ""
@@ -1492,7 +1474,7 @@ cloudbeaver:
   enabled: false
   image:
     repository: dbeaver/cloudbeaver
-    tag: 25.2.0
+    tag: 25.2.5
     pullPolicy: IfNotPresent
   service:
     port: 8978
@@ -1517,6 +1499,7 @@ cloudbeaver:
       passwordKey: shared-connection-password
       bootstrapUsernameKey: shared-bootstrap-username
       bootstrapGroupsKey: shared-bootstrap-groups
+      expectedCatalog: redcap
   trustedCa:
     existingSecret: ""
     certKey: ca.crt
@@ -1536,6 +1519,8 @@ cloudbeaver:
     lastNameHeader: ""
     logoutUrl: ""
   app:
+    defaultUserTeam: ""
+    adminTeam: ""
     supportsCustomConnections: true
     showReadOnlyConnectionInfo: false
     publicCredentialsSaveEnabled: false

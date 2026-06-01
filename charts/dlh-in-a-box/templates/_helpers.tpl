@@ -199,26 +199,10 @@ app.kubernetes.io/managed-by: {{ .Release.Service }}
 {{- end -}}
 {{- end -}}
 
-{{- define "dlh-in-a-box.group.app" -}}
-{{- $root := .root -}}
-{{- $name := .name -}}
-{{- $identity := $root.Values.global.identity | default dict -}}
-{{- $conventions := get $identity "groupConventions" | default dict -}}
-{{- printf "%s%s" (default "platform-app-" $conventions.appAccessPrefix) $name -}}
-{{- end -}}
-
-{{- define "dlh-in-a-box.group.role" -}}
-{{- $root := .root -}}
-{{- $name := .name -}}
-{{- $identity := $root.Values.global.identity | default dict -}}
-{{- $conventions := get $identity "groupConventions" | default dict -}}
-{{- printf "%s%s" (default "platform-role-" $conventions.rolePrefix) $name -}}
-{{- end -}}
-
 {{- define "dlh-in-a-box.identity.directoryMode" -}}
 {{- $identity := .Values.global.identity | default dict -}}
 {{- $directory := get $identity "directory" | default dict -}}
-{{- default "externalLdap" $directory.mode -}}
+{{- default "keycloakLocal" $directory.mode -}}
 {{- end -}}
 
 {{- define "dlh-in-a-box.identity.accessModelRolesJson" -}}

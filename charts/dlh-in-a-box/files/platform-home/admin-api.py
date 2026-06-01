@@ -355,6 +355,25 @@ def resolve_launcher(name, profile):
         )
         return {"mode": "redirect", "url": launched_url}
 
+    if mode == "minio-sso":
+        internal_api_url = str(launcher.get("internalApiUrl") or "").rstrip("/")
+        target_url = str(launcher.get("targetUrl") or "").strip()
+        if not internal_api_url:
+            raise ApiError(500, "The MinIO launcher is missing its internal API URL.")
+        response = launcher_request(f"{internal_api_url}/api/v1/login")
+        redirect_rules = response.get("redirectRules")
+        if not isinstance(redirect_rules, list):
+            redirect_rules = []
+        for rule in redirect_rules:
+            if not isinstance(rule, dict):
+                continue
+            redirect_url = str(rule.get("redirect") or "").strip()
+            if redirect_url:
+                return {"mode": "redirect", "url": redirect_url}
+        if target_url:
+            return {"mode": "redirect", "url": target_url}
+        raise ApiError(502, "MinIO did not return an OIDC redirect URL.")
+
     raise ApiError(500, f"Unsupported launcher mode: {mode}")
 
 

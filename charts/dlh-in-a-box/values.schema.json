@@ -88,12 +88,6 @@
           "additionalProperties": {
             "$ref": "#/definitions/accessModelRole"
           }
-        },
-        "groupRoleMappings": {
-          "type": "object",
-          "additionalProperties": {
-            "$ref": "#/definitions/accessModelGroupRoleMapping"
-          }
         }
       }
     },
@@ -119,18 +113,6 @@
         }
       }
     },
-    "accessModelGroupRoleMapping": {
-      "type": "object",
-      "additionalProperties": true,
-      "properties": {
-        "roles": {
-          "type": "array",
-          "items": { "type": "string" },
-          "minItems": 1
-        }
-      },
-      "required": ["roles"]
-    },
     "identityContract": {
       "type": "object",
       "additionalProperties": true,
@@ -141,7 +123,7 @@
         },
         "accessModel": {
           "$ref": "#/definitions/accessModel",
-          "description": "Keycloak-centered catalog of platform roles, app access, and deployment-owned group-to-role mappings."
+          "description": "Keycloak-centered catalog of platform roles and app access."
         },
         "provider": {
           "type": "object",
@@ -819,15 +801,6 @@
                 }
               ]
             }
-          }
-        },
-        "groupConventions": {
-          "type": "object",
-          "additionalProperties": true,
-          "properties": {
-            "appAccessPrefix": { "type": "string" },
-            "rolePrefix": { "type": "string" },
-            "dataPrefix": { "type": "string" }
           }
         }
       },

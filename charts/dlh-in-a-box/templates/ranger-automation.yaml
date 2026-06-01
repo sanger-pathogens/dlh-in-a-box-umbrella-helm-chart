@@ -7,7 +7,7 @@
 {{- $provider := get $identity "provider" | default dict -}}
 {{- $providerMode := default "externalOidc" $provider.mode -}}
 {{- $directory := get $identity "directory" | default dict -}}
-{{- $keycloakLocalMode := eq (default "externalLdap" (get $directory "mode")) "keycloakLocal" -}}
+{{- $keycloakLocalMode := eq (default "keycloakLocal" (get $directory "mode")) "keycloakLocal" -}}
 {{- $accessModel := get $identity "accessModel" | default dict -}}
 {{- $ldap := get $directory "ldap" | default dict -}}
 {{- $ldapAllowAnonymousRead := default false $ldap.allowAnonymousRead -}}
@@ -17,6 +17,17 @@
 {{- $ldapTrustedCaPath := printf "/opt/ranger-automation/ldap-ca/%s" $ldapTrustedCaCertKey -}}
 {{- $ldapHostAliases := default (list) $ldap.hostAliases -}}
 {{- $rangerBootstrap := get $ranger "bootstrap" | default dict -}}
+{{- $rangerAdmin := get $ranger "admin" | default dict -}}
+{{- $passwordReconcile := get $rangerAdmin "passwordReconcile" | default dict -}}
+{{- $passwordReconcileImage := get $passwordReconcile "image" | default dict -}}
+{{- $passwordReconcileEnabled := true -}}
+{{- if hasKey $passwordReconcile "enabled" -}}
+  {{- $passwordReconcileEnabled = $passwordReconcile.enabled -}}
+{{- end -}}
+{{- $postgresql := get $ranger "postgresql" | default dict -}}
+{{- $dbHost := default (include "dlh-in-a-box.ranger.postgresql.serviceName" .) $postgresql.host -}}
+{{- $dbName := default "ranger" $postgresql.database -}}
+{{- $dbUser := default "rangeradmin" $postgresql.username -}}
 {{- $usersync := get $ranger "usersync" | default dict -}}
 {{- $usersyncImage := get $usersync "image" | default dict -}}
 {{- $localUserSync := get $ranger "localUserSync" | default dict -}}
@@ -105,7 +116,7 @@ data:
         "groupSearchMemberAttribute" (default "member" $ldap.groupSearchMemberAttribute)
       )
       "identity" (dict
-        "directoryMode" (default "externalLdap" (get $directory "mode"))
+        "directoryMode" (default "keycloakLocal" (get $directory "mode"))
         "keycloak" (dict
           "realm" (include "dlh-in-a-box.keycloak.realm" .)
           "adminUrl" (include "dlh-in-a-box.keycloak.internalBaseUrl" .)
@@ -123,6 +134,101 @@ data:
   keycloak_ranger_sync.py: |
 {{ .Files.Get "files/ranger-automation/keycloak_ranger_sync.py" | nindent 4 }}
 ---
+{{- if $passwordReconcileEnabled }}
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ include "dlh-in-a-box.ranger.admin.serviceName" . }}-password-reconcile
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "dlh-in-a-box.labels" . | nindent 4 }}
+    app.kubernetes.io/component: ranger-password-reconcile
+  annotations:
+    helm.sh/hook: post-install,post-upgrade
+    helm.sh/hook-weight: "5"
+    helm.sh/hook-delete-policy: before-hook-creation,hook-succeeded
+spec:
+  backoffLimit: 3
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/instance: {{ .Release.Name }}
+        app.kubernetes.io/name: {{ include "dlh-in-a-box.name" . }}
+        app.kubernetes.io/component: ranger-password-reconcile
+    spec:
+      restartPolicy: OnFailure
+      containers:
+        - name: ranger-password-reconcile
+          image: "{{ default "postgres" $passwordReconcileImage.repository }}:{{ default "15" $passwordReconcileImage.tag }}"
+          imagePullPolicy: {{ default "IfNotPresent" $passwordReconcileImage.pullPolicy }}
+          command:
+            - /bin/bash
+            - -ec
+            - |
+              export PGPASSWORD="${RANGER_DB_PASSWORD}"
+
+              for _ in $(seq 1 120); do
+                if psql -h "${RANGER_DB_HOST}" -U "${RANGER_DB_USERNAME}" -d "${RANGER_DB_NAME}" -tAc "select to_regclass('public.x_portal_user')" | grep -qx x_portal_user; then
+                  break
+                fi
+                sleep 5
+              done
+
+              update_ranger_password() {
+                local login_id="${1:?login id required}"
+                local password="${2:-}"
+                local password_hash
+                if [ -z "${password}" ]; then
+                  return 0
+                fi
+                password_hash="$(printf '%s{%s}' "${password}" "${login_id}" | sha256sum | awk '{print $1}')"
+                psql -h "${RANGER_DB_HOST}" -U "${RANGER_DB_USERNAME}" -d "${RANGER_DB_NAME}" -v ON_ERROR_STOP=1 \
+                  --set=login_id="${login_id}" \
+                  --set=password_hash="${password_hash}" <<'SQL'
+              UPDATE x_portal_user
+                 SET password = :'password_hash',
+                     update_time = CURRENT_TIMESTAMP
+               WHERE login_id = :'login_id'
+                 AND password <> :'password_hash';
+
+              DELETE FROM x_auth_sess
+               WHERE login_id = :'login_id'
+                 AND auth_status <> 1;
+              SQL
+              }
+
+              update_ranger_password admin "${RANGER_ADMIN_PASSWORD}"
+              update_ranger_password rangerusersync "${RANGER_USERSYNC_PASSWORD:-}"
+              update_ranger_password rangertagsync "${RANGER_TAGSYNC_PASSWORD:-}"
+          env:
+            - name: RANGER_DB_HOST
+              value: {{ $dbHost | quote }}
+            - name: RANGER_DB_NAME
+              value: {{ $dbName | quote }}
+            - name: RANGER_DB_USERNAME
+              value: {{ $dbUser | quote }}
+            - name: RANGER_DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $postgresql.existingSecret }}
+                  key: {{ default "password" $postgresql.passwordKey }}
+            - name: RANGER_ADMIN_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $rangerAdmin.existingSecret }}
+                  key: {{ default "rangerAdminPassword" $rangerAdmin.adminPasswordKey }}
+            - name: RANGER_USERSYNC_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $rangerAdmin.existingSecret }}
+                  key: {{ default "rangerUsersyncPassword" $rangerAdmin.usersyncPasswordKey }}
+            - name: RANGER_TAGSYNC_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $rangerAdmin.existingSecret }}
+                  key: {{ default "rangerTagsyncPassword" $rangerAdmin.tagsyncPasswordKey }}
+---
+{{- end }}
 {{- if (dig "bootstrap" "enabled" true $ranger) }}
 apiVersion: batch/v1
 kind: Job

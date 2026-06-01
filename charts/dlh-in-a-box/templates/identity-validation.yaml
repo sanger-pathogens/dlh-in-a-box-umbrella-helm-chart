@@ -11,7 +11,6 @@
 {{- $accessModel := get $identity "accessModel" | default dict -}}
 {{- $builtinRoles := get $accessModel "builtinRoles" | default dict -}}
 {{- $additionalRoles := get $accessModel "additionalRoles" | default dict -}}
-{{- $groupRoleMappings := get $accessModel "groupRoleMappings" | default dict -}}
 {{- $clients := get $external "clients" | default dict -}}
 {{- $trinoIdentity := get $clients "trino" | default dict -}}
 {{- $trinoDirectGrantIdentity := get $clients "trinoDirectGrant" | default dict -}}
@@ -26,7 +25,6 @@
 {{- $prefectDirectGrantIdentity := get $clients "prefectDirectGrant" | default dict -}}
 {{- $authorization := $global.authorization | default dict -}}
 {{- $ranger := get $authorization "ranger" | default dict -}}
-{{- $platformRoleMembershipSource := default "git" (get $authorization "platformRoleMembershipSource") -}}
 {{- $datahubValues := .Values.datahub | default dict -}}
 {{- $datahubAuth := get $datahubValues "auth" | default dict -}}
 {{- $datahubFrontend := get $datahubValues "datahub-frontend" | default dict -}}
@@ -58,12 +56,6 @@
 {{- $keycloakValues := .Values.keycloak | default dict -}}
 {{- $keycloakConfigCli := get $keycloakValues "keycloakConfigCli" | default dict -}}
 {{- $keycloakProvider := get $provider "keycloak" | default dict -}}
-{{- $keycloakRegistration := get $keycloakProvider "registration" | default dict -}}
-{{- $selfRegistrationEnabled := default false (get $keycloakRegistration "enabled") -}}
-{{- $requireEmailVerification := true -}}
-{{- if hasKey $keycloakRegistration "requireEmailVerification" -}}
-  {{- $requireEmailVerification = get $keycloakRegistration "requireEmailVerification" -}}
-{{- end -}}
 {{- $configCliEnvSecretName := default "" $keycloakProvider.configCliEnvExistingSecret -}}
 {{- $bootstrapUsers := default (list) $keycloakProvider.bootstrapUsers -}}
 {{- $bootstrapUsersEnabled := gt (len $bootstrapUsers) 0 -}}
@@ -84,7 +76,10 @@
 {{- fail "global.authorization.platformRoleMembershipSource is no longer supported. Keycloak is the source of truth for platform roles and role membership." -}}
 {{- end -}}
 {{- if hasKey $authorization "platformRoles" -}}
-{{- fail "global.authorization.platformRoles is no longer supported. Define platform roles and group mappings under global.identity.accessModel." -}}
+{{- fail "global.authorization.platformRoles is no longer supported. Define platform roles under global.identity.accessModel." -}}
+{{- end -}}
+{{- if hasKey $accessModel "groupRoleMappings" -}}
+{{- fail "global.identity.accessModel.groupRoleMappings is no longer supported. Assign Keycloak realm roles directly to users; app access and Ranger roles are derived from those realm roles." -}}
 {{- end -}}
 {{- if hasKey $datahubAuth "groupProvisioning" -}}
 {{- fail "datahub.auth.groupProvisioning is no longer supported. DataHub browser access must not depend on OIDC group claims; use global.identity.accessModel roles and client roles." -}}
@@ -154,20 +149,6 @@
       {{- end -}}
     {{- end -}}
   {{- end -}}
-  {{- range $groupName, $mapping := $groupRoleMappings -}}
-    {{- if not (trim $groupName) -}}
-      {{- fail "global.identity.accessModel.groupRoleMappings must not contain an empty group name." -}}
-    {{- end -}}
-    {{- $roles := get $mapping "roles" | default list -}}
-    {{- if eq (len $roles) 0 -}}
-      {{- fail (printf "global.identity.accessModel.groupRoleMappings.%s.roles must contain at least one platform role." $groupName) -}}
-    {{- end -}}
-    {{- range $roleName := $roles -}}
-      {{- if not (hasKey $accessModelRoleKeys (toString $roleName)) -}}
-        {{- fail (printf "global.identity.accessModel.groupRoleMappings.%s.roles references unknown or disabled platform role %s." $groupName $roleName) -}}
-      {{- end -}}
-    {{- end -}}
-  {{- end -}}
   {{- range $launcherName, $launcher := get $platformHomeValues "launchers" | default dict -}}
     {{- if hasKey ($launcher | default dict) "requiredGroups" -}}
       {{- fail (printf "platformHome.launchers.%s.requiredGroups is no longer supported. Use platformHome.launchers.%s.requiredRoles with Keycloak realm role names from global.identity.accessModel." $launcherName $launcherName) -}}
@@ -196,6 +177,14 @@
   {{- end -}}
   {{- if not (get $user "passwordEnvVar") -}}
     {{- fail (printf "global.identity.provider.keycloak.bootstrapUsers[%d].passwordEnvVar is required." $index) -}}
+  {{- end -}}
+  {{- if hasKey $user "groups" -}}
+    {{- fail (printf "global.identity.provider.keycloak.bootstrapUsers[%d].groups is no longer supported. Use realmRoles with platform roles such as platform-admin, platform-user, or platform-viewer." $index) -}}
+  {{- end -}}
+  {{- range $roleName := get $user "realmRoles" | default list -}}
+    {{- if not (hasKey $accessModelRoleKeys (toString $roleName)) -}}
+      {{- fail (printf "global.identity.provider.keycloak.bootstrapUsers[%d].realmRoles references unknown or disabled platform role %s." $index $roleName) -}}
+    {{- end -}}
   {{- end -}}
 {{- end -}}
 
@@ -229,20 +218,11 @@
 {{- if and (default false $identity.enabled) $keycloakLocalMode (default false $ldap.enabled) -}}
 {{- fail "global.identity.directory.ldap.enabled must be false when global.identity.directory.mode=keycloakLocal." -}}
 {{- end -}}
-{{- if and (default false $identity.enabled) $keycloakLocalMode (not $selfRegistrationEnabled) -}}
-{{- fail "global.identity.provider.keycloak.registration.enabled must be true when global.identity.directory.mode=keycloakLocal." -}}
-{{- end -}}
 {{- if and (default false $identity.enabled) $keycloakLocalMode (default false $trinoIdentity.passwordAuthEnabled) (ne (default "ldap" $trinoIdentity.passwordAuthMode) "file") -}}
 {{- fail "global.identity.external.clients.trino.passwordAuthMode must be file when Trino PASSWORD auth is enabled in global.identity.directory.mode=keycloakLocal. LDAP PASSWORD auth is not allowed in that mode." -}}
 {{- end -}}
 {{- if and (default false $identity.enabled) $keycloakLocalMode (default false $ranger.enabled) (dig "usersync" "enabled" true $ranger) -}}
 {{- fail "global.authorization.ranger.usersync.enabled must be false when global.identity.directory.mode=keycloakLocal." -}}
-{{- end -}}
-{{- if and (eq $platformRoleMembershipSource "keycloak") (not $keycloakLocalMode) -}}
-{{- fail "global.authorization.platformRoleMembershipSource=keycloak requires global.identity.directory.mode=keycloakLocal." -}}
-{{- end -}}
-{{- if and (eq $platformRoleMembershipSource "keycloak") (default false $ranger.enabled) (not (dig "localUserSync" "enabled" true $ranger)) -}}
-{{- fail "global.authorization.platformRoleMembershipSource=keycloak requires global.authorization.ranger.localUserSync.enabled=true." -}}
 {{- end -}}
 {{- if and (default false (get $trinoDirectGrantIdentity "enabled")) (not (default false (get $trinoIdentity "enabled"))) -}}
 {{- fail "global.identity.external.clients.trinoDirectGrant.enabled requires global.identity.external.clients.trino.enabled=true." -}}

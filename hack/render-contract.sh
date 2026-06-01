@@ -329,6 +329,8 @@ assert_contains "${dev_manifest}" "\"roles\": ["
 assert_contains "${prod_manifest}" "\"roles\": ["
 assert_contains "${dev_manifest}" "\"user\":\"cloudbeaver-service\",\"catalog\":\"system\",\"allow\":\"all\""
 assert_contains "${dev_manifest}" "\"user\":\"superset-service\",\"catalog\":\"system\",\"allow\":\"all\""
+assert_contains "${dev_manifest}" 'driver: "${CLOUDBEAVER_DB_DRIVER:h2_embedded_v2}"'
+assert_contains "${dev_manifest}" 'url: "${CLOUDBEAVER_DB_URL:jdbc:h2:${workspace}/.data/cb.h2v2.dat}"'
 
 echo "--- Negative contract renders"
 expect_fail_any \

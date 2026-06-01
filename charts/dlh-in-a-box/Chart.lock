@@ -1,7 +1,7 @@
 dependencies:
 - name: trino
   repository: file://charts/trino
-  version: 0.34.0
+  version: 1.41.0
 - name: superset
   repository: https://apache.github.io/superset
   version: 0.15.2
@@ -53,5 +53,5 @@ dependencies:
 - name: postgresql
   repository: https://charts.bitnami.com/bitnami
   version: 14.3.3
-digest: sha256:5d41ce19cca7f6f1d229e97859ca44ebdb6c6f05cc575629d63bceccbfca064f
-generated: "2026-05-18T12:23:24.909635+01:00"
+digest: sha256:c94374a92552162b44f4490f10e29b72dbff8a70f84144cffb25dc94bdcbc710
+generated: "2026-05-28T11:04:23.3119+01:00"

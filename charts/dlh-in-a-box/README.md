@@ -249,27 +249,26 @@ things the old docs under-explained.
 | `global.identity.provider.mode=bundledKeycloak` | this chart deploys Keycloak and manages clients for supported apps |
 | `global.identity.provider.mode=externalOidc` | an external OIDC provider already exists, so the chart consumes it instead of deploying Keycloak as the source of browser login |
 
-### Axis 2: where users and groups come from
+### Axis 2: where users come from
 
 | Setting | Meaning |
 | --- | --- |
-| `global.identity.directory.mode=externalLdap` | users and groups come from LDAP or AD; this is the main shared-environment model |
-| `global.identity.directory.mode=keycloakLocal` | Keycloak manages local users directly; this is the local auth-heavy model |
+| `global.identity.directory.mode=keycloakLocal` | Keycloak manages users directly; this is the supported dev and production model for this deployment |
+| `global.identity.directory.mode=externalLdap` | legacy escape hatch for an external directory-backed environment |
 
 ### Supported combinations that matter most here
 
 | Provider mode | Directory mode | Typical use |
 | --- | --- | --- |
-| `bundledKeycloak` | `externalLdap` | default shared dev or prod pattern |
-| `bundledKeycloak` | `keycloakLocal` | local smoke or demo auth pattern |
-| `externalOidc` | `externalLdap` | escape hatch when an external IdP already exists |
+| `bundledKeycloak` | `keycloakLocal` | supported shared dev and production pattern |
+| `externalOidc` | `externalLdap` | legacy escape hatch when an external IdP already exists |
 
 Important restrictions encoded by the chart:
 
 - `platformHome` currently requires `bundledKeycloak` because it uses the
   Keycloak JavaScript adapter directly
-- local Keycloak-managed users and LDAP-backed Ranger usersync are mutually
-  exclusive
+- Keycloak-local human role membership and LDAP-backed Ranger usersync are
+  mutually exclusive
 - many browser clients require redirect URIs and web origins when bundled
   Keycloak is creating the client
 
@@ -308,9 +307,9 @@ This describes the data sources the platform should expose. It is the seed for:
 
 This is the durable role catalog the platform cares about.
 
-It defines Keycloak platform roles, app access, and deployment-owned
-group-to-role mappings. Ranger receives the same role names from Keycloak; the
-chart no longer supports `global.authorization.platformRoles`.
+It defines Keycloak platform roles and the app access derived from those roles.
+Ranger receives the same role names from Keycloak; the chart no longer supports
+`global.authorization.platformRoles` or group-to-role mappings.
 
 ### `global.authorization.platformRoleExceptions`
 
@@ -433,9 +432,9 @@ The detailed per-template explanation lives in
 | --- | --- | --- |
 | `examples/values-local.yaml` | you want the simplest manual first install | core local platform wiring without the full auth-heavy stack |
 | `make smoke-install` with `examples/values-local-auth.yaml` | you want the strongest local auth and access smoke test | bundled Keycloak, proxies, Ranger, and platform-home |
-| `examples/values-dev.yaml` | you want the shared development baseline | bundled Keycloak plus LDAP, shared browser stack, governed external S3 |
+| `examples/values-dev.yaml` | you want the shared development baseline | bundled Keycloak, shared browser stack, governed external S3 |
 | `examples/values-prod.yaml` | you want the production-shaped baseline | stricter shared browser stack and shared-environment assumptions |
-| `examples/values-shared-auth.yaml` | you already have an external OIDC provider | external IdP plus LDAP-backed shared auth pattern |
+| `examples/values-shared-auth.yaml` | you already have an external OIDC provider | legacy external IdP pattern |
 
 ## Common Change Recipes
 
