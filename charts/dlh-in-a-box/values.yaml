@@ -1513,7 +1513,12 @@ cloudbeaver:
   authProxy:
     enabled: false
     userHeader: X-Forwarded-Preferred-Username
-    groupHeader: X-Forwarded-Groups
+    # CloudBeaver treats this header as a list of existing team ids. The
+    # oauth2-proxy X-Forwarded-Groups header can contain broad Keycloak/OIDC
+    # roles such as offline_access, which breaks CloudBeaver login when those
+    # teams do not exist. Keep this dedicated header unless an upstream proxy
+    # explicitly emits CloudBeaver team ids such as platform-admin/platform-user.
+    groupHeader: X-CloudBeaver-Platform-Team
     groupDelimiter: ","
     firstNameHeader: ""
     lastNameHeader: ""
@@ -1521,6 +1526,11 @@ cloudbeaver:
   app:
     defaultUserTeam: ""
     adminTeam: ""
+    # Keep CloudBeaver's workspace runtime config aligned with Helm values.
+    # CloudBeaver gives workspace/.data/.cloudbeaver.runtime.conf precedence over
+    # cloudbeaver.conf, so auth must be enforced there as well for PVC-backed
+    # deployments.
+    enforceRuntimeConfig: true
     supportsCustomConnections: true
     showReadOnlyConnectionInfo: false
     publicCredentialsSaveEnabled: false

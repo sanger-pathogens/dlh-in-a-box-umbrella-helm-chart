@@ -1488,7 +1488,9 @@
             "showReadOnlyConnectionInfo": { "type": "boolean" },
             "publicCredentialsSaveEnabled": { "type": "boolean" },
             "adminCredentialsSaveEnabled": { "type": "boolean" },
-            "secretManagerEnabled": { "type": "boolean" }
+            "secretManagerEnabled": { "type": "boolean" },
+            "enableReverseProxyAuth": { "type": "boolean" },
+            "enforceRuntimeConfig": { "type": "boolean" }
           }
         }
       }
