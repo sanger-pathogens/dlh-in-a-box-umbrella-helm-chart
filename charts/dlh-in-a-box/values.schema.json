@@ -551,6 +551,10 @@
                     "webOrigins": {
                       "type": "array",
                       "items": { "type": "string" }
+                    },
+                    "accessTokenLifespanSeconds": {
+                      "type": "integer",
+                      "minimum": 300
                     }
                   },
                   "allOf": [

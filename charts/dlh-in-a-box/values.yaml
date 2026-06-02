@@ -139,6 +139,7 @@ global:
           clientSecretKey: jupyterhubClientSecret
           redirectUris: []
           webOrigins: []
+          accessTokenLifespanSeconds: 28800
         rangerProxy:
           enabled: false
           clientId: ""
@@ -833,6 +834,8 @@ keycloak:
             directAccessGrantsEnabled: false
             serviceAccountsEnabled: false
             secret: "$(env:KC_JUPYTERHUB_CLIENT_SECRET:change-me)"
+            attributes:
+              access.token.lifespan: {{ printf "%d" (int (default 28800 .Values.global.identity.external.clients.jupyterhub.accessTokenLifespanSeconds)) | quote }}
             redirectUris:
             {{- range .Values.global.identity.external.clients.jupyterhub.redirectUris }}
               - {{ . | quote }}
@@ -1211,6 +1214,9 @@ jupyterhub:
       JupyterHub:
         admin_access: true
         authenticator_class: generic-oauth
+      Spawner:
+        http_timeout: 180
+        start_timeout: 600
     extraEnv:
       JUPYTERHUB_BROWSER_AUTHORIZE_URL: ""
       JUPYTERHUB_INTERNAL_TOKEN_URL: ""
@@ -1322,6 +1328,7 @@ jupyterhub:
       TRINO_SCHEMA: default
       TRINO_VERIFY_TLS: "true"
       TRINO_DEMO_QUERY: SELECT * FROM redcap.default.platform_demo_enrollment LIMIT 10
+      TRINO_TOKEN_MIN_TTL_SECONDS: "1800"
     extraFiles:
       dlh-singleuser-start.sh:
         mountPath: /usr/local/bin/dlh-singleuser-start.sh
@@ -1408,9 +1415,13 @@ jupyterhub:
                 "outputs": [],
                 "source": [
                   "import os\n",
+                  "import base64\n",
+                  "import json\n",
+                  "import time\n",
                   "\n",
                   "import pandas as pd\n",
                   "import requests\n",
+                  "from trino.auth import JWTAuthentication\n",
                   "from trino.dbapi import connect\n",
                   "\n",
                   "token = os.environ.get(\"TRINO_ACCESS_TOKEN\") or os.environ.get(\"KEYCLOAK_ACCESS_TOKEN\")\n",
@@ -1422,6 +1433,7 @@ jupyterhub:
                   "schema = os.environ.get(\"TRINO_SCHEMA\", \"default\")\n",
                   "verify_tls = os.environ.get(\"TRINO_VERIFY_TLS\", \"true\").lower() not in {\"0\", \"false\", \"no\"}\n",
                   "query = os.environ.get(\"TRINO_DEMO_QUERY\", \"SELECT * FROM redcap.default.platform_demo_enrollment LIMIT 10\")\n",
+                  "min_ttl_seconds = int(os.environ.get(\"TRINO_TOKEN_MIN_TTL_SECONDS\", \"1800\"))\n",
                   "\n",
                   "if not token:\n",
                   "    raise RuntimeError(\"No Trino or Keycloak access token was found in the notebook environment.\")\n",
@@ -1430,11 +1442,15 @@ jupyterhub:
                   "if not host:\n",
                   "    raise RuntimeError(\"TRINO_HOST is not configured for this notebook server.\")\n",
                   "\n",
+                  "claims = json.loads(base64.urlsafe_b64decode(token.split(\".\")[1] + \"=\" * (-len(token.split(\".\")[1]) % 4)))\n",
+                  "ttl_seconds = int(claims.get(\"exp\", 0)) - int(time.time())\n",
+                  "if ttl_seconds < min_ttl_seconds:\n",
+                  "    raise RuntimeError(f\"The forwarded Trino token expires too soon ({ttl_seconds}s remaining). Stop and restart your Jupyter server to refresh it.\")\n",
+                  "\n",
                   "session = requests.Session()\n",
                   "session.verify = verify_tls\n",
                   "if not verify_tls:\n",
                   "    requests.packages.urllib3.disable_warnings()\n",
-                  "session.headers[\"Authorization\"] = f\"Bearer {token}\"\n",
                   "\n",
                   "conn = connect(\n",
                   "    host=host,\n",
@@ -1444,6 +1460,7 @@ jupyterhub:
                   "    catalog=catalog,\n",
                   "    schema=schema,\n",
                   "    verify=verify_tls,\n",
+                  "    auth=JWTAuthentication(token),\n",
                   "    http_session=session,\n",
                   ")\n",
                   "\n",
