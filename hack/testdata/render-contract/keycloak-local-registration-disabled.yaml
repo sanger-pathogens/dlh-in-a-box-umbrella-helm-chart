@@ -8,6 +8,8 @@ global:
       clients:
         trino:
           enabled: false
+        trinoDirectGrant:
+          enabled: false
     provider:
       keycloak:
         registration:

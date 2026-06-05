@@ -1,0 +1,108 @@
+{{- $sharedPostgresql := .Values.sharedPostgresql | default dict -}}
+{{- $provisioning := $sharedPostgresql.provisioning | default dict -}}
+{{- if and $sharedPostgresql.enabled (default true $provisioning.enabled) -}}
+{{- $auth := $sharedPostgresql.auth | default dict -}}
+{{- $image := $provisioning.image | default dict -}}
+{{- $adminSecret := $provisioning.adminSecret | default dict -}}
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ .Release.Name }}-shared-postgresql-provision
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "dlh-in-a-box.labels" . | nindent 4 }}
+    app.kubernetes.io/component: shared-postgresql-provisioner
+  annotations:
+    "helm.sh/hook": post-install,post-upgrade
+    "helm.sh/hook-weight": "5"
+    "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded
+spec:
+  backoffLimit: {{ default 6 $provisioning.backoffLimit }}
+  template:
+    metadata:
+      labels:
+        {{- include "dlh-in-a-box.labels" . | nindent 8 }}
+        app.kubernetes.io/component: shared-postgresql-provisioner
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: provision
+          image: "{{ default "docker.io" $image.registry }}/{{ default "postgres" $image.repository }}:{{ default "15" $image.tag }}"
+          imagePullPolicy: {{ default "IfNotPresent" $image.pullPolicy }}
+          command:
+            - /bin/bash
+            - -ec
+          args:
+            - |
+              set -euo pipefail
+
+              export PGHOST="${PGHOST}"
+              export PGPORT="${PGPORT}"
+              export PGUSER="${PGUSER}"
+              export PGPASSWORD="${PGPASSWORD}"
+
+              until pg_isready -h "${PGHOST}" -p "${PGPORT}" -U "${PGUSER}"; do
+                echo "Waiting for shared PostgreSQL at ${PGHOST}:${PGPORT}..."
+                sleep 2
+              done
+
+              provision_database() {
+                local app="$1"
+                local db="$2"
+                local owner="$3"
+                local password_env="$4"
+                local app_password="${!password_env}"
+                local role_exists
+                local database_exists
+
+                echo "Provisioning ${app}: database=${db}, owner=${owner}"
+
+                role_exists="$(printf '%s\n' "SELECT 1 FROM pg_roles WHERE rolname = :'owner';" | psql --dbname=postgres --tuples-only --no-align --set=owner="${owner}")"
+                if [ "${role_exists}" != "1" ]; then
+                  printf '%s\n' "CREATE ROLE :\"owner\" LOGIN PASSWORD :'app_password';" | psql --dbname=postgres --set=ON_ERROR_STOP=1 --set=owner="${owner}" --set=app_password="${app_password}"
+                else
+                  printf '%s\n' "ALTER ROLE :\"owner\" LOGIN PASSWORD :'app_password';" | psql --dbname=postgres --set=ON_ERROR_STOP=1 --set=owner="${owner}" --set=app_password="${app_password}"
+                fi
+
+                database_exists="$(printf '%s\n' "SELECT 1 FROM pg_database WHERE datname = :'db';" | psql --dbname=postgres --tuples-only --no-align --set=db="${db}")"
+                if [ "${database_exists}" != "1" ]; then
+                  printf '%s\n' "CREATE DATABASE :\"db\" OWNER :\"owner\";" | psql --dbname=postgres --set=ON_ERROR_STOP=1 --set=db="${db}" --set=owner="${owner}"
+                fi
+
+                printf '%s\n' \
+                  "ALTER DATABASE :\"db\" OWNER TO :\"owner\";" \
+                  "GRANT ALL PRIVILEGES ON DATABASE :\"db\" TO :\"owner\";" |
+                  psql --dbname=postgres --set=ON_ERROR_STOP=1 --set=db="${db}" --set=owner="${owner}"
+
+                printf '%s\n' \
+                  "GRANT ALL ON SCHEMA public TO :\"owner\";" \
+                  "ALTER SCHEMA public OWNER TO :\"owner\";" \
+                  "ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON TABLES TO :\"owner\";" \
+                  "ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON SEQUENCES TO :\"owner\";" \
+                  "ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON FUNCTIONS TO :\"owner\";" |
+                  psql --dbname="${db}" --set=ON_ERROR_STOP=1 --set=owner="${owner}"
+              }
+
+              {{- range $index, $database := default list $provisioning.databases }}
+              provision_database {{ $database.name | quote }} {{ $database.database | quote }} {{ $database.username | quote }} "APP_{{ $index }}_PASSWORD"
+              {{- end }}
+          env:
+            - name: PGHOST
+              value: {{ include "dlh-in-a-box.sharedPostgresql.serviceName" . | quote }}
+            - name: PGPORT
+              value: "5432"
+            - name: PGUSER
+              value: postgres
+            - name: PGPASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ default $auth.existingSecret $adminSecret.name | quote }}
+                  key: {{ default "postgres-password" $adminSecret.passwordKey | quote }}
+            {{- range $index, $database := default list $provisioning.databases }}
+            - name: APP_{{ $index }}_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $database.secretName | quote }}
+                  key: {{ default "password" $database.passwordKey | quote }}
+            {{- end }}
+{{- end -}}

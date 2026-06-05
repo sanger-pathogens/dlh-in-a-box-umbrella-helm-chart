@@ -30,7 +30,6 @@ global:
             superset: true
             datahub: true
       additionalRoles: {}
-      groupRoleMappings: {}
     provider:
       mode: externalOidc
       keycloak:
@@ -42,6 +41,11 @@ global:
         registration:
           enabled: false
           requireEmailVerification: true
+        adminClientRoles:
+          enabled: true
+          clientId: realm-management
+          roles:
+            - realm-admin
         configCliEnvExistingSecret: dlh-keycloak-config-cli-env
         bootstrapUsers: []
     external:
@@ -56,7 +60,6 @@ global:
           - openid
           - profile
           - email
-          - groups
         processForwardedHeaders: true
       clients:
         trino:
@@ -136,6 +139,7 @@ global:
           clientSecretKey: jupyterhubClientSecret
           redirectUris: []
           webOrigins: []
+          accessTokenLifespanSeconds: 28800
         rangerProxy:
           enabled: false
           clientId: ""
@@ -204,7 +208,7 @@ global:
           clientId: ""
           tokenAudience: prefect-api
     directory:
-      mode: externalLdap
+      mode: keycloakLocal
       ldap:
         enabled: false
         url: ""
@@ -251,6 +255,16 @@ global:
       legacyManagedGroups: []
       legacyManagedRoles: []
       legacyManagedPolicies: []
+      cleanup:
+        enabled: true
+        dryRun: false
+        staleUsers: []
+        staleUserPatterns:
+          - "^codex-"
+          - "-test-sync$"
+        staleGroups: []
+        staleRoles: []
+        stalePolicies: []
       useRangerGroups: false
       postgresql:
         enabled: true
@@ -270,6 +284,12 @@ global:
         adminPasswordKey: rangerAdminPassword
         usersyncPasswordKey: rangerUsersyncPassword
         tagsyncPasswordKey: rangerTagsyncPassword
+        passwordReconcile:
+          enabled: true
+          image:
+            repository: postgres
+            tag: "15"
+            pullPolicy: IfNotPresent
       usersync:
         enabled: true
         image:
@@ -277,7 +297,7 @@ global:
           tag: 3.12-slim
           pullPolicy: IfNotPresent
         schedule: "*/15 * * * *"
-        syncSource: LDAP
+        syncSource: KEYCLOAK_LOCAL
       localUserSync:
         enabled: true
         image:
@@ -323,6 +343,68 @@ global:
 
   # Data catalogs configuration (used to generate Hive metastores and Trino catalogs)
   dataCatalogs: {}
+
+sharedPostgresql:
+  enabled: false
+  nameOverride: shared-postgresql
+  image:
+    repository: bitnamilegacy/postgresql
+    tag: 17.6.0-debian-12-r0
+  auth:
+    enablePostgresUser: true
+    existingSecret: dlh-shared-postgresql
+    secretKeys:
+      adminPasswordKey: postgres-password
+  primary:
+    extendedConfiguration: |-
+      password_encryption = md5
+    persistence:
+      enabled: true
+      size: 100Gi
+  provisioning:
+    enabled: true
+    backoffLimit: 6
+    image:
+      registry: docker.io
+      repository: postgres
+      tag: "15"
+      pullPolicy: IfNotPresent
+    adminSecret:
+      name: dlh-shared-postgresql
+      passwordKey: postgres-password
+    databases:
+      - name: keycloak
+        database: bitnami_keycloak
+        username: bn_keycloak
+        secretName: dlh-keycloak-postgresql
+        passwordKey: password
+      - name: ranger
+        database: ranger
+        username: rangeradmin
+        secretName: dlh-ranger-postgresql
+        passwordKey: password
+      - name: hive-redcap
+        database: redcap
+        username: hive
+        secretName: dlh-hive-metastore-postgres
+        passwordKey: password
+      - name: superset
+        database: superset
+        username: superset
+        secretName: dlh-superset-runtime-env
+        passwordKey: DB_PASS
+      - name: prefect
+        database: server
+        username: prefect
+        secretName: dlh-prefect-postgresql
+        passwordKey: password
+      - name: jupyterhub
+        database: jupyterhub
+        username: jupyterhub
+        secretName: dlh-jupyterhub-postgresql
+        passwordKey: password
+  migration:
+    allowBundledPostgresql: false
 
 trino:
   enabled: true
@@ -378,7 +460,6 @@ keycloak:
           - profile
           - email
           - roles
-          - groups
           - platform-access
         clientScopes:
           - name: groups
@@ -432,18 +513,31 @@ keycloak:
           realm:
           {{- range $roleKey := keys $accessModelRoles | sortAlpha }}
             {{- $role := get $accessModelRoles $roleKey | default dict }}
+            {{- $roleClientComposites := dict }}
+            {{- range $appName, $enabled := get $role "appAccess" | default dict }}
+              {{- if and $enabled (hasKey $accessModelAppClients $appName) }}
+                {{- $_ := set $roleClientComposites (get $accessModelAppClients $appName) (list "access") }}
+              {{- end }}
+            {{- end }}
+            {{- if eq $roleKey "platform-admin" }}
+              {{- $_ := set $roleClientComposites "realm-management" (list "realm-admin") }}
+            {{- end }}
             - name: {{ $roleKey | quote }}
               {{- if get $role "description" }}
               description: {{ get $role "description" | quote }}
               {{- else }}
               description: {{ printf "Built-in platform role %s" $roleKey | quote }}
               {{- end }}
-              {{- if eq $roleKey "platform-admin" }}
+              {{- if gt (len $roleClientComposites) 0 }}
               composite: true
               composites:
                 client:
-                  realm-management:
-                    - realm-admin
+                  {{- range $clientId := keys $roleClientComposites | sortAlpha }}
+                  {{ $clientId | quote }}:
+                    {{- range $clientRole := get $roleClientComposites $clientId }}
+                    - {{ $clientRole | quote }}
+                    {{- end }}
+                  {{- end }}
               {{- end }}
           {{- end }}
           {{- if gt (len $accessModelClientRoleApps) 0 }}
@@ -457,13 +551,9 @@ keycloak:
         {{- end }}
         {{- end }}
         {{- $bootstrapUsers := default (list) .Values.global.identity.provider.keycloak.bootstrapUsers }}
-        {{- $accessModelGroupRoleMappings := get (.Values.global.identity.accessModel | default dict) "groupRoleMappings" | default dict }}
         {{- $managedGroups := fromJsonArray (include "dlh-in-a-box.identity.keycloakManagedGroupsJson" $) }}
         {{- $seededGroups := dict }}
         {{- range $groupName := $managedGroups }}
-          {{- $_ := set $seededGroups (toString $groupName) true }}
-        {{- end }}
-        {{- range $groupName, $_ := $accessModelGroupRoleMappings }}
           {{- $_ := set $seededGroups (toString $groupName) true }}
         {{- end }}
         {{- range $user := $bootstrapUsers }}
@@ -475,30 +565,6 @@ keycloak:
         groups:
         {{- range $groupName := keys $seededGroups | sortAlpha }}
           - name: {{ $groupName | quote }}
-            {{- if hasKey $accessModelGroupRoleMappings $groupName }}
-            {{- $mapping := get $accessModelGroupRoleMappings $groupName | default dict }}
-            {{- $mappedRoles := get $mapping "roles" | default list }}
-            realmRoles:
-            {{- range $roleName := $mappedRoles }}
-              - {{ $roleName | quote }}
-            {{- end }}
-            {{- $groupClientRoles := dict }}
-            {{- range $roleName := $mappedRoles }}
-              {{- $role := get $accessModelRoles (toString $roleName) | default dict }}
-              {{- range $appName, $enabled := get $role "appAccess" | default dict }}
-                {{- if and $enabled (hasKey $accessModelAppClients $appName) }}
-                  {{- $_ := set $groupClientRoles (get $accessModelAppClients $appName) true }}
-                {{- end }}
-              {{- end }}
-            {{- end }}
-            {{- if gt (len $groupClientRoles) 0 }}
-            clientRoles:
-            {{- range $clientId := keys $groupClientRoles | sortAlpha }}
-              {{ $clientId | quote }}:
-                - access
-            {{- end }}
-            {{- end }}
-            {{- end }}
         {{- end }}
         {{- end }}
         {{- if gt (len $bootstrapUsers) 0 }}
@@ -730,7 +796,6 @@ keycloak:
               - profile
               - email
               - roles
-              - groups
               - platform-access
         {{- end }}
         {{- if .Values.global.identity.external.clients.headlamp.enabled }}
@@ -756,7 +821,6 @@ keycloak:
               - profile
               - email
               - roles
-              - groups
               - platform-access
         {{- end }}
         {{- if .Values.global.identity.external.clients.jupyterhub.enabled }}
@@ -770,6 +834,8 @@ keycloak:
             directAccessGrantsEnabled: false
             serviceAccountsEnabled: false
             secret: "$(env:KC_JUPYTERHUB_CLIENT_SECRET:change-me)"
+            attributes:
+              access.token.lifespan: {{ printf "%d" (int (default 28800 .Values.global.identity.external.clients.jupyterhub.accessTokenLifespanSeconds)) | quote }}
             redirectUris:
             {{- range .Values.global.identity.external.clients.jupyterhub.redirectUris }}
               - {{ . | quote }}
@@ -819,7 +885,6 @@ keycloak:
               - profile
               - email
               - roles
-              - groups
               - platform-access
         {{- end }}
         {{- if .Values.global.identity.external.clients.rangerProxy.enabled }}
@@ -845,7 +910,6 @@ keycloak:
               - profile
               - email
               - roles
-              - groups
               - platform-access
         {{- end }}
         {{- if .Values.global.identity.external.clients.prefectProxy.enabled }}
@@ -871,7 +935,6 @@ keycloak:
               - profile
               - email
               - roles
-              - groups
               - platform-access
         {{- end }}
         {{- if .Values.global.identity.external.clients.prefectAutomation.enabled }}
@@ -889,7 +952,6 @@ keycloak:
               - profile
               - email
               - roles
-              - groups
               - platform-access
             protocolMappers:
               - name: prefect-automation-audience
@@ -915,7 +977,6 @@ keycloak:
               - profile
               - email
               - roles
-              - groups
               - platform-access
             protocolMappers:
               - name: prefect-direct-grant-audience
@@ -1153,13 +1214,17 @@ jupyterhub:
       JupyterHub:
         admin_access: true
         authenticator_class: generic-oauth
+      Spawner:
+        http_timeout: 180
+        start_timeout: 600
     extraEnv:
       JUPYTERHUB_BROWSER_AUTHORIZE_URL: ""
       JUPYTERHUB_INTERNAL_TOKEN_URL: ""
       JUPYTERHUB_INTERNAL_USERDATA_URL: ""
       JUPYTERHUB_OAUTH_CALLBACK_URL: ""
       JUPYTERHUB_CLIENT_ID: ""
-      JUPYTERHUB_CLIENT_SECRET: ""
+      JUPYTERHUB_CLIENT_SECRET:
+        value: ""
       JUPYTERHUB_ROLES_CLAIM: platform_roles
       JUPYTERHUB_ALLOWED_ROLES: ""
       JUPYTERHUB_ADMIN_ROLES: ""
@@ -1263,6 +1328,7 @@ jupyterhub:
       TRINO_SCHEMA: default
       TRINO_VERIFY_TLS: "true"
       TRINO_DEMO_QUERY: SELECT * FROM redcap.default.platform_demo_enrollment LIMIT 10
+      TRINO_TOKEN_MIN_TTL_SECONDS: "1800"
     extraFiles:
       dlh-singleuser-start.sh:
         mountPath: /usr/local/bin/dlh-singleuser-start.sh
@@ -1275,6 +1341,7 @@ jupyterhub:
           EXAMPLES_DIR="${HOME_DIR}/examples"
           NOTEBOOK_SOURCE="/etc/dlh-jupyterhub/notebooks/ICDDRB_Trino_Demo.ipynb"
           NOTEBOOK_TARGET="${EXAMPLES_DIR}/ICDDRB_Trino_Demo.ipynb"
+          NOTEBOOK_MARKER="${EXAMPLES_DIR}/.ICDDRB_Trino_Demo.ipynb.managed-sha256"
           VENV_DIR="${HOME_DIR}/.cache/dlh-trino-demo/venv"
           VERSION_MARKER="${VENV_DIR}/.trino-client-version"
           TRINO_CLIENT_VERSION="${DLH_TRINO_PYTHON_CLIENT_VERSION:-0.337.0}"
@@ -1295,8 +1362,33 @@ jupyterhub:
 
           "${VENV_DIR}/bin/python" -m ipykernel install --user --name dlh-trino-demo --display-name "Python 3 (Trino Demo)" >/dev/null 2>&1 || true
 
-          if [ -f "${NOTEBOOK_SOURCE}" ] && [ ! -f "${NOTEBOOK_TARGET}" ]; then
-            cp "${NOTEBOOK_SOURCE}" "${NOTEBOOK_TARGET}"
+          file_sha256() {
+            NOTEBOOK_HASH_PATH="$1" "${VENV_DIR}/bin/python" - <<'PY'
+          import hashlib
+          import os
+
+          digest = hashlib.sha256()
+          with open(os.environ["NOTEBOOK_HASH_PATH"], "rb") as handle:
+              for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+                  digest.update(chunk)
+          print(digest.hexdigest())
+          PY
+          }
+
+          if [ -f "${NOTEBOOK_SOURCE}" ]; then
+            NOTEBOOK_HASH="$(file_sha256 "${NOTEBOOK_SOURCE}")"
+            CURRENT_MARKER="$(cat "${NOTEBOOK_MARKER}" 2>/dev/null || true)"
+
+            if [ ! -f "${NOTEBOOK_TARGET}" ]; then
+              cp "${NOTEBOOK_SOURCE}" "${NOTEBOOK_TARGET}"
+              printf '%s' "${NOTEBOOK_HASH}" > "${NOTEBOOK_MARKER}"
+            elif [ "${CURRENT_MARKER}" != "${NOTEBOOK_HASH}" ]; then
+              if [ -z "${CURRENT_MARKER}" ] || [ "$(file_sha256 "${NOTEBOOK_TARGET}")" != "${CURRENT_MARKER}" ]; then
+                cp "${NOTEBOOK_TARGET}" "${NOTEBOOK_TARGET}.pre-managed-$(date +%Y%m%d%H%M%S).bak"
+              fi
+              cp "${NOTEBOOK_SOURCE}" "${NOTEBOOK_TARGET}"
+              printf '%s' "${NOTEBOOK_HASH}" > "${NOTEBOOK_MARKER}"
+            fi
           fi
 
           exec jupyterhub-singleuser
@@ -1323,9 +1415,13 @@ jupyterhub:
                 "outputs": [],
                 "source": [
                   "import os\n",
+                  "import base64\n",
+                  "import json\n",
+                  "import time\n",
                   "\n",
                   "import pandas as pd\n",
                   "import requests\n",
+                  "from trino.auth import JWTAuthentication\n",
                   "from trino.dbapi import connect\n",
                   "\n",
                   "token = os.environ.get(\"TRINO_ACCESS_TOKEN\") or os.environ.get(\"KEYCLOAK_ACCESS_TOKEN\")\n",
@@ -1337,6 +1433,7 @@ jupyterhub:
                   "schema = os.environ.get(\"TRINO_SCHEMA\", \"default\")\n",
                   "verify_tls = os.environ.get(\"TRINO_VERIFY_TLS\", \"true\").lower() not in {\"0\", \"false\", \"no\"}\n",
                   "query = os.environ.get(\"TRINO_DEMO_QUERY\", \"SELECT * FROM redcap.default.platform_demo_enrollment LIMIT 10\")\n",
+                  "min_ttl_seconds = int(os.environ.get(\"TRINO_TOKEN_MIN_TTL_SECONDS\", \"1800\"))\n",
                   "\n",
                   "if not token:\n",
                   "    raise RuntimeError(\"No Trino or Keycloak access token was found in the notebook environment.\")\n",
@@ -1345,8 +1442,15 @@ jupyterhub:
                   "if not host:\n",
                   "    raise RuntimeError(\"TRINO_HOST is not configured for this notebook server.\")\n",
                   "\n",
+                  "claims = json.loads(base64.urlsafe_b64decode(token.split(\".\")[1] + \"=\" * (-len(token.split(\".\")[1]) % 4)))\n",
+                  "ttl_seconds = int(claims.get(\"exp\", 0)) - int(time.time())\n",
+                  "if ttl_seconds < min_ttl_seconds:\n",
+                  "    raise RuntimeError(f\"The forwarded Trino token expires too soon ({ttl_seconds}s remaining). Stop and restart your Jupyter server to refresh it.\")\n",
+                  "\n",
                   "session = requests.Session()\n",
-                  "session.headers[\"Authorization\"] = f\"Bearer {token}\"\n",
+                  "session.verify = verify_tls\n",
+                  "if not verify_tls:\n",
+                  "    requests.packages.urllib3.disable_warnings()\n",
                   "\n",
                   "conn = connect(\n",
                   "    host=host,\n",
@@ -1356,6 +1460,7 @@ jupyterhub:
                   "    catalog=catalog,\n",
                   "    schema=schema,\n",
                   "    verify=verify_tls,\n",
+                  "    auth=JWTAuthentication(token),\n",
                   "    http_session=session,\n",
                   ")\n",
                   "\n",
@@ -1386,10 +1491,12 @@ cloudbeaver:
   enabled: false
   image:
     repository: dbeaver/cloudbeaver
-    tag: 25.2.0
+    tag: 25.2.5
     pullPolicy: IfNotPresent
   service:
     port: 8978
+  strategy:
+    type: Recreate
   workspace:
     persistence:
       enabled: false
@@ -1409,6 +1516,7 @@ cloudbeaver:
       passwordKey: shared-connection-password
       bootstrapUsernameKey: shared-bootstrap-username
       bootstrapGroupsKey: shared-bootstrap-groups
+      expectedCatalog: redcap
   trustedCa:
     existingSecret: ""
     certKey: ca.crt
@@ -1422,12 +1530,24 @@ cloudbeaver:
   authProxy:
     enabled: false
     userHeader: X-Forwarded-Preferred-Username
-    groupHeader: X-Forwarded-Groups
+    # CloudBeaver treats this header as a list of existing team ids. The
+    # oauth2-proxy X-Forwarded-Groups header can contain broad Keycloak/OIDC
+    # roles such as offline_access, which breaks CloudBeaver login when those
+    # teams do not exist. Keep this dedicated header unless an upstream proxy
+    # explicitly emits CloudBeaver team ids such as platform-admin/platform-user.
+    groupHeader: X-CloudBeaver-Platform-Team
     groupDelimiter: ","
     firstNameHeader: ""
     lastNameHeader: ""
     logoutUrl: ""
   app:
+    defaultUserTeam: ""
+    adminTeam: ""
+    # Keep CloudBeaver's workspace runtime config aligned with Helm values.
+    # CloudBeaver gives workspace/.data/.cloudbeaver.runtime.conf precedence over
+    # cloudbeaver.conf, so auth must be enforced there as well for PVC-backed
+    # deployments.
+    enforceRuntimeConfig: true
     supportsCustomConnections: true
     showReadOnlyConnectionInfo: false
     publicCredentialsSaveEnabled: false
@@ -1435,6 +1555,7 @@ cloudbeaver:
     secretManagerEnabled: false
 
 rangerPostgresql:
+  enabled: false
   nameOverride: ranger-postgresql
   image:
     repository: bitnamilegacy/postgresql
@@ -1520,6 +1641,7 @@ prefect-auth-proxy:
       allowed_roles = [{{ printf "%s:access" .Values.global.identity.external.clients.prefectProxy.clientId | quote }}]
       oidc_groups_claim = "{{ .Values.global.identity.external.oidc.groupsClaim }}"
       redirect_url = "{{ .Values.global.identity.external.clients.prefectProxy.redirectUrl }}"
+      approval_prompt = "auto"
       skip_provider_button = true
       cookie_secure = {{ hasPrefix "https://" .Values.global.identity.external.clients.prefectProxy.redirectUrl }}
       # Use a distinct oauth2-proxy cookie per app so localhost tunnel access
@@ -1565,6 +1687,7 @@ cloudbeaver-auth-proxy:
       allowed_roles = [{{ printf "%s:access" .Values.global.identity.external.clients.cloudbeaverProxy.clientId | quote }}]
       oidc_groups_claim = "{{ .Values.global.identity.external.oidc.groupsClaim }}"
       redirect_url = "{{ .Values.global.identity.external.clients.cloudbeaverProxy.redirectUrl }}"
+      approval_prompt = "auto"
       skip_provider_button = true
       cookie_secure = {{ hasPrefix "https://" .Values.global.identity.external.clients.cloudbeaverProxy.redirectUrl }}
       # Use a distinct oauth2-proxy cookie per app so localhost tunnel access
@@ -1611,6 +1734,7 @@ ranger-auth-proxy:
       allowed_roles = [{{ printf "%s:access" .Values.global.identity.external.clients.rangerProxy.clientId | quote }}]
       oidc_groups_claim = "{{ .Values.global.identity.external.oidc.groupsClaim }}"
       redirect_url = "{{ .Values.global.identity.external.clients.rangerProxy.redirectUrl }}"
+      approval_prompt = "auto"
       skip_provider_button = true
       cookie_secure = {{ hasPrefix "https://" .Values.global.identity.external.clients.rangerProxy.redirectUrl }}
       cookie_name = "_oauth2_proxy_ranger"
@@ -1785,6 +1909,7 @@ hive:
     host: ""
     port: "5432"
     username: ""
+    createDatabase: true
     # Do not commit real database passwords in tracked values files.
     password: ""
     existingSecret: ""
@@ -1811,4 +1936,5 @@ vault:
       timeoutSeconds: 5
 
 hivePostgresql:
+  enabled: false
   nameOverride: hive-postgresql

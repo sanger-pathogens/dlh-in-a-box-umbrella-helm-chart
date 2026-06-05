@@ -21,6 +21,7 @@
 {{- $sharedConnectionPasswordKey := default "shared-connection-password" $sharedConnectionSeed.passwordKey -}}
 {{- $sharedConnectionBootstrapUsernameKey := default "shared-bootstrap-username" $sharedConnectionSeed.bootstrapUsernameKey -}}
 {{- $sharedConnectionBootstrapGroupsKey := default "shared-bootstrap-groups" $sharedConnectionSeed.bootstrapGroupsKey -}}
+{{- $sharedConnectionExpectedCatalog := default "redcap" $sharedConnectionSeed.expectedCatalog -}}
 {{- $trustedCaSecret := default "" $trustedCa.existingSecret -}}
 {{- $trustedCaCertKey := default "ca.crt" $trustedCa.certKey -}}
 {{- $trustStorePath := default "/opt/cloudbeaver/trust/cloudbeaver-trino-truststore.p12" $trustedCa.trustStorePath -}}
@@ -34,25 +35,30 @@
 {{- $trustedCaInitImagePullPolicy := default "IfNotPresent" $trustedCaInitImage.pullPolicy -}}
 {{- $global := .Values.global | default dict -}}
 {{- $identity := get $global "identity" | default dict -}}
-{{- $accessModel := get $identity "accessModel" | default dict -}}
 {{- $accessModelRoles := fromJson (include "dlh-in-a-box.identity.accessModelRolesJson" .) -}}
-{{- $groupRoleMappings := get $accessModel "groupRoleMappings" | default dict -}}
-{{- $cloudbeaverGroups := list -}}
-{{- $adminGroups := list -}}
-{{- range $groupName, $mapping := $groupRoleMappings -}}
-  {{- range $roleName := get ($mapping | default dict) "roles" | default (list) -}}
-    {{- $roleName = toString $roleName -}}
-    {{- $role := get $accessModelRoles $roleName | default dict -}}
-    {{- if default false (get (get $role "appAccess" | default dict) "cloudbeaver") -}}
-      {{- $cloudbeaverGroups = uniq (append $cloudbeaverGroups (toString $groupName)) -}}
-    {{- end -}}
-    {{- if eq $roleName "platform-admin" -}}
-      {{- $adminGroups = uniq (append $adminGroups (toString $groupName)) -}}
-    {{- end -}}
+{{- $cloudbeaverRoles := list -}}
+{{- range $roleName := keys $accessModelRoles | sortAlpha -}}
+  {{- $role := get $accessModelRoles $roleName | default dict -}}
+  {{- if default false (get (get $role "appAccess" | default dict) "cloudbeaver") -}}
+    {{- $cloudbeaverRoles = uniq (append $cloudbeaverRoles (toString $roleName)) -}}
   {{- end -}}
 {{- end -}}
-{{- $defaultUserTeam := default "" (first $cloudbeaverGroups) -}}
-{{- $adminTeam := default "" (first $adminGroups) -}}
+{{- $derivedDefaultUserTeam := default "" (first $cloudbeaverRoles) -}}
+{{- $derivedAdminTeam := "platform-admin" -}}
+{{- $defaultUserTeam := default $derivedDefaultUserTeam $appConfig.defaultUserTeam -}}
+{{- $adminTeam := default $derivedAdminTeam $appConfig.adminTeam -}}
+{{- $reverseProxyAuthEnabled := default false $authProxy.enabled -}}
+{{- if hasKey $appConfig "enableReverseProxyAuth" -}}
+  {{- $reverseProxyAuthEnabled = get $appConfig "enableReverseProxyAuth" -}}
+{{- end -}}
+{{- $enforceRuntimeConfig := $reverseProxyAuthEnabled -}}
+{{- if hasKey $appConfig "enforceRuntimeConfig" -}}
+  {{- $enforceRuntimeConfig = get $appConfig "enforceRuntimeConfig" -}}
+{{- end -}}
+{{- $enabledAuthProviders := list "local" -}}
+{{- if $reverseProxyAuthEnabled -}}
+  {{- $enabledAuthProviders = list "reverseProxy" -}}
+{{- end -}}
 {{- $external := get $identity "external" | default dict -}}
 {{- $clients := get $external "clients" | default dict -}}
 {{- $cloudbeaverIdentity := get $clients "cloudbeaverProxy" | default dict -}}
@@ -129,8 +135,8 @@ data:
           }
         },
         database: {
-          driver: "${CLOUDBEAVER_DB_DRIVER:h2_embedded}",
-          url: "${CLOUDBEAVER_DB_URL:jdbc:h2:${workspace}/.data/cb.h2.dat}",
+          driver: "${CLOUDBEAVER_DB_DRIVER:h2_embedded_v2}",
+          url: "${CLOUDBEAVER_DB_URL:jdbc:h2:${workspace}/.data/cb.h2v2.dat}",
           schema: "${CLOUDBEAVER_DB_SCHEMA:''}",
           user: "${CLOUDBEAVER_DB_USER:''}",
           password: "${CLOUDBEAVER_DB_PASSWORD:''}",
@@ -152,10 +158,17 @@ data:
         publicCredentialsSaveEnabled: {{ ternary "true" "false" (default false $appConfig.publicCredentialsSaveEnabled) }},
         adminCredentialsSaveEnabled: {{ ternary "true" "false" (default false $appConfig.adminCredentialsSaveEnabled) }},
         secretManagerEnabled: {{ ternary "true" "false" $cloudbeaverSecretManagerEnabled }},
+        enableReverseProxyAuth: {{ ternary "true" "false" $reverseProxyAuthEnabled }},
+        forwardProxy: true,
+        linkExternalCredentialsWithUser: true,
         enabledAuthProviders: [
-          "reverseProxy"
+          {{- range $index, $provider := $enabledAuthProviders }}
+          {{- if $index }},{{ end }}
+          {{ $provider | quote }}
+          {{- end }}
         ],
         authConfigurations: [
+          {{- if $reverseProxyAuthEnabled }}
           {
             id: "keycloak-proxy",
             provider: "reverseProxy",
@@ -172,6 +185,48 @@ data:
               "last-name-header": {{ default "" $authProxy.lastNameHeader | quote }}
             }
           }
+          {{- end }}
+        ]
+      }
+    }
+  cloudbeaver.runtime.conf: |
+    {
+      app: {
+        anonymousAccessEnabled: false,
+        defaultUserTeam: {{ $defaultUserTeam | quote }},
+        supportsCustomConnections: {{ ternary "true" "false" $supportsCustomConnections }},
+        showReadOnlyConnectionInfo: {{ ternary "true" "false" $showReadOnlyConnectionInfo }},
+        publicCredentialsSaveEnabled: {{ ternary "true" "false" (default false $appConfig.publicCredentialsSaveEnabled) }},
+        adminCredentialsSaveEnabled: {{ ternary "true" "false" (default false $appConfig.adminCredentialsSaveEnabled) }},
+        secretManagerEnabled: {{ ternary "true" "false" $cloudbeaverSecretManagerEnabled }},
+        enableReverseProxyAuth: {{ ternary "true" "false" $reverseProxyAuthEnabled }},
+        forwardProxy: true,
+        linkExternalCredentialsWithUser: true,
+        enabledAuthProviders: [
+          {{- range $index, $provider := $enabledAuthProviders }}
+          {{- if $index }},{{ end }}
+          {{ $provider | quote }}
+          {{- end }}
+        ],
+        authConfigurations: [
+          {{- if $reverseProxyAuthEnabled }}
+          {
+            id: "keycloak-proxy",
+            provider: "reverseProxy",
+            displayName: "Keycloak",
+            disabled: false,
+            iconURL: "",
+            description: "CloudBeaver browser login is delegated to the Keycloak-backed reverse proxy.",
+            parameters: {
+              "logout-url": {{ $logoutUrl | quote }},
+              "user-header": {{ default "X-Forwarded-Preferred-Username" $authProxy.userHeader | quote }},
+              "team-header": {{ default "X-Forwarded-Groups" $authProxy.groupHeader | quote }},
+              "team-delimiter": {{ default "," $authProxy.groupDelimiter | quote }},
+              "first-name-header": {{ default "" $authProxy.firstNameHeader | quote }},
+              "last-name-header": {{ default "" $authProxy.lastNameHeader | quote }}
+            }
+          }
+          {{- end }}
         ]
       }
     }
@@ -225,6 +280,8 @@ metadata:
     app.kubernetes.io/component: cloudbeaver
 spec:
   replicas: 1
+  strategy:
+    {{- toYaml (default (dict "type" "Recreate") .Values.cloudbeaver.strategy) | nindent 4 }}
   selector:
     matchLabels:
       app.kubernetes.io/instance: {{ .Release.Name }}
@@ -246,7 +303,7 @@ spec:
       imagePullSecrets:
         {{- toYaml . | nindent 8 }}
       {{- end }}
-      {{- if or $trustedCaSecret $workspaceSeedSecret }}
+      {{- if or $trustedCaSecret $workspaceSeedSecret $enforceRuntimeConfig }}
       initContainers:
         {{- if $trustedCaSecret }}
         - name: cloudbeaver-truststore
@@ -299,6 +356,23 @@ spec:
               mountPath: /workspace
             - name: workspace-seed
               mountPath: /seed
+              readOnly: true
+        {{- end }}
+        {{- if $enforceRuntimeConfig }}
+        - name: cloudbeaver-runtime-config
+          image: docker.io/busybox:1.36
+          imagePullPolicy: IfNotPresent
+          command:
+            - /bin/sh
+            - -ec
+            - |
+              mkdir -p /workspace/.data
+              cp /config/cloudbeaver.runtime.conf /workspace/.data/.cloudbeaver.runtime.conf
+          volumeMounts:
+            - name: workspace
+              mountPath: /workspace
+            - name: cloudbeaver-config
+              mountPath: /config
               readOnly: true
         {{- end }}
       {{- end }}
@@ -357,11 +431,14 @@ spec:
                   - /bin/sh
                   - -ec
                   - |
+                    (
+                    set +e
                     if [ -z "${CB_SHARED_CONNECTION_ID:-}" ] || [ -z "${CB_SHARED_BOOTSTRAP_USERNAME:-}" ]; then
                       exit 0
                     fi
                     project_id="${CB_SHARED_CONNECTION_PROJECT_ID:-g_GlobalConfiguration}"
                     bootstrap_groups="${CB_SHARED_BOOTSTRAP_GROUPS:-{{ $adminTeam }},{{ $defaultUserTeam }}}"
+                    expected_catalog={{ $sharedConnectionExpectedCatalog | quote }}
                     for _ in $(seq 1 90); do
                       if curl -fsS "http://127.0.0.1:{{ $port }}/status" >/dev/null 2>&1; then
                         break
@@ -467,15 +544,17 @@ spec:
                           "http://127.0.0.1:{{ $port }}/api/gql" || true
                       )"
                       if printf '%s' "${access_response}" | grep -Eq '"setConnectionSubjectAccess":[[:space:]]*true' \
-                        && printf '%s' "${navigator_response}" | grep -Eq '"name":"(redcap|system)"'; then
+                        && printf '%s' "${navigator_response}" | tr -d '[:space:]' | grep -Fq "\"name\":\"${expected_catalog}\""; then
                         bootstrap_complete=1
                         break
                       fi
                       sleep 2
                     done
                     if [ "${bootstrap_complete}" != "1" ]; then
-                      echo "WARN: CloudBeaver shared Trino bootstrap did not complete during postStart; continuing startup." >&2
+                      echo "WARN: CloudBeaver shared Trino bootstrap did not confirm expected catalog '${expected_catalog}' during postStart; continuing startup." >&2
                     fi
+                    exit 0
+                    ) >/proc/1/fd/1 2>/proc/1/fd/2 &
                     exit 0
           {{- end }}
           ports:

@@ -6,17 +6,6 @@ global:
   domain: local.test
   identity:
     enabled: true
-    accessModel:
-      groupRoleMappings:
-        admins:
-          roles:
-            - platform-admin
-        data-analyst:
-          roles:
-            - platform-user
-        principal-investigator:
-          roles:
-            - platform-viewer
     provider:
       mode: bundledKeycloak
       keycloak:

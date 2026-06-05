@@ -5,6 +5,7 @@
 {{- $dbHost := default (include "dlh-in-a-box.ranger.postgresql.serviceName" .) $postgresql.host -}}
 {{- $dbName := default "ranger" $postgresql.database -}}
 {{- $dbUser := default "rangeradmin" $postgresql.username -}}
+{{- $dbAdminSecret := default $postgresql.existingSecret $postgresql.adminExistingSecret -}}
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -89,7 +90,7 @@ spec:
             - name: RANGER_DB_ADMIN_PASSWORD
               valueFrom:
                 secretKeyRef:
-                  name: {{ $postgresql.existingSecret }}
+                  name: {{ $dbAdminSecret }}
                   key: {{ default "postgres-password" $postgresql.adminPasswordKey }}
             - name: RANGER_ADMIN_PASSWORD
               valueFrom:

@@ -179,11 +179,6 @@ assert_not_contains "${local_manifest}" "platform-app-prefect"
 assert_contains "${local_manifest}" "name: platform-access"
 assert_contains "${local_manifest}" 'name: "platform-user"'
 assert_contains "${local_manifest}" 'name: "platform-viewer"'
-assert_contains "${local_manifest}" 'name: "admins"'
-assert_contains "${local_manifest}" 'name: "data-analyst"'
-assert_contains "${local_manifest}" 'name: "principal-investigator"'
-assert_contains "${local_manifest}" 'realmRoles:'
-assert_contains "${local_manifest}" 'clientRoles:'
 assert_contains "${local_manifest}" "trino-cli"
 assert_contains "${local_manifest}" "http-server.authentication.type=OAUTH2"
 assert_not_contains "${local_manifest}" "http-server.authentication.type=OAUTH2,PASSWORD"
@@ -322,13 +317,13 @@ assert_contains "${prefect_job_runner_manifest}" "\"default\": \"prefect-job-run
 assert_contains "${prefect_job_runner_manifest}" "sync-base-job-template"
 assert_contains "${prefect_job_runner_manifest}" "prefect work-pool update"
 assert_contains "${dev_manifest}" "\"accessModel\": {"
-assert_contains "${dev_manifest}" "\"data-analyst\""
-assert_contains "${dev_manifest}" "\"principal-investigator\""
 assert_contains "${prod_manifest}" "\"platform-admin\""
 assert_contains "${dev_manifest}" "\"roles\": ["
 assert_contains "${prod_manifest}" "\"roles\": ["
 assert_contains "${dev_manifest}" "\"user\":\"cloudbeaver-service\",\"catalog\":\"system\",\"allow\":\"all\""
 assert_contains "${dev_manifest}" "\"user\":\"superset-service\",\"catalog\":\"system\",\"allow\":\"all\""
+assert_contains "${dev_manifest}" 'driver: "${CLOUDBEAVER_DB_DRIVER:h2_embedded_v2}"'
+assert_contains "${dev_manifest}" 'url: "${CLOUDBEAVER_DB_URL:jdbc:h2:${workspace}/.data/cb.h2v2.dat}"'
 
 echo "--- Negative contract renders"
 expect_fail_any \
@@ -458,7 +453,7 @@ expect_fail \
   -f "${FIXTURE_DIR}/legacy-trino-authentication-type.yaml"
 
 expect_fail_any \
-  "global.authorization.platformRoles is no longer supported. Define platform roles and group mappings under global.identity.accessModel." \
+  "global.authorization.platformRoles is no longer supported. Define platform roles under global.identity.accessModel." \
   "global.authorization.platformRoles is no longer supported" \
   -- \
   -f "${DEV_VALUES}" \
@@ -472,9 +467,9 @@ expect_fail_any \
   -f "${FIXTURE_DIR}/invalid-access-model-app.yaml"
 
 expect_fail \
-  "global.identity.accessModel.groupRoleMappings.principal-investigator.roles references unknown or disabled platform role missing-role." \
+  "global.identity.accessModel.groupRoleMappings is no longer supported. Assign Keycloak realm roles directly to users; app access and Ranger roles are derived from those realm roles." \
   -f "${DEV_VALUES}" \
-  -f "${FIXTURE_DIR}/access-model-unknown-role.yaml"
+  -f "${FIXTURE_DIR}/access-model-group-role-mappings.yaml"
 
 expect_fail \
   "global.identity.accessModel.builtinRoles.platform-viewer.ranger is not supported. Keycloak role names are synced to Ranger exactly as-is." \

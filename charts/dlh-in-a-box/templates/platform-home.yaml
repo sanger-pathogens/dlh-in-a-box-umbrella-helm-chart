@@ -17,7 +17,6 @@
 {{- $identity := get $global "identity" | default dict -}}
 {{- $accessModel := get $identity "accessModel" | default dict -}}
 {{- $accessModelRoles := fromJson (include "dlh-in-a-box.identity.accessModelRolesJson" .) -}}
-{{- $groupRoleMappings := get $accessModel "groupRoleMappings" | default dict -}}
 {{- $directory := get $identity "directory" | default dict -}}
 {{- $directoryMode := include "dlh-in-a-box.identity.directoryMode" . -}}
 {{- $keycloakLocalMode := eq $directoryMode "keycloakLocal" -}}
@@ -32,14 +31,6 @@
 {{- $rangerProxyIdentity := get $clients "rangerProxy" | default dict -}}
 {{- $oidc := get $external "oidc" | default dict -}}
 {{- $rangerBrowserUrl := default (default "" (get $rangerAdmin "browserUrl")) (first (default (list) (get $rangerProxyIdentity "webOrigins"))) -}}
-{{- $roleGroupsByRole := dict -}}
-{{- range $groupName, $mapping := $groupRoleMappings -}}
-  {{- range $roleName := get ($mapping | default dict) "roles" | default (list) -}}
-    {{- $roleName = toString $roleName -}}
-    {{- $existingGroups := get $roleGroupsByRole $roleName | default (list) -}}
-    {{- $_ := set $roleGroupsByRole $roleName (uniq (append $existingGroups (toString $groupName))) -}}
-  {{- end -}}
-{{- end -}}
 {{- $adminRequiredRoles := list "platform-admin" -}}
 {{- $ldapEnabled := default false $ldap.enabled -}}
 {{- $ldapUrl := include "dlh-in-a-box.identity.directory.url" . -}}
@@ -94,7 +85,6 @@
 {{- range $roleKey := keys $accessModelRoles | sortAlpha -}}
   {{- $role := get $accessModelRoles $roleKey | default dict -}}
   {{- $roleApps := get $role "appAccess" | default dict -}}
-  {{- $directoryGroups := get $roleGroupsByRole $roleKey | default (list) -}}
   {{- if default false (get $roleApps "superset") -}}
     {{- $_ := set $appRequiredRoles "superset" (uniq (append (get $appRequiredRoles "superset") $roleKey)) -}}
   {{- end -}}
@@ -156,7 +146,7 @@
     "displayName" (default "" (get $role "label"))
     "manageable" true
     "description" (default "" (get $role "description"))
-    "directoryGroups" $directoryGroups
+    "directoryGroups" (list)
     "users" (list)
     "nestedRoles" (list)
     "apps" (dict

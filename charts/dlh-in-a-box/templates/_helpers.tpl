@@ -190,10 +190,19 @@ app.kubernetes.io/managed-by: {{ .Release.Service }}
 {{- printf "%s-cloudbeaver" .Release.Name -}}
 {{- end -}}
 
+{{- define "dlh-in-a-box.sharedPostgresql.serviceName" -}}
+{{- $sharedPostgresql := .Values.sharedPostgresql | default dict -}}
+{{- if $sharedPostgresql.fullnameOverride -}}
+{{- $sharedPostgresql.fullnameOverride -}}
+{{- else -}}
+{{- printf "%s-%s" .Release.Name (default "shared-postgresql" $sharedPostgresql.nameOverride) | trunc 63 | trimSuffix "-" -}}
+{{- end -}}
+{{- end -}}
+
 {{- define "dlh-in-a-box.identity.directoryMode" -}}
 {{- $identity := .Values.global.identity | default dict -}}
 {{- $directory := get $identity "directory" | default dict -}}
-{{- default "externalLdap" $directory.mode -}}
+{{- default "keycloakLocal" $directory.mode -}}
 {{- end -}}
 
 {{- define "dlh-in-a-box.identity.accessModelRolesJson" -}}
@@ -206,13 +215,13 @@ app.kubernetes.io/managed-by: {{ .Release.Service }}
   {{- $_ := set $roles $roleKey $role -}}
 {{- end -}}
 {{- range $roleKey, $role := get $accessModel "additionalRoles" | default dict -}}
-    {{- $roleEnabled := true -}}
-    {{- if hasKey $role "enabled" -}}
-      {{- $roleEnabled = get $role "enabled" -}}
-    {{- end -}}
-    {{- if $roleEnabled -}}
-      {{- $_ := set $roles $roleKey $role -}}
-    {{- end -}}
+  {{- $roleEnabled := true -}}
+  {{- if hasKey $role "enabled" -}}
+    {{- $roleEnabled = get $role "enabled" -}}
+  {{- end -}}
+  {{- if $roleEnabled -}}
+    {{- $_ := set $roles $roleKey $role -}}
+  {{- end -}}
 {{- end -}}
 {{- $roles | toJson -}}
 {{- end -}}

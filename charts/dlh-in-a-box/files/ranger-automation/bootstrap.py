@@ -79,7 +79,51 @@ def normalize_names(items):
     return sorted({str(item) for item in items if str(item).strip()})
 
 
-RANGER_POLICY_USER_TOKENS = {"{USER}"}
+def cleanup_config(config):
+    return ((config.get("ranger") or {}).get("cleanup") or {})
+
+
+def cleanup_enabled(config):
+    cleanup = cleanup_config(config)
+    return bool(cleanup.get("enabled", True))
+
+
+def cleanup_dry_run(config):
+    return bool(cleanup_config(config).get("dryRun", False))
+
+
+def cleanup_names(config, legacy_key, cleanup_key):
+    ranger_cfg = config.get("ranger") or {}
+    names = normalize_names(ranger_cfg.get(legacy_key, []))
+    if cleanup_enabled(config):
+        names = normalize_names(names + normalize_names(cleanup_config(config).get(cleanup_key, [])))
+    return names
+
+
+def cleanup_user_matches_patterns(config, username):
+    if not cleanup_enabled(config):
+        return False
+    username = str(username or "").strip()
+    if not username:
+        return False
+    for pattern in normalize_names(cleanup_config(config).get("staleUserPatterns", [])):
+        try:
+            if re.search(pattern, username):
+                return True
+        except re.error as exc:
+            print(f"WARNING: invalid Ranger cleanup staleUserPattern ignored: {pattern}: {exc}")
+    return False
+
+
+def cleanup_user_names(config):
+    names = set(cleanup_names(config, "legacyManagedUsers", "staleUsers"))
+    if cleanup_enabled(config):
+        names.update(
+            str(user.get("name", "")).strip()
+            for user in list_users()
+            if cleanup_user_matches_patterns(config, str(user.get("name", "")).strip())
+        )
+    return sorted(name for name in names if name)
 
 
 def role_member(name, is_admin=False):
@@ -250,7 +294,7 @@ def get_user(username):
     return None
 
 
-def build_external_user(username, first_name="", last_name="", email_address=""):
+def build_managed_user(username, first_name="", last_name="", email_address=""):
     username = str(username or "").strip()
     first_name = str(first_name or "").strip() or username
     last_name = str(last_name or "").strip() or "User"
@@ -264,7 +308,7 @@ def build_external_user(username, first_name="", last_name="", email_address="")
         "isVisible": 1,
         "userSource": 1,
         "userRoleList": ["ROLE_USER"],
-        "syncSource": "LDAP",
+        "syncSource": "KEYCLOAK_LOCAL",
     }
 
 
@@ -275,9 +319,9 @@ def ensure_users_exist(usernames):
         if str(user.get("name", "")).strip()
     }
     missing = [
-        build_external_user(username)
+        build_managed_user(username)
         for username in normalize_names(usernames)
-        if username not in existing_usernames and username not in RANGER_POLICY_USER_TOKENS
+        if username not in existing_usernames
     ]
     if not missing:
         return
@@ -400,83 +444,127 @@ def build_catalog_acl_policies(config):
     return policies
 
 
+def policy_resource_values(policy, resource_key):
+    resource = (policy.get("resources") or {}).get(resource_key)
+    if resource is None:
+        return []
+    if isinstance(resource, dict):
+        values = resource.get("values", resource.get("value", []))
+        if isinstance(values, list):
+            return normalize_names(values)
+        return normalize_names([values])
+    if isinstance(resource, list):
+        return normalize_names(resource)
+    return normalize_names([resource])
+
+
+def policy_has_resource(policy, resource_key):
+    return resource_key in (policy.get("resources") or {})
+
+
+def has_self_trinouser_policy(policies):
+    for policy in policies or []:
+        values = policy_resource_values(policy, "trinouser")
+        if "{USER}" in values:
+            return True
+    return False
+
+
 def build_trino_baseline_policies(config):
     service_name = config["ranger"]["serviceName"]
     if not config["ranger"].get("trinoEnabled", False):
         return []
-    return [
-        normalize_policy(
-            {
-                "name": "all - queryid",
-                "description": "Required Trino/Ranger baseline policy that lets each authenticated user execute their own queries.",
-                "resources": {
-                    "queryid": "*",
-                },
-                "policyItems": [
-                    {
-                        "users": ["{USER}"],
-                        "groups": [],
-                        "roles": [],
-                        "accesses": [
-                            {"type": "all", "isAllowed": True},
-                        ],
-                        "conditions": [],
-                        "delegateAdmin": False,
+    bootstrap_policies = config["ranger"].get("bootstrapPolicies", []) or []
+    has_explicit_queryid_policy = any(
+        policy_has_resource(policy, "queryid") for policy in bootstrap_policies
+    )
+    has_explicit_self_trinouser_policy = has_self_trinouser_policy(bootstrap_policies)
+    has_explicit_system_policy = any(
+        str((policy.get("resources") or {}).get("catalog")) == "system"
+        for policy in bootstrap_policies
+    )
+    policies = []
+    if not has_explicit_queryid_policy:
+        policies.append(
+            normalize_policy(
+                {
+                    "name": "all - queryid",
+                    "description": "Required Trino/Ranger baseline policy that lets each authenticated user execute their own queries.",
+                    "resources": {
+                        "queryid": "*",
                     },
-                ],
-            },
-            service_name,
-        ),
-        normalize_policy(
-            {
-                "name": "all - trinouser",
-                "description": "Required Trino/Ranger baseline policy that lets each authenticated principal become the matching Trino user.",
-                "resources": {
-                    "trinouser": "{USER}",
+                    "policyItems": [
+                        {
+                            "users": [],
+                            "groups": ["public"],
+                            "roles": [],
+                            "accesses": [
+                                {"type": "execute", "isAllowed": True},
+                            ],
+                            "conditions": [],
+                            "delegateAdmin": False,
+                        },
+                    ],
                 },
-                "policyItems": [
-                    {
-                        "users": ["{USER}"],
-                        "groups": [],
-                        "roles": [],
-                        "accesses": [
-                            {"type": "all", "isAllowed": True},
-                        ],
-                        "conditions": [],
-                        "delegateAdmin": False,
+                service_name,
+            )
+        )
+    if not has_explicit_self_trinouser_policy:
+        policies.append(
+            normalize_policy(
+                {
+                    "name": "all - trinouser",
+                    "description": "Required Trino/Ranger baseline policy that lets each authenticated principal become the matching Trino user.",
+                    "resources": {
+                        "trinouser": "{USER}",
                     },
-                ],
-            },
-            service_name,
-        ),
-        normalize_policy(
-            {
-                "name": "all - system",
-                "description": "Allow each authenticated user to read JDBC metadata in the system catalog.",
-                "resources": {
-                    "catalog": "system",
-                    "schema": "jdbc",
-                    "table": "*",
-                    "column": "*",
+                    "policyItems": [
+                        {
+                            "users": [],
+                            "groups": ["public"],
+                            "roles": [],
+                            "accesses": [
+                                {"type": "impersonate", "isAllowed": True},
+                            ],
+                            "conditions": [],
+                            "delegateAdmin": False,
+                        },
+                    ],
                 },
-                "policyItems": [
-                    {
-                        "users": ["{USER}"],
-                        "groups": [],
-                        "roles": [],
-                        "accesses": [
-                            {"type": "select", "isAllowed": True},
-                            {"type": "show", "isAllowed": True},
-                            {"type": "use", "isAllowed": True},
-                        ],
-                        "conditions": [],
-                        "delegateAdmin": False,
+                service_name,
+            )
+        )
+    if not has_explicit_system_policy:
+        policies.append(
+            normalize_policy(
+                {
+                    "name": "all - system",
+                    "description": "Allow each authenticated user to read JDBC metadata in the system catalog.",
+                    "resources": {
+                        "catalog": "system",
+                        "schema": "jdbc",
+                        "table": "*",
+                        "column": "*",
                     },
-                ],
-            },
-            service_name,
-        ),
-    ]
+                    "policyItems": [
+                        {
+                            "users": [],
+                            "groups": ["public"],
+                            "roles": [],
+                            "accesses": [
+                                {"type": "select", "isAllowed": True},
+                                {"type": "show", "isAllowed": True},
+                                {"type": "use", "isAllowed": True},
+                            ],
+                            "conditions": [],
+                            "delegateAdmin": False,
+                        },
+                    ],
+                },
+                service_name,
+            )
+        )
+    return policies
 
 
 def usernames_from_policy_items(items):
@@ -513,8 +601,11 @@ def purge_legacy_roles(config, service_name):
         for role in list_roles()
         if str(role.get("name", "")).strip()
     }
-    for stale_role_name in normalize_names(config["ranger"].get("legacyManagedRoles", [])):
+    for stale_role_name in cleanup_names(config, "legacyManagedRoles", "staleRoles"):
         if stale_role_name in existing_roles_by_name:
+            if cleanup_dry_run(config):
+                print(f"DRY RUN: would delete stale managed Ranger role: {stale_role_name}")
+                continue
             detach_role_from_policies(service_name, stale_role_name)
             delete_role(service_name, stale_role_name)
             print(f"Deleted stale managed Ranger role: {stale_role_name}")
@@ -619,8 +710,15 @@ def delete_user_by_name(username):
     print(f"Deleted stale Ranger user: {username}")
 
 
-def purge_legacy_users(config, service_name):
-    for username in normalize_names(config["ranger"].get("legacyManagedUsers", [])):
+def purge_legacy_users(config, service_name, protected_usernames=None):
+    protected_usernames = set(normalize_names(protected_usernames or []))
+    for username in cleanup_user_names(config):
+        if username in protected_usernames:
+            print(f"Skipping stale Ranger user cleanup because it is still desired: {username}")
+            continue
+        if cleanup_dry_run(config):
+            print(f"DRY RUN: would delete stale Ranger user: {username}")
+            continue
         detach_user_from_roles(service_name, username)
         detach_user_from_policies(service_name, username)
         delete_user_by_name(username)
@@ -645,7 +743,10 @@ def delete_group_by_name(group_name):
 
 
 def purge_legacy_groups(config):
-    for group_name in normalize_names(config["ranger"].get("legacyManagedGroups", [])):
+    for group_name in cleanup_names(config, "legacyManagedGroups", "staleGroups"):
+        if cleanup_dry_run(config):
+            print(f"DRY RUN: would delete stale Ranger group: {group_name}")
+            continue
         delete_group_by_name(group_name)
 
 
@@ -667,7 +768,10 @@ def delete_policy_by_name(service_name, policy_name):
 
 
 def purge_legacy_policies(config, service_name):
-    for policy_name in normalize_names(config["ranger"].get("legacyManagedPolicies", [])):
+    for policy_name in cleanup_names(config, "legacyManagedPolicies", "stalePolicies"):
+        if cleanup_dry_run(config):
+            print(f"DRY RUN: would delete stale Ranger policy: {policy_name}")
+            continue
         delete_policy_by_name(service_name, policy_name)
 
 
@@ -740,8 +844,9 @@ def main():
     for raw_policy in config["ranger"].get("bootstrapPolicies", []):
         policies.append(normalize_policy(raw_policy, service_name))
 
-    ensure_users_exist(policy_principal_usernames(config, policies))
-    purge_legacy_users(config, service_name)
+    desired_policy_usernames = policy_principal_usernames(config, policies)
+    ensure_users_exist(desired_policy_usernames)
+    purge_legacy_users(config, service_name, desired_policy_usernames)
     purge_legacy_groups(config)
     purge_legacy_policies(config, service_name)
 

@@ -137,9 +137,24 @@ def keycloak_list(config, token, path):
 def should_sync_user(username, email, enabled):
     if not enabled:
         return False
-    if username in {"admin", "trino-admin"}:
+    if username in {
+        "admin",
+        "keyadmin",
+        "trino",
+        "trino-admin",
+        "cloudbeaver-service",
+        "superset-service",
+        "service-account-prefect-automation",
+        "{OWNER}",
+        "{USER}",
+    }:
         return False
-    if username.startswith("codex-smoke-") or username.endswith("-service"):
+    if (
+        username.startswith("codex-")
+        or username.startswith("service-account-")
+        or username.endswith("-service")
+        or username.endswith("-test-sync")
+    ):
         return False
     if email.endswith(".example.invalid"):
         return False
@@ -248,11 +263,6 @@ def access_model_role_names(config):
     return normalize_names(role_names)
 
 
-def configured_group_names(config):
-    access_model = config.get("accessModel") or {}
-    return normalize_names((access_model.get("groupRoleMappings") or {}).keys())
-
-
 def list_ranger_users():
     users = []
     start_index = 0
@@ -272,27 +282,6 @@ def list_ranger_users():
             break
         start_index += len(batch)
     return users
-
-
-def list_ranger_groups():
-    groups = []
-    start_index = 0
-    page_size = 200
-    while True:
-        payload = ranger_request(
-            "GET",
-            f"/service/xusers/groups?startIndex={start_index}&pageSize={page_size}",
-            ok=(200,),
-        ) or {}
-        batch = payload.get("vXGroups", []) or []
-        if not batch:
-            break
-        groups.extend(batch)
-        total_count = int(payload.get("totalCount", len(groups)) or len(groups))
-        if len(groups) >= total_count:
-            break
-        start_index += len(batch)
-    return groups
 
 
 def list_roles():
@@ -349,27 +338,6 @@ def upsert_role(role, create_missing_principals):
         ranger_request("POST", role_create_path(create_missing_principals), payload, ok=(200, 201))
 
 
-def keycloak_group_by_name(config, token, group_name):
-    realm = config["identity"]["keycloak"]["realm"]
-    groups = keycloak_request(
-        config,
-        token,
-        "GET",
-        f"/admin/realms/{realm}/groups?search={urllib.parse.quote(group_name)}&max=1000",
-        ok=(200,),
-    ) or []
-
-    def walk(items):
-        for item in items or []:
-            yield item
-            yield from walk(item.get("subGroups") or [])
-
-    for group in walk(groups):
-        if str(group.get("name", "")).strip() == group_name:
-            return group
-    return None
-
-
 def keycloak_role_exists(config, token, role_name):
     realm = config["identity"]["keycloak"]["realm"]
     encoded = urllib.parse.quote(role_name, safe="")
@@ -383,42 +351,16 @@ def keycloak_role_exists(config, token, role_name):
     return isinstance(payload, dict) and str(payload.get("name") or "").strip() == role_name
 
 
-def keycloak_role_users(config, token, role_name):
+def keycloak_user_realm_role_names(config, token, user_id):
     realm = config["identity"]["keycloak"]["realm"]
-    encoded = urllib.parse.quote(role_name, safe="")
-    users = keycloak_list(config, token, f"/admin/realms/{realm}/roles/{encoded}/users")
-    result = []
-    for user in users:
-        username = str(user.get("username") or "").strip()
-        email = str(user.get("email") or "").strip()
-        enabled = bool(user.get("enabled", True))
-        if username and should_sync_user(username, email, enabled):
-            result.append(username)
-    return normalize_names(result)
-
-
-def keycloak_role_groups(config, token, role_name):
-    realm = config["identity"]["keycloak"]["realm"]
-    encoded = urllib.parse.quote(role_name, safe="")
-    groups = keycloak_list(config, token, f"/admin/realms/{realm}/roles/{encoded}/groups")
-    result = []
-    for group in groups:
-        name = str(group.get("name") or "").strip()
-        group_id = str(group.get("id") or "").strip()
-        if name:
-            result.append({"name": name, "id": group_id})
-    return result
-
-
-def keycloak_group_members(config, token, group_id, eligible_users):
-    realm = config["identity"]["keycloak"]["realm"]
-    members = keycloak_list(config, token, f"/admin/realms/{realm}/groups/{group_id}/members")
-    result = []
-    for user in members:
-        username = str(user.get("username") or "").strip()
-        if username and username in eligible_users:
-            result.append(username)
-    return normalize_names(result)
+    roles = keycloak_request(
+        config,
+        token,
+        "GET",
+        f"/admin/realms/{realm}/users/{user_id}/role-mappings/realm",
+        ok=(200,),
+    ) or []
+    return normalize_names(role.get("name") for role in roles)
 
 
 def keycloak_users(config, token):
@@ -427,22 +369,31 @@ def keycloak_users(config, token):
 
 
 def keycloak_role_memberships(config, token, role_names):
+    role_names = normalize_names(role_names)
     memberships = {}
-    groups_by_name = {}
     for role_name in role_names:
         if not keycloak_role_exists(config, token, role_name):
             print(f"WARNING: Keycloak realm role {role_name} does not exist; skipping Ranger role sync.")
             continue
-        role_groups = keycloak_role_groups(config, token, role_name)
-        groups = normalize_names(group["name"] for group in role_groups)
-        for group in role_groups:
-            if group.get("id"):
-                groups_by_name[group["name"]] = group
-        memberships[role_name] = {
-            "users": keycloak_role_users(config, token, role_name),
-            "groups": groups,
-        }
-    return memberships, groups_by_name
+        memberships[role_name] = {"users": [], "groups": []}
+
+    if not memberships:
+        return memberships
+
+    for user in keycloak_users(config, token):
+        username = str(user.get("username") or "").strip()
+        email = str(user.get("email") or "").strip()
+        enabled = bool(user.get("enabled", True))
+        user_id = str(user.get("id") or "").strip()
+        if not username or not user_id or not should_sync_user(username, email, enabled):
+            continue
+        direct_roles = set(keycloak_user_realm_role_names(config, token, user_id))
+        for role_name in sorted(set(memberships) & direct_roles):
+            memberships[role_name]["users"].append(username)
+
+    for role_name in memberships:
+        memberships[role_name]["users"] = normalize_names(memberships[role_name]["users"])
+    return memberships
 
 
 def sync_ranger_users(users):
@@ -464,55 +415,7 @@ def sync_ranger_users(users):
     return len(missing)
 
 
-def sync_ranger_groups(group_members):
-    if not group_members:
-        return 0
-    existing_names = {
-        str(group.get("name") or "").strip()
-        for group in list_ranger_groups()
-        if str(group.get("name") or "").strip()
-    }
-    missing_names = sorted(set(group_members) - existing_names)
-    if not missing_names:
-        return 0
-    ranger_request(
-        "POST",
-        "/service/xusers/ugsync/groups",
-        {
-            "vXGroups": [
-                {
-                    "name": group_name,
-                    "description": "Synced from Keycloak",
-                    "isVisible": 1,
-                    "groupSource": 1,
-                    "syncSource": "KEYCLOAK_LOCAL",
-                }
-                for group_name in missing_names
-            ]
-        },
-        ok=(200, 201),
-    )
-    return len(missing_names)
-
-
-def sync_ranger_group_memberships(group_members):
-    if not group_members:
-        return 0
-    current = ranger_request("GET", "/service/xusers/ugsync/groupusers", ok=(200,)) or {}
-    deltas = []
-    for group_name, desired_members in group_members.items():
-        current_members = set(current.get(group_name, []))
-        desired_members = set(desired_members)
-        add_users = sorted(desired_members - current_members)
-        del_users = sorted(current_members - desired_members)
-        if add_users or del_users:
-            deltas.append({"groupName": group_name, "addUsers": add_users, "delUsers": del_users})
-    if deltas:
-        ranger_request("POST", "/service/xusers/ugsync/groupusers", deltas, ok=(200, 201))
-    return len(deltas)
-
-
-def sync_local_principals(config, token, role_group_index):
+def sync_local_principals(config, token):
     users = {}
     normalized_count = 0
     logged_out_count = 0
@@ -536,26 +439,8 @@ def sync_local_principals(config, token, role_group_index):
             email,
         )
 
-    group_index = dict(role_group_index)
-    for group_name in configured_group_names(config):
-        if group_name in group_index:
-            continue
-        group = keycloak_group_by_name(config, token, group_name)
-        if group and group.get("id"):
-            group_index[group_name] = {"name": group_name, "id": str(group["id"])}
-        else:
-            print(f"WARNING: configured Keycloak group {group_name} does not exist; skipping Ranger group sync.")
-
-    group_members = {}
-    for group_name, group in sorted(group_index.items()):
-        group_id = str(group.get("id") or "").strip()
-        if group_id:
-            group_members[group_name] = keycloak_group_members(config, token, group_id, users)
-
     synced_users = sync_ranger_users(users)
-    synced_groups = sync_ranger_groups(group_members)
-    group_deltas = sync_ranger_group_memberships(group_members)
-    return synced_users, synced_groups, group_deltas, normalized_count, logged_out_count
+    return synced_users, normalized_count, logged_out_count
 
 
 def sync_ranger_roles(memberships, create_missing_principals):
@@ -585,28 +470,24 @@ def sync():
 
     wait_for_ranger()
     token = keycloak_token(config)
-    memberships, role_group_index = keycloak_role_memberships(config, token, role_names)
+    memberships = keycloak_role_memberships(config, token, role_names)
     local_mode = config["identity"].get("directoryMode") == "keycloakLocal"
 
     synced_users = 0
-    synced_groups = 0
-    group_deltas = 0
     normalized_count = 0
     logged_out_count = 0
     if local_mode:
         (
             synced_users,
-            synced_groups,
-            group_deltas,
             normalized_count,
             logged_out_count,
-        ) = sync_local_principals(config, token, role_group_index)
+        ) = sync_local_principals(config, token)
 
     synced_roles = sync_ranger_roles(memberships, create_missing_principals=local_mode)
     print(
         "Synced Keycloak realm roles to Ranger "
-        f"({synced_roles} roles, local principals: {synced_users} users, {synced_groups} groups, "
-        f"{group_deltas} group membership deltas, {normalized_count} Keycloak accounts normalized, "
+        f"({synced_roles} roles, local principals: {synced_users} users, "
+        f"{normalized_count} Keycloak accounts normalized, "
         f"{logged_out_count} stale Keycloak sessions cleared)."
     )
 

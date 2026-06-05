@@ -16,29 +16,6 @@ global:
           description: Approved read-only users for the geospatial catalog.
         geospatial-writer:
           description: Approved read-write users for the geospatial catalog.
-      groupRoleMappings:
-        dlh_team:
-          roles:
-            - bronze-reader
-            - silver-reader
-            - geospatial-reader
-        surveillance_dashboard:
-          roles:
-            - bronze-reader
-            - silver-reader
-            - geospatial-reader
-        datahub:
-          roles:
-            - bronze-reader
-        platform-data-bronze-rw:
-          roles:
-            - bronze-writer
-        platform-data-silver-rw:
-          roles:
-            - silver-writer
-        platform-data-geospatial-rw:
-          roles:
-            - geospatial-writer
   authorization:
     platformRoleExceptions: []
     ranger:
