@@ -29,9 +29,9 @@ The icddr,b deployment groups are:
 2. `data-analyst`
 3. `principal-investigator`
 
-Initial group-to-role mapping:
+Initial role intent:
 
-| Keycloak group | Keycloak realm role | Ranger role | Browser app access |
+| Source cohort | Keycloak realm role | Ranger role | Browser app access |
 | --- | --- | --- | --- |
 | `admins` | `platform-admin` | `platform-admin` | all enabled platform components |
 | `data-analyst` | `platform-user` | `platform-user` | Superset, DataHub, JupyterHub, CloudBeaver |
@@ -79,16 +79,6 @@ global:
             superset: true
             datahub: true
       additionalRoles: {}
-      groupRoleMappings:
-        admins:
-          roles:
-            - platform-admin
-        data-analyst:
-          roles:
-            - platform-user
-        principal-investigator:
-          roles:
-            - platform-viewer
 ```
 
 Role names are synchronized from Keycloak to Ranger exactly as-is.
@@ -105,6 +95,9 @@ The old `global.authorization.platformRoleMembershipSource` switch is not part o
 Keycloak is the only supported routine source for platform role definitions and platform role membership.
 There is no `git` fallback and no Ranger-as-source mode.
 
+The old `global.identity.accessModel.groupRoleMappings` key is not part of the target contract.
+Assign Keycloak realm roles directly to users, service accounts, or Keycloak-managed groups outside the chart.
+
 `global.authorization` remains only for Ranger runtime, policy, exception, and service configuration that is not a platform-role source of truth.
 A future cleanup may move remaining Ranger-specific keys under a clearer namespace, but that is outside this iteration.
 
@@ -120,7 +113,7 @@ In LDAP mode:
 - Keycloak federates users and groups from LDAP.
 - Ranger Usersync reads users and groups from the same LDAP server.
 - Keycloak owns platform roles and role membership.
-- Keycloak group-to-role mappings can be rendered for LDAP-backed group names as they appear in Keycloak.
+- Operators manage any LDAP-backed group-to-role assignments in Keycloak, outside chart values.
 - The Keycloak-to-Ranger role sync reads Keycloak role membership and updates Ranger roles through Ranger APIs.
 - The role sync must not create duplicate Ranger users or groups already supplied by Ranger Usersync.
 
@@ -158,8 +151,8 @@ Its admin API authorizes administrators through roles, defaulting to `platform-a
 
 ## Bootstrap Users and Service Accounts
 
-Human bootstrap users should join the access model through groups.
-For the icddr,b dev bootstrap path, `icddrb-admin` should be assigned to the `admins` group, and the `admins` group should receive `platform-admin` through `groupRoleMappings`.
+Human bootstrap users should join the access model through `realmRoles`.
+For the icddr,b dev bootstrap path, `icddrb-admin` should receive the `platform-admin` realm role directly.
 
 Service accounts should not depend on the removed `global.authorization.platformRoles` model.
 They should receive only the roles they need through the component-specific provisioning path that creates or synchronizes that service account.
@@ -198,15 +191,14 @@ The chart currently has:
 
 - `global.identity.accessModel.builtinRoles`
 - `global.identity.accessModel.additionalRoles`
-- `global.identity.accessModel.groupRoleMappings`
 - exact Keycloak role-name synchronization to Ranger
 - no `ranger.roleName` override
 - validation that rejects `global.authorization.platformRoles`
 - validation that rejects `global.authorization.platformRoleMembershipSource`
+- validation that rejects `global.identity.accessModel.groupRoleMappings`
 - validation that rejects `global.identity.external.clients.*.allowedGroups`
 - validation that rejects Platform Home launcher `requiredGroups`
 - Keycloak realm role rendering from the access model
-- Keycloak group-to-role mapping from the access model
 - Keycloak client role rendering for app access
 - `platform_roles` as the default roles claim
 - oauth2-proxy clients using `provider = "keycloak-oidc"` and `allowed_roles`
@@ -221,9 +213,9 @@ The chart currently has:
 
 The infra overlays currently have:
 
-- access-model mappings for `admins`, `data-analyst`, and `principal-investigator`
+- role catalogs for `platform-admin`, `platform-user`, and `platform-viewer`
 - policy references migrated to `platform-admin`, `platform-user`, and `platform-viewer`
-- the bootstrap admin script assigning `icddrb-admin` to `admins`
+- bootstrap admin assignment through direct realm roles
 - Prefect automation service-account sync granting `prefect:access`
 - render checks updated for the role-based contract
 - Superset role mappings changed from deployment groups to platform roles
@@ -251,7 +243,7 @@ Update infra documentation and examples so operators see the new process:
 
 - in LDAP mode, create users and manage source group membership in LDAP
 - in Keycloak-local mode, create users and manage source group membership in Keycloak
-- manage platform role membership in Keycloak, usually through group-to-role mappings
+- manage platform role membership in Keycloak
 - inspect projected Ranger roles in Ranger
 - manage Ranger policies in Ranger
 - do not manage routine platform role membership in Ranger

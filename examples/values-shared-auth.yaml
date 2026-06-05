@@ -6,17 +6,6 @@ global:
   domain: shared.example.org
   identity:
     enabled: true
-    accessModel:
-      groupRoleMappings:
-        admins:
-          roles:
-            - platform-admin
-        platform-data-default-ro:
-          roles:
-            - platform-viewer
-        platform-data-default-rw:
-          roles:
-            - platform-user
     provider:
       mode: externalOidc
     external:

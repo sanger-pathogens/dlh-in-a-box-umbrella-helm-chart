@@ -2,6 +2,6 @@ global:
   identity:
     accessModel:
       groupRoleMappings:
-        principal-investigator:
+        admins:
           roles:
-            - missing-role
+            - platform-admin

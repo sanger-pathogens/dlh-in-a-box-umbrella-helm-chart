@@ -56,6 +56,7 @@
 {{- $keycloakValues := .Values.keycloak | default dict -}}
 {{- $keycloakConfigCli := get $keycloakValues "keycloakConfigCli" | default dict -}}
 {{- $keycloakProvider := get $provider "keycloak" | default dict -}}
+{{- $keycloakRegistration := get $keycloakProvider "registration" | default dict -}}
 {{- $configCliEnvSecretName := default "" $keycloakProvider.configCliEnvExistingSecret -}}
 {{- $bootstrapUsers := default (list) $keycloakProvider.bootstrapUsers -}}
 {{- $bootstrapUsersEnabled := gt (len $bootstrapUsers) 0 -}}
@@ -217,6 +218,9 @@
 {{- end -}}
 {{- if and (default false $identity.enabled) $keycloakLocalMode (default false $ldap.enabled) -}}
 {{- fail "global.identity.directory.ldap.enabled must be false when global.identity.directory.mode=keycloakLocal." -}}
+{{- end -}}
+{{- if and (default false $identity.enabled) $keycloakLocalMode (not (default false (get $keycloakRegistration "enabled"))) -}}
+{{- fail "global.identity.provider.keycloak.registration.enabled must be true when global.identity.directory.mode=keycloakLocal." -}}
 {{- end -}}
 {{- if and (default false $identity.enabled) $keycloakLocalMode (default false $trinoIdentity.passwordAuthEnabled) (ne (default "ldap" $trinoIdentity.passwordAuthMode) "file") -}}
 {{- fail "global.identity.external.clients.trino.passwordAuthMode must be file when Trino PASSWORD auth is enabled in global.identity.directory.mode=keycloakLocal. LDAP PASSWORD auth is not allowed in that mode." -}}
