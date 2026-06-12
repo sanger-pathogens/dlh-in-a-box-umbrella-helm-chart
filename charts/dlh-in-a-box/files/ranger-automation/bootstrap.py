@@ -220,6 +220,10 @@ def role_update_path(role_id):
     return f"/service/public/v2/api/roles/{role_id}?createNonExistUserGroup=true"
 
 
+def role_create_path():
+    return "/service/public/v2/api/roles?createNonExistUserGroup=true"
+
+
 def list_roles():
     roles = []
     start_index = 0
@@ -348,6 +352,64 @@ def delete_role(service_name, role_name):
         return
     path = "/service/public/v2/api/roles/" + urllib.parse.quote(str(existing["id"]), safe="")
     request("DELETE", path, ok=(204, 404))
+
+
+def upsert_role(role):
+    payload = {
+        "name": role["name"],
+        "description": role.get("description", ""),
+        "isEnabled": bool(role.get("isEnabled", True)),
+        "users": normalize_role_members(role.get("users", [])),
+        "groups": normalize_role_members(role.get("groups", [])),
+        "roles": normalize_role_members(role.get("roles", [])),
+    }
+    existing = get_role(None, role["name"])
+    if existing:
+        payload["id"] = existing["id"]
+        payload["guid"] = existing.get("guid")
+        payload["version"] = existing.get("version")
+        payload["createdByUser"] = existing.get("createdByUser")
+        request("PUT", role_update_path(existing["id"]), payload, ok=(200,))
+    else:
+        request("POST", role_create_path(), payload, ok=(200, 201))
+
+
+def data_role_usernames(config):
+    usernames = set()
+    for role in ((config.get("ranger") or {}).get("dataRoles") or {}).values():
+        if not isinstance(role, dict) or role.get("enabled") is False:
+            continue
+        usernames.update(normalize_names(role.get("users", [])))
+        usernames.update(normalize_names(role.get("adminUsers", [])))
+    return usernames
+
+
+def reconcile_data_roles(config):
+    data_roles = (config.get("ranger") or {}).get("dataRoles") or {}
+    for role_name in sorted(data_roles):
+        role_config = data_roles.get(role_name) or {}
+        if not isinstance(role_config, dict) or role_config.get("enabled") is False:
+            continue
+        users = [
+            role_member(username, False)
+            for username in normalize_names(role_config.get("users", []))
+        ]
+        admin_users = [
+            role_member(username, True)
+            for username in normalize_names(role_config.get("adminUsers", []))
+        ]
+        upsert_role(
+            {
+                "name": role_name,
+                "description": role_config.get("description")
+                or f"Data access role managed by Ranger bootstrap: {role_name}.",
+                "isEnabled": True,
+                "users": users + admin_users,
+                "groups": [],
+                "roles": [],
+            }
+        )
+        print(f"Reconciled Ranger data role: {role_name}")
 
 
 def policy_path(policy_id):
@@ -813,6 +875,14 @@ def upsert_policy(service_name, policy):
             if not match:
                 raise
             existing_name = match.group(1).strip()
+            if existing_name != name:
+                raise RuntimeError(
+                    "Ranger refused to create policy "
+                    + repr(name)
+                    + " because its resource set collides with existing policy "
+                    + repr(existing_name)
+                    + ". Merge the principals into one policy item set or make the resources distinct."
+                )
             existing_path = (
                 "/service/public/v2/api/service/"
                 + urllib.parse.quote(service_name, safe="")
@@ -837,6 +907,7 @@ def main():
     service_name = config["ranger"]["serviceName"]
     upsert_service(config)
     purge_legacy_roles(config, service_name)
+    reconcile_data_roles(config)
 
     policies = []
     policies.extend(build_trino_baseline_policies(config))

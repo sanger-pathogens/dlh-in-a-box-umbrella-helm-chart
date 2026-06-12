@@ -80,7 +80,7 @@
 {{- fail "global.authorization.platformRoles is no longer supported. Define platform roles under global.identity.accessModel." -}}
 {{- end -}}
 {{- if hasKey $accessModel "groupRoleMappings" -}}
-{{- fail "global.identity.accessModel.groupRoleMappings is no longer supported. Assign Keycloak realm roles directly to users; app access and Ranger roles are derived from those realm roles." -}}
+{{- fail "global.identity.accessModel.groupRoleMappings is no longer supported. Assign Keycloak realm roles directly to users for app access, and define data access roles under global.authorization.ranger.dataRoles." -}}
 {{- end -}}
 {{- if hasKey $datahubAuth "groupProvisioning" -}}
 {{- fail "datahub.auth.groupProvisioning is no longer supported. DataHub browser access must not depend on OIDC group claims; use global.identity.accessModel roles and client roles." -}}
@@ -104,25 +104,23 @@
     {{- if not (hasKey $builtinRoles $roleKey) -}}
       {{- fail (printf "global.identity.accessModel.builtinRoles.%s is required." $roleKey) -}}
     {{- end -}}
-    {{- $role := get $builtinRoles $roleKey | default dict -}}
+  {{- end -}}
+  {{- range $roleKey, $role := $builtinRoles -}}
     {{- $roleEnabled := true -}}
     {{- if hasKey $role "enabled" -}}
       {{- $roleEnabled = get $role "enabled" -}}
     {{- end -}}
-    {{- if not $roleEnabled -}}
-      {{- fail (printf "global.identity.accessModel.builtinRoles.%s.enabled must be true." $roleKey) -}}
+    {{- if $roleEnabled -}}
+      {{- $_ := set $accessModelRoleKeys $roleKey true -}}
     {{- end -}}
-  {{- end -}}
-  {{- range $roleKey, $role := $builtinRoles -}}
-    {{- $_ := set $accessModelRoleKeys $roleKey true -}}
     {{- if hasKey $role "ranger" -}}
-      {{- fail (printf "global.identity.accessModel.builtinRoles.%s.ranger is not supported. Keycloak role names are synced to Ranger exactly as-is." $roleKey) -}}
+      {{- fail (printf "global.identity.accessModel.builtinRoles.%s.ranger is not supported. Keycloak roles control app access only; define Ranger data roles under global.authorization.ranger.dataRoles." $roleKey) -}}
     {{- end -}}
     {{- range $appName, $_ := get $role "appAccess" | default dict -}}
       {{- if not (has $appName $supportedAccessModelApps) -}}
         {{- fail (printf "global.identity.accessModel.builtinRoles.%s.appAccess.%s is not supported. Allowed app access keys are superset, datahub, trinoUi, jupyterhub, cloudbeaver, prefect, and ranger." $roleKey $appName) -}}
       {{- end -}}
-      {{- if $_ -}}
+      {{- if and $roleEnabled $_ -}}
         {{- $_ := set $accessModelAppAccess $appName true -}}
       {{- end -}}
     {{- end -}}
@@ -132,7 +130,7 @@
       {{- fail (printf "global.identity.accessModel.additionalRoles.%s conflicts with a chart-owned builtin role. Override builtin role metadata under global.identity.accessModel.builtinRoles.%s." $roleKey $roleKey) -}}
     {{- end -}}
     {{- if hasKey $role "ranger" -}}
-      {{- fail (printf "global.identity.accessModel.additionalRoles.%s.ranger is not supported. Keycloak role names are synced to Ranger exactly as-is." $roleKey) -}}
+      {{- fail (printf "global.identity.accessModel.additionalRoles.%s.ranger is not supported. Keycloak roles control app access only; define Ranger data roles under global.authorization.ranger.dataRoles." $roleKey) -}}
     {{- end -}}
     {{- $roleEnabled := true -}}
     {{- if hasKey $role "enabled" -}}
@@ -180,7 +178,7 @@
     {{- fail (printf "global.identity.provider.keycloak.bootstrapUsers[%d].passwordEnvVar is required." $index) -}}
   {{- end -}}
   {{- if hasKey $user "groups" -}}
-    {{- fail (printf "global.identity.provider.keycloak.bootstrapUsers[%d].groups is no longer supported. Use realmRoles with platform roles such as platform-admin, platform-user, or platform-viewer." $index) -}}
+    {{- fail (printf "global.identity.provider.keycloak.bootstrapUsers[%d].groups is no longer supported. Use realmRoles with enabled Keycloak app roles such as platform-admin or platform-user-scientist." $index) -}}
   {{- end -}}
   {{- range $roleName := get $user "realmRoles" | default list -}}
     {{- if not (hasKey $accessModelRoleKeys (toString $roleName)) -}}

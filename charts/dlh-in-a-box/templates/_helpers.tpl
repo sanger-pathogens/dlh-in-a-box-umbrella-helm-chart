@@ -212,7 +212,13 @@ app.kubernetes.io/managed-by: {{ .Release.Service }}
 {{- $builtinRoles := get $accessModel "builtinRoles" | default dict -}}
 {{- range $roleKey := list "platform-admin" "platform-user" "platform-viewer" -}}
   {{- $role := get $builtinRoles $roleKey | default dict -}}
-  {{- $_ := set $roles $roleKey $role -}}
+  {{- $roleEnabled := true -}}
+  {{- if hasKey $role "enabled" -}}
+    {{- $roleEnabled = get $role "enabled" -}}
+  {{- end -}}
+  {{- if $roleEnabled -}}
+    {{- $_ := set $roles $roleKey $role -}}
+  {{- end -}}
 {{- end -}}
 {{- range $roleKey, $role := get $accessModel "additionalRoles" | default dict -}}
   {{- $roleEnabled := true -}}

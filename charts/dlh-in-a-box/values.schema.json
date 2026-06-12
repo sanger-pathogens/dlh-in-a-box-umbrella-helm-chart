@@ -869,6 +869,26 @@
               "type": "array",
               "items": { "type": "string" }
             },
+            "dataRoles": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "object",
+                "additionalProperties": true,
+                "properties": {
+                  "enabled": { "type": "boolean" },
+                  "description": { "type": "string" },
+                  "users": {
+                    "type": "array",
+                    "items": { "type": "string" }
+                  },
+                  "adminUsers": {
+                    "type": "array",
+                    "items": { "type": "string" }
+                  }
+                }
+              }
+            },
+            "syncAccessModelRoles": { "type": "boolean" },
             "cleanup": {
               "type": "object",
               "additionalProperties": true,
