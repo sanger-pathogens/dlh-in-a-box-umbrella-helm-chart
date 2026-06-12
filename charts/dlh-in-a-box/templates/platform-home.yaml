@@ -81,6 +81,7 @@
   "jupyterhub" (list)
   "cloudbeaver" (list)
   "prefect" (list)
+  "trinoUi" (list)
 -}}
 {{- range $roleKey := keys $accessModelRoles | sortAlpha -}}
   {{- $role := get $accessModelRoles $roleKey | default dict -}}
@@ -99,6 +100,9 @@
   {{- end -}}
   {{- if default false (get $roleApps "prefect") -}}
     {{- $_ := set $appRequiredRoles "prefect" (uniq (append (get $appRequiredRoles "prefect") $roleKey)) -}}
+  {{- end -}}
+  {{- if default false (get $roleApps "trinoUi") -}}
+    {{- $_ := set $appRequiredRoles "trinoUi" (uniq (append (get $appRequiredRoles "trinoUi") $roleKey)) -}}
   {{- end -}}
   {{- $declaredExceptions := list -}}
   {{- range $exception := $platformRoleExceptions -}}
@@ -225,6 +229,7 @@
     "iconBackground" (default "" (get $toolMeta "iconBackground"))
     "health" (get $toolMeta "health" | default dict)
     "group" "Platform Operations"
+    "requiredRoles" (get $appRequiredRoles "trinoUi")
   ) -}}
 {{- end -}}
 {{- range $tool := (get $platformHomeValues "adminTools" | default (list)) -}}
@@ -354,7 +359,7 @@
     "name" (get $tool "name")
     "group" (get $tool "group")
     "url" (get $tool "url")
-    "requiredRoles" $adminRequiredRoles
+    "requiredRoles" (default $adminRequiredRoles (get $tool "requiredRoles"))
     "adminOnly" true
     "health" (get $tool "health" | default dict)
   ) -}}
@@ -365,7 +370,8 @@
 {{- end -}}
 {{- $portalAdminTools := list -}}
 {{- range $tool := $adminTools -}}
-  {{- $portalAdminTools = append $portalAdminTools (omit $tool "health") -}}
+  {{- $toolRequiredRoles := default $adminRequiredRoles (get $tool "requiredRoles") -}}
+  {{- $portalAdminTools = append $portalAdminTools (mergeOverwrite (omit $tool "health") (dict "requiredRoles" $toolRequiredRoles)) -}}
 {{- end -}}
 {{- $portalConfig := dict
   "branding" (dict

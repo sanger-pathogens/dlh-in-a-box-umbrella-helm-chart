@@ -59,7 +59,7 @@
     {{- $sharingStatus := default "" $governance.sharingStatus -}}
     {{- $irbStatus := default "" $governance.irbStatus -}}
     {{- if hasKey $catalog "authorizedGroups" -}}
-      {{- fail (printf "global.dataCatalogs.%s.authorizedGroups is no longer supported. Use authorizedRoles with Keycloak platform role names from global.identity.accessModel." $catalogName) -}}
+      {{- fail (printf "global.dataCatalogs.%s.authorizedGroups is no longer supported. Use authorizedRoles or explicit Ranger bootstrap policies with Ranger role names." $catalogName) -}}
     {{- end -}}
     {{- $authorizedRoles := get $catalog "authorizedRoles" | default dict -}}
     {{- $authorizedUsers := get $catalog "authorizedUsers" | default dict -}}
@@ -114,7 +114,22 @@
         {{- if $hasDataAccess -}}
           {{- $hasCatalogScopedPolicy = true -}}
           {{- $policyType := int (default 0 (get $policy "policyType")) -}}
-          {{- $isFineGrained := or (eq $policyType 1) (eq $policyType 2) (gt (len (get $policy "dataMaskPolicyItems" | default (list))) 0) (gt (len (get $policy "rowFilterPolicyItems" | default (list))) 0) -}}
+          {{- $columnResource := get $resources "column" -}}
+          {{- $columnValues := list -}}
+          {{- if kindIs "slice" $columnResource -}}
+            {{- $columnValues = $columnResource -}}
+          {{- else if kindIs "map" $columnResource -}}
+            {{- $rawColumnValues := get $columnResource "values" | default (get $columnResource "value" | default (list)) -}}
+            {{- if kindIs "slice" $rawColumnValues -}}
+              {{- $columnValues = $rawColumnValues -}}
+            {{- else if $rawColumnValues -}}
+              {{- $columnValues = list $rawColumnValues -}}
+            {{- end -}}
+          {{- else if $columnResource -}}
+            {{- $columnValues = list $columnResource -}}
+          {{- end -}}
+          {{- $hasColumnAllowlist := and (gt (len $columnValues) 0) (not (has "*" $columnValues)) -}}
+          {{- $isFineGrained := or (eq $policyType 1) (eq $policyType 2) $hasColumnAllowlist (gt (len (get $policy "dataMaskPolicyItems" | default (list))) 0) (gt (len (get $policy "rowFilterPolicyItems" | default (list))) 0) -}}
           {{- if $isFineGrained -}}
             {{- $hasFineGrainedPolicy = true -}}
           {{- end -}}
@@ -139,7 +154,7 @@
         {{- fail (printf "global.dataCatalogs.%s is restricted-identifiable, so authorization.ranger.enabled must be true." $catalogName) -}}
       {{- end -}}
       {{- if and (or $governance.containsDirectIdentifiers $governance.containsQuasiIdentifiers) (not $hasFineGrainedPolicy) -}}
-        {{- fail (printf "global.dataCatalogs.%s is restricted-identifiable and contains direct or quasi identifiers, so authorization.ranger.bootstrapPolicies must include a masking or row-filter policy for this catalog." $catalogName) -}}
+        {{- fail (printf "global.dataCatalogs.%s is restricted-identifiable and contains direct or quasi identifiers, so authorization.ranger.bootstrapPolicies must include a column allowlist, masking policy, or row-filter policy for this catalog." $catalogName) -}}
       {{- end -}}
     {{- end -}}
   {{- end -}}

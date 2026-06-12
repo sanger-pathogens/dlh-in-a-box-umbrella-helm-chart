@@ -250,6 +250,9 @@ def access_model_role_names(config):
     access_model = config.get("accessModel") or {}
     role_names = []
     for role_name in sorted((access_model.get("builtinRoles") or {}).keys()):
+        raw_role = (access_model.get("builtinRoles") or {}).get(role_name) or {}
+        if isinstance(raw_role, dict) and raw_role.get("enabled") is False:
+            continue
         name = str(role_name or "").strip()
         if name:
             role_names.append(name)
@@ -463,14 +466,8 @@ def sync_ranger_roles(memberships, create_missing_principals):
 
 def sync():
     config = load_config()
-    role_names = access_model_role_names(config)
-    if not role_names:
-        print("No platform access-model roles are configured; skipping Ranger Keycloak sync.")
-        return
-
     wait_for_ranger()
     token = keycloak_token(config)
-    memberships = keycloak_role_memberships(config, token, role_names)
     local_mode = config["identity"].get("directoryMode") == "keycloakLocal"
 
     synced_users = 0
@@ -482,6 +479,23 @@ def sync():
             normalized_count,
             logged_out_count,
         ) = sync_local_principals(config, token)
+
+    if not (config.get("ranger") or {}).get("syncAccessModelRoles", True):
+        print(
+            "Synced Keycloak users to Ranger "
+            f"({synced_users} users, "
+            f"{normalized_count} Keycloak accounts normalized, "
+            f"{logged_out_count} stale Keycloak sessions cleared); "
+            "access-model role projection is disabled."
+        )
+        return
+
+    role_names = access_model_role_names(config)
+    if not role_names:
+        print("No platform access-model roles are configured; skipping Ranger Keycloak sync.")
+        return
+
+    memberships = keycloak_role_memberships(config, token, role_names)
 
     synced_roles = sync_ranger_roles(memberships, create_missing_principals=local_mode)
     print(

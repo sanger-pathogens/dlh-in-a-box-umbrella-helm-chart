@@ -455,22 +455,32 @@ function renderApps(config, userRoles) {
   renderGroupedCards(launchGroups, visibleApps, ["Data Access", "Analysis", "Workflows"]);
 }
 
-function renderAdminTools(config, isAdmin) {
+function renderAdminTools(config, userRoles = []) {
   if (!adminToolsPanel || !adminTools) {
     return;
   }
 
-  if (!isAdmin || currentPortalRoute() === "access-control") {
+  if (currentPortalRoute() === "access-control") {
     hide(adminToolsPanel);
     return;
   }
 
-  const tools = (config.admin?.tools || []).filter((tool) => tool.url);
+  const tools = (config.admin?.tools || []).filter((tool) => {
+    if (!tool.url) {
+      return false;
+    }
+    const requiredRoles = tool.requiredRoles || [];
+    return requiredRoles.length === 0 || requiredRoles.some((role) => userRoles.includes(role));
+  });
   if (tools.length === 0) {
     hide(adminToolsPanel);
+    hide(administration);
     return;
   }
 
+  if (administration && currentPortalRoute() !== "access-control") {
+    show(administration);
+  }
   show(adminToolsPanel);
   renderGroupedCards(adminTools, tools, ["Governance & Access", "Platform Operations", "Cluster Operations"]);
 }
@@ -1123,7 +1133,7 @@ async function refreshHealth() {
     console.warn("Unable to refresh portal health status.", error);
   }
   renderApps(state.config, state.userRoles);
-  renderAdminTools(state.config, state.isAdmin);
+  renderAdminTools(state.config, state.userRoles);
 }
 
 async function handlePrincipalSearch(event) {
@@ -1313,7 +1323,7 @@ async function handleRoleAction(event) {
 }
 
 async function loadAdminExperience() {
-  renderAdminTools(state.config, state.isAdmin);
+  renderAdminTools(state.config, state.userRoles);
   if (!accessControlEnabled() && currentPortalRoute() === "access-control") {
     rememberRouteNotice("info", state.config?.admin?.accessControlNotice || "Use Keycloak Admin and Ranger Admin for access management in this environment.");
     window.location.replace("/");

@@ -255,6 +255,8 @@ global:
       legacyManagedGroups: []
       legacyManagedRoles: []
       legacyManagedPolicies: []
+      dataRoles: {}
+      syncAccessModelRoles: true
       cleanup:
         enabled: true
         dryRun: false
@@ -1534,7 +1536,7 @@ cloudbeaver:
     # oauth2-proxy X-Forwarded-Groups header can contain broad Keycloak/OIDC
     # roles such as offline_access, which breaks CloudBeaver login when those
     # teams do not exist. Keep this dedicated header unless an upstream proxy
-    # explicitly emits CloudBeaver team ids such as platform-admin/platform-user.
+    # explicitly emits CloudBeaver team ids such as platform-admin/platform-user-scientist.
     groupHeader: X-CloudBeaver-Platform-Team
     groupDelimiter: ","
     firstNameHeader: ""
