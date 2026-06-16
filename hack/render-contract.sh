@@ -339,7 +339,7 @@ expect_fail \
   -f "${FIXTURE_DIR}/missing-governance.yaml"
 
 expect_fail \
-  "global.dataCatalogs.pii_smoke is restricted-identifiable and contains direct or quasi identifiers, so authorization.ranger.bootstrapPolicies must include a masking or row-filter policy for this catalog." \
+  "global.dataCatalogs.pii_smoke is restricted-identifiable and contains direct or quasi identifiers, so authorization.ranger.bootstrapPolicies must include a column allowlist, masking policy, or row-filter policy for this catalog." \
   -f "${DEV_VALUES}" \
   -f "${FIXTURE_DIR}/missing-fine-grained-policy.yaml"
 
@@ -467,12 +467,12 @@ expect_fail_any \
   -f "${FIXTURE_DIR}/invalid-access-model-app.yaml"
 
 expect_fail \
-  "global.identity.accessModel.groupRoleMappings is no longer supported. Assign Keycloak realm roles directly to users; app access and Ranger roles are derived from those realm roles." \
+  "global.identity.accessModel.groupRoleMappings is no longer supported. Assign Keycloak realm roles directly to users for app access, and define data access roles under global.authorization.ranger.dataRoles." \
   -f "${DEV_VALUES}" \
   -f "${FIXTURE_DIR}/access-model-group-role-mappings.yaml"
 
 expect_fail \
-  "global.identity.accessModel.builtinRoles.platform-viewer.ranger is not supported. Keycloak role names are synced to Ranger exactly as-is." \
+  "global.identity.accessModel.builtinRoles.platform-viewer.ranger is not supported. Keycloak roles control app access only; define Ranger data roles under global.authorization.ranger.dataRoles." \
   -f "${DEV_VALUES}" \
   -f "${FIXTURE_DIR}/access-model-ranger-override.yaml"
 
@@ -487,7 +487,7 @@ expect_fail \
   -f "${FIXTURE_DIR}/platform-home-required-groups.yaml"
 
 expect_fail \
-  "global.dataCatalogs.redcap.authorizedGroups is no longer supported. Use authorizedRoles with Keycloak platform role names from global.identity.accessModel." \
+  "global.dataCatalogs.redcap.authorizedGroups is no longer supported. Use authorizedRoles or explicit Ranger bootstrap policies with Ranger role names." \
   -f "${DEV_VALUES}" \
   -f "${FIXTURE_DIR}/catalog-authorized-groups.yaml"
 

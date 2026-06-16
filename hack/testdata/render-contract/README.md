@@ -80,11 +80,11 @@ These fixtures exercise the governance validation template:
 | File | What it targets |
 | --- | --- |
 | `missing-governance.yaml` | catalog governance block missing in `dev` or `prod` |
-| `missing-fine-grained-policy.yaml` | restricted catalog missing masking or row-filter policy coverage |
+| `missing-fine-grained-policy.yaml` | restricted catalog missing column allowlist, masking, or row-filter policy coverage |
 | `invalid-platform-role-app.yaml` | deprecated `global.authorization.platformRoles` is rejected |
 | `invalid-access-model-app.yaml` | unsupported app access key in the identity access model |
 | `access-model-group-role-mappings.yaml` | deprecated access-model group-to-role mappings |
-| `access-model-ranger-override.yaml` | access-model role attempts to override the exact Keycloak-to-Ranger role name |
+| `access-model-ranger-override.yaml` | deprecated Ranger mapping nested under an identity access-model role |
 | `oauth2-proxy-allowed-groups.yaml` | deprecated oauth2-proxy `allowedGroups` client setting is rejected |
 | `platform-home-required-groups.yaml` | deprecated Platform Home launcher `requiredGroups` setting is rejected |
 | `catalog-authorized-groups.yaml` | deprecated catalog `authorizedGroups` ACL setting is rejected |
