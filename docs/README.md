@@ -50,7 +50,7 @@ flowchart TD
 | `assets/` | shared image and icon files used by docs or chart metadata |
 | `architecture/` | IcePanel model source, publication companion text, and exported architecture diagrams |
 | `Internal/` | internal review material and audit notes, not part of the public folder-guide scope |
-| `release-agent-playbook.md` | agent-neutral checklist for tagged chart releases, GitHub Releases, Zenodo DOI metadata, and badges |
+| `release-agent-playbook.md` | pointer to the reusable release skill under `skills/release-agent/` |
 
 ## Why This Folder Is Small
 
