@@ -1,0 +1,39 @@
+{
+  "title": "dlh-in-a-box Umbrella Helm Chart",
+  "description": "Production-oriented umbrella Helm chart for deploying a modular data lakehouse platform on Kubernetes.",
+  "creators": [
+    {
+      "name": "Viljoen, Christiaan",
+      "affiliation": "Wellcome Sanger Institute"
+    },
+    {
+      "name": "Popov, Iaroslav",
+      "affiliation": "Wellcome Sanger Institute"
+    }
+  ],
+  "license": "Apache-2.0",
+  "upload_type": "software",
+  "access_right": "open",
+  "version": "0.4.1",
+  "keywords": [
+    "lakehouse",
+    "kubernetes",
+    "helm",
+    "trino",
+    "hive",
+    "superset",
+    "prefect",
+    "spark",
+    "datahub",
+    "vault",
+    "jupyterhub"
+  ],
+  "related_identifiers": [
+    {
+      "scheme": "url",
+      "identifier": "https://github.com/sanger-pathogens/dlh-in-a-box-umbrella-helm-chart",
+      "relation": "isSupplementTo",
+      "resource_type": "software"
+    }
+  ]
+}
