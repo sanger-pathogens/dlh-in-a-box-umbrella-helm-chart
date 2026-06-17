@@ -1,3 +1,8 @@
+---
+name: release-agent
+description: Use when creating tagged Helm chart releases, GitHub Releases, GHCR chart publications, Zenodo citation metadata, DOI records, release notes, and DOI badges for this repository.
+---
+
 # Release Agent Skill
 
 Use this skill when an agent or maintainer needs to create a tagged Helm chart

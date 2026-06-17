@@ -28,6 +28,7 @@ If you know nothing about this repo yet, start with this file. It explains:
 | change example overlays | [examples/README.md](examples/README.md) | `examples/*.yaml` |
 | run maintainer checks | [hack/README.md](hack/README.md) | `make help` |
 | understand repo automation | [.github/OVERVIEW.md](.github/OVERVIEW.md) | [.github/workflows/README.md](.github/workflows/README.md) |
+| reuse agent-maintainer workflows | [skills/README.md](skills/README.md) | `skills/*/SKILL.md` |
 
 ## What Problem This Repo Solves
 
