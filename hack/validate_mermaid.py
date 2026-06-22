@@ -16,7 +16,7 @@ import tempfile
 FENCE_RE = re.compile(r"^```mermaid[^\n]*\n(.*?)^```[ \t]*$", re.MULTILINE | re.DOTALL)
 DEFAULT_IMAGE = os.environ.get("MERMAID_CLI_IMAGE", "minlag/mermaid-cli:10.9.1")
 STRICT_ENV_VALUES = {"1", "true", "yes", "on"}
-DOCKER_PROBE_TIMEOUT_SECONDS = float(os.environ.get("MERMAID_DOCKER_PROBE_TIMEOUT_SECONDS", "5"))
+DOCKER_PROBE_TIMEOUT_SECONDS = float(os.environ.get("MERMAID_DOCKER_PROBE_TIMEOUT_SECONDS", "30"))
 MERMAID_IMAGE_PULL_TIMEOUT_SECONDS = float(
     os.environ.get("MERMAID_IMAGE_PULL_TIMEOUT_SECONDS", "180")
 )
