@@ -8,11 +8,13 @@ It is intentionally small and mostly static.
 flowchart TD
   subgraph Assets["Shared assets"]
     Icon[dlh-in-a-box-icon.jpg]
+    Logo[dlh-in-a-box-logo.svg]
     Future[future shared images]
   end
 
   subgraph Consumers["Consumers"]
     Guides[guide files]
+    RootReadme[root README]
     ChartMeta[Chart metadata]
     PackageMeta[published chart metadata]
   end
@@ -24,6 +26,8 @@ flowchart TD
 
   Icon --> Guides
   Icon --> ChartMeta
+  Logo --> RootReadme
+  Logo --> Guides
   Future --> Guides
   ChartMeta --> PackageMeta
   Paths --> Guides
@@ -35,6 +39,7 @@ flowchart TD
 | File | What it is for |
 | --- | --- |
 | `dlh-in-a-box-icon.jpg` | icon referenced by `charts/dlh-in-a-box/Chart.yaml` and used in chart metadata |
+| `dlh-in-a-box-logo.svg` | logo used by the root `README.md` and shared documentation surfaces |
 
 ## How This Folder Fits Into The Repo
 

@@ -4,6 +4,10 @@
 [![Helm Publish](https://github.com/sanger-pathogens/dlh-in-a-box-umbrella-helm-chart/actions/workflows/helm-publish.yaml/badge.svg)](https://github.com/sanger-pathogens/dlh-in-a-box-umbrella-helm-chart/actions/workflows/helm-publish.yaml)
 [![DOI](https://zenodo.org/badge/DOI/10.5281%2Fzenodo.20731685.svg)](https://doi.org/10.5281/zenodo.20731685)
 
+<p align="center">
+  <img src="docs/assets/dlh-in-a-box-logo.svg" alt="dlh-in-a-box logo" width="560">
+</p>
+
 This repository publishes one Helm chart named `dlh-in-a-box`.
 
 In plain language, this chart installs a ready-made analytics platform on
