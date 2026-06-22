@@ -5,7 +5,7 @@
 [![DOI](https://zenodo.org/badge/DOI/10.5281%2Fzenodo.20731685.svg)](https://doi.org/10.5281/zenodo.20731685)
 
 <p align="center">
-  <img src="docs/assets/dlh-in-a-box-icon.jpg" alt="dlh-in-a-box icon" width="560">
+  <img src="docs/assets/dlh-in-a-box-icon.jpg" alt="dlh-in-a-box logo" width="560">
 </p>
 
 `dlh-in-a-box` is an open-source Helm chart for deploying a modern research

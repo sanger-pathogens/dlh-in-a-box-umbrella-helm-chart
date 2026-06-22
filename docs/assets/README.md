@@ -36,7 +36,7 @@ flowchart TD
 
 | File | What it is for |
 | --- | --- |
-| `dlh-in-a-box-icon.jpg` | icon referenced by `charts/dlh-in-a-box/Chart.yaml`, the root `README.md`, and chart metadata |
+| `dlh-in-a-box-icon.jpg` | logo/icon image with platform title, referenced by `charts/dlh-in-a-box/Chart.yaml`, the root `README.md`, and chart metadata |
 
 ## How This Folder Fits Into The Repo
 
