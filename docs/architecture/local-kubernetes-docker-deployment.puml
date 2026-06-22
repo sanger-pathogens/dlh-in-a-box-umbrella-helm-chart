@@ -1,0 +1,92 @@
+@startuml
+title Local dlh-in-a-box deployment on Kubernetes and Docker
+
+top to bottom direction
+skinparam shadowing false
+skinparam componentStyle rectangle
+skinparam wrapWidth 180
+skinparam maxMessageSize 180
+
+actor "Laptop user" as user
+
+node "Developer laptop" as laptop {
+  artifact "dlh-in-a-box repo checkout" as repo
+
+  package "Local tools" as tools {
+    component "Docker Desktop\ncontainer runtime" as docker
+    component "kind CLI\ncreates Kubernetes in Docker" as kind
+    component "Helm v3\ninstalls the chart" as helm
+    component "kubectl\ninspects and port-forwards" as kubectl
+  }
+
+  node "Docker-managed kind node container" as kind_node {
+    frame "Local Kubernetes cluster\ncontext: kind-dlh-local" as cluster {
+      package "Namespace: data-lakehouse-local" as namespace {
+        artifact "Helm release: dlh" as release
+
+        package "Core local stack\nexamples/values-local.yaml" as local_stack {
+          component "Trino\nSQL query engine" as trino
+          database "MinIO\nS3-compatible object storage" as minio
+          component "Hive Metastore\ntable metadata service" as hive
+          database "Hive PostgreSQL\nmetastore database" as hive_db
+          component "Prefect Server + Worker\nworkflow orchestration" as prefect
+          component "Spark Operator\nSpark jobs on Kubernetes" as spark_operator
+          component "Vault dev mode\ndemo secret store" as vault
+        }
+      }
+    }
+  }
+}
+
+cloud "Internet" as internet {
+  artifact "Helm chart repositories" as chart_repos
+  artifact "Container image registries" as image_registries
+}
+
+user --> repo : Work from repo root
+docker --> kind_node : Runs the kind node container
+kind --> docker : Creates the local cluster
+repo --> helm : chart + values file
+helm --> chart_repos : Fetch subcharts
+helm --> release : Install Kubernetes manifests
+cluster --> image_registries : Pull application images
+kubectl --> cluster : Check pods and services
+kubectl --> trino : Optional port-forward to a service
+
+release --> local_stack : Owns deployed workloads and services
+trino --> hive : Read table metadata
+hive --> hive_db : Store metastore state
+trino --> minio : Query objects through S3 API
+prefect --> cluster : Schedule and monitor workflow pods
+spark_operator --> cluster : Manage SparkApplication pods
+vault --> namespace : Provide demo local secrets
+
+note left of tools
+Local install flow:
+1. Start Docker Desktop.
+2. kind create cluster --name dlh-local
+3. ./hack/helm-dependency-update.sh
+4. helm upgrade --install dlh charts/dlh-in-a-box
+   -n data-lakehouse-local --create-namespace
+   -f examples/values-local.yaml
+5. kubectl get pods -n data-lakehouse-local
+6. kubectl port-forward svc/<service>
+end note
+
+note right of release
+Simple first-success path:
+- uses examples/values-local.yaml
+- installs the core local stack
+- avoids browser SSO, Ranger, and platformHome
+
+Use make smoke-install when you
+specifically need the auth-heavy path.
+end note
+
+note bottom of cluster
+Cleanup:
+helm uninstall dlh -n data-lakehouse-local
+kind delete cluster --name dlh-local
+end note
+
+@enduml
