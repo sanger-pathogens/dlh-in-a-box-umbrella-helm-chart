@@ -29,6 +29,7 @@ flowchart TD
 | `dlh-in-a-box-icepanel-model.md` | Publication-readable companion model description. |
 | `local-kubernetes-docker-deployment.puml` | PlantUML deployment diagram for a laptop install using Docker, kind, Kubernetes, and Helm. |
 | `local-kubernetes-docker-deployment.svg` | Rendered SVG version of the local Docker/Kubernetes deployment diagram. |
+| `local-kubernetes-docker-deployment.png` | Rendered PNG version of the local Docker/Kubernetes deployment diagram. |
 | `sync_dlh_icepanel.py` | Dry-run/apply synchronisation into IcePanel. |
 | `validate_dlh_icepanel_json.py` | Local JSON schema and semantic validator. |
 | `export_dlh_icepanel_diagrams.py` | Exports official dark-mode diagram PNGs. |
