@@ -55,6 +55,7 @@ if (( ${#missing[@]} > 0 )); then
 fi
 
 ruby <<'RUBY'
+require "find"
 require "pathname"
 
 root = Pathname.new(Dir.pwd)
@@ -77,26 +78,32 @@ def docs_ignored?(path, patterns)
   end
 end
 
-markdown_files = Dir.glob("{README.md,CONTRIBUTING.md,SUPPORT.md,.github/**/*.md,.vscode/**/*.md,charts/**/*.md,docs/**/*.md,examples/**/*.md,hack/**/*.md}")
-  .sort
-  .reject { |path| docs_ignored?(path, ignore_patterns) }
-
+markdown_files = []
 guide_files = []
 
-Dir.glob("**/", File::FNM_DOTMATCH).sort.each do |dir|
-  dir = dir.sub(%r{/\z}, "")
-  next if dir.empty? || dir == "."
-  next if docs_ignored?(dir, ignore_patterns)
+Find.find(".") do |path|
+  rel = path.delete_prefix("./")
+  next if rel.empty? || rel == "."
 
-  guide = ["OVERVIEW.md", "README.md", "README.md.gotmpl", "_README.txt"]
-    .map { |name| File.join(dir, name) }
-    .find { |path| File.exist?(path) }
-
-  guide_files << guide if guide
+  if File.directory?(path)
+    if docs_ignored?(rel, ignore_patterns)
+      Find.prune
+    else
+      guide = ["OVERVIEW.md", "README.md", "README.md.gotmpl", "_README.txt"]
+        .map { |name| File.join(rel, name) }
+        .find { |p| File.exist?(p) }
+      guide_files << guide if guide
+    end
+  elsif File.file?(path)
+    if rel.end_with?(".md") && !docs_ignored?(rel, ignore_patterns)
+      markdown_files << rel
+    end
+  end
 end
 
 guide_files << "README.md" if File.exist?("README.md")
 guide_files.uniq!
+markdown_files.sort!
 
 errors = []
 
