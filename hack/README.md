@@ -87,6 +87,30 @@ The simplest mental model is:
 - `package.sh` proves the chart can still be packaged
 - `smoke-install.sh` is the heavy, cluster-touching end-to-end local auth test
 
+## Pre-Commit Hooks
+Some of these maintainer scripts are used as Git pre-commit hooks. On each commit, this repo's pre-commit hooks will:
+- Validate syntax across maintainer scripts
+- Run `license-check.sh`
+- Run `helm-dependency-update.sh` only if `Chart.yaml` or `Chart.lock` changed
+- Run `docs-check.sh`
+- Validate Mermaid diagrams only if `*.md` files changed
+- Run `helm-lint.sh`
+- Run `security-check.sh`
+- Run `template.sh`
+- Run `shellcheck` on all shell scripts
+
+To use the hooks, ensure pre-commit is installed. Use a system-wide install via brew or another package manager of choice,
+or install `pre-commit` to a local python venv.
+
+To activate the hooks:
+```commandline
+pre-commit install
+```
+To run the hooks at any point, use `pre-commit` to run on staged files, or `pre-commit run -a` to run on all files.
+
+On first run, these hooks may take a couple of minutes to install and run the helm dependency update and Mermaid validate steps.
+Subsequent runs will be much faster, especially if the chart and mermaid diagrams have not changed.
+
 ## Script-By-Script Behavior
 
 ### `helm-dependency-update.sh`

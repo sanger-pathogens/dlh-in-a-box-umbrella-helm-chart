@@ -1,0 +1,60 @@
+default_language_version:
+  python: python3.12
+repos:
+  - repo: local
+    hooks:
+      - id: script-check
+        name: "Syntax check for all shell scripts"
+        entry: bash -c 'bash -n ./hack/*.sh'
+        language: system
+        always_run: true
+        pass_filenames: false
+      - id: license-check
+        name: "License Check"
+        entry: hack/license-check.sh
+        language: system
+        always_run: true
+      - id: helm-dependency-update
+        name: "Update Helm Chart Dependencies"
+        entry: hack/helm-dependency-update.sh
+        language: system
+        files: ^charts/dlh-in-a-box/Chart\.(yaml|lock)$
+        pass_filenames: false
+      - id: check-docs
+        name: "Check Documentation"
+        entry: env SKIP_MERMAID_CHECK=1 hack/docs-check.sh
+        language: system
+        always_run: true
+        pass_filenames: false
+      # Check mermaid diagrams only when docs are changed
+      - id: validate-mermaid
+        name: "Validate Mermaid Diagrams"
+        entry: hack/docs-check.sh
+        language: system
+        files: \.md$
+        pass_filenames: false
+      - id: lint-chart
+        name: "Lint Helm Chart"
+        entry: hack/helm-lint.sh
+        language: system
+        always_run: true
+        pass_filenames: false
+      - id: security-check
+        name: "Security Check"
+        entry: hack/security-check.sh
+        language: system
+        always_run: true
+      - id: render-chart
+        name: "Render Helm Template"
+        entry: hack/template.sh
+        language: system
+        always_run: true
+        pass_filenames: false
+  - repo: https://github.com/jumanjihouse/pre-commit-hooks
+    rev: 3.0.0
+    hooks:
+      - id: shellcheck
+        name: "Shellcheck (shell script checker)"
+        args:
+          - --severity=warning
+          - --external-sources
