@@ -341,6 +341,35 @@
     "requiredRoles" (get $appRequiredRoles "cloudbeaver")
   ) -}}
 {{- end -}}
+{{- $demoAppsConfig := get $platformHomeValues "demoApps" | default (list) -}}
+{{- $demoApps := list -}}
+{{- if kindIs "slice" $demoAppsConfig -}}
+  {{- $demoApps = $demoAppsConfig -}}
+{{- else -}}
+  {{- range $appId := keys $demoAppsConfig | sortAlpha -}}
+    {{- $demoApps = append $demoApps (mergeOverwrite (dict "id" $appId) (get $demoAppsConfig $appId | default dict)) -}}
+  {{- end -}}
+{{- end -}}
+{{- range $app := $demoApps -}}
+  {{- $appId := default "" (get $app "id") -}}
+  {{- if default true (get $app "enabled") -}}
+    {{- $appMeta := get $itemMeta $appId | default dict -}}
+    {{- $apps = append $apps (dict
+      "id" $appId
+      "name" (default $appId (get $app "name"))
+      "summary" (default "" (get $app "summary"))
+      "url" (default "" (get $app "url"))
+      "group" (default "Data Access" (get $app "group"))
+      "icon" (default "" (get $app "icon"))
+      "iconText" (default (default "" (get $appMeta "iconText")) (default "" (get $app "iconText")))
+      "iconUrl" (default (default "" (get $appMeta "iconUrl")) (default "" (get $app "iconUrl")))
+      "iconAlt" (default (printf "%s logo" (default $appId (get $app "name"))) (default (default "" (get $appMeta "iconAlt")) (default "" (get $app "iconAlt"))))
+      "iconBackground" (default (default "" (get $appMeta "iconBackground")) (default "" (get $app "iconBackground")))
+      "health" (mergeOverwrite (get $appMeta "health" | default dict) (get $app "health" | default dict))
+      "requiredRoles" (default (list "platform-admin") (get $app "requiredRoles"))
+    ) -}}
+  {{- end -}}
+{{- end -}}
 {{- $healthItems := list -}}
 {{- range $app := $apps -}}
   {{- $healthItems = append $healthItems (dict

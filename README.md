@@ -1,18 +1,44 @@
-# dlh-in-a-box Umbrella Helm Chart
+# dlh-in-a-box: a research data lakehouse on Kubernetes
 
 [![Helm Lint](https://github.com/sanger-pathogens/dlh-in-a-box-umbrella-helm-chart/actions/workflows/helm-lint.yaml/badge.svg)](https://github.com/sanger-pathogens/dlh-in-a-box-umbrella-helm-chart/actions/workflows/helm-lint.yaml)
 [![Helm Publish](https://github.com/sanger-pathogens/dlh-in-a-box-umbrella-helm-chart/actions/workflows/helm-publish.yaml/badge.svg)](https://github.com/sanger-pathogens/dlh-in-a-box-umbrella-helm-chart/actions/workflows/helm-publish.yaml)
-[![DOI](https://zenodo.org/badge/DOI/10.5281%2Fzenodo.20731685.svg)](https://doi.org/10.5281/zenodo.20731685)
+[![DOI](https://img.shields.io/badge/DOI-10.5281%2Fzenodo.20731685-blue.svg)](https://doi.org/10.5281/zenodo.20731685)
 
-This repository publishes one Helm chart named `dlh-in-a-box`.
+<p align="center">
+  <img src="docs/assets/dlh-in-a-box-icon.jpg" alt="dlh-in-a-box logo" width="560">
+</p>
 
-In plain language, this chart installs a ready-made analytics platform on
-Kubernetes so a team does not have to wire together login, query services,
-storage, browser tools, and access control from scratch.
+`dlh-in-a-box` is an open-source Helm chart for deploying a modern research
+data platform on Kubernetes.
+
+It is built for a common failure mode in data-intensive research: data becomes
+FAIR only at publication or archive deposit time, after the active scientific
+context has already scattered across storage locations, notebooks, pipelines,
+databases, spreadsheets, and local conventions. The result is data that exists,
+but is harder than it should be to discover, govern, trust, query, and reuse.
+
+`dlh-in-a-box` gives research organisations a practical middle path between
+buying a managed commercial lakehouse and hand-assembling a complex open-source
+stack. It packages mature components for object storage, table metadata,
+distributed SQL, workflow orchestration, notebooks, dashboards, catalogue and
+lineage, identity, access policy, secrets management, health checks, and portal
+access behind one versioned, values-driven deployment interface.
+
+Use it to build research data infrastructure that is:
+
+- operationally FAIR, so selected outputs can be discoverable, governed,
+  queryable, and reusable while studies are still in progress
+- deployable where data is allowed to live, including on-premises clusters,
+  private clouds, sovereign clouds, or public cloud Kubernetes environments
+- modular enough to start small, grow over time, or reuse existing object
+  stores, identity providers, notebook services, dashboard services, databases,
+  and secrets systems
+- practical for teams that need lakehouse capabilities without committing to a
+  single vendor, hosting model, or governance posture
 
 If you know nothing about this repo yet, start with this file. It explains:
 
-- what problem the chart solves
+- why the platform exists
 - what you need before you can try it
 - which install path to use first
 - how the major platform pieces fit together
@@ -30,26 +56,55 @@ If you know nothing about this repo yet, start with this file. It explains:
 | understand repo automation | [.github/OVERVIEW.md](.github/OVERVIEW.md) | [.github/workflows/README.md](.github/workflows/README.md) |
 | reuse agent-maintainer workflows | [skills/README.md](skills/README.md) | `skills/*/SKILL.md` |
 
-## What Problem This Repo Solves
+## Why dlh-in-a-box Exists
 
-Without an umbrella chart, a team would need to decide:
+Modern research produces datasets whose value often extends far beyond their
+first analysis. The same outputs may later support cross-study synthesis, AI
+model development, public-health surveillance, operational decision-making, or
+integration with climate, demographic, clinical, genomic, laboratory, or survey
+context.
+
+That value is easy to lose. Research organisations are usually decentralised by
+design: groups need autonomy, collaborations move quickly, and local practices
+emerge around the work. Over time, that can leave institutions with duplicated
+effort, fragmented data estates, and reusable analytical assets that are too
+dependent on informal knowledge.
+
+`dlh-in-a-box` exists to make that next layer easier to operate.
+
+| Research data challenge | What this chart helps provide |
+| --- | --- |
+| outputs are scattered across buckets, notebooks, pipelines, databases, and local conventions | a shared platform pattern for storage, metadata, query, catalogue, workflow, and browser access |
+| provenance, quality status, ownership, and access rules live in people's heads | governance, identity, policy, lineage, secrets, and health-check wiring as deployable configuration |
+| commercial platforms may not fit fixed-term grants, data-residency rules, ethical approvals, or existing institutional infrastructure | an open-source stack that can run where the organisation is allowed to store and process data |
+| open-source components are mature but costly to integrate securely | one umbrella Helm chart with a consolidated values interface and first-party integration glue |
+
+In practical terms, without this chart a team would need to decide:
 
 - how browser users sign in
 - how SQL tools and notebooks share identity
 - where object storage lives
 - how table metadata is exposed
 - where access rules are enforced
-- how optional apps such as workflow UIs or metadata catalogs fit in
+- how optional apps such as workflow UIs or metadata catalogues fit in
 
-This repo gives you one install surface for those decisions.
+This repo gives you one install surface for those decisions, while still
+letting each deployment enable, disable, or replace components according to its
+local infrastructure and governance requirements.
 
 It is not a full platform product on its own. It does not create your
 Kubernetes cluster, your real production secrets, your DNS, or your
-organization's approval process. What it does provide is the packaging and
+organisation's approval process. What it does provide is the packaging and
 repo structure for deploying the platform components together in a consistent
 way.
 
 ## What This Repo Does
+
+At full strength, the chart assembles a Kubernetes-native research data
+lakehouse from established open-source components rather than introducing a new
+monolithic platform. It is the packaging, integration, validation, and
+configuration layer that makes those components deployable as one coherent
+platform.
 
 ```mermaid
 flowchart TD

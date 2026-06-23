@@ -13,6 +13,7 @@ flowchart TD
 
   subgraph Consumers["Consumers"]
     Guides[guide files]
+    RootReadme[root README]
     ChartMeta[Chart metadata]
     PackageMeta[published chart metadata]
   end
@@ -23,6 +24,7 @@ flowchart TD
   end
 
   Icon --> Guides
+  Icon --> RootReadme
   Icon --> ChartMeta
   Future --> Guides
   ChartMeta --> PackageMeta
@@ -34,7 +36,7 @@ flowchart TD
 
 | File | What it is for |
 | --- | --- |
-| `dlh-in-a-box-icon.jpg` | icon referenced by `charts/dlh-in-a-box/Chart.yaml` and used in chart metadata |
+| `dlh-in-a-box-icon.jpg` | logo/icon image with platform title, referenced by `charts/dlh-in-a-box/Chart.yaml`, the root `README.md`, and chart metadata |
 
 ## How This Folder Fits Into The Repo
 
