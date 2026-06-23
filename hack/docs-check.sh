@@ -4,12 +4,38 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "${ROOT_DIR}"
 
+DOCS_CHECK_IGNORE=(
+  .git
+  .idea
+  artifacts
+  dist
+  references
+  "docs/Internal"
+  __pycache__
+  node_modules
+  "tmpcharts-*"
+)
+
+# Build find(1) -prune arguments.
+prune_args=()
+for pat in "${DOCS_CHECK_IGNORE[@]}"; do
+  [[ ${#prune_args[@]} -gt 0 ]] && prune_args+=(-o)
+  if [[ "$pat" == */* ]]; then
+    prune_args+=(-path "${ROOT_DIR}/${pat}")
+  elif [[ "$pat" == *'*'* ]]; then
+    prune_args+=(-path "*/${pat}")
+  else
+    prune_args+=(-path "${ROOT_DIR}/${pat}" -o -path "*/${pat}")
+  fi
+done
+
+# Export space-separated list for the Ruby block below.
+export DOCS_CHECK_IGNORE_LIST="${DOCS_CHECK_IGNORE[*]}"
+
 missing=()
 
 while IFS= read -r dir; do
   [[ "${dir}" == "${ROOT_DIR}" ]] && continue
-  [[ "${dir}" == "${ROOT_DIR}/docs/Internal" ]] && continue
-  [[ "${dir}" == "${ROOT_DIR}/docs/Internal/"* ]] && continue
 
   if [[ -f "${dir}/OVERVIEW.md" ]] || [[ -f "${dir}/README.md" ]] || [[ -f "${dir}/README.md.gotmpl" ]] || [[ -f "${dir}/_README.txt" ]]; then
     continue
@@ -18,7 +44,7 @@ while IFS= read -r dir; do
   missing+=("${dir#${ROOT_DIR}/}")
 done < <(
   find "${ROOT_DIR}" \
-    \( -path "${ROOT_DIR}/.git" -o -path "${ROOT_DIR}/.idea" -o -path "${ROOT_DIR}/artifacts" -o -path "${ROOT_DIR}/dist" -o -path "${ROOT_DIR}/references" -o -path "${ROOT_DIR}/docs/Internal" -o -path "${ROOT_DIR}/__pycache__" -o -path "*/__pycache__" -o -path "${ROOT_DIR}/node_modules" -o -path "*/node_modules" -o -path "*/node_modules/*" \) -prune -o \
+    \( "${prune_args[@]}" \) -prune -o \
     -type d -print | sort
 )
 
@@ -29,33 +55,55 @@ if (( ${#missing[@]} > 0 )); then
 fi
 
 ruby <<'RUBY'
+require "find"
 require "pathname"
 
 root = Pathname.new(Dir.pwd)
+ignore_patterns = ENV.fetch('DOCS_CHECK_IGNORE_LIST', '').split
 
-markdown_files = Dir.glob("{README.md,CONTRIBUTING.md,SUPPORT.md,.github/**/*.md,.vscode/**/*.md,charts/**/*.md,docs/**/*.md,examples/**/*.md,hack/**/*.md}")
-  .sort
-  .reject { |path| path == "docs/Internal/README.md" || path.start_with?("docs/Internal/") || path.include?("/node_modules/") || path.start_with?("node_modules/") }
+# Check for ignored paths
+def docs_ignored?(path, patterns)
+  parts = path.split('/')
+  (1..parts.length).any? do |n|
+    segment = parts[0, n].join('/')
+    patterns.any? do |pat|
+      if pat.include?('/')
+        segment == pat
+      elsif pat.include?('*')
+        File.fnmatch(pat, parts[n - 1])
+      else
+        parts[n - 1] == pat
+      end
+    end
+  end
+end
 
+markdown_files = []
 guide_files = []
 
-Dir.glob("**/", File::FNM_DOTMATCH).sort.each do |dir|
-  dir = dir.sub(%r{/\z}, "")
-  next if dir.empty? || dir == "."
-  next if dir.start_with?(".git/", ".idea/", "artifacts/", "dist/", "references/")
-  next if dir == "docs/Internal" || dir.start_with?("docs/Internal/")
-  next if dir == "node_modules" || dir.include?("/node_modules/")
-  next if dir.include?("/__pycache__")
+Find.find(".") do |path|
+  rel = path.delete_prefix("./")
+  next if rel.empty? || rel == "."
 
-  guide = ["OVERVIEW.md", "README.md", "README.md.gotmpl", "_README.txt"]
-    .map { |name| File.join(dir, name) }
-    .find { |path| File.exist?(path) }
-
-  guide_files << guide if guide
+  if File.directory?(path)
+    if docs_ignored?(rel, ignore_patterns)
+      Find.prune
+    else
+      guide = ["OVERVIEW.md", "README.md", "README.md.gotmpl", "_README.txt"]
+        .map { |name| File.join(rel, name) }
+        .find { |p| File.exist?(p) }
+      guide_files << guide if guide
+    end
+  elsif File.file?(path)
+    if rel.end_with?(".md") && !docs_ignored?(rel, ignore_patterns)
+      markdown_files << rel
+    end
+  end
 end
 
 guide_files << "README.md" if File.exist?("README.md")
 guide_files.uniq!
+markdown_files.sort!
 
 errors = []
 
