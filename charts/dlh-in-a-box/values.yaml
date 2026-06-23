@@ -396,7 +396,7 @@ sharedPostgresql:
         secretName: dlh-superset-runtime-env
         passwordKey: DB_PASS
       - name: prefect
-        database: server
+        database: prefect
         username: prefect
         secretName: dlh-prefect-postgresql
         passwordKey: password

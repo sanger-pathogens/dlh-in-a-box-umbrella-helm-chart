@@ -3,6 +3,7 @@ import datetime
 import json
 import os
 import re
+import secrets
 import time
 import urllib.error
 import urllib.parse
@@ -308,6 +309,7 @@ def build_managed_user(username, first_name="", last_name="", email_address=""):
         "firstName": first_name,
         "lastName": last_name,
         "emailAddress": email_address,
+        "password": secrets.token_urlsafe(32),
         "status": 1,
         "isVisible": 1,
         "userSource": 1,
@@ -329,13 +331,18 @@ def ensure_users_exist(usernames):
     ]
     if not missing:
         return
-    request(
-        "POST",
-        "/service/xusers/ugsync/users",
-        {"vXUsers": missing},
-        ok=(200, 201),
-    )
-    print("Seeded Ranger users: " + ", ".join(sorted(user["name"] for user in missing)))
+    created = []
+    for user in missing:
+        try:
+            request("POST", "/service/xusers/users", user, ok=(200, 201))
+            created.append(user["name"])
+        except urllib.error.HTTPError as exc:
+            detail = str(getattr(exc, "ranger_body", "")).lower()
+            if exc.code == 400 and "duplicate" in detail:
+                continue
+            raise
+    if created:
+        print("Seeded Ranger users: " + ", ".join(sorted(created)))
 
 
 def get_role(service_name, role_name):
@@ -845,6 +852,44 @@ def normalize_policy_resource(value):
     return normalized
 
 
+def policy_item_compare_key(item):
+    normalized = json.loads(json.dumps(item or {}))
+    for key in ["users", "groups", "roles"]:
+        if key in normalized:
+            normalized[key] = normalize_names(normalized.get(key, []))
+    if "accesses" in normalized:
+        normalized["accesses"] = sorted(
+            normalized.get("accesses", []),
+            key=lambda value: json.dumps(value, sort_keys=True),
+        )
+    return json.dumps(normalized, sort_keys=True)
+
+
+def merge_policy_item_list(existing_items, desired_items):
+    merged = list(existing_items or [])
+    seen = {policy_item_compare_key(item) for item in merged}
+    for item in desired_items or []:
+        key = policy_item_compare_key(item)
+        if key not in seen:
+            merged.append(item)
+            seen.add(key)
+    return merged
+
+
+def merge_policy_items(existing, desired):
+    merged = dict(existing)
+    for key in [
+        "policyItems",
+        "denyPolicyItems",
+        "allowExceptions",
+        "denyExceptions",
+        "dataMaskPolicyItems",
+        "rowFilterPolicyItems",
+    ]:
+        merged[key] = merge_policy_item_list(existing.get(key, []), desired.get(key, []))
+    return merged
+
+
 def upsert_policy(service_name, policy):
     name = policy["name"]
     path = (
@@ -875,14 +920,6 @@ def upsert_policy(service_name, policy):
             if not match:
                 raise
             existing_name = match.group(1).strip()
-            if existing_name != name:
-                raise RuntimeError(
-                    "Ranger refused to create policy "
-                    + repr(name)
-                    + " because its resource set collides with existing policy "
-                    + repr(existing_name)
-                    + ". Merge the principals into one policy item set or make the resources distinct."
-                )
             existing_path = (
                 "/service/public/v2/api/service/"
                 + urllib.parse.quote(service_name, safe="")
@@ -892,13 +929,22 @@ def upsert_policy(service_name, policy):
             existing = request("GET", existing_path, ok=(200,))
             if not existing:
                 raise
-            policy["id"] = existing["id"]
-            policy["guid"] = existing.get("guid")
             update_path = (
                 "/service/public/v2/api/policy/"
                 + urllib.parse.quote(str(existing["id"]), safe="")
             )
-            request("PUT", update_path, policy, ok=(200,))
+            if existing_name == name:
+                policy["id"] = existing["id"]
+                policy["guid"] = existing.get("guid")
+                request("PUT", update_path, policy, ok=(200,))
+            else:
+                request("PUT", update_path, merge_policy_items(existing, policy), ok=(200,))
+                print(
+                    "Merged Ranger policy "
+                    + repr(name)
+                    + " into existing colliding policy "
+                    + repr(existing_name)
+                )
 
 
 def main():
