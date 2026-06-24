@@ -30,6 +30,27 @@ metadata:
     app.kubernetes.io/component: ranger-admin
 spec:
   type: ClusterIP
+  clusterIP: None
+  selector:
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/name: {{ include "dlh-in-a-box.name" . }}
+    app.kubernetes.io/component: ranger-admin
+  ports:
+    - name: http
+      port: 6080
+      targetPort: http
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "dlh-in-a-box.ranger.admin.browserServiceName" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "dlh-in-a-box.labels" . | nindent 4 }}
+    app.kubernetes.io/component: ranger-admin
+    app.kubernetes.io/part-of: ranger-browser-proxy
+spec:
+  type: ClusterIP
   selector:
     app.kubernetes.io/instance: {{ .Release.Name }}
     app.kubernetes.io/name: {{ include "dlh-in-a-box.name" . }}
@@ -124,17 +145,20 @@ spec:
             httpGet:
               path: /login.jsp
               port: http
+            timeoutSeconds: 5
             periodSeconds: 10
             failureThreshold: 60
           readinessProbe:
             httpGet:
               path: /login.jsp
               port: http
+            timeoutSeconds: 5
             periodSeconds: 10
           livenessProbe:
             httpGet:
               path: /login.jsp
               port: http
+            timeoutSeconds: 5
             periodSeconds: 20
           volumeMounts:
             - name: bootstrap

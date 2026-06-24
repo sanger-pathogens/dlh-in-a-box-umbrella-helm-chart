@@ -308,6 +308,9 @@ global:
           pullPolicy: IfNotPresent
         schedule: "*/5 * * * *"
         suspend: false
+        readiness:
+          attempts: 120
+          delaySeconds: 5
       importCatalogAcls: false
       exceptionRoleAudit:
         enabled: true
@@ -1519,6 +1522,9 @@ cloudbeaver:
       bootstrapUsernameKey: shared-bootstrap-username
       bootstrapGroupsKey: shared-bootstrap-groups
       expectedCatalog: redcap
+  h2FreshSchemaPatch:
+    enabled: false
+    pluginJar: ""
   trustedCa:
     existingSecret: ""
     certKey: ca.crt
@@ -1743,6 +1749,7 @@ ranger-auth-proxy:
       cookie_csrf_per_request = true
       session_cookie_minimal = true
       upstreams = [ "http://{{ include "dlh-in-a-box.ranger.browserProxy.serviceName" $ }}:80" ]
+      upstream_timeout = "180s"
       pass_access_token = false
       pass_authorization_header = false
       pass_user_headers = true

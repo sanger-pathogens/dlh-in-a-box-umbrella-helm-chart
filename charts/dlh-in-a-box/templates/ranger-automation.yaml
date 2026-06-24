@@ -31,6 +31,9 @@
 {{- $usersync := get $ranger "usersync" | default dict -}}
 {{- $usersyncImage := get $usersync "image" | default dict -}}
 {{- $localUserSync := get $ranger "localUserSync" | default dict -}}
+{{- $localUserSyncReadiness := get $localUserSync "readiness" | default dict -}}
+{{- $localUserSyncReadinessAttempts := default 120 $localUserSyncReadiness.attempts -}}
+{{- $localUserSyncReadinessDelaySeconds := default 5 $localUserSyncReadiness.delaySeconds -}}
 {{- $usersyncEnabled := true -}}
 {{- if hasKey $usersync "enabled" -}}
   {{- $usersyncEnabled = $usersync.enabled -}}
@@ -139,6 +142,39 @@ data:
 {{ .Files.Get "files/ranger-automation/usersync.py" | nindent 4 }}
   keycloak_ranger_sync.py: |
 {{ .Files.Get "files/ranger-automation/keycloak_ranger_sync.py" | nindent 4 }}
+  wait_for_ranger_keycloak.py: |
+    import os
+    import sys
+    import time
+    import urllib.error
+    import urllib.request
+    from urllib.parse import urljoin
+
+    attempts = int(os.getenv("RANGER_KEYCLOAK_SYNC_READINESS_ATTEMPTS", "120"))
+    delay_seconds = float(os.getenv("RANGER_KEYCLOAK_SYNC_READINESS_DELAY_SECONDS", "5"))
+
+    checks = [
+        ("Ranger Admin", urljoin(os.environ["RANGER_URL"].rstrip("/") + "/", "login.jsp")),
+        ("Keycloak OIDC discovery", os.environ["KEYCLOAK_OIDC_DISCOVERY_URL"]),
+    ]
+
+    opener = urllib.request.build_opener()
+    opener.addheaders = [("User-Agent", "dlh-ranger-keycloak-sync-readiness")]
+
+    for name, url in checks:
+        for attempt in range(1, attempts + 1):
+            try:
+                with opener.open(url, timeout=5) as response:
+                    if 200 <= response.status < 500:
+                        print(f"{name} readiness check passed: HTTP {response.status} {url}", flush=True)
+                        break
+                    print(f"{name} readiness check returned HTTP {response.status} on attempt {attempt}/{attempts}", flush=True)
+            except (urllib.error.URLError, TimeoutError, OSError) as exc:
+                print(f"{name} readiness check failed on attempt {attempt}/{attempts}: {exc}", flush=True)
+            if attempt == attempts:
+                print(f"{name} readiness check timed out after {attempts} attempts: {url}", file=sys.stderr, flush=True)
+                sys.exit(1)
+            time.sleep(delay_seconds)
 ---
 {{- if $passwordReconcileEnabled }}
 apiVersion: batch/v1
@@ -316,10 +352,17 @@ spec:
             - /bin/sh
             - -ec
             - |
+              python /opt/ranger-automation/wait_for_ranger_keycloak.py
               python /opt/ranger-automation/keycloak_ranger_sync.py
           env:
             - name: RANGER_URL
               value: {{ include "dlh-in-a-box.ranger.admin.url" . | quote }}
+            - name: KEYCLOAK_OIDC_DISCOVERY_URL
+              value: {{ printf "%s/.well-known/openid-configuration" (include "dlh-in-a-box.identity.internalIssuer" .) | quote }}
+            - name: RANGER_KEYCLOAK_SYNC_READINESS_ATTEMPTS
+              value: {{ $localUserSyncReadinessAttempts | quote }}
+            - name: RANGER_KEYCLOAK_SYNC_READINESS_DELAY_SECONDS
+              value: {{ $localUserSyncReadinessDelaySeconds | quote }}
             - name: RANGER_ADMIN_PASSWORD
               valueFrom:
                 secretKeyRef:
@@ -451,10 +494,17 @@ spec:
                 - /bin/sh
                 - -ec
                 - |
+                  python /opt/ranger-automation/wait_for_ranger_keycloak.py
                   python /opt/ranger-automation/keycloak_ranger_sync.py
               env:
                 - name: RANGER_URL
                   value: {{ include "dlh-in-a-box.ranger.admin.url" . | quote }}
+                - name: KEYCLOAK_OIDC_DISCOVERY_URL
+                  value: {{ printf "%s/.well-known/openid-configuration" (include "dlh-in-a-box.identity.internalIssuer" .) | quote }}
+                - name: RANGER_KEYCLOAK_SYNC_READINESS_ATTEMPTS
+                  value: {{ $localUserSyncReadinessAttempts | quote }}
+                - name: RANGER_KEYCLOAK_SYNC_READINESS_DELAY_SECONDS
+                  value: {{ $localUserSyncReadinessDelaySeconds | quote }}
                 - name: RANGER_ADMIN_PASSWORD
                   valueFrom:
                     secretKeyRef:

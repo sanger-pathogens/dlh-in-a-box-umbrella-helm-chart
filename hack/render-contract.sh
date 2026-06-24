@@ -146,6 +146,10 @@ prefect_direct_grant_manifest="$(make_tmp_file)"
 render_manifest "${prefect_direct_grant_manifest}" -f "${DEV_VALUES}" -f "${FIXTURE_DIR}/prefect-direct-grant-enabled.yaml"
 prefect_job_runner_manifest="$(make_tmp_file)"
 render_manifest "${prefect_job_runner_manifest}" --namespace dlh-dev -f "${DEV_VALUES}" -f "${FIXTURE_DIR}/prefect-job-runner-enabled.yaml"
+ranger_proxy_manifest="$(make_tmp_file)"
+render_manifest "${ranger_proxy_manifest}" -f "${DEV_VALUES}" -f "${FIXTURE_DIR}/ranger-proxy-enabled.yaml"
+cloudbeaver_h2_patch_manifest="$(make_tmp_file)"
+render_manifest "${cloudbeaver_h2_patch_manifest}" -f "${DEV_VALUES}" -f "${FIXTURE_DIR}/cloudbeaver-h2-fresh-schema-patch.yaml"
 
 assert_no_unresolved_helm_templates "${default_manifest}"
 assert_no_unresolved_helm_templates "${local_manifest}"
@@ -153,6 +157,7 @@ assert_no_unresolved_helm_templates "${dev_manifest}"
 assert_no_unresolved_helm_templates "${prod_manifest}"
 assert_no_unresolved_helm_templates "${shared_manifest}"
 assert_no_unresolved_helm_templates "${prefect_job_runner_manifest}"
+assert_no_unresolved_helm_templates "${cloudbeaver_h2_patch_manifest}"
 
 assert_not_contains "${default_manifest}" "icddr,b"
 assert_not_contains "${default_manifest}" "icddrb.org"
@@ -160,6 +165,7 @@ assert_not_contains "${default_manifest}" "background_logo"
 assert_not_contains "${default_manifest}" "FSLolaWeb"
 assert_not_contains "${default_manifest}" "SourceSansPro"
 assert_contains "${local_manifest}" "name: dlh-ranger-admin"
+assert_contains "${local_manifest}" "clusterIP: None"
 assert_contains "${local_manifest}" "name: dlh-ranger-admin-exception-audit"
 assert_contains "${local_manifest}" "name: dlh-platform-home"
 assert_contains "${local_manifest}" "Administration"
@@ -189,6 +195,16 @@ assert_contains "${prod_manifest}" "name: dlh-ranger-admin-keycloak-sync"
 assert_not_contains "${dev_manifest}" '"platformRoleMembershipSource"'
 assert_not_contains "${prod_manifest}" '"platformRoleMembershipSource"'
 assert_contains "${local_manifest}" "keycloak_ranger_sync.py"
+assert_contains "${dev_manifest}" "wait_for_ranger_keycloak.py"
+assert_contains "${prod_manifest}" "wait_for_ranger_keycloak.py"
+assert_contains "${prod_manifest}" "KEYCLOAK_OIDC_DISCOVERY_URL"
+assert_contains "${prod_manifest}" "dlh-ranger-keycloak-sync-readiness"
+assert_contains "${prod_manifest}" "name: dlh-ranger-admin-browser"
+assert_contains "${prod_manifest}" "app.kubernetes.io/part-of: ranger-browser-proxy"
+assert_contains "${ranger_proxy_manifest}" "proxy_pass http://dlh-ranger-admin-browser"
+assert_contains "${ranger_proxy_manifest}" "path: /readyz"
+assert_contains "${ranger_proxy_manifest}" "proxy_read_timeout 180s"
+assert_contains "${ranger_proxy_manifest}" 'upstream_timeout = \"180s\"'
 assert_not_contains "${local_manifest}" "keycloak_local_users.py"
 assert_not_contains "${local_manifest}" "RANGER_POSTGRES_PASSWORD"
 assert_not_contains "${local_manifest}" "psycopg[binary]"
@@ -324,8 +340,22 @@ assert_contains "${dev_manifest}" "\"user\":\"cloudbeaver-service\",\"catalog\":
 assert_contains "${dev_manifest}" "\"user\":\"superset-service\",\"catalog\":\"system\",\"allow\":\"all\""
 assert_contains "${dev_manifest}" 'driver: "${CLOUDBEAVER_DB_DRIVER:h2_embedded_v2}"'
 assert_contains "${dev_manifest}" 'url: "${CLOUDBEAVER_DB_URL:jdbc:h2:${workspace}/.data/cb.h2v2.dat}"'
+assert_contains "${cloudbeaver_h2_patch_manifest}" "name: cloudbeaver-h2-fresh-schema-patch"
+assert_contains "${cloudbeaver_h2_patch_manifest}" "plugin_jar=\"io.cloudbeaver.service.security_1.0.89.202511171057.jar\""
+assert_contains "${cloudbeaver_h2_patch_manifest}" "mountPath: /opt/cloudbeaver/server/plugins/io.cloudbeaver.service.security_1.0.89.202511171057.jar"
+assert_contains "${cloudbeaver_h2_patch_manifest}" "Skipped by dlh-in-a-box for forced fresh CloudBeaver workspaces."
 
 echo "--- Negative contract renders"
+expect_fail \
+  "cloudbeaver.h2FreshSchemaPatch.enabled requires cloudbeaver.bootstrap.forceWorkspaceSeed=true because it is only safe for intentionally fresh CloudBeaver workspaces." \
+  -f "${DEV_VALUES}" \
+  -f "${FIXTURE_DIR}/cloudbeaver-h2-fresh-schema-patch-without-fresh-workspace.yaml"
+
+expect_fail \
+  "cloudbeaver.h2FreshSchemaPatch.pluginJar is required when cloudbeaver.h2FreshSchemaPatch.enabled=true." \
+  -f "${DEV_VALUES}" \
+  -f "${FIXTURE_DIR}/cloudbeaver-h2-fresh-schema-patch-missing-jar.yaml"
+
 expect_fail_any \
   "global.environment must be one of the following: \"local\", \"dev\", \"prod\"" \
   "value must be one of 'local', 'dev', 'prod'" \

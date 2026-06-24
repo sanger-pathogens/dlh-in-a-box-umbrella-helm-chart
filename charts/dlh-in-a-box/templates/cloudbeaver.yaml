@@ -10,6 +10,15 @@
 {{- $workspaceSeedSecret := default "" $bootstrap.workspaceSeedExistingSecret -}}
 {{- $workspaceDataSourcesKey := default "data-sources.json" $bootstrap.workspaceDataSourcesKey -}}
 {{- $forceWorkspaceSeed := default false $bootstrap.forceWorkspaceSeed -}}
+{{- $h2FreshSchemaPatch := get .Values.cloudbeaver "h2FreshSchemaPatch" | default dict -}}
+{{- $h2FreshSchemaPatchEnabled := default false $h2FreshSchemaPatch.enabled -}}
+{{- $h2FreshSchemaPatchPluginJar := default "" $h2FreshSchemaPatch.pluginJar -}}
+{{- if and $h2FreshSchemaPatchEnabled (not $forceWorkspaceSeed) -}}
+  {{- fail "cloudbeaver.h2FreshSchemaPatch.enabled requires cloudbeaver.bootstrap.forceWorkspaceSeed=true because it is only safe for intentionally fresh CloudBeaver workspaces." -}}
+{{- end -}}
+{{- if and $h2FreshSchemaPatchEnabled (not $h2FreshSchemaPatchPluginJar) -}}
+  {{- fail "cloudbeaver.h2FreshSchemaPatch.pluginJar is required when cloudbeaver.h2FreshSchemaPatch.enabled=true." -}}
+{{- end -}}
 {{- $bootstrapInitialDataKey := default "initial-data.conf" $bootstrap.initialDataKey -}}
 {{- $bootstrapAdminNameKey := default "admin-name" $bootstrap.adminNameKey -}}
 {{- $bootstrapAdminPasswordKey := default "admin-password" $bootstrap.adminPasswordKey -}}
@@ -80,7 +89,7 @@
 {{- end -}}
 {{- $cloudbeaverForceHttps := hasPrefix "https://" $cloudbeaverServerUrl -}}
 {{- $checksums := dict
-  "config" ((printf "%s\n%s\n%s\n%s" (toPrettyJson $authProxy) (toPrettyJson $appConfig) (toPrettyJson $cloudbeaverIdentity) $logoutUrl) | sha256sum)
+  "config" ((printf "%s\n%s\n%s\n%s\n%s" (toPrettyJson $authProxy) (toPrettyJson $appConfig) (toPrettyJson $cloudbeaverIdentity) (toPrettyJson $h2FreshSchemaPatch) $logoutUrl) | sha256sum)
   "bootstrap" $bootstrap.existingSecret
   "workspaceSeed" $workspaceSeedSecret
   "trustedCa" $trustedCaSecret
@@ -303,8 +312,38 @@ spec:
       imagePullSecrets:
         {{- toYaml . | nindent 8 }}
       {{- end }}
-      {{- if or $trustedCaSecret $workspaceSeedSecret $enforceRuntimeConfig }}
+      {{- if or $trustedCaSecret $workspaceSeedSecret $enforceRuntimeConfig $h2FreshSchemaPatchEnabled }}
       initContainers:
+        {{- if $h2FreshSchemaPatchEnabled }}
+        - name: cloudbeaver-h2-fresh-schema-patch
+          image: "{{ .Values.cloudbeaver.image.repository }}:{{ .Values.cloudbeaver.image.tag }}"
+          imagePullPolicy: {{ .Values.cloudbeaver.image.pullPolicy }}
+          command:
+            - /bin/sh
+            - -ec
+            - |
+              plugin_jar={{ $h2FreshSchemaPatchPluginJar | quote }}
+              source_path="/opt/cloudbeaver/server/plugins/${plugin_jar}"
+              patched_path="/patched/${plugin_jar}"
+
+              test -f "${source_path}"
+              cp "${source_path}" "${patched_path}"
+
+              tmp_dir="$(mktemp -d)"
+              trap 'rm -rf "${tmp_dir}"' EXIT
+              cd "${tmp_dir}"
+              jar xf "${patched_path}" db
+              find db -type f -name 'cb_schema_update_*.sql' | while read -r script; do
+                printf '%s\n' \
+                  "-- Skipped by dlh-in-a-box for forced fresh CloudBeaver workspaces." \
+                  "-- The bundled cb_schema_create.sql already contains the current schema." \
+                  >"${script}"
+              done
+              jar uf "${patched_path}" db
+          volumeMounts:
+            - name: cloudbeaver-security-plugin-patch
+              mountPath: /patched
+        {{- end }}
         {{- if $trustedCaSecret }}
         - name: cloudbeaver-truststore
           image: "{{ $trustedCaInitImageRepository }}:{{ $trustedCaInitImageTag }}"
@@ -584,6 +623,12 @@ spec:
               readOnly: true
             - name: workspace
               mountPath: /opt/cloudbeaver/workspace
+            {{- if $h2FreshSchemaPatchEnabled }}
+            - name: cloudbeaver-security-plugin-patch
+              mountPath: /opt/cloudbeaver/server/plugins/{{ $h2FreshSchemaPatchPluginJar }}
+              subPath: {{ $h2FreshSchemaPatchPluginJar }}
+              readOnly: true
+            {{- end }}
             {{- if $trustedCaSecret }}
             - name: cloudbeaver-truststore
               mountPath: {{ $trustStoreMountPath }}
@@ -610,6 +655,10 @@ spec:
         - name: workspace-seed
           secret:
             secretName: {{ $workspaceSeedSecret }}
+        {{- end }}
+        {{- if $h2FreshSchemaPatchEnabled }}
+        - name: cloudbeaver-security-plugin-patch
+          emptyDir: {}
         {{- end }}
         - name: workspace
           {{- if default false $workspacePersistence.enabled }}
