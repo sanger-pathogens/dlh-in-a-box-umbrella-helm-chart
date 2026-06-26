@@ -2,15 +2,18 @@ enabled: true
 
 metastore:
   image:
-    registry: ghcr.io
-    repository: sanger-pathogens/dlh-in-a-box-umbrella-helm-chart/hive-metastore
+    registry: docker.io
+    repository: apache/hive
     tag: "4.2.0"
 
 schemainit:
   image:
-    registry: ghcr.io
-    repository: sanger-pathogens/dlh-in-a-box-umbrella-helm-chart/hive-metastore
+    registry: docker.io
+    repository: apache/hive
     tag: "4.2.0"
+
+jdbcDriver:
+  url: "https://jdbc.postgresql.org/download/postgresql-42.7.4.jar"
   job:
     enabled: false
 
