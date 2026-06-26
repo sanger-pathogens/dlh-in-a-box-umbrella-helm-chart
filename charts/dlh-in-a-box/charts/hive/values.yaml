@@ -2,15 +2,15 @@ enabled: true
 
 metastore:
   image:
-    registry: ""
-    repository: ""
-    tag: ""
+    registry: ghcr.io
+    repository: sanger-pathogens/dlh-in-a-box-umbrella-helm-chart/hive-metastore
+    tag: "4.2.0"
 
 schemainit:
   image:
-    registry: ""
-    repository: ""
-    tag: ""
+    registry: ghcr.io
+    repository: sanger-pathogens/dlh-in-a-box-umbrella-helm-chart/hive-metastore
+    tag: "4.2.0"
   job:
     enabled: false
 

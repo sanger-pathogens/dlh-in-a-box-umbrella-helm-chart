@@ -20,6 +20,7 @@ local scripts under `hack/` so CI and local maintainer workflows stay aligned.
 | `helm-lint.yaml` | `pull_request`, push to `main` | refresh deps, run validation, render, and package |
 | `helm-smoke-install.yaml` | `workflow_dispatch` | create a disposable kind cluster and run the auth-heavy smoke path |
 | `helm-publish.yaml` | `workflow_dispatch`, push to `main`, push tags `v*` | resolve publish version, package the chart, and push to GHCR |
+| `docker-hive-metastore.yaml` | push to `main` affecting `docker/hive-metastore/**`, `workflow_dispatch` | build the custom Hive metastore image and push it to GHCR |
 
 ```mermaid
 flowchart TD
@@ -34,6 +35,7 @@ flowchart TD
     Lint[helm-lint.yaml]
     Smoke[helm-smoke-install.yaml]
     Publish[helm-publish.yaml]
+    Docker[docker-hive-metastore.yaml]
   end
 
   subgraph LocalParity["Matching local scripts"]
@@ -54,6 +56,7 @@ flowchart TD
   PR --> Lint
   Main --> Lint
   Main --> Publish
+  Main --> Docker
   Tag --> Publish
   Manual --> Smoke
   Lint --> Deps
@@ -79,6 +82,7 @@ flowchart TD
 | `helm-lint.yaml` | main validation workflow |
 | `helm-publish.yaml` | package and publish workflow |
 | `helm-smoke-install.yaml` | disposable kind smoke-test workflow |
+| `docker-hive-metastore.yaml` | build and push the custom Hive metastore image |
 | `README.md` | this guide |
 
 ## Workflow-By-Workflow Detail

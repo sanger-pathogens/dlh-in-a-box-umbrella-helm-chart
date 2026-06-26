@@ -19,3 +19,6 @@ references/
 
 # Internal working notes and private review documents
 docs/Internal/
+
+# Agent files
+.claude
