@@ -22,8 +22,16 @@ spec:
         catalog: {{ $catalogName }}
     spec:
       restartPolicy: Never
-      {{- if $.Values.postgres.createDatabase }}
       initContainers:
+        - name: download-jdbc
+          image: alpine:3
+          command: ["/bin/sh", "-c"]
+          args:
+            - wget -qO /extra-jars/postgresql-jdbc.jar "{{ $.Values.jdbcDriver.url }}"
+          volumeMounts:
+            - name: jdbc-driver
+              mountPath: /extra-jars
+        {{- if $.Values.postgres.createDatabase }}
         - name: create-db-{{ $safeCatalog }}
           image: postgres:15
           command: ["/bin/sh", "-c"]
@@ -68,7 +76,7 @@ spec:
                 configMapKeyRef:
                   name: {{ include "hive.fullname" $ }}-init-config
                   key: POSTGRES_PORT
-      {{- end }}
+        {{- end }}
       containers:
         - name: hive-schema-init-{{ $safeCatalog }}
           image: "{{ $.Values.schemainit.image.registry }}/{{ $.Values.schemainit.image.repository }}:{{ $.Values.schemainit.image.tag }}"
@@ -76,22 +84,30 @@ spec:
           args:
             - |
               set -e
-              echo "Checking if Hive schema '{{ $catalogName }}' is already initialized..."
-              if /opt/hive/bin/schematool -dbType postgres \
-                    -userName "$POSTGRES_USER" \
-                    -passWord "$POSTGRES_PASSWORD" \
-                    -url "jdbc:postgresql://$POSTGRES_HOST:$POSTGRES_PORT/{{ $catalogName }}" \
-                    -info; then
-                echo "Hive schema '{{ $catalogName }}' is already initialized. Skipping initSchema."
-              else
-                echo "Initializing Hive schema '{{ $catalogName }}'..."
-                /opt/hive/bin/schematool --verbose -initSchema -dbType postgres \
+              JDBC_URL="jdbc:postgresql://$POSTGRES_HOST:$POSTGRES_PORT/{{ $catalogName }}"
+              echo "Upgrading or verifying Hive schema for '{{ $catalogName }}'..."
+              if /opt/hive/bin/schematool \
+                  -dbType postgres \
                   -driver org.postgresql.Driver \
                   -userName "$POSTGRES_USER" \
                   -passWord "$POSTGRES_PASSWORD" \
-                  -url "jdbc:postgresql://$POSTGRES_HOST:$POSTGRES_PORT/{{ $catalogName }}"
+                  -url "$JDBC_URL" \
+                  -upgradeSchema; then
+                echo "Schema is current."
+              else
+                echo "No existing schema found, initializing..."
+                /opt/hive/bin/schematool \
+                  --verbose \
+                  -dbType postgres \
+                  -driver org.postgresql.Driver \
+                  -userName "$POSTGRES_USER" \
+                  -passWord "$POSTGRES_PASSWORD" \
+                  -url "$JDBC_URL" \
+                  -initSchema
               fi
           env:
+            - name: HADOOP_CLASSPATH
+              value: /extra-jars/*
             - name: POSTGRES_USER
               valueFrom:
                 secretKeyRef:
@@ -112,6 +128,12 @@ spec:
                 configMapKeyRef:
                   name: {{ include "hive.fullname" $ }}-init-config
                   key: POSTGRES_PORT
+          volumeMounts:
+            - name: jdbc-driver
+              mountPath: /extra-jars
+      volumes:
+        - name: jdbc-driver
+          emptyDir: {}
 
 {{- end }}
 {{- end }}

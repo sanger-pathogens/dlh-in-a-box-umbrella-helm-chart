@@ -38,6 +38,14 @@ spec:
         app: {{ include "hive.fullname" $ }}-{{ $safeCatalog }}-metastore
     spec:
       initContainers:
+        - name: download-jdbc
+          image: alpine:3
+          command: ["/bin/sh", "-c"]
+          args:
+            - wget -qO /extra-jars/postgresql-jdbc.jar "{{ $.Values.jdbcDriver.url }}"
+          volumeMounts:
+            - name: jdbc-driver
+              mountPath: /extra-jars
         {{- if $.Values.postgres.createDatabase }}
         - name: create-db-{{ $safeCatalog }}
           image: postgres:15
@@ -97,23 +105,30 @@ spec:
           args:
             - |
               set -e
-              echo "Checking if Hive schema '{{ $catalogName }}' is already initialized..."
-              if /opt/hive/bin/schematool -dbType postgres \
-                    -driver org.postgresql.Driver \
-                    -userName "$POSTGRES_USER" \
-                    -passWord "$POSTGRES_PASSWORD" \
-                    -url "jdbc:postgresql://$POSTGRES_HOST:$POSTGRES_PORT/{{ $catalogName }}" \
-                    -info; then
-                echo "Hive schema '{{ $catalogName }}' is already initialized. Skipping initSchema."
-              else
-                echo "Initializing Hive schema '{{ $catalogName }}'..."
-                /opt/hive/bin/schematool --verbose -initSchema -dbType postgres \
+              JDBC_URL="jdbc:postgresql://$POSTGRES_HOST:$POSTGRES_PORT/{{ $catalogName }}"
+              echo "Upgrading or verifying Hive schema for '{{ $catalogName }}'..."
+              if /opt/hive/bin/schematool \
+                  -dbType postgres \
                   -driver org.postgresql.Driver \
                   -userName "$POSTGRES_USER" \
                   -passWord "$POSTGRES_PASSWORD" \
-                  -url "jdbc:postgresql://$POSTGRES_HOST:$POSTGRES_PORT/{{ $catalogName }}"
+                  -url "$JDBC_URL" \
+                  -upgradeSchema; then
+                echo "Schema is current."
+              else
+                echo "No existing schema found, initializing..."
+                /opt/hive/bin/schematool \
+                  --verbose \
+                  -dbType postgres \
+                  -driver org.postgresql.Driver \
+                  -userName "$POSTGRES_USER" \
+                  -passWord "$POSTGRES_PASSWORD" \
+                  -url "$JDBC_URL" \
+                  -initSchema
               fi
           env:
+            - name: HADOOP_CLASSPATH
+              value: /extra-jars/*
             - name: POSTGRES_USER
               valueFrom:
                 secretKeyRef:
@@ -134,6 +149,9 @@ spec:
                 configMapKeyRef:
                   name: {{ include "hive.fullname" $ }}-init-config
                   key: POSTGRES_PORT
+          volumeMounts:
+            - name: jdbc-driver
+              mountPath: /extra-jars
       containers:
         - name: metastore
           image: "{{ $.Values.metastore.image.registry }}/{{ $.Values.metastore.image.repository }}:{{ $.Values.metastore.image.tag }}"
@@ -154,7 +172,7 @@ spec:
             - name: HADOOP_OPTIONAL_TOOLS
               value: hadoop-aws
             - name: HADOOP_CLASSPATH
-              value: /opt/hadoop/share/hadoop/tools/lib/*
+              value: /opt/hadoop/share/hadoop/tools/lib/*:/extra-jars/*
           envFrom:
             - secretRef:
                 name: {{ include "hive.postgresSecretName" $ }}
@@ -167,10 +185,14 @@ spec:
           volumeMounts:
             - name: metastore-cfg-vol
               mountPath: /hive_custom_conf
+            - name: jdbc-driver
+              mountPath: /extra-jars
       volumes:
         - name: metastore-cfg-vol
           secret:
             secretName: {{ include "hive.fullname" $ }}-metastore-cfg-{{ $safeCatalog }}
+        - name: jdbc-driver
+          emptyDir: {}
 
 {{- if $.Values.ingress.enabled }}
 ---
