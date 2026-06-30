@@ -119,10 +119,17 @@ but uses a separate database name per catalog.
 There are two schema-initialization paths and this is easy to miss when reading
 only the values file:
 
-- the main metastore Deployment includes init containers that create the
-  catalog database and run `schematool` if the schema is missing
+- the main metastore Deployment includes init containers that download the
+  PostgreSQL JDBC driver, create the catalog database, and run
+  `schematool -upgradeSchema` (falling back to `schematool -initSchema` when
+  no schema exists yet)
 - `init-schema-job.yaml` can also render a post-install or post-upgrade Helm
-  hook Job when `schemainit.job.enabled=true`
+  hook Job when `schemainit.job.enabled=true`, following the same upgrade-first
+  logic
+
+Both paths share the same JDBC download init container and volume definitions
+via named templates in `_helpers.tpl`. If the driver URL or mount path changes,
+update it there.
 
 The default path is the init-container path inside the Deployment. The hook Job
 is an opt-in operational pattern for teams that want schema init to happen as a
@@ -149,7 +156,10 @@ This file is intentionally small compared with the umbrella chart defaults.
 
 It defines:
 
-- image locations for the metastore and schema-init containers
+- image locations for the metastore and schema-init containers (default
+  `docker.io/apache/hive:4.2.0`)
+- the JDBC driver download URL (`jdbcDriver.url`), defaulting to the
+  PostgreSQL JDBC driver
 - PostgreSQL and S3 secret expectations
 - the warehouse directory base
 - ingress toggles
@@ -193,6 +203,9 @@ and Deployments are rendered for your example catalogs.
   `global.dataCatalogs`
 - forgetting that one catalog means one metastore Deployment and Service
 - changing secret generation without checking the existing-secret path
+- editing the JDBC download init container directly in `metastore.yaml` or
+  `init-schema-job.yaml` instead of updating the shared helper in
+  `templates/_helpers.tpl`
 - adding umbrella-only logic here when it belongs at the parent chart layer
 
 ## When You Can Ignore This Folder

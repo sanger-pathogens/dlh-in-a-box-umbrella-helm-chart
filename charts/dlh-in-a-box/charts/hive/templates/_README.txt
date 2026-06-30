@@ -83,6 +83,12 @@ It holds helper functions for:
 - resolving the effective PostgreSQL host
 - resolving which PostgreSQL and S3 secret names to mount
 - computing checksums used by rollout annotations
+- shared JDBC driver init container, volume, and volumeMount fragments
+
+The JDBC helper templates (`hive.downloadJdbcInitContainer`,
+`hive.jdbcDriverVolume`, `hive.jdbcDriverVolumeMount`) are used by both
+`metastore.yaml` and `init-schema-job.yaml`. If the download source or mount
+path needs changing, this file is the single place to change it.
 
 When multiple templates need the same naming or secret-selection logic, the
 change belongs here.
@@ -120,9 +126,10 @@ It creates one post-install and post-upgrade Helm hook Job per catalog.
 
 Each job:
 
+- downloads the PostgreSQL JDBC driver via the `download-jdbc` init container
 - checks whether the PostgreSQL database exists and creates it if needed
-- runs Hive `schematool -info`
-- initializes the schema only when it is missing
+- runs Hive `schematool -upgradeSchema`; if that fails (no existing schema),
+  falls back to `schematool -initSchema`
 
 This is not the only schema-init path. The main Deployment also includes init
 containers that can do the same work on startup.
@@ -143,9 +150,13 @@ For each catalog, it renders:
 Important details owned here:
 
 - checksum annotations for config and secret changes
-- the init-container flow that waits for PostgreSQL, creates the catalog
-  database, and initializes the schema when needed
-- environment and volume wiring for the Hive image
+- a `download-jdbc` init container that fetches the PostgreSQL JDBC driver
+  (shared from `_helpers.tpl`) before any schema work runs
+- the init-container flow that creates the catalog database and runs
+  `schematool -upgradeSchema`, falling back to `schematool -initSchema` when
+  no existing schema is found
+- environment and volume wiring for the Hive image, including the JDBC driver
+  on `HADOOP_CLASSPATH`
 - mounting the per-catalog metastore configuration secret
 - per-catalog hostnames for optional ingress exposure
 
@@ -207,6 +218,9 @@ Check the rendered output for:
   contains credentials
 - editing only the schema hook Job and forgetting that the Deployment init
   containers also perform schema work
+- editing the `download-jdbc` init container in one template without
+  remembering it is shared via `_helpers.tpl`; always change the helper, not
+  individual template copies
 - testing with a catalog-free values file and concluding the template did
   nothing
 - changing secret key names without checking how the Deployment consumes them
