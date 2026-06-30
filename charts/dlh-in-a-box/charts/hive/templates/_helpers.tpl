@@ -117,3 +117,24 @@ external-secret-missing
 {{- include (print .Template.BasePath "/s3-secret.yaml") . | sha256sum -}}
 {{- end -}}
 {{- end -}}
+
+{{- define "hive.downloadJdbcInitContainer" -}}
+- name: download-jdbc
+  image: alpine:3
+  command: ["/bin/sh", "-c"]
+  args:
+    - wget -qO /extra-jars/postgresql-jdbc.jar "{{ .Values.jdbcDriver.url }}"
+  volumeMounts:
+    - name: jdbc-driver
+      mountPath: /extra-jars
+{{- end -}}
+
+{{- define "hive.jdbcDriverVolume" -}}
+- name: jdbc-driver
+  emptyDir: {}
+{{- end -}}
+
+{{- define "hive.jdbcDriverVolumeMount" -}}
+- name: jdbc-driver
+  mountPath: /extra-jars
+{{- end -}}

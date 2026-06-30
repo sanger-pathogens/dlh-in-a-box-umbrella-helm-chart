@@ -38,14 +38,7 @@ spec:
         app: {{ include "hive.fullname" $ }}-{{ $safeCatalog }}-metastore
     spec:
       initContainers:
-        - name: download-jdbc
-          image: alpine:3
-          command: ["/bin/sh", "-c"]
-          args:
-            - wget -qO /extra-jars/postgresql-jdbc.jar "{{ $.Values.jdbcDriver.url }}"
-          volumeMounts:
-            - name: jdbc-driver
-              mountPath: /extra-jars
+        {{- include "hive.downloadJdbcInitContainer" $ | nindent 8 }}
         {{- if $.Values.postgres.createDatabase }}
         - name: create-db-{{ $safeCatalog }}
           image: postgres:15
@@ -150,8 +143,7 @@ spec:
                   name: {{ include "hive.fullname" $ }}-init-config
                   key: POSTGRES_PORT
           volumeMounts:
-            - name: jdbc-driver
-              mountPath: /extra-jars
+            {{- include "hive.jdbcDriverVolumeMount" $ | nindent 12 }}
       containers:
         - name: metastore
           image: "{{ $.Values.metastore.image.registry }}/{{ $.Values.metastore.image.repository }}:{{ $.Values.metastore.image.tag }}"
@@ -185,14 +177,12 @@ spec:
           volumeMounts:
             - name: metastore-cfg-vol
               mountPath: /hive_custom_conf
-            - name: jdbc-driver
-              mountPath: /extra-jars
+            {{- include "hive.jdbcDriverVolumeMount" $ | nindent 12 }}
       volumes:
         - name: metastore-cfg-vol
           secret:
             secretName: {{ include "hive.fullname" $ }}-metastore-cfg-{{ $safeCatalog }}
-        - name: jdbc-driver
-          emptyDir: {}
+        {{- include "hive.jdbcDriverVolume" $ | nindent 8 }}
 
 {{- if $.Values.ingress.enabled }}
 ---
