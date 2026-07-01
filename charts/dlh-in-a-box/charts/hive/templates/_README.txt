@@ -65,7 +65,6 @@ flowchart TD
 | `_helpers.tpl` | repo-owned | naming and helper logic such as catalog-safe names and secret resolution |
 | `configmap.yaml` | repo-owned | renders the per-catalog metastore configuration secret |
 | `init-config.yaml` | repo-owned | renders the small ConfigMap with database host and port for init steps |
-| `init-schema-job.yaml` | repo-owned | optional Helm hook Job that runs schema initialization per catalog |
 | `metastore.yaml` | repo-owned | renders the main Service, Deployment, and optional Ingress per catalog |
 | `postgres-secret.yaml` | repo-owned | creates a PostgreSQL secret only when one is not supplied |
 | `s3-secret.yaml` | repo-owned | creates an S3 credential secret only when one is not supplied |
@@ -86,9 +85,13 @@ It holds helper functions for:
 - shared JDBC driver init container, volume, and volumeMount fragments
 
 The JDBC helper templates (`hive.downloadJdbcInitContainer`,
-`hive.jdbcDriverVolume`, `hive.jdbcDriverVolumeMount`) are used by both
-`metastore.yaml` and `init-schema-job.yaml`. If the download source or mount
-path needs changing, this file is the single place to change it.
+`hive.jdbcDriverVolume`, `hive.jdbcDriverVolumeMount`) are used by
+`metastore.yaml`. If the download source or mount path needs changing, this
+file is the single place to change it.
+
+`hive.waitForPostgresInitContainer` is used by `metastore.yaml` as the first
+init container in every Deployment, polling `pg_isready` before any schema work
+runs.
 
 When multiple templates need the same naming or secret-selection logic, the
 change belongs here.
@@ -115,31 +118,8 @@ This template renders one small ConfigMap containing:
 - `POSTGRES_HOST`
 - `POSTGRES_PORT`
 
-The metastore Deployment init containers and the optional schema hook job both
-consume this ConfigMap so the host and port logic lives in one place.
-
-### `init-schema-job.yaml`
-
-This file renders only when `schemainit.job.enabled=true`.
-
-It creates one post-install and post-upgrade Helm hook Job per catalog.
-
-Each job:
-
-- downloads the PostgreSQL JDBC driver via the `download-jdbc` init container
-- checks whether the PostgreSQL database exists and creates it if needed
-- runs Hive `schematool -upgradeSchema`; if that fails (no existing schema),
-  falls back to `schematool -initSchema`
-
-The Job is the authoritative place for schema initialization and upgrades. The
-Deployment init container only checks that the schema exists and blocks startup
-if it does not — it never modifies the schema.
-
-This is not the only schema-init path. The main Deployment also includes init
-containers that can do the same work on startup.
-
-Use this hook path only when you explicitly want schema initialization as a
-separate Helm hook lifecycle step.
+The metastore Deployment init containers consume this ConfigMap so the host and
+port logic lives in one place.
 
 ### `metastore.yaml`
 
@@ -154,12 +134,13 @@ For each catalog, it renders:
 Important details owned here:
 
 - checksum annotations for config and secret changes
+- a `wait-for-postgres` init container that polls `pg_isready` until PostgreSQL
+  is accepting connections
 - a `download-jdbc` init container that fetches the PostgreSQL JDBC driver
-  (shared from `_helpers.tpl`) before any schema work runs
-- the init-container flow that creates the catalog database and runs
-  `schematool -info` to verify the schema is ready; if the schema is not yet
-  initialized the init container fails and the pod will not start until the
-  schema has been created by the hook Job
+- an optional `create-db` init container (when `postgres.createDatabase=true`)
+  that creates the catalog database if it does not exist
+- an `init-schema` init container that runs `schematool -upgradeSchema`,
+  falling back to `schematool -initSchema` when no schema exists yet
 - environment and volume wiring for the Hive image, including the JDBC driver
   on `HADOOP_CLASSPATH`
 - mounting the per-catalog metastore configuration secret
@@ -196,7 +177,8 @@ If you need to:
 
 - change generated Hive XML: edit `configmap.yaml`
 - change how PostgreSQL host and port are shared: edit `init-config.yaml`
-- change schema hook behavior: edit `init-schema-job.yaml`
+- change schema init, upgrade, or postgres wait behavior: edit `metastore.yaml`
+- change the JDBC driver URL or mount path: edit `_helpers.tpl`
 - change pod startup, mounts, probes, or ingress: edit `metastore.yaml`
 - change secret generation fallback: edit `postgres-secret.yaml` or
   `s3-secret.yaml`
@@ -221,11 +203,9 @@ Check the rendered output for:
 
 - forgetting that `configmap.yaml` intentionally renders a secret because it
   contains credentials
-- editing only the schema hook Job and forgetting that the Deployment init
-  containers also perform schema work
-- editing the `download-jdbc` init container in one template without
-  remembering it is shared via `_helpers.tpl`; always change the helper, not
-  individual template copies
+- editing the `download-jdbc` or `wait-for-postgres` init containers directly
+  in `metastore.yaml` without realizing they come from `_helpers.tpl`; always
+  change the helper
 - testing with a catalog-free values file and concluding the template did
   nothing
 - changing secret key names without checking how the Deployment consumes them

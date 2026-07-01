@@ -14,8 +14,6 @@ schemainit:
 
 jdbcDriver:
   url: "https://jdbc.postgresql.org/download/postgresql-42.7.4.jar"
-  job:
-    enabled: false
 
 # PostgreSQL connection (external or deployed separately)
 postgres:

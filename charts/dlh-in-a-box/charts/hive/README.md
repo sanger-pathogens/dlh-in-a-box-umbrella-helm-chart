@@ -116,27 +116,23 @@ but uses a separate database name per catalog.
 
 ### Schema initialization lifecycle
 
-There are two schema-initialization paths and this is easy to miss when reading
-only the values file:
+Schema initialization and upgrades are handled entirely by init containers in
+the metastore Deployment. Each Deployment starts with init containers that run
+in order:
 
-- the main metastore Deployment includes init containers that download the
-  PostgreSQL JDBC driver, optionally create the catalog database, and run
-  `schematool -info` to verify the schema is present; if the schema does not
-  exist the init container fails and the Deployment will not become ready
-- `init-schema-job.yaml` renders a post-install and post-upgrade Helm hook Job
-  per catalog when `schemainit.job.enabled=true`; each job runs
-  `schematool -upgradeSchema`, falling back to `schematool -initSchema` when no
-  schema exists yet
+1. `wait-for-postgres` — polls `pg_isready` until PostgreSQL accepts connections
+2. `download-jdbc` — fetches the PostgreSQL JDBC driver
+3. `create-db` (optional, when `postgres.createDatabase=true`) — creates the
+   per-catalog database if it does not already exist
+4. `init-schema` — runs `schematool -upgradeSchema`; if no schema exists yet,
+   falls back to `schematool -initSchema`
 
-The hook Job is the authoritative path for schema initialization and upgrades.
-The Deployment init container is a guard only — it checks but never modifies.
+The metastore pod will not start until the schema is initialized or upgraded.
+This approach works with both external and bundled PostgreSQL without any Helm
+hook lifecycle configuration.
 
-Both paths share the same JDBC download init container and volume definitions
-via named templates in `_helpers.tpl`. If the driver URL or mount path changes,
-update it there.
-
-Enable the hook Job (`schemainit.job.enabled=true`) before first install so the
-schema exists before the Deployment attempts its check.
+The JDBC init container and volume definitions are shared via named templates in
+`_helpers.tpl`. If the driver URL or mount path changes, update it there.
 
 ### How Trino uses the result
 
@@ -182,9 +178,10 @@ If you need to:
 
 - change how per-catalog metastore config is generated: edit
   `templates/configmap.yaml`
-- change startup or mounts for the metastore pods: edit
+- change startup, schema init, or mounts for the metastore pods: edit
   `templates/metastore.yaml`
-- change schema-init behavior: edit `templates/init-schema-job.yaml`
+- change the JDBC driver URL or postgres wait image: edit
+  `templates/_helpers.tpl`
 - change how generated secrets work: edit `templates/postgres-secret.yaml` or
   `templates/s3-secret.yaml`
 
@@ -206,8 +203,8 @@ and Deployments are rendered for your example catalogs.
   `global.dataCatalogs`
 - forgetting that one catalog means one metastore Deployment and Service
 - changing secret generation without checking the existing-secret path
-- editing the JDBC download init container directly in `metastore.yaml` or
-  `init-schema-job.yaml` instead of updating the shared helper in
+- editing the JDBC download or postgres wait init containers directly in
+  `metastore.yaml` instead of updating the shared helpers in
   `templates/_helpers.tpl`
 - adding umbrella-only logic here when it belongs at the parent chart layer
 

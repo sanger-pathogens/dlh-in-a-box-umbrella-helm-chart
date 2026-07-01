@@ -118,6 +118,31 @@ external-secret-missing
 {{- end -}}
 {{- end -}}
 
+{{- define "hive.waitForPostgresInitContainer" -}}
+- name: wait-for-postgres
+  image: postgres:15
+  command: ["/bin/sh", "-c"]
+  args:
+    - |
+      until pg_isready \
+          -h "$POSTGRES_HOST" \
+          -p "$POSTGRES_PORT" \
+          -U "$POSTGRES_USER"; do
+        echo "Waiting for PostgreSQL to become ready..."
+        sleep 2
+      done
+  env:
+    - name: POSTGRES_USER
+      valueFrom:
+        secretKeyRef:
+          name: {{ include "hive.postgresSecretName" . }}
+          key: username
+    - name: POSTGRES_HOST
+      value: {{ include "hive.postgresHost" . }}
+    - name: POSTGRES_PORT
+      value: {{ .Values.postgres.port | quote }}
+{{- end -}}
+
 {{- define "hive.downloadJdbcInitContainer" -}}
 - name: download-jdbc
   image: alpine:3
