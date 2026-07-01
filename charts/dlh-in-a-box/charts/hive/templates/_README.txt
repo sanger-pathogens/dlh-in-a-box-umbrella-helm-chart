@@ -131,6 +131,10 @@ Each job:
 - runs Hive `schematool -upgradeSchema`; if that fails (no existing schema),
   falls back to `schematool -initSchema`
 
+The Job is the authoritative place for schema initialization and upgrades. The
+Deployment init container only checks that the schema exists and blocks startup
+if it does not — it never modifies the schema.
+
 This is not the only schema-init path. The main Deployment also includes init
 containers that can do the same work on startup.
 
@@ -153,8 +157,9 @@ Important details owned here:
 - a `download-jdbc` init container that fetches the PostgreSQL JDBC driver
   (shared from `_helpers.tpl`) before any schema work runs
 - the init-container flow that creates the catalog database and runs
-  `schematool -upgradeSchema`, falling back to `schematool -initSchema` when
-  no existing schema is found
+  `schematool -info` to verify the schema is ready; if the schema is not yet
+  initialized the init container fails and the pod will not start until the
+  schema has been created by the hook Job
 - environment and volume wiring for the Hive image, including the JDBC driver
   on `HADOOP_CLASSPATH`
 - mounting the per-catalog metastore configuration secret

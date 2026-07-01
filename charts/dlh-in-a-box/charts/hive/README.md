@@ -120,20 +120,23 @@ There are two schema-initialization paths and this is easy to miss when reading
 only the values file:
 
 - the main metastore Deployment includes init containers that download the
-  PostgreSQL JDBC driver, create the catalog database, and run
-  `schematool -upgradeSchema` (falling back to `schematool -initSchema` when
-  no schema exists yet)
-- `init-schema-job.yaml` can also render a post-install or post-upgrade Helm
-  hook Job when `schemainit.job.enabled=true`, following the same upgrade-first
-  logic
+  PostgreSQL JDBC driver, optionally create the catalog database, and run
+  `schematool -info` to verify the schema is present; if the schema does not
+  exist the init container fails and the Deployment will not become ready
+- `init-schema-job.yaml` renders a post-install and post-upgrade Helm hook Job
+  per catalog when `schemainit.job.enabled=true`; each job runs
+  `schematool -upgradeSchema`, falling back to `schematool -initSchema` when no
+  schema exists yet
+
+The hook Job is the authoritative path for schema initialization and upgrades.
+The Deployment init container is a guard only — it checks but never modifies.
 
 Both paths share the same JDBC download init container and volume definitions
 via named templates in `_helpers.tpl`. If the driver URL or mount path changes,
 update it there.
 
-The default path is the init-container path inside the Deployment. The hook Job
-is an opt-in operational pattern for teams that want schema init to happen as a
-separate hook lifecycle step.
+Enable the hook Job (`schemainit.job.enabled=true`) before first install so the
+schema exists before the Deployment attempts its check.
 
 ### How Trino uses the result
 

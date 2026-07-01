@@ -99,26 +99,15 @@ spec:
             - |
               set -e
               JDBC_URL="jdbc:postgresql://$POSTGRES_HOST:$POSTGRES_PORT/{{ $catalogName }}"
-              echo "Upgrading or verifying Hive schema for '{{ $catalogName }}'..."
-              if /opt/hive/bin/schematool \
+              echo "Checking Hive schema for '{{ $catalogName }}'..."
+              /opt/hive/bin/schematool \
                   -dbType postgres \
                   -driver org.postgresql.Driver \
                   -userName "$POSTGRES_USER" \
                   -passWord "$POSTGRES_PASSWORD" \
                   -url "$JDBC_URL" \
-                  -upgradeSchema; then
-                echo "Schema is current."
-              else
-                echo "No existing schema found, initializing..."
-                /opt/hive/bin/schematool \
-                  --verbose \
-                  -dbType postgres \
-                  -driver org.postgresql.Driver \
-                  -userName "$POSTGRES_USER" \
-                  -passWord "$POSTGRES_PASSWORD" \
-                  -url "$JDBC_URL" \
-                  -initSchema
-              fi
+                  -info
+              echo "Schema check passed."
           env:
             - name: HADOOP_CLASSPATH
               value: /extra-jars/*
