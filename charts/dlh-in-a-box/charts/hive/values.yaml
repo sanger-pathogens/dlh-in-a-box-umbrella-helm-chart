@@ -11,6 +11,8 @@ schemainit:
     registry: docker.io
     repository: apache/hive
     tag: "4.2.0"
+  job:
+    enabled: true
 
 jdbcDriver:
   url: "https://jdbc.postgresql.org/download/postgresql-42.7.4.jar"

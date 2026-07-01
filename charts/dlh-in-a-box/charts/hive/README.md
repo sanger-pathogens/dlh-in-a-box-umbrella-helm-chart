@@ -116,20 +116,35 @@ but uses a separate database name per catalog.
 
 ### Schema initialization lifecycle
 
-Schema initialization and upgrades are handled entirely by init containers in
-the metastore Deployment. Each Deployment starts with init containers that run
-in order:
+Schema initialization and upgrades are handled by a regular Kubernetes Job
+(`init-schema-job.yaml`). The metastore Deployment waits for the schema to be
+ready using an init container, but never creates or modifies the schema itself.
+
+**Schema Job** (`schemainit.job.enabled=true`, default):
+
+Each catalog gets one Job that runs init containers in order:
 
 1. `wait-for-postgres` — polls `pg_isready` until PostgreSQL accepts connections
 2. `download-jdbc` — fetches the PostgreSQL JDBC driver
 3. `create-db` (optional, when `postgres.createDatabase=true`) — creates the
    per-catalog database if it does not already exist
-4. `init-schema` — runs `schematool -upgradeSchema`; if no schema exists yet,
-   falls back to `schematool -initSchema`
 
-The metastore pod will not start until the schema is initialized or upgraded.
-This approach works with both external and bundled PostgreSQL without any Helm
-hook lifecycle configuration.
+The Job's main container then runs `schematool -upgradeSchema`, falling back to
+`schematool -initSchema` if no schema exists yet.
+
+The Job name includes the Hive image tag. Bumping the image version creates a
+new Job on the next `helm upgrade`, which triggers a schema upgrade automatically.
+
+**Metastore Deployment** init containers:
+
+1. `wait-for-postgres` — polls `pg_isready`
+2. `download-jdbc` — fetches the PostgreSQL JDBC driver
+3. `wait-for-schema` — loops on `schematool -info` until the schema exists and
+   is at the expected version
+
+The metastore pod will not start until `schematool -info` succeeds. On restart,
+this check passes immediately because the schema already exists. There are no
+Helm hooks and no ordering concerns — Kubernetes retry handles the wait naturally.
 
 The JDBC init container and volume definitions are shared via named templates in
 `_helpers.tpl`. If the driver URL or mount path changes, update it there.
@@ -178,7 +193,10 @@ If you need to:
 
 - change how per-catalog metastore config is generated: edit
   `templates/configmap.yaml`
-- change startup, schema init, or mounts for the metastore pods: edit
+- change schema init or upgrade logic: edit `templates/init-schema-job.yaml`
+- change how long the metastore waits for the schema: edit
+  `templates/metastore.yaml`
+- change startup, mounts, or ingress for metastore pods: edit
   `templates/metastore.yaml`
 - change the JDBC driver URL or postgres wait image: edit
   `templates/_helpers.tpl`
@@ -201,11 +219,16 @@ and Deployments are rendered for your example catalogs.
 
 - assuming Hive owns the catalog list locally instead of consuming
   `global.dataCatalogs`
-- forgetting that one catalog means one metastore Deployment and Service
-- changing secret generation without checking the existing-secret path
+- forgetting that one catalog means one metastore Deployment, Service, and
+  schema init Job
+- expecting the metastore to create or upgrade the schema; it only waits for
+  the schema to be ready via `schematool -info`
+- disabling the schema Job (`schemainit.job.enabled=false`) without an external
+  mechanism to create the schema; the metastore will hang indefinitely
 - editing the JDBC download or postgres wait init containers directly in
-  `metastore.yaml` instead of updating the shared helpers in
-  `templates/_helpers.tpl`
+  `metastore.yaml` or `init-schema-job.yaml` instead of updating the shared
+  helpers in `templates/_helpers.tpl`
+- changing secret generation without checking the existing-secret path
 - adding umbrella-only logic here when it belongs at the parent chart layer
 
 ## When You Can Ignore This Folder

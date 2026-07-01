@@ -26,7 +26,7 @@ flowchart TD
     Helpers[helpers]
     Config[config secret]
     InitConfig[init config]
-    InitSchema[schema hook job]
+    InitSchema[schema init job]
     Metastore[metastore runtime]
     PgSecret[postgres secret]
     S3Secret[s3 secret]
@@ -65,6 +65,7 @@ flowchart TD
 | `_helpers.tpl` | repo-owned | naming and helper logic such as catalog-safe names and secret resolution |
 | `configmap.yaml` | repo-owned | renders the per-catalog metastore configuration secret |
 | `init-config.yaml` | repo-owned | renders the small ConfigMap with database host and port for init steps |
+| `init-schema-job.yaml` | repo-owned | renders a per-catalog Job that creates or upgrades the metastore schema |
 | `metastore.yaml` | repo-owned | renders the main Service, Deployment, and optional Ingress per catalog |
 | `postgres-secret.yaml` | repo-owned | creates a PostgreSQL secret only when one is not supplied |
 | `s3-secret.yaml` | repo-owned | creates an S3 credential secret only when one is not supplied |
@@ -89,9 +90,9 @@ The JDBC helper templates (`hive.downloadJdbcInitContainer`,
 `metastore.yaml`. If the download source or mount path needs changing, this
 file is the single place to change it.
 
-`hive.waitForPostgresInitContainer` is used by `metastore.yaml` as the first
-init container in every Deployment, polling `pg_isready` before any schema work
-runs.
+`hive.waitForPostgresInitContainer` is used by both `metastore.yaml` and
+`init-schema-job.yaml` as the first init container, polling `pg_isready` before
+any schema work runs.
 
 When multiple templates need the same naming or secret-selection logic, the
 change belongs here.
@@ -121,6 +122,26 @@ This template renders one small ConfigMap containing:
 The metastore Deployment init containers consume this ConfigMap so the host and
 port logic lives in one place.
 
+### `init-schema-job.yaml`
+
+This template renders one Job per catalog when `schemainit.job.enabled=true`.
+
+The Job is a regular Kubernetes resource with no Helm hooks. It runs alongside
+the metastore Deployment and completes once the schema is created or upgraded.
+
+Each Job runs init containers in order:
+
+1. `wait-for-postgres` — polls `pg_isready` until PostgreSQL accepts connections
+2. `download-jdbc` — fetches the PostgreSQL JDBC driver
+3. `create-db` (optional, when `postgres.createDatabase=true`) — creates the
+   catalog database if it does not exist
+
+The main container then runs `schematool -upgradeSchema`, falling back to
+`schematool -initSchema` if no schema exists yet.
+
+The Job name includes the Hive image tag so that a chart upgrade that bumps the
+image version creates a new Job, which triggers a schema upgrade automatically.
+
 ### `metastore.yaml`
 
 This is the main runtime template in the subchart.
@@ -128,7 +149,7 @@ This is the main runtime template in the subchart.
 For each catalog, it renders:
 
 - a ClusterIP Service on port `9083`
-- a Deployment with init containers for database creation and schema checks
+- a Deployment with init containers that act as readiness gates
 - an optional Ingress when enabled
 
 Important details owned here:
@@ -137,14 +158,17 @@ Important details owned here:
 - a `wait-for-postgres` init container that polls `pg_isready` until PostgreSQL
   is accepting connections
 - a `download-jdbc` init container that fetches the PostgreSQL JDBC driver
-- an optional `create-db` init container (when `postgres.createDatabase=true`)
-  that creates the catalog database if it does not exist
-- an `init-schema` init container that runs `schematool -upgradeSchema`,
-  falling back to `schematool -initSchema` when no schema exists yet
+- a `wait-for-schema` init container that loops on `schematool -info` until the
+  schema exists and is at the expected version; this gates the metastore on the
+  schema Job having completed
 - environment and volume wiring for the Hive image, including the JDBC driver
   on `HADOOP_CLASSPATH`
 - mounting the per-catalog metastore configuration secret
 - per-catalog hostnames for optional ingress exposure
+
+The metastore Deployment does not create or modify the schema. All schema work
+happens in `init-schema-job.yaml`. On restart, `schematool -info` passes quickly
+because the schema already exists.
 
 If a metastore pod will not start, this is the first template to inspect.
 
@@ -177,7 +201,8 @@ If you need to:
 
 - change generated Hive XML: edit `configmap.yaml`
 - change how PostgreSQL host and port are shared: edit `init-config.yaml`
-- change schema init, upgrade, or postgres wait behavior: edit `metastore.yaml`
+- change schema init or upgrade behavior: edit `init-schema-job.yaml`
+- change the metastore readiness gate (how long it waits for the schema): edit `metastore.yaml`
 - change the JDBC driver URL or mount path: edit `_helpers.tpl`
 - change pod startup, mounts, probes, or ingress: edit `metastore.yaml`
 - change secret generation fallback: edit `postgres-secret.yaml` or
@@ -204,8 +229,12 @@ Check the rendered output for:
 - forgetting that `configmap.yaml` intentionally renders a secret because it
   contains credentials
 - editing the `download-jdbc` or `wait-for-postgres` init containers directly
-  in `metastore.yaml` without realizing they come from `_helpers.tpl`; always
-  change the helper
+  in `metastore.yaml` or `init-schema-job.yaml` without realizing they come from
+  `_helpers.tpl`; always change the helper
+- expecting the metastore to create or upgrade the schema on restart; it does
+  not — the schema Job owns that
+- disabling the schema Job (`schemainit.job.enabled=false`) without having an
+  external mechanism to create the schema; the metastore will hang waiting
 - testing with a catalog-free values file and concluding the template did
   nothing
 - changing secret key names without checking how the Deployment consumes them

@@ -1,0 +1,123 @@
+{{- if $.Values.schemainit.job.enabled }}
+{{- $catalogs := default dict .Values.global.dataCatalogs }}
+{{- range $catalogName, $catalog := $catalogs }}
+{{- $safeCatalog := include "hive.sanitize" $catalogName }}
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ printf "%s-schema-%s-%s" (include "hive.fullname" $) $safeCatalog ($.Values.schemainit.image.tag | replace "." "-" | lower) | trunc 63 | trimSuffix "-" }}
+  namespace: {{ $.Release.Namespace }}
+  labels:
+    app: {{ include "hive.fullname" $ }}-schema-init
+spec:
+  backoffLimit: 1
+  template:
+    spec:
+      restartPolicy: Never
+      initContainers:
+        {{- include "hive.waitForPostgresInitContainer" $ | nindent 8 }}
+        {{- include "hive.downloadJdbcInitContainer" $ | nindent 8 }}
+        {{- if $.Values.postgres.createDatabase }}
+        - name: create-db-{{ $safeCatalog }}
+          image: postgres:15
+          command: ["/bin/sh", "-c"]
+          args:
+            - |
+              set -e
+              echo "Checking if database '{{ $catalogName }}' exists..."
+              if ! PGPASSWORD="$POSTGRES_PASSWORD" psql \
+                  -h "$POSTGRES_HOST" \
+                  -U "$POSTGRES_USER" \
+                  -p "$POSTGRES_PORT" \
+                  -d postgres \
+                  -tAc "SELECT 1 FROM pg_database WHERE datname='{{ $catalogName }}';" | grep -q 1; then
+                echo "Creating database '{{ $catalogName }}'..."
+                PGPASSWORD="$POSTGRES_PASSWORD" psql \
+                  -h "$POSTGRES_HOST" \
+                  -U "$POSTGRES_USER" \
+                  -p "$POSTGRES_PORT" \
+                  -d postgres \
+                  -c "CREATE DATABASE \"{{ $catalogName }}\""
+              else
+                echo "Database '{{ $catalogName }}' already exists."
+              fi
+          env:
+            - name: POSTGRES_USER
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "hive.postgresSecretName" $ }}
+                  key: username
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "hive.postgresSecretName" $ }}
+                  key: password
+            - name: POSTGRES_HOST
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ include "hive.fullname" $ }}-init-config
+                  key: POSTGRES_HOST
+            - name: POSTGRES_PORT
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ include "hive.fullname" $ }}-init-config
+                  key: POSTGRES_PORT
+        {{- end }}
+      containers:
+        - name: init-schema-{{ $safeCatalog }}
+          image: "{{ $.Values.schemainit.image.registry }}/{{ $.Values.schemainit.image.repository }}:{{ $.Values.schemainit.image.tag }}"
+          command: ["/bin/sh", "-c"]
+          args:
+            - |
+              set -e
+              JDBC_URL="jdbc:postgresql://$POSTGRES_HOST:$POSTGRES_PORT/{{ $catalogName }}"
+              echo "Upgrading or verifying Hive schema for '{{ $catalogName }}'..."
+              if /opt/hive/bin/schematool \
+                  -dbType postgres \
+                  -driver org.postgresql.Driver \
+                  -userName "$POSTGRES_USER" \
+                  -passWord "$POSTGRES_PASSWORD" \
+                  -url "$JDBC_URL" \
+                  -upgradeSchema; then
+                echo "Schema is current."
+              else
+                echo "No existing schema found, initializing..."
+                /opt/hive/bin/schematool \
+                  --verbose \
+                  -dbType postgres \
+                  -driver org.postgresql.Driver \
+                  -userName "$POSTGRES_USER" \
+                  -passWord "$POSTGRES_PASSWORD" \
+                  -url "$JDBC_URL" \
+                  -initSchema
+              fi
+          env:
+            - name: HADOOP_CLASSPATH
+              value: /extra-jars/*
+            - name: POSTGRES_USER
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "hive.postgresSecretName" $ }}
+                  key: username
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "hive.postgresSecretName" $ }}
+                  key: password
+            - name: POSTGRES_HOST
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ include "hive.fullname" $ }}-init-config
+                  key: POSTGRES_HOST
+            - name: POSTGRES_PORT
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ include "hive.fullname" $ }}-init-config
+                  key: POSTGRES_PORT
+          volumeMounts:
+            {{- include "hive.jdbcDriverVolumeMount" $ | nindent 12 }}
+      volumes:
+        {{- include "hive.jdbcDriverVolume" $ | nindent 8 }}
+{{- end }}
+{{- end }}
