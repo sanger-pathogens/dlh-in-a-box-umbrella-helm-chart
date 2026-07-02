@@ -56,13 +56,13 @@ dependencies:
 
   - name: prefect-server
     alias: prefectServer
-    version: "2025.12.31221620"
+    version: "2026.6.1154549"
     repository: https://prefecthq.github.io/prefect-helm
     condition: prefect.enabled,prefect.server.enabled
 
   - name: prefect-worker
     alias: prefectWorker
-    version: "2025.12.31221620"
+    version: "2026.6.1154549"
     repository: https://prefecthq.github.io/prefect-helm
     condition: prefect.enabled,prefect.workers.enabled
 
