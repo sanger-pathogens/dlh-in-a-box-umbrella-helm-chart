@@ -566,6 +566,38 @@ These mostly expose upstream chart values at the umbrella level:
 - `hivePostgresql`
 - `rangerPostgresql`
 
+### Prefect External PostgreSQL
+
+By default, the Prefect server uses a bundled Bitnami PostgreSQL pod. To point
+it at an external instance (including the `sharedPostgresql` subchart) instead:
+
+```yaml
+prefect:
+  externalPostgresql:
+    enabled: true
+    host: my-postgres.example.com
+    port: 5432          # default
+    database: prefect   # default (the Prefect server database)
+    username: prefect
+    existingSecret: my-prefect-db-secret   # must contain a key matching passwordKey
+    passwordKey: password                   # default
+
+prefectServer:
+  postgresql:
+    enabled: false
+  secret:
+    create: false
+```
+
+`templates/prefect-external-postgresql.yaml` builds the `connection-string`
+Secret (`prefect-server-postgresql-connection`) at render time by reading the
+password out of `existingSecret` via Helm `lookup`. The upstream Prefect server
+chart then mounts that secret exactly as it would the bundled-postgres one.
+
+`templates/prefect-validation.yaml` fails the render when
+`prefect.externalPostgresql.enabled=true` is set without the required companion
+values.
+
 ### Prefect Job Runner Pull Identity
 
 `prefect.jobRunner` can create a lightweight Kubernetes service account for
@@ -611,6 +643,9 @@ Important examples:
   secret into the exact shape DataHub expects
 - the Trino helper path can read S3 credentials from an existing secret when
   generated catalogs use `global.storage.s3.existingSecret`
+- `templates/prefect-external-postgresql.yaml` reads the database password from
+  `prefect.externalPostgresql.existingSecret` to build the Prefect
+  `connection-string` Secret when `prefect.externalPostgresql.enabled=true`
 
 If a render seems surprising, ask whether `lookup` is part of the path and
 whether the referenced secret already exists in the namespace you rendered
