@@ -2,17 +2,20 @@ enabled: true
 
 metastore:
   image:
-    registry: ""
-    repository: ""
-    tag: ""
+    registry: docker.io
+    repository: apache/hive
+    tag: "4.2.0"
 
 schemainit:
   image:
-    registry: ""
-    repository: ""
-    tag: ""
+    registry: docker.io
+    repository: apache/hive
+    tag: "4.2.0"
   job:
-    enabled: false
+    enabled: true
+
+jdbcDriver:
+  url: "https://jdbc.postgresql.org/download/postgresql-42.7.4.jar"
 
 # PostgreSQL connection (external or deployed separately)
 postgres:
