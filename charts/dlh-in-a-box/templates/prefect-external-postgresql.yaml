@@ -1,0 +1,21 @@
+{{- $prefect := .Values.prefect | default dict -}}
+{{- $extPg := get $prefect "externalPostgresql" | default dict -}}
+{{- if and (default false (get $prefect "enabled")) (default false (get $extPg "enabled")) -}}
+{{- $secretData := (lookup "v1" "Secret" .Release.Namespace $extPg.existingSecret).data | default dict -}}
+{{- $password := index $secretData $extPg.passwordKey | default "" | b64dec -}}
+{{- $prefectServer := .Values.prefectServer | default dict -}}
+{{- $secret := get $prefectServer "secret" | default dict -}}
+{{- $secretName := get $secret "name" | default "prefect-server-postgresql-connection" -}}
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: {{ $secretName | quote }}
+  namespace: {{ .Release.Namespace | quote }}
+  labels:
+    {{- include "dlh-in-a-box.labels" . | nindent 4 }}
+    app.kubernetes.io/component: prefect-server
+type: Opaque
+stringData:
+  connection-string: {{ printf "postgresql+asyncpg://%s:%s@%s:%d/%s" $extPg.username $password $extPg.host (int $extPg.port) $extPg.database | quote }}
+{{- end -}}

@@ -1602,6 +1602,20 @@ prefect:
       server: ghcr.io
       username: ""
       password: ""
+  externalPostgresql:
+    # Set enabled=true to connect the Prefect server to a PostgreSQL instance
+    # managed outside this chart (including the sharedPostgresql subchart).
+    # When enabled, also set:
+    #   prefectServer.postgresql.enabled: false
+    #   prefectServer.secret.create: false
+    enabled: false
+    host: ""
+    port: 5432
+    database: prefect
+    username: prefect
+    # Name of an existing Secret that contains the PostgreSQL password.
+    existingSecret: ""
+    passwordKey: password
 
 # Upstream Prefect chart values can be passed directly via these aliases.
 prefectServer:
@@ -1610,6 +1624,10 @@ prefectServer:
     nameOverride: prefect-postgresql
     image:
       repository: bitnamilegacy/postgresql
+  secret:
+    # Fixed name used by both the bundled-postgres path (upstream creates it)
+    # and the external-postgres path (this chart creates it).
+    name: prefect-server-postgresql-connection
 
 prefectWorker:
   worker:

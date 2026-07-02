@@ -1552,6 +1552,19 @@
             "enabled": { "type": "boolean" }
           }
         },
+        "externalPostgresql": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "enabled": { "type": "boolean" },
+            "host": { "type": "string" },
+            "port": { "type": "integer" },
+            "database": { "type": "string" },
+            "username": { "type": "string" },
+            "existingSecret": { "type": "string" },
+            "passwordKey": { "type": "string" }
+          }
+        },
         "jobRunner": {
           "type": "object",
           "additionalProperties": false,

@@ -1,0 +1,35 @@
+{{- $prefect := .Values.prefect | default dict -}}
+{{- $extPg := get $prefect "externalPostgresql" | default dict -}}
+{{- if and (default false (get $prefect "enabled")) (default false (get $extPg "enabled")) -}}
+
+{{- $prefectServer := .Values.prefectServer | default dict -}}
+{{- $prefectPostgresql := get $prefectServer "postgresql" | default dict -}}
+{{- $prefectSecret := get $prefectServer "secret" | default dict -}}
+
+{{- $prefectPostgresqlEnabled := true -}}
+{{- if hasKey $prefectPostgresql "enabled" -}}
+{{- $prefectPostgresqlEnabled = $prefectPostgresql.enabled -}}
+{{- end -}}
+
+{{- $prefectSecretCreate := true -}}
+{{- if hasKey $prefectSecret "create" -}}
+{{- $prefectSecretCreate = $prefectSecret.create -}}
+{{- end -}}
+
+{{- if $prefectPostgresqlEnabled -}}
+{{- fail "prefect.externalPostgresql.enabled=true requires prefectServer.postgresql.enabled=false." -}}
+{{- end -}}
+
+{{- if $prefectSecretCreate -}}
+{{- fail "prefect.externalPostgresql.enabled=true requires prefectServer.secret.create=false." -}}
+{{- end -}}
+
+{{- if empty (get $extPg "host") -}}
+{{- fail "prefect.externalPostgresql.host is required when prefect.externalPostgresql.enabled=true." -}}
+{{- end -}}
+
+{{- if empty (get $extPg "existingSecret") -}}
+{{- fail "prefect.externalPostgresql.existingSecret is required when prefect.externalPostgresql.enabled=true." -}}
+{{- end -}}
+
+{{- end -}}
