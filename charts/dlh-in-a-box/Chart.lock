@@ -7,10 +7,10 @@ dependencies:
   version: 0.15.2
 - name: prefect-server
   repository: https://prefecthq.github.io/prefect-helm
-  version: 2025.12.31221620
+  version: 2026.6.1154549
 - name: prefect-worker
   repository: https://prefecthq.github.io/prefect-helm
-  version: 2025.12.31221620
+  version: 2026.6.1154549
 - name: oauth2-proxy
   repository: https://oauth2-proxy.github.io/manifests
   version: 10.1.4
@@ -53,5 +53,5 @@ dependencies:
 - name: postgresql
   repository: https://charts.bitnami.com/bitnami
   version: 14.3.3
-digest: sha256:c94374a92552162b44f4490f10e29b72dbff8a70f84144cffb25dc94bdcbc710
-generated: "2026-05-28T11:04:23.3119+01:00"
+digest: sha256:707ab1234773ad96456c14f784bd04572cd6871a9f252d3b32ba16f0f3a24e52
+generated: "2026-07-02T10:42:33.737502+01:00"
