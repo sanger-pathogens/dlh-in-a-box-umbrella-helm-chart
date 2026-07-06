@@ -1,0 +1,5 @@
+cloudbeaver:
+  bootstrap:
+    forceWorkspaceSeed: true
+  h2FreshSchemaPatch:
+    enabled: true

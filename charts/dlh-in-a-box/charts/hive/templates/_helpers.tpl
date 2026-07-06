@@ -6,6 +6,13 @@ Sanitize schema name for Kubernetes resource names
 {{- end -}}
 
 {{/*
+Escape text values embedded in Hadoop XML configuration files.
+*/}}
+{{- define "hive.xmlEscape" -}}
+{{- replace ">" "&gt;" (replace "<" "&lt;" (replace "&" "&amp;" .)) -}}
+{{- end -}}
+
+{{/*
 Full name for Hive resources
 */}}
 {{- define "hive.fullname" -}}

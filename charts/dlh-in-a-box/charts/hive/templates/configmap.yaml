@@ -22,7 +22,7 @@ stringData:
       </property>
       <property>
         <name>fs.s3a.endpoint</name>
-        <value>{{ $.Values.s3.endpoint }}</value>
+        <value>{{ include "hive.xmlEscape" $.Values.s3.endpoint }}</value>
       </property>
       <property>
         <name>fs.s3a.fast.upload</name>
@@ -30,11 +30,11 @@ stringData:
       </property>
       <property>
         <name>fs.s3a.access.key</name>
-        <value>{{ include "hive.s3AccessKey" $ }}</value>
+        <value>{{ include "hive.xmlEscape" (include "hive.s3AccessKey" $) }}</value>
       </property>
       <property>
         <name>fs.s3a.secret.key</name>
-        <value>{{ include "hive.s3SecretKey" $ }}</value>
+        <value>{{ include "hive.xmlEscape" (include "hive.s3SecretKey" $) }}</value>
       </property>
       <property>
         <name>fs.s3a.path.style.access</name>
@@ -58,15 +58,15 @@ stringData:
       </property>
       <property>
         <name>javax.jdo.option.ConnectionURL</name>
-        <value>jdbc:postgresql://{{ $postgresHost }}:{{ $.Values.postgres.port }}/{{ $catalogName }}</value>
+        <value>{{ include "hive.xmlEscape" (printf "jdbc:postgresql://%s:%v/%s" $postgresHost $.Values.postgres.port $catalogName) }}</value>
       </property>
       <property>
         <name>javax.jdo.option.ConnectionUserName</name>
-        <value>{{ include "hive.postgresUsername" $ }}</value>
+        <value>{{ include "hive.xmlEscape" (include "hive.postgresUsername" $) }}</value>
       </property>
       <property>
         <name>javax.jdo.option.ConnectionPassword</name>
-        <value>{{ include "hive.postgresPassword" $ }}</value>
+        <value>{{ include "hive.xmlEscape" (include "hive.postgresPassword" $) }}</value>
       </property>
       <property>
         <name>datanucleus.connectionPoolingType</name>
@@ -86,7 +86,7 @@ stringData:
       </property>
       <property>
         <name>metastore.warehouse.dir</name>
-        <value>{{ $.Values.warehouseDir }}/{{ $catalogName }}</value>
+        <value>{{ include "hive.xmlEscape" (printf "%s/%s" $.Values.warehouseDir $catalogName) }}</value>
       </property>
       <property>
         <name>metastore.thrift.port</name>

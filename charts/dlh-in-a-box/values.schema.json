@@ -940,7 +940,15 @@
               "properties": {
                 "enabled": { "type": "boolean" },
                 "schedule": { "type": "string" },
-                "suspend": { "type": "boolean" }
+                "suspend": { "type": "boolean" },
+                "readiness": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "properties": {
+                    "attempts": { "type": "integer", "minimum": 1 },
+                    "delaySeconds": { "type": "integer", "minimum": 1 }
+                  }
+                }
               }
             },
             "importCatalogAcls": { "type": "boolean" },
@@ -1469,6 +1477,14 @@
                 "bootstrapGroupsKey": { "type": "string" }
               }
             }
+          }
+        },
+        "h2FreshSchemaPatch": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "enabled": { "type": "boolean" },
+            "pluginJar": { "type": "string" }
           }
         },
         "trustedCa": {

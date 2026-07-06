@@ -1,0 +1,18 @@
+global:
+  identity:
+    external:
+      clients:
+        rangerProxy:
+          enabled: true
+          clientId: ranger
+          existingSecret: dlh-ranger-oauth2-proxy
+          clientSecretKey: client-secret
+          cookieExistingSecret: dlh-ranger-oauth2-proxy
+          cookieSecretKey: cookie-secret
+          redirectUrl: https://ranger.dev.example.org/oauth2/callback
+          redirectUris:
+            - https://ranger.dev.example.org/oauth2/callback
+          webOrigins:
+            - https://ranger.dev.example.org
+          emailDomains:
+            - "*"
