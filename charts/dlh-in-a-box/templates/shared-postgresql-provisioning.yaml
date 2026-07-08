@@ -1,6 +1,7 @@
 {{- $sharedPostgresql := .Values.sharedPostgresql | default dict -}}
+{{- $external := get $sharedPostgresql "external" | default dict -}}
 {{- $provisioning := $sharedPostgresql.provisioning | default dict -}}
-{{- if and $sharedPostgresql.enabled (default true $provisioning.enabled) -}}
+{{- if and (or $sharedPostgresql.enabled (default false $external.enabled)) (default true $provisioning.enabled) -}}
 {{- $auth := $sharedPostgresql.auth | default dict -}}
 {{- $image := $provisioning.image | default dict -}}
 {{- $adminSecret := $provisioning.adminSecret | default dict -}}
@@ -90,14 +91,19 @@ spec:
             - name: PGHOST
               value: {{ include "dlh-in-a-box.sharedPostgresql.serviceName" . | quote }}
             - name: PGPORT
-              value: "5432"
+              value: {{ include "dlh-in-a-box.sharedPostgresql.port" . | quote }}
             - name: PGUSER
-              value: postgres
+              value: {{ if default false $external.enabled }}{{ default "postgres" $external.username | quote }}{{ else }}postgres{{ end }}
             - name: PGPASSWORD
               valueFrom:
                 secretKeyRef:
+                  {{- if default false $external.enabled }}
+                  name: {{ $external.existingSecret | quote }}
+                  key: {{ default "postgres-password" $external.passwordKey | quote }}
+                  {{- else }}
                   name: {{ default $auth.existingSecret $adminSecret.name | quote }}
                   key: {{ default "postgres-password" $adminSecret.passwordKey | quote }}
+                  {{- end }}
             {{- range $index, $database := default list $provisioning.databases }}
             - name: APP_{{ $index }}_PASSWORD
               valueFrom:

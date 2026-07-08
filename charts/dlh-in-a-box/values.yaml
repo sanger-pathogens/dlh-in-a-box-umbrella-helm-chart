@@ -351,6 +351,18 @@ global:
 
 sharedPostgresql:
   enabled: false
+  # Point the shared-postgres feature at an instance you manage yourself
+  # instead of the bundled bitnami/postgresql pod above. Leave
+  # sharedPostgresql.enabled=false when using this.
+  external:
+    enabled: false
+    host: ""
+    port: 5432
+    username: postgres
+    # Name of an existing Secret containing the admin/superuser password used
+    # to provision the per-app databases and roles below.
+    existingSecret: ""
+    passwordKey: postgres-password
   nameOverride: shared-postgresql
   image:
     repository: bitnamilegacy/postgresql
@@ -1616,6 +1628,11 @@ prefectServer:
     nameOverride: prefect-postgresql
     image:
       repository: bitnamilegacy/postgresql
+  secret:
+    # Fixed name used by both the bundled-postgres path (upstream creates it)
+    # and the sharedPostgresql path (templates/prefect-shared-postgresql-connection.yaml
+    # creates it when prefectServer.postgresql.enabled=false).
+    name: prefect-server-postgresql-connection
 
 prefectWorker:
   worker:
