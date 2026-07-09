@@ -1,0 +1,19 @@
+apiVersion: v2
+name: shared-postgresql
+description: Wrapper chart that lets the umbrella's shared PostgreSQL feature target either a bundled Bitnami PostgreSQL instance or an externally managed one, while leaving per-app database provisioning owned by the parent umbrella chart.
+type: application
+version: 0.1.0
+appVersion: "0.1.0"
+home: https://github.com/sanger-pathogens/dlh-in-a-box-umbrella-helm-chart
+annotations:
+  org.opencontainers.image.source: https://github.com/sanger-pathogens/dlh-in-a-box-umbrella-helm-chart
+  org.opencontainers.image.licenses: Apache-2.0
+sources:
+  - https://github.com/sanger-pathogens/dlh-in-a-box-umbrella-helm-chart
+
+dependencies:
+  - name: postgresql
+    alias: bundled
+    version: "14.3.3"
+    repository: https://charts.bitnami.com/bitnami
+    condition: bundled.enabled

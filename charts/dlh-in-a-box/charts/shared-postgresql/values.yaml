@@ -1,0 +1,10 @@
+# This chart has no templates of its own -- it only exists so that
+# `sharedPostgresql.bundled.*` in the parent umbrella chart's values can be
+# forwarded to a nested Bitnami PostgreSQL dependency (aliased `bundled`
+# here) without colliding with the parent's own `sharedPostgresql.enabled`,
+# which independently gates whether this whole chart is included at all.
+#
+# Real defaults for `bundled.*` live in the parent umbrella chart's
+# values.yaml; this file only needs to guarantee `bundled.enabled` exists.
+bundled:
+  enabled: false
