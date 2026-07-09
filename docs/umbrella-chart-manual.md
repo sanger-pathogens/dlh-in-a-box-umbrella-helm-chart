@@ -489,6 +489,7 @@ The published chart mixes four kinds of material:
 | --- | --- | --- |
 | first-party umbrella chart logic | `charts/dlh-in-a-box/values.yaml` and `templates/` | repo-owned cross-component behavior |
 | first-party local subchart | `charts/dlh-in-a-box/charts/hive/` | repo-owned Hive Metastore generation |
+| first-party local wrapper subchart | `charts/dlh-in-a-box/charts/shared-postgresql/` | lets `sharedPostgresql.bundled.*` reach a nested Bitnami PostgreSQL dependency; see [Shared PostgreSQL](#shared-postgresql) |
 | vendored upstream source with local patch points | `charts/dlh-in-a-box/charts/trino/` | mostly upstream Trino chart code plus a small local patch set |
 | packaged dependency archives | `charts/dlh-in-a-box/charts/*.tgz` | reproducible dependency bundles used for packaging and release |
 
@@ -577,18 +578,25 @@ consolidation: one PostgreSQL instance plus a chart-owned provisioning Job
 role, and password Secret for each app listed in
 `sharedPostgresql.provisioning.databases`.
 
-`sharedPostgresql` has two mutually exclusive data-plane options:
+`sharedPostgresql.enabled` is the master switch for the whole feature. Once
+it's true, pick exactly one data plane:
 
-- `sharedPostgresql.enabled=true` deploys the bundled bitnami/postgresql pod
-  (the `sharedPostgresql` alias in `Chart.yaml`) and provisions the per-app
-  databases on it.
+- `sharedPostgresql.bundled.enabled=true` deploys a bundled Bitnami
+  PostgreSQL pod and provisions the per-app databases on it. This is backed
+  by a local wrapper subchart, `charts/dlh-in-a-box/charts/shared-postgresql/`
+  (see its `README.md`) — it exists purely so `bundled.*` can be forwarded to
+  a nested Bitnami dependency (aliased `bundled` inside that wrapper) without
+  colliding with `sharedPostgresql.enabled` itself, which independently gates
+  whether the wrapper chart is included at all. `bundled.nameOverride`,
+  `bundled.image`, `bundled.auth`, and `bundled.primary` all land on that
+  Bitnami chart's own values, same as before this existed as its own key.
 - `sharedPostgresql.external.enabled=true` skips the bundled pod and
   provisions the same per-app databases on a PostgreSQL instance you manage
   yourself:
 
   ```yaml
   sharedPostgresql:
-    enabled: false
+    enabled: true
     external:
       enabled: true
       host: my-postgres.example.com
@@ -598,14 +606,16 @@ role, and password Secret for each app listed in
       passwordKey: postgres-password      # default
   ```
 
-Either way, once a shared instance is active,
-`templates/shared-postgresql-validation.yaml` requires disabling the bundled
-pod for every app it provisions for (`keycloak.postgresql.enabled=false`,
+`templates/shared-postgresql-validation.yaml` fails the render if
+`bundled.enabled` and `external.enabled` are both set, if `enabled=true` but
+neither is set, if either is set without `enabled=true`, or if
+`external.enabled=true` is missing `host` or `existingSecret`. Once a shared
+instance is active either way, it also requires disabling the bundled pod
+for every app it provisions for (`keycloak.postgresql.enabled=false`,
 `prefectServer.postgresql.enabled=false`, `superset.postgresql.enabled=false`,
-`rangerPostgresql.enabled=false`, `hivePostgresql.enabled=false`), and fails
-the render if `sharedPostgresql.enabled` and `sharedPostgresql.external.enabled`
-are both set, or if `external.enabled=true` is missing `host` or
-`existingSecret`.
+`rangerPostgresql.enabled=false`, `hivePostgresql.enabled=false`) unless
+`sharedPostgresql.migration.allowBundledPostgresql=true` — useful for
+migrating one app at a time instead of all at once.
 
 #### Prefect's Connection Secret
 
