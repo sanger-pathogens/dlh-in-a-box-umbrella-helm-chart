@@ -350,10 +350,28 @@ global:
   dataCatalogs: {}
 
 sharedPostgresql:
+  # Master switch for the whole shared-postgres feature. Pick exactly one
+  # data plane below (bundled.enabled or external.enabled) once this is true.
   enabled: false
+  bundled:
+    enabled: false
+    nameOverride: shared-postgresql
+    image:
+      repository: bitnamilegacy/postgresql
+      tag: 17.6.0-debian-12-r0
+    auth:
+      enablePostgresUser: true
+      existingSecret: dlh-shared-postgresql
+      secretKeys:
+        adminPasswordKey: postgres-password
+    primary:
+      extendedConfiguration: |-
+        password_encryption = md5
+      persistence:
+        enabled: true
+        size: 100Gi
   # Point the shared-postgres feature at an instance you manage yourself
-  # instead of the bundled bitnami/postgresql pod above. Leave
-  # sharedPostgresql.enabled=false when using this.
+  # instead of the bundled instance above.
   external:
     enabled: false
     host: ""
@@ -363,21 +381,6 @@ sharedPostgresql:
     # to provision the per-app databases and roles below.
     existingSecret: ""
     passwordKey: postgres-password
-  nameOverride: shared-postgresql
-  image:
-    repository: bitnamilegacy/postgresql
-    tag: 17.6.0-debian-12-r0
-  auth:
-    enablePostgresUser: true
-    existingSecret: dlh-shared-postgresql
-    secretKeys:
-      adminPasswordKey: postgres-password
-  primary:
-    extendedConfiguration: |-
-      password_encryption = md5
-    persistence:
-      enabled: true
-      size: 100Gi
   provisioning:
     enabled: true
     backoffLimit: 6

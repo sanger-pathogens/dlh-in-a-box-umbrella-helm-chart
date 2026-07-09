@@ -1,9 +1,18 @@
 {{- $sharedPostgresql := .Values.sharedPostgresql | default dict -}}
 {{- $external := get $sharedPostgresql "external" | default dict -}}
-{{- if and $sharedPostgresql.enabled (default false $external.enabled) -}}
-{{- fail "sharedPostgresql.enabled and sharedPostgresql.external.enabled are mutually exclusive: pick either the bundled instance or an external one." -}}
+{{- $bundled := get $sharedPostgresql "bundled" | default dict -}}
+{{- $externalEnabled := default false (get $external "enabled") -}}
+{{- $bundledEnabled := default false (get $bundled "enabled") -}}
+{{- if and $bundledEnabled $externalEnabled -}}
+{{- fail "sharedPostgresql.bundled.enabled and sharedPostgresql.external.enabled are mutually exclusive: pick one data plane." -}}
 {{- end -}}
-{{- if default false $external.enabled -}}
+{{- if and $sharedPostgresql.enabled (not (or $bundledEnabled $externalEnabled)) -}}
+{{- fail "sharedPostgresql.enabled=true requires picking a data plane: set sharedPostgresql.bundled.enabled=true or sharedPostgresql.external.enabled=true." -}}
+{{- end -}}
+{{- if and (or $bundledEnabled $externalEnabled) (not $sharedPostgresql.enabled) -}}
+{{- fail "sharedPostgresql.bundled.enabled or sharedPostgresql.external.enabled is set without sharedPostgresql.enabled=true, so nothing will actually deploy." -}}
+{{- end -}}
+{{- if $externalEnabled -}}
 {{- if empty (get $external "host") -}}
 {{- fail "sharedPostgresql.external.host is required when sharedPostgresql.external.enabled=true." -}}
 {{- end -}}
@@ -11,7 +20,7 @@
 {{- fail "sharedPostgresql.external.existingSecret is required when sharedPostgresql.external.enabled=true." -}}
 {{- end -}}
 {{- end -}}
-{{- if or $sharedPostgresql.enabled (default false $external.enabled) -}}
+{{- if $sharedPostgresql.enabled -}}
 {{- $migration := get $sharedPostgresql "migration" | default dict -}}
 {{- $allowBundledPostgresql := default false (get $migration "allowBundledPostgresql") -}}
 {{- $keycloakValues := get .Values "keycloak" | default dict -}}

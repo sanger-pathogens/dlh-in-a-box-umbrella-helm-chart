@@ -1,6 +1,5 @@
 {{- $sharedPostgresql := .Values.sharedPostgresql | default dict -}}
-{{- $external := get $sharedPostgresql "external" | default dict -}}
-{{- $sharedPostgresqlActive := or $sharedPostgresql.enabled (default false $external.enabled) -}}
+{{- $sharedPostgresqlActive := $sharedPostgresql.enabled -}}
 {{- $prefectServer := .Values.prefectServer | default dict -}}
 {{- $prefectPostgresql := get $prefectServer "postgresql" | default dict -}}
 {{- $prefectPostgresqlEnabled := true -}}

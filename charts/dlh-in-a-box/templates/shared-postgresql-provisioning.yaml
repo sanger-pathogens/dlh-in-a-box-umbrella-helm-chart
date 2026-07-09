@@ -1,8 +1,9 @@
 {{- $sharedPostgresql := .Values.sharedPostgresql | default dict -}}
 {{- $external := get $sharedPostgresql "external" | default dict -}}
+{{- $bundled := get $sharedPostgresql "bundled" | default dict -}}
 {{- $provisioning := $sharedPostgresql.provisioning | default dict -}}
-{{- if and (or $sharedPostgresql.enabled (default false $external.enabled)) (default true $provisioning.enabled) -}}
-{{- $auth := $sharedPostgresql.auth | default dict -}}
+{{- if and $sharedPostgresql.enabled (default true $provisioning.enabled) -}}
+{{- $auth := $bundled.auth | default dict -}}
 {{- $image := $provisioning.image | default dict -}}
 {{- $adminSecret := $provisioning.adminSecret | default dict -}}
 apiVersion: batch/v1
