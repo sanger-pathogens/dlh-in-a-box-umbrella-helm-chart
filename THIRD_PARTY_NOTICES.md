@@ -24,7 +24,7 @@ This is an engineering-facing compliance record, not formal legal advice.
 | --- | --- | --- | --- | --- |
 | Trino Helm chart | `1.41.0` | Apache-2.0 | Vendored source at `charts/dlh-in-a-box/charts/trino/` and packaged as a local subchart dependency | Upstream Apache-2.0 text is included at `charts/dlh-in-a-box/charts/trino/LICENSE`. Files modified locally for `dlh-in-a-box` carry prominent notices stating that they were changed. |
 | Apache Superset Helm chart | `0.15.2` | Apache-2.0 | Redistributed as an upstream chart archive | No local source modifications. The chart bundles Bitnami PostgreSQL and Redis subcharts, which stay covered by the Bitnami Apache-2.0 notices already documented here. |
-| Prefect Helm charts | `prefect-server` and `prefect-worker` `2025.12.31221620` | Apache-2.0 | Redistributed as upstream chart archives | No local source modifications. The packaged Prefect charts also bundle Bitnami subcharts noted below. |
+| Prefect Helm charts | `prefect-server` and `prefect-worker` `2026.6.1154549` | Apache-2.0 | Redistributed as upstream chart archives | No local source modifications. The packaged Prefect charts also bundle Bitnami subcharts noted below. |
 | oauth2-proxy Helm chart | `10.1.4` | MIT | Redistributed as an upstream chart archive | No local source modifications. This dependency is used to place self-hosted Prefect behind OIDC authentication without pretending that Prefect itself has native open-source RBAC parity with the other components. The reproduced MIT license text is included at `charts/dlh-in-a-box/third_party/oauth2-proxy/LICENSE`. |
 | Bitnami keycloak Helm chart | `25.2.0` | Apache-2.0 | Redistributed as an upstream Bitnami chart archive | No local source modifications. This dependency is used for the default platform OIDC provider pattern. |
 | Spark Operator Helm chart | `2.4.0` | Apache-2.0 | Redistributed as an upstream chart archive | No local source modifications. |
@@ -34,6 +34,7 @@ This is an engineering-facing compliance record, not formal legal advice.
 | Vault Helm chart | `0.32.0` | MPL-2.0 | Redistributed as upstream dependency material in the repository and packaged chart | No local source modifications. The upstream dependency material carries `vault/LICENSE`; this repository also documents the upstream source and license below. |
 | JupyterHub Helm chart | `4.3.3` | BSD-3-Clause | Redistributed as upstream dependency material in the repository and packaged chart | No local source modifications. This optional dependency provides Keycloak-backed notebook access and token-aware single-user servers. |
 | Local Hive subchart | `0.1.0` | Apache-2.0 | Local source under `charts/dlh-in-a-box/charts/hive/` and packaged as a local subchart dependency | Covered by this repository's Apache-2.0 license. |
+| Local shared-postgresql subchart | `0.1.0` | Apache-2.0 | Local source under `charts/dlh-in-a-box/charts/shared-postgresql/` and packaged as a local subchart dependency | Covered by this repository's Apache-2.0 license. Its own Bitnami `postgresql 14.3.3` dependency stays covered by the Bitnami Apache-2.0 notice above. |
 
 ## Upstream license sources reviewed
 

@@ -1,7 +1,9 @@
 {{- $sharedPostgresql := .Values.sharedPostgresql | default dict -}}
+{{- $external := get $sharedPostgresql "external" | default dict -}}
+{{- $bundled := get $sharedPostgresql "bundled" | default dict -}}
 {{- $provisioning := $sharedPostgresql.provisioning | default dict -}}
 {{- if and $sharedPostgresql.enabled (default true $provisioning.enabled) -}}
-{{- $auth := $sharedPostgresql.auth | default dict -}}
+{{- $auth := $bundled.auth | default dict -}}
 {{- $image := $provisioning.image | default dict -}}
 {{- $adminSecret := $provisioning.adminSecret | default dict -}}
 apiVersion: batch/v1
@@ -57,11 +59,15 @@ spec:
 
                 echo "Provisioning ${app}: database=${db}, owner=${owner}"
 
-                role_exists="$(printf '%s\n' "SELECT 1 FROM pg_roles WHERE rolname = :'owner';" | psql --dbname=postgres --tuples-only --no-align --set=owner="${owner}")"
-                if [ "${role_exists}" != "1" ]; then
-                  printf '%s\n' "CREATE ROLE :\"owner\" LOGIN PASSWORD :'app_password';" | psql --dbname=postgres --set=ON_ERROR_STOP=1 --set=owner="${owner}" --set=app_password="${app_password}"
+                if [ "${owner}" = "${PGUSER}" ]; then
+                  echo "Owner ${owner} is the connecting user; skipping role and ownership management."
                 else
-                  printf '%s\n' "ALTER ROLE :\"owner\" LOGIN PASSWORD :'app_password';" | psql --dbname=postgres --set=ON_ERROR_STOP=1 --set=owner="${owner}" --set=app_password="${app_password}"
+                  role_exists="$(printf '%s\n' "SELECT 1 FROM pg_roles WHERE rolname = :'owner';" | psql --dbname=postgres --tuples-only --no-align --set=owner="${owner}")"
+                  if [ "${role_exists}" != "1" ]; then
+                    printf '%s\n' "CREATE ROLE :\"owner\" LOGIN PASSWORD :'app_password';" | psql --dbname=postgres --set=ON_ERROR_STOP=1 --set=owner="${owner}" --set=app_password="${app_password}"
+                  else
+                    printf '%s\n' "ALTER ROLE :\"owner\" LOGIN PASSWORD :'app_password';" | psql --dbname=postgres --set=ON_ERROR_STOP=1 --set=owner="${owner}" --set=app_password="${app_password}"
+                  fi
                 fi
 
                 database_exists="$(printf '%s\n' "SELECT 1 FROM pg_database WHERE datname = :'db';" | psql --dbname=postgres --tuples-only --no-align --set=db="${db}")"
@@ -69,18 +75,20 @@ spec:
                   printf '%s\n' "CREATE DATABASE :\"db\" OWNER :\"owner\";" | psql --dbname=postgres --set=ON_ERROR_STOP=1 --set=db="${db}" --set=owner="${owner}"
                 fi
 
-                printf '%s\n' \
-                  "ALTER DATABASE :\"db\" OWNER TO :\"owner\";" \
-                  "GRANT ALL PRIVILEGES ON DATABASE :\"db\" TO :\"owner\";" |
-                  psql --dbname=postgres --set=ON_ERROR_STOP=1 --set=db="${db}" --set=owner="${owner}"
+                if [ "${owner}" != "${PGUSER}" ]; then
+                  printf '%s\n' \
+                    "ALTER DATABASE :\"db\" OWNER TO :\"owner\";" \
+                    "GRANT ALL PRIVILEGES ON DATABASE :\"db\" TO :\"owner\";" |
+                    psql --dbname=postgres --set=ON_ERROR_STOP=1 --set=db="${db}" --set=owner="${owner}"
 
-                printf '%s\n' \
-                  "GRANT ALL ON SCHEMA public TO :\"owner\";" \
-                  "ALTER SCHEMA public OWNER TO :\"owner\";" \
-                  "ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON TABLES TO :\"owner\";" \
-                  "ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON SEQUENCES TO :\"owner\";" \
-                  "ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON FUNCTIONS TO :\"owner\";" |
-                  psql --dbname="${db}" --set=ON_ERROR_STOP=1 --set=owner="${owner}"
+                  printf '%s\n' \
+                    "GRANT ALL ON SCHEMA public TO :\"owner\";" \
+                    "ALTER SCHEMA public OWNER TO :\"owner\";" \
+                    "ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON TABLES TO :\"owner\";" \
+                    "ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON SEQUENCES TO :\"owner\";" \
+                    "ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON FUNCTIONS TO :\"owner\";" |
+                    psql --dbname="${db}" --set=ON_ERROR_STOP=1 --set=owner="${owner}"
+                fi
               }
 
               {{- range $index, $database := default list $provisioning.databases }}
@@ -90,14 +98,19 @@ spec:
             - name: PGHOST
               value: {{ include "dlh-in-a-box.sharedPostgresql.serviceName" . | quote }}
             - name: PGPORT
-              value: "5432"
+              value: {{ include "dlh-in-a-box.sharedPostgresql.port" . | quote }}
             - name: PGUSER
-              value: postgres
+              value: {{ if default false $external.enabled }}{{ default "postgres" $external.username | quote }}{{ else }}postgres{{ end }}
             - name: PGPASSWORD
               valueFrom:
                 secretKeyRef:
+                  {{- if default false $external.enabled }}
+                  name: {{ $external.existingSecret | quote }}
+                  key: {{ default "postgres-password" $external.passwordKey | quote }}
+                  {{- else }}
                   name: {{ default $auth.existingSecret $adminSecret.name | quote }}
                   key: {{ default "postgres-password" $adminSecret.passwordKey | quote }}
+                  {{- end }}
             {{- range $index, $database := default list $provisioning.databases }}
             - name: APP_{{ $index }}_PASSWORD
               valueFrom:

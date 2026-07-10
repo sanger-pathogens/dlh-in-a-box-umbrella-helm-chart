@@ -489,6 +489,7 @@ The published chart mixes four kinds of material:
 | --- | --- | --- |
 | first-party umbrella chart logic | `charts/dlh-in-a-box/values.yaml` and `templates/` | repo-owned cross-component behavior |
 | first-party local subchart | `charts/dlh-in-a-box/charts/hive/` | repo-owned Hive Metastore generation |
+| first-party local wrapper subchart | `charts/dlh-in-a-box/charts/shared-postgresql/` | lets `sharedPostgresql.bundled.*` reach a nested Bitnami PostgreSQL dependency; see [Shared PostgreSQL](#shared-postgresql) |
 | vendored upstream source with local patch points | `charts/dlh-in-a-box/charts/trino/` | mostly upstream Trino chart code plus a small local patch set |
 | packaged dependency archives | `charts/dlh-in-a-box/charts/*.tgz` | reproducible dependency bundles used for packaging and release |
 
@@ -565,6 +566,72 @@ These mostly expose upstream chart values at the umbrella level:
 - `vault`
 - `hivePostgresql`
 - `rangerPostgresql`
+- `sharedPostgresql`
+
+### Shared PostgreSQL
+
+By default every app that needs PostgreSQL runs its own bundled bitnami pod
+(`keycloak.postgresql`, `prefectServer.postgresql`, `superset.postgresql`,
+`rangerPostgresql`, `hivePostgresql`). `sharedPostgresql` is an optional
+consolidation: one PostgreSQL instance plus a chart-owned provisioning Job
+(`templates/shared-postgresql-provisioning.yaml`) that creates a database,
+role, and password Secret for each app listed in
+`sharedPostgresql.provisioning.databases`.
+
+`sharedPostgresql.enabled` is the master switch for the whole feature. Once
+it's true, pick exactly one data plane:
+
+- `sharedPostgresql.bundled.enabled=true` deploys a bundled Bitnami
+  PostgreSQL pod and provisions the per-app databases on it. This is backed
+  by a local wrapper subchart, `charts/dlh-in-a-box/charts/shared-postgresql/`
+  (see its `README.md`) — it exists purely so `bundled.*` can be forwarded to
+  a nested Bitnami dependency (aliased `bundled` inside that wrapper) without
+  colliding with `sharedPostgresql.enabled` itself, which independently gates
+  whether the wrapper chart is included at all. `bundled.nameOverride`,
+  `bundled.image`, `bundled.auth`, and `bundled.primary` all land on that
+  Bitnami chart's own values, same as before this existed as its own key.
+- `sharedPostgresql.external.enabled=true` skips the bundled pod and
+  provisions the same per-app databases on a PostgreSQL instance you manage
+  yourself:
+
+  ```yaml
+  sharedPostgresql:
+    enabled: true
+    external:
+      enabled: true
+      host: my-postgres.example.com
+      port: 5432          # default
+      username: postgres  # default
+      existingSecret: my-postgres-admin   # must contain a key matching passwordKey
+      passwordKey: postgres-password      # default
+  ```
+
+`templates/shared-postgresql-validation.yaml` fails the render if
+`bundled.enabled` and `external.enabled` are both set, if `enabled=true` but
+neither is set, if either is set without `enabled=true`, or if
+`external.enabled=true` is missing `host` or `existingSecret`. Once a shared
+instance is active either way, it also requires disabling the bundled pod
+for every app it provisions for (`keycloak.postgresql.enabled=false`,
+`prefectServer.postgresql.enabled=false`, `superset.postgresql.enabled=false`,
+`rangerPostgresql.enabled=false`, `hivePostgresql.enabled=false`) unless
+`sharedPostgresql.migration.allowBundledPostgresql=true` — useful for
+migrating one app at a time instead of all at once.
+
+#### Prefect's Connection Secret
+
+Most apps on a shared instance can point their own upstream chart directly at
+it (for example Keycloak's `externalDatabase.*`). Prefect's upstream chart
+cannot: `prefectServer.secret.*` only accepts a plaintext password, with no
+`existingSecret` support, when `prefectServer.postgresql.enabled=false`.
+
+`templates/prefect-shared-postgresql-connection.yaml` bridges that gap: when a
+shared instance is active and `prefectServer.postgresql.enabled=false`, it
+reads the password via Helm `lookup` from the `prefect` entry's
+`secretName`/`passwordKey` in `sharedPostgresql.provisioning.databases`, and
+builds the `connection-string` Secret (`prefectServer.secret.name`, fixed at
+`prefect-server-postgresql-connection`) that the upstream Prefect server chart
+expects. Also set `prefectServer.secret.create=false` so the upstream chart
+does not try to build its own copy of that Secret.
 
 ### Prefect Job Runner Pull Identity
 
@@ -590,6 +657,7 @@ Two files are the main fail-fast safety rails:
 | --- | --- |
 | `templates/identity-validation.yaml` | unsupported identity combinations, missing client wiring, invalid local Keycloak versus LDAP combinations, and inconsistent app-auth assumptions |
 | `templates/governance-validation.yaml` | broken platform roles, missing exception metadata, incomplete governed-catalog metadata, and unsafe authorization combinations |
+| `templates/shared-postgresql-validation.yaml` | conflicting or incomplete `sharedPostgresql`/`sharedPostgresql.external` settings, and bundled per-app postgres pods left enabled alongside a shared instance |
 
 `values.schema.json` also enforces input shape, but it is not the whole story.
 Many of the most important platform rules live in those validation templates.
@@ -611,6 +679,10 @@ Important examples:
   secret into the exact shape DataHub expects
 - the Trino helper path can read S3 credentials from an existing secret when
   generated catalogs use `global.storage.s3.existingSecret`
+- `templates/prefect-shared-postgresql-connection.yaml` reads the `prefect`
+  database password out of `sharedPostgresql.provisioning.databases` to build
+  the Prefect `connection-string` Secret when a shared PostgreSQL instance is
+  active and `prefectServer.postgresql.enabled=false`
 
 If a render seems surprising, ask whether `lookup` is part of the path and
 whether the referenced secret already exists in the namespace you rendered

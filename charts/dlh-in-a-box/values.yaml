@@ -350,22 +350,37 @@ global:
   dataCatalogs: {}
 
 sharedPostgresql:
+  # Master switch for the whole shared-postgres feature. Pick exactly one
+  # data plane below (bundled.enabled or external.enabled) once this is true.
   enabled: false
-  nameOverride: shared-postgresql
-  image:
-    repository: bitnamilegacy/postgresql
-    tag: 17.6.0-debian-12-r0
-  auth:
-    enablePostgresUser: true
-    existingSecret: dlh-shared-postgresql
-    secretKeys:
-      adminPasswordKey: postgres-password
-  primary:
-    extendedConfiguration: |-
-      password_encryption = md5
-    persistence:
-      enabled: true
-      size: 100Gi
+  bundled:
+    enabled: false
+    nameOverride: shared-postgresql
+    image:
+      repository: bitnamilegacy/postgresql
+      tag: 17.6.0-debian-12-r0
+    auth:
+      enablePostgresUser: true
+      existingSecret: dlh-shared-postgresql
+      secretKeys:
+        adminPasswordKey: postgres-password
+    primary:
+      extendedConfiguration: |-
+        password_encryption = md5
+      persistence:
+        enabled: true
+        size: 100Gi
+  # Point the shared-postgres feature at an instance you manage yourself
+  # instead of the bundled instance above.
+  external:
+    enabled: false
+    host: ""
+    port: 5432
+    username: postgres
+    # Name of an existing Secret containing the admin/superuser password used
+    # to provision the per-app databases and roles below.
+    existingSecret: ""
+    passwordKey: postgres-password
   provisioning:
     enabled: true
     backoffLimit: 6
@@ -1616,6 +1631,11 @@ prefectServer:
     nameOverride: prefect-postgresql
     image:
       repository: bitnamilegacy/postgresql
+  secret:
+    # Fixed name used by both the bundled-postgres path (upstream creates it)
+    # and the sharedPostgresql path (templates/prefect-shared-postgresql-connection.yaml
+    # creates it when prefectServer.postgresql.enabled=false).
+    name: prefect-server-postgresql-connection
 
 prefectWorker:
   worker:

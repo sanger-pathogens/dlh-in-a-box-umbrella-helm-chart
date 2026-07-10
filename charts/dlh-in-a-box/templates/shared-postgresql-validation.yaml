@@ -1,4 +1,25 @@
 {{- $sharedPostgresql := .Values.sharedPostgresql | default dict -}}
+{{- $external := get $sharedPostgresql "external" | default dict -}}
+{{- $bundled := get $sharedPostgresql "bundled" | default dict -}}
+{{- $externalEnabled := default false (get $external "enabled") -}}
+{{- $bundledEnabled := default false (get $bundled "enabled") -}}
+{{- if and $bundledEnabled $externalEnabled -}}
+{{- fail "sharedPostgresql.bundled.enabled and sharedPostgresql.external.enabled are mutually exclusive: pick one data plane." -}}
+{{- end -}}
+{{- if and $sharedPostgresql.enabled (not (or $bundledEnabled $externalEnabled)) -}}
+{{- fail "sharedPostgresql.enabled=true requires picking a data plane: set sharedPostgresql.bundled.enabled=true or sharedPostgresql.external.enabled=true." -}}
+{{- end -}}
+{{- if and (or $bundledEnabled $externalEnabled) (not $sharedPostgresql.enabled) -}}
+{{- fail "sharedPostgresql.bundled.enabled or sharedPostgresql.external.enabled is set without sharedPostgresql.enabled=true, so nothing will actually deploy." -}}
+{{- end -}}
+{{- if $externalEnabled -}}
+{{- if empty (get $external "host") -}}
+{{- fail "sharedPostgresql.external.host is required when sharedPostgresql.external.enabled=true." -}}
+{{- end -}}
+{{- if empty (get $external "existingSecret") -}}
+{{- fail "sharedPostgresql.external.existingSecret is required when sharedPostgresql.external.enabled=true." -}}
+{{- end -}}
+{{- end -}}
 {{- if $sharedPostgresql.enabled -}}
 {{- $migration := get $sharedPostgresql "migration" | default dict -}}
 {{- $allowBundledPostgresql := default false (get $migration "allowBundledPostgresql") -}}
@@ -23,18 +44,18 @@
 {{- $supersetPostgresqlEnabled = $supersetPostgresql.enabled -}}
 {{- end -}}
 {{- if and $keycloakPostgresqlEnabled (not $allowBundledPostgresql) -}}
-{{- fail "sharedPostgresql.enabled=true requires keycloak.postgresql.enabled=false." -}}
+{{- fail "a shared PostgreSQL instance is active, which requires keycloak.postgresql.enabled=false." -}}
 {{- end -}}
 {{- if and $prefectPostgresqlEnabled (not $allowBundledPostgresql) -}}
-{{- fail "sharedPostgresql.enabled=true requires prefectServer.postgresql.enabled=false." -}}
+{{- fail "a shared PostgreSQL instance is active, which requires prefectServer.postgresql.enabled=false." -}}
 {{- end -}}
 {{- if and $supersetPostgresqlEnabled (not $allowBundledPostgresql) -}}
-{{- fail "sharedPostgresql.enabled=true requires superset.postgresql.enabled=false." -}}
+{{- fail "a shared PostgreSQL instance is active, which requires superset.postgresql.enabled=false." -}}
 {{- end -}}
 {{- if and (default false (get $rangerPostgresql "enabled")) (not $allowBundledPostgresql) -}}
-{{- fail "sharedPostgresql.enabled=true requires rangerPostgresql.enabled=false." -}}
+{{- fail "a shared PostgreSQL instance is active, which requires rangerPostgresql.enabled=false." -}}
 {{- end -}}
 {{- if and (default false (get $hivePostgresql "enabled")) (not $allowBundledPostgresql) -}}
-{{- fail "sharedPostgresql.enabled=true requires hivePostgresql.enabled=false." -}}
+{{- fail "a shared PostgreSQL instance is active, which requires hivePostgresql.enabled=false." -}}
 {{- end -}}
 {{- end -}}

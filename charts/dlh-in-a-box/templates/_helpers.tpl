@@ -192,10 +192,24 @@ app.kubernetes.io/managed-by: {{ .Release.Service }}
 
 {{- define "dlh-in-a-box.sharedPostgresql.serviceName" -}}
 {{- $sharedPostgresql := .Values.sharedPostgresql | default dict -}}
-{{- if $sharedPostgresql.fullnameOverride -}}
-{{- $sharedPostgresql.fullnameOverride -}}
+{{- $external := get $sharedPostgresql "external" | default dict -}}
+{{- $bundled := get $sharedPostgresql "bundled" | default dict -}}
+{{- if default false $external.enabled -}}
+{{- $external.host -}}
+{{- else if $bundled.fullnameOverride -}}
+{{- $bundled.fullnameOverride -}}
 {{- else -}}
-{{- printf "%s-%s" .Release.Name (default "shared-postgresql" $sharedPostgresql.nameOverride) | trunc 63 | trimSuffix "-" -}}
+{{- printf "%s-%s" .Release.Name (default "shared-postgresql" $bundled.nameOverride) | trunc 63 | trimSuffix "-" -}}
+{{- end -}}
+{{- end -}}
+
+{{- define "dlh-in-a-box.sharedPostgresql.port" -}}
+{{- $sharedPostgresql := .Values.sharedPostgresql | default dict -}}
+{{- $external := get $sharedPostgresql "external" | default dict -}}
+{{- if default false $external.enabled -}}
+{{- default 5432 $external.port -}}
+{{- else -}}
+5432
 {{- end -}}
 {{- end -}}
 

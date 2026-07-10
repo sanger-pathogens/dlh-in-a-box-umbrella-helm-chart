@@ -12,7 +12,7 @@ embedded dependency charts keep their own upstream licenses.
 | --- | --- | --- | --- |
 | Trino Helm chart | `1.41.0` | Apache-2.0 | Vendored locally and packaged as a dependency. Upstream Apache-2.0 text is included at `charts/trino/LICENSE`. Files modified for `dlh-in-a-box` contain prominent change notices. |
 | Apache Superset Helm chart | `0.15.2` | Apache-2.0 | Packaged upstream chart archive. The chart bundles Bitnami PostgreSQL and Redis subcharts that stay covered by the Bitnami Apache-2.0 notices already documented here. |
-| Prefect Helm charts | `prefect-server` and `prefect-worker` `2025.12.31221620` | Apache-2.0 | Packaged upstream chart archives. These archives bundle Bitnami `common`, `postgresql`, and `redis` subcharts. |
+| Prefect Helm charts | `prefect-server` and `prefect-worker` `2026.6.1154549` | Apache-2.0 | Packaged upstream chart archives. These archives bundle Bitnami `common`, `postgresql`, and `redis` subcharts. |
 | oauth2-proxy Helm chart | `10.1.4` | MIT | Packaged upstream chart archive. Used to place self-hosted Prefect behind OIDC authentication in shared environments. The reproduced MIT license text is included at `third_party/oauth2-proxy/LICENSE`. |
 | Bitnami keycloak Helm chart | `25.2.0` | Apache-2.0 | Packaged upstream Bitnami chart archive. Used for the default platform OIDC provider pattern. |
 | Spark Operator Helm chart | `2.4.0` | Apache-2.0 | Packaged upstream chart archive. |
@@ -22,6 +22,7 @@ embedded dependency charts keep their own upstream licenses.
 | Vault Helm chart | `0.32.0` | MPL-2.0 | Packaged upstream dependency material. The packaged dependency includes `charts/vault/LICENSE`. |
 | JupyterHub Helm chart | `4.3.3` | BSD-3-Clause | Packaged upstream dependency material. Used for the optional Keycloak-backed notebook environment and Trino demo workspace. |
 | Local Hive subchart | `hive 0.1.0` | Apache-2.0 | Local subchart source packaged into the umbrella chart and covered by the umbrella chart's Apache-2.0 license. |
+| Local shared-postgresql wrapper subchart | `shared-postgresql 0.1.0` | Apache-2.0 | Local subchart source packaged into the umbrella chart and covered by the umbrella chart's Apache-2.0 license. Its own Bitnami `postgresql 14.3.3` dependency is already covered by the Bitnami Apache-2.0 notice above. |
 
 ## Upstream sources
 

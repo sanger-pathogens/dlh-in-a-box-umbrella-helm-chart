@@ -2,8 +2,8 @@ apiVersion: v2
 name: dlh-in-a-box
 description: Production-oriented umbrella Helm chart for deploying a modular data lakehouse platform on Kubernetes.
 type: application
-version: 0.4.1
-appVersion: "0.4.1"
+version: 0.5.0
+appVersion: "0.5.0"
 home: https://github.com/sanger-pathogens/dlh-in-a-box-umbrella-helm-chart
 icon: https://raw.githubusercontent.com/sanger-pathogens/dlh-in-a-box-umbrella-helm-chart/main/docs/assets/dlh-in-a-box-icon.jpg
 annotations:
@@ -56,13 +56,13 @@ dependencies:
 
   - name: prefect-server
     alias: prefectServer
-    version: "2025.12.31221620"
+    version: "2026.6.1154549"
     repository: https://prefecthq.github.io/prefect-helm
     condition: prefect.enabled,prefect.server.enabled
 
   - name: prefect-worker
     alias: prefectWorker
-    version: "2025.12.31221620"
+    version: "2026.6.1154549"
     repository: https://prefecthq.github.io/prefect-helm
     condition: prefect.enabled,prefect.workers.enabled
 
@@ -121,10 +121,10 @@ dependencies:
     repository: https://jupyterhub.github.io/helm-chart
     condition: jupyterhub.enabled
 
-  - name: postgresql
+  - name: shared-postgresql
     alias: sharedPostgresql
-    version: "14.3.3"
-    repository: https://charts.bitnami.com/bitnami
+    version: "0.1.0"
+    repository: file://charts/shared-postgresql
     condition: sharedPostgresql.enabled
 
   - name: hive

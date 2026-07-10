@@ -7,10 +7,10 @@ dependencies:
   version: 0.15.2
 - name: prefect-server
   repository: https://prefecthq.github.io/prefect-helm
-  version: 2025.12.31221620
+  version: 2026.6.1154549
 - name: prefect-worker
   repository: https://prefecthq.github.io/prefect-helm
-  version: 2025.12.31221620
+  version: 2026.6.1154549
 - name: oauth2-proxy
   repository: https://oauth2-proxy.github.io/manifests
   version: 10.1.4
@@ -41,9 +41,9 @@ dependencies:
 - name: jupyterhub
   repository: https://jupyterhub.github.io/helm-chart
   version: 4.3.3
-- name: postgresql
-  repository: https://charts.bitnami.com/bitnami
-  version: 14.3.3
+- name: shared-postgresql
+  repository: file://charts/shared-postgresql
+  version: 0.1.0
 - name: hive
   repository: file://charts/hive
   version: 0.1.0
@@ -53,5 +53,5 @@ dependencies:
 - name: postgresql
   repository: https://charts.bitnami.com/bitnami
   version: 14.3.3
-digest: sha256:c94374a92552162b44f4490f10e29b72dbff8a70f84144cffb25dc94bdcbc710
-generated: "2026-05-28T11:04:23.3119+01:00"
+digest: sha256:7b0fbf890c18e7b034372d64314bbf3b2d8524986a5f16c362dd2eb1c2c27163
+generated: "2026-07-09T13:56:11.361931+01:00"

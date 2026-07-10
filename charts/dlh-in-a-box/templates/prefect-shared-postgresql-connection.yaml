@@ -1,0 +1,43 @@
+{{- $sharedPostgresql := .Values.sharedPostgresql | default dict -}}
+{{- $sharedPostgresqlActive := $sharedPostgresql.enabled -}}
+{{- $prefectServer := .Values.prefectServer | default dict -}}
+{{- $prefectPostgresql := get $prefectServer "postgresql" | default dict -}}
+{{- $prefectPostgresqlEnabled := true -}}
+{{- if hasKey $prefectPostgresql "enabled" -}}
+{{- $prefectPostgresqlEnabled = $prefectPostgresql.enabled -}}
+{{- end -}}
+{{- if and $sharedPostgresqlActive (not $prefectPostgresqlEnabled) -}}
+{{- $prefectSecret := get $prefectServer "secret" | default dict -}}
+{{- $prefectSecretCreate := true -}}
+{{- if hasKey $prefectSecret "create" -}}
+{{- $prefectSecretCreate = $prefectSecret.create -}}
+{{- end -}}
+{{- if $prefectSecretCreate -}}
+{{- fail "sharedPostgresql is active with prefectServer.postgresql.enabled=false, which requires prefectServer.secret.create=false." -}}
+{{- end -}}
+{{- $provisioning := get $sharedPostgresql "provisioning" | default dict -}}
+{{- $prefectDb := dict -}}
+{{- range default list (get $provisioning "databases") -}}
+{{- if eq .name "prefect" -}}
+{{- $prefectDb = . -}}
+{{- end -}}
+{{- end -}}
+{{- if not (get $prefectDb "secretName") -}}
+{{- fail "sharedPostgresql.provisioning.databases must include an entry named 'prefect' when prefectServer.postgresql.enabled=false." -}}
+{{- end -}}
+{{- $secretData := (lookup "v1" "Secret" .Release.Namespace $prefectDb.secretName).data | default dict -}}
+{{- $password := index $secretData (default "password" (get $prefectDb "passwordKey")) | default "" | b64dec -}}
+{{- $secretName := default "prefect-server-postgresql-connection" $prefectSecret.name -}}
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: {{ $secretName | quote }}
+  namespace: {{ .Release.Namespace | quote }}
+  labels:
+    {{- include "dlh-in-a-box.labels" . | nindent 4 }}
+    app.kubernetes.io/component: prefect-server
+type: Opaque
+stringData:
+  connection-string: {{ printf "postgresql+asyncpg://%s:%s@%s:%s/%s" $prefectDb.username $password (include "dlh-in-a-box.sharedPostgresql.serviceName" .) (include "dlh-in-a-box.sharedPostgresql.port" .) $prefectDb.database | quote }}
+{{- end -}}

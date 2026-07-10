@@ -20,6 +20,7 @@ Understanding that split is the main job of this guide.
 flowchart TD
   subgraph Owned["Locally owned chart material"]
     Hive[hive subchart]
+    SharedPostgresql[shared-postgresql wrapper subchart]
   end
 
   subgraph Vendored["Vendored source"]
@@ -36,6 +37,7 @@ flowchart TD
   end
 
   Hive --> Umbrella
+  SharedPostgresql --> Umbrella
   Trino --> Umbrella
   Archives --> Umbrella
   Umbrella --> Release
@@ -46,6 +48,7 @@ flowchart TD
 | Path or file | Ownership | What it is for |
 | --- | --- | --- |
 | `hive/` | repo-owned | local Hive subchart |
+| `shared-postgresql/` | repo-owned | local wrapper subchart that lets `sharedPostgresql.bundled.*` reach a nested Bitnami PostgreSQL dependency (aliased `bundled`); see `shared-postgresql/README.md` |
 | `trino/` | mostly upstream with local notes | vendored Trino chart source and patch points |
 | `datahub-0.8.21.tgz` | generated dependency archive | packaged DataHub chart |
 | `datahub-prerequisites-0.2.3.tgz` | generated dependency archive | packaged DataHub prerequisites chart |
@@ -55,8 +58,9 @@ flowchart TD
 | `minio-15.0.7.tgz` | generated dependency archive | packaged MinIO dependency |
 | `oauth2-proxy-10.1.4.tgz` | generated dependency archive | packaged oauth2-proxy dependency |
 | `postgresql-14.3.3.tgz` | generated dependency archive | packaged PostgreSQL dependency used by multiple aliases |
-| `prefect-server-2025.12.31221620.tgz` | generated dependency archive | packaged Prefect server dependency |
-| `prefect-worker-2025.12.31221620.tgz` | generated dependency archive | packaged Prefect worker dependency |
+| `prefect-server-2026.6.1154549.tgz` | generated dependency archive | packaged Prefect server dependency |
+| `prefect-worker-2026.6.1154549.tgz` | generated dependency archive | packaged Prefect worker dependency |
+| `shared-postgresql-0.1.0.tgz` | generated dependency archive | packaged local shared-postgresql wrapper subchart |
 | `spark-operator-2.4.0.tgz` | generated dependency archive | packaged Spark Operator dependency |
 | `superset-0.15.2.tgz` | generated dependency archive | packaged Superset dependency |
 | `trino-1.41.0.tgz` | generated dependency archive | packaged Trino dependency |

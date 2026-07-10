@@ -1357,12 +1357,31 @@
       "additionalProperties": true,
       "properties": {
         "enabled": { "type": "boolean" },
-        "nameOverride": { "type": "string" },
-        "auth": {
+        "bundled": {
           "type": "object",
           "additionalProperties": true,
           "properties": {
-            "existingSecret": { "type": "string" }
+            "enabled": { "type": "boolean" },
+            "nameOverride": { "type": "string" },
+            "auth": {
+              "type": "object",
+              "additionalProperties": true,
+              "properties": {
+                "existingSecret": { "type": "string" }
+              }
+            }
+          }
+        },
+        "external": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "enabled": { "type": "boolean" },
+            "host": { "type": "string" },
+            "port": { "type": "integer" },
+            "username": { "type": "string" },
+            "existingSecret": { "type": "string" },
+            "passwordKey": { "type": "string" }
           }
         },
         "provisioning": {

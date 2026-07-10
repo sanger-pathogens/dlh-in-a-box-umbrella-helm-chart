@@ -1,5 +1,6 @@
 # Helm dependencies and lock files
 charts/dlh-in-a-box/charts/*.tgz
+charts/dlh-in-a-box/charts/**/*.tgz
 
 # macOS and editor files
 .DS_Store
