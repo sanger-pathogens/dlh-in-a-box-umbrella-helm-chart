@@ -60,7 +60,7 @@ you did not make.
 Confirm the target version and tag do not already exist:
 
 ```bash
-git tag --list 'v0.4.1'
+git tag --list 'v0.5.0'
 ```
 
 ## Metadata Files
@@ -85,8 +85,8 @@ ruby -rdate -ryaml -e 'YAML.safe_load(File.read("CITATION.cff"), permitted_class
 Update `charts/dlh-in-a-box/Chart.yaml`:
 
 ```yaml
-version: 0.4.1
-appVersion: "0.4.1"
+version: 0.5.0
+appVersion: "0.5.0"
 ```
 
 Search for stale version references:

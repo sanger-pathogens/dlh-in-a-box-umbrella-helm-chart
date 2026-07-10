@@ -2,8 +2,8 @@ apiVersion: v2
 name: dlh-in-a-box
 description: Production-oriented umbrella Helm chart for deploying a modular data lakehouse platform on Kubernetes.
 type: application
-version: 0.4.1
-appVersion: "0.4.1"
+version: 0.5.0
+appVersion: "0.5.0"
 home: https://github.com/sanger-pathogens/dlh-in-a-box-umbrella-helm-chart
 icon: https://raw.githubusercontent.com/sanger-pathogens/dlh-in-a-box-umbrella-helm-chart/main/docs/assets/dlh-in-a-box-icon.jpg
 annotations:
