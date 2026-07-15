@@ -572,10 +572,10 @@ These mostly expose upstream chart values at the umbrella level:
 
 By default every app that needs PostgreSQL runs its own bundled bitnami pod
 (`keycloak.postgresql`, `prefectServer.postgresql`, `superset.postgresql`,
-`rangerPostgresql`, `hivePostgresql`). `sharedPostgresql` is an optional
-consolidation: one PostgreSQL instance plus a chart-owned provisioning Job
-(`templates/shared-postgresql-provisioning.yaml`) that creates a database,
-role, and password Secret for each app listed in
+`rangerPostgresql`, `hivePostgresql`). `sharedPostgresql` is an optional consolidation: one PostgreSQL instance plus a
+chart-owned provisioning Job (`templates/shared-postgresql-provisioning.yaml`)
+that creates a database, role, and password Secret for each app listed in
+`sharedPostgresql.provisioning.database-list` or the new map-based
 `sharedPostgresql.provisioning.databases`.
 
 `sharedPostgresql.enabled` is the master switch for the whole feature. Once
@@ -626,12 +626,13 @@ cannot: `prefectServer.secret.*` only accepts a plaintext password, with no
 
 `templates/prefect-shared-postgresql-connection.yaml` bridges that gap: when a
 shared instance is active and `prefectServer.postgresql.enabled=false`, it
-reads the password via Helm `lookup` from the `prefect` entry's
-`secretName`/`passwordKey` in `sharedPostgresql.provisioning.databases`, and
-builds the `connection-string` Secret (`prefectServer.secret.name`, fixed at
-`prefect-server-postgresql-connection`) that the upstream Prefect server chart
-expects. Also set `prefectServer.secret.create=false` so the upstream chart
-does not try to build its own copy of that Secret.
+uses the `prefect` entry in `sharedPostgresql.provisioning.databases` when the
+new map contract is present, falls back to the legacy
+`sharedPostgresql.provisioning.database-list` entry when needed, and builds the
+`connection-string` Secret. The default connection Secret name is
+`dlh-prefect-postgresql-connection`, which matches `prefectServer.secret.name`.
+When `connectionSecret.create=true`, keep `prefectServer.secret.create=false`
+so Helm does not render the same Secret twice.
 
 ### Prefect Job Runner Pull Identity
 
@@ -680,9 +681,9 @@ Important examples:
 - the Trino helper path can read S3 credentials from an existing secret when
   generated catalogs use `global.storage.s3.existingSecret`
 - `templates/prefect-shared-postgresql-connection.yaml` reads the `prefect`
-  database password out of `sharedPostgresql.provisioning.databases` to build
-  the Prefect `connection-string` Secret when a shared PostgreSQL instance is
-  active and `prefectServer.postgresql.enabled=false`
+  database password from the shared PostgreSQL contract to build the Prefect
+  `connection-string` Secret when a shared PostgreSQL instance is active and
+  `prefectServer.postgresql.enabled=false`
 
 If a render seems surprising, ask whether `lookup` is part of the path and
 whether the referenced secret already exists in the namespace you rendered

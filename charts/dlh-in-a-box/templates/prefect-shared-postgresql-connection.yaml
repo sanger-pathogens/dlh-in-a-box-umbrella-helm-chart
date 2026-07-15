@@ -6,38 +6,82 @@
 {{- if hasKey $prefectPostgresql "enabled" -}}
 {{- $prefectPostgresqlEnabled = $prefectPostgresql.enabled -}}
 {{- end -}}
+
 {{- if and $sharedPostgresqlActive (not $prefectPostgresqlEnabled) -}}
-{{- $prefectSecret := get $prefectServer "secret" | default dict -}}
-{{- $prefectSecretCreate := true -}}
-{{- if hasKey $prefectSecret "create" -}}
-{{- $prefectSecretCreate = $prefectSecret.create -}}
-{{- end -}}
-{{- if $prefectSecretCreate -}}
-{{- fail "sharedPostgresql is active with prefectServer.postgresql.enabled=false, which requires prefectServer.secret.create=false." -}}
-{{- end -}}
-{{- $provisioning := get $sharedPostgresql "provisioning" | default dict -}}
-{{- $prefectDb := dict -}}
-{{- range default list (get $provisioning "databases") -}}
-{{- if eq .name "prefect" -}}
-{{- $prefectDb = . -}}
-{{- end -}}
-{{- end -}}
-{{- if not (get $prefectDb "secretName") -}}
-{{- fail "sharedPostgresql.provisioning.databases must include an entry named 'prefect' when prefectServer.postgresql.enabled=false." -}}
-{{- end -}}
-{{- $secretData := (lookup "v1" "Secret" .Release.Namespace $prefectDb.secretName).data | default dict -}}
-{{- $password := index $secretData (default "password" (get $prefectDb "passwordKey")) | default "" | b64dec -}}
-{{- $secretName := default "prefect-server-postgresql-connection" $prefectSecret.name -}}
+  {{- $provisioning := get $sharedPostgresql "provisioning" | default dict -}}
+  {{- $provisioningDatabases := get $provisioning "databases" | default dict -}}
+  {{- $prefectDb := get $provisioningDatabases "prefect" | default dict -}}
+
+  {{- if empty $prefectDb -}}
+    {{- fail "sharedPostgresql.provisioning.databases.prefect is required when prefectServer.postgresql.enabled=false." -}}
+  {{- end -}}
+
+  {{- $prefectDbEnabled := true -}}
+  {{- if hasKey $prefectDb "enabled" -}}
+    {{- $prefectDbEnabled = $prefectDb.enabled -}}
+  {{- end -}}
+  {{- if not $prefectDbEnabled -}}
+    {{- fail "sharedPostgresql.provisioning.databases.prefect.enabled must be true when prefectServer.postgresql.enabled=false." -}}
+  {{- end -}}
+
+  {{- $prefectPasswordConfig := get $prefectDb "password" | default dict -}}
+  {{- $prefectPasswordExistingSecret := default "" (get $prefectPasswordConfig "existingSecret") -}}
+  {{- $prefectPasswordKey := default "password" (get $prefectPasswordConfig "key") -}}
+
+  {{- $prefectConnectionSecretConfig := get $prefectDb "connectionSecret" | default dict -}}
+  {{- $prefectConnectionSecretCreate := true -}}
+  {{- if hasKey $prefectConnectionSecretConfig "create" -}}
+    {{- $prefectConnectionSecretCreate = $prefectConnectionSecretConfig.create -}}
+  {{- end -}}
+
+  {{- $prefectServerSecret := get $prefectServer "secret" | default dict -}}
+  {{- $prefectConnectionSecretName := default (default "dlh-prefect-postgresql-connection" (get $prefectServerSecret "name")) (get $prefectConnectionSecretConfig "name") -}}
+  {{- if empty $prefectConnectionSecretName -}}
+    {{- fail "sharedPostgresql.provisioning.databases.prefect.connectionSecret.name is required when prefectServer.postgresql.enabled=false." -}}
+  {{- end -}}
+
+  {{- if ne $prefectPasswordExistingSecret "" -}}
+    {{- $prefectPasswordSecretObject := lookup "v1" "Secret" .Release.Namespace $prefectPasswordExistingSecret | default dict -}}
+    {{- $prefectPasswordSecretData := get $prefectPasswordSecretObject "data" | default dict -}}
+    {{- $prefectPasswordValue := index $prefectPasswordSecretData $prefectPasswordKey | default "" -}}
+    {{- if $prefectPasswordValue -}}
+      {{- $prefectPassword := $prefectPasswordValue | b64dec -}}
+    {{- else -}}
+      {{- fail (printf "sharedPostgresql.provisioning.databases.prefect.password.existingSecret=%s must contain key %s." $prefectPasswordExistingSecret $prefectPasswordKey) -}}
+    {{- end -}}
+  {{- else -}}
+    {{- if hasKey $prefectDb "password" -}}
+      {{- $prefectPassword := randAlphaNum 32 -}}
+
 ---
 apiVersion: v1
 kind: Secret
 metadata:
-  name: {{ $secretName | quote }}
+  name: {{ default "dlh-prefect-postgresql" (get $prefectDb "secretName") | quote }}
   namespace: {{ .Release.Namespace | quote }}
   labels:
-    {{- include "dlh-in-a-box.labels" . | nindent 4 }}
+    {{ include "dlh-in-a-box.labels" . | nindent 4 }}
     app.kubernetes.io/component: prefect-server
 type: Opaque
 stringData:
-  connection-string: {{ printf "postgresql+asyncpg://%s:%s@%s:%s/%s" $prefectDb.username $password (include "dlh-in-a-box.sharedPostgresql.serviceName" .) (include "dlh-in-a-box.sharedPostgresql.port" .) $prefectDb.database | quote }}
+  {{ $prefectPasswordKey }}: {{ $prefectPassword | quote }}
+    {{- else -}}
+      {{- fail "sharedPostgresql.provisioning.databases.prefect.password is required (either existingSecret or password config) when prefectServer.postgresql.enabled=false." -}}
+    {{- end -}}
+  {{- end -}}
+
+  {{- if $prefectConnectionSecretCreate -}}
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: {{ $prefectConnectionSecretName | quote }}
+  namespace: {{ .Release.Namespace | quote }}
+  labels:
+    {{ include "dlh-in-a-box.labels" . | nindent 4 }}
+    app.kubernetes.io/component: prefect-server
+type: Opaque
+stringData:
+  connection-string: {{ printf "postgresql+asyncpg://%s:%s@%s:%s/%s" $prefectDb.username (default $prefectPassword "") (include "dlh-in-a-box.sharedPostgresql.serviceName" .) (include "dlh-in-a-box.sharedPostgresql.port" .) $prefectDb.database | quote }}
+  {{- end -}}
 {{- end -}}

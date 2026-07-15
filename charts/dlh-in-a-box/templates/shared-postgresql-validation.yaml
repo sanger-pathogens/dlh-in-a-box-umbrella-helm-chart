@@ -21,6 +21,51 @@
 {{- end -}}
 {{- end -}}
 {{- if $sharedPostgresql.enabled -}}
+{{- $provisioning := get $sharedPostgresql "provisioning" | default dict -}}
+{{- $provisioningDatabases := get $provisioning "databases" | default dict -}}
+
+{{- if not (kindIs "map" $provisioningDatabases) -}}
+  {{- fail "sharedPostgresql.provisioning.databases must be a map/object using the new map-based contract. Legacy database-list is no longer supported." -}}
+{{- end -}}
+
+{{- $prefectDb := get $provisioningDatabases "prefect" | default dict -}}
+{{- if empty $prefectDb -}}
+  {{- fail "sharedPostgresql.provisioning.databases.prefect is required when prefectServer.postgresql.enabled=false." -}}
+{{- end -}}
+
+{{- $prefectDbEnabled := true -}}
+{{- if hasKey $prefectDb "enabled" -}}
+  {{- $prefectDbEnabled = $prefectDb.enabled -}}
+{{- end -}}
+{{- if not $prefectDbEnabled -}}
+  {{- fail "sharedPostgresql.provisioning.databases.prefect.enabled must be true when prefectServer.postgresql.enabled=false." -}}
+{{- end -}}
+
+{{- $prefectConnectionSecretCreate := true -}}
+{{- $prefectConnectionSecretName := "dlh-prefect-postgresql-connection" -}}
+{{- if hasKey $prefectDb "connectionSecret" -}}
+  {{- $prefectConnectionSecret := get $prefectDb "connectionSecret" | default dict -}}
+  {{- if hasKey $prefectConnectionSecret "create" -}}
+    {{- $prefectConnectionSecretCreate = $prefectConnectionSecret.create -}}
+  {{- end -}}
+  {{- if hasKey $prefectConnectionSecret "name" -}}
+    {{- $prefectConnectionSecretName = $prefectConnectionSecret.name -}}
+  {{- end -}}
+{{- end -}}
+
+{{- $prefectServer := get .Values "prefectServer" | default dict -}}
+{{- $prefectServerSecret := get $prefectServer "secret" | default dict -}}
+{{- $prefectServerSecretCreate := true -}}
+{{- if hasKey $prefectServerSecret "create" -}}
+  {{- $prefectServerSecretCreate = $prefectServerSecret.create -}}
+{{- end -}}
+{{- if and $prefectConnectionSecretCreate $prefectServerSecretCreate -}}
+  {{- fail "sharedPostgresql.provisioning.databases.prefect.connectionSecret.create=true requires prefectServer.secret.create=false so Helm does not render the same Secret twice." -}}
+{{- end -}}
+{{- if and $prefectConnectionSecretCreate (empty $prefectConnectionSecretName) -}}
+  {{- fail "sharedPostgresql.provisioning.databases.prefect.connectionSecret.name is required when connectionSecret.create=true." -}}
+{{- end -}}
+
 {{- $migration := get $sharedPostgresql "migration" | default dict -}}
 {{- $allowBundledPostgresql := default false (get $migration "allowBundledPostgresql") -}}
 {{- $keycloakValues := get .Values "keycloak" | default dict -}}
@@ -35,27 +80,27 @@
 {{- $prefectPostgresqlEnabled := true -}}
 {{- $supersetPostgresqlEnabled := true -}}
 {{- if hasKey $keycloakPostgresql "enabled" -}}
-{{- $keycloakPostgresqlEnabled = $keycloakPostgresql.enabled -}}
+  {{- $keycloakPostgresqlEnabled = $keycloakPostgresql.enabled -}}
 {{- end -}}
 {{- if hasKey $prefectPostgresql "enabled" -}}
-{{- $prefectPostgresqlEnabled = $prefectPostgresql.enabled -}}
+  {{- $prefectPostgresqlEnabled = $prefectPostgresql.enabled -}}
 {{- end -}}
 {{- if hasKey $supersetPostgresql "enabled" -}}
-{{- $supersetPostgresqlEnabled = $supersetPostgresql.enabled -}}
+  {{- $supersetPostgresqlEnabled = $supersetPostgresql.enabled -}}
 {{- end -}}
 {{- if and $keycloakPostgresqlEnabled (not $allowBundledPostgresql) -}}
-{{- fail "a shared PostgreSQL instance is active, which requires keycloak.postgresql.enabled=false." -}}
+  {{- fail "a shared PostgreSQL instance is active, which requires keycloak.postgresql.enabled=false." -}}
 {{- end -}}
 {{- if and $prefectPostgresqlEnabled (not $allowBundledPostgresql) -}}
-{{- fail "a shared PostgreSQL instance is active, which requires prefectServer.postgresql.enabled=false." -}}
+  {{- fail "a shared PostgreSQL instance is active, which requires prefectServer.postgresql.enabled=false." -}}
 {{- end -}}
 {{- if and $supersetPostgresqlEnabled (not $allowBundledPostgresql) -}}
-{{- fail "a shared PostgreSQL instance is active, which requires superset.postgresql.enabled=false." -}}
+  {{- fail "a shared PostgreSQL instance is active, which requires superset.postgresql.enabled=false." -}}
 {{- end -}}
 {{- if and (default false (get $rangerPostgresql "enabled")) (not $allowBundledPostgresql) -}}
-{{- fail "a shared PostgreSQL instance is active, which requires rangerPostgresql.enabled=false." -}}
+  {{- fail "a shared PostgreSQL instance is active, which requires rangerPostgresql.enabled=false." -}}
 {{- end -}}
 {{- if and (default false (get $hivePostgresql "enabled")) (not $allowBundledPostgresql) -}}
-{{- fail "a shared PostgreSQL instance is active, which requires hivePostgresql.enabled=false." -}}
+  {{- fail "a shared PostgreSQL instance is active, which requires hivePostgresql.enabled=false." -}}
 {{- end -}}
 {{- end -}}
