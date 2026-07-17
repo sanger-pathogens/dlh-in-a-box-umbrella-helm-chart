@@ -27,6 +27,7 @@
   {{- $prefectPasswordConfig := get $prefectDb "password" | default dict -}}
   {{- $prefectPasswordExistingSecret := default "" (get $prefectPasswordConfig "existingSecret") -}}
   {{- $prefectPasswordKey := default "password" (get $prefectPasswordConfig "key") -}}
+  {{- $prefectPassword := "" -}}
 
   {{- $prefectConnectionSecretConfig := get $prefectDb "connectionSecret" | default dict -}}
   {{- $prefectConnectionSecretCreate := true -}}
@@ -45,13 +46,13 @@
     {{- $prefectPasswordSecretData := get $prefectPasswordSecretObject "data" | default dict -}}
     {{- $prefectPasswordValue := index $prefectPasswordSecretData $prefectPasswordKey | default "" -}}
     {{- if $prefectPasswordValue -}}
-      {{- $prefectPassword := $prefectPasswordValue | b64dec -}}
+      {{- $prefectPassword = $prefectPasswordValue | b64dec -}}
     {{- else -}}
       {{- fail (printf "sharedPostgresql.provisioning.databases.prefect.password.existingSecret=%s must contain key %s." $prefectPasswordExistingSecret $prefectPasswordKey) -}}
     {{- end -}}
   {{- else -}}
     {{- if hasKey $prefectDb "password" -}}
-      {{- $prefectPassword := randAlphaNum 32 -}}
+      {{- $prefectPassword = randAlphaNum 32 -}}
 
 ---
 apiVersion: v1
