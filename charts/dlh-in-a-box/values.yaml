@@ -361,7 +361,7 @@ sharedPostgresql:
       tag: 17.6.0-debian-12-r0
     auth:
       enablePostgresUser: true
-      existingSecret: dlh-shared-postgresql
+      existingSecret: ""
       secretKeys:
         adminPasswordKey: postgres-password
     primary:
@@ -392,7 +392,9 @@ sharedPostgresql:
     adminSecret:
       name: dlh-shared-postgresql
       passwordKey: postgres-password
-    databases:
+    # Legacy list contract kept for non-Prefect integrations until they are
+    # deliberately migrated to the new map form below.
+    database-list:
       - name: keycloak
         database: bitnami_keycloak
         username: bn_keycloak
@@ -413,16 +415,25 @@ sharedPostgresql:
         username: superset
         secretName: dlh-superset-runtime-env
         passwordKey: DB_PASS
-      - name: prefect
-        database: prefect
-        username: prefect
-        secretName: dlh-prefect-postgresql
-        passwordKey: password
       - name: jupyterhub
         database: jupyterhub
         username: jupyterhub
         secretName: dlh-jupyterhub-postgresql
         passwordKey: password
+    # New map contract for Prefect.
+    databases:
+      prefect:
+        enabled: true
+        database: prefect
+        username: prefect
+        password:
+          # Empty means generate the app password Secret; set an existing
+          # Secret name here to reuse it instead.
+          existingSecret: ""
+          key: password
+        connectionSecret:
+          create: true
+          name: dlh-prefect-postgresql-connection
   migration:
     allowBundledPostgresql: false
 
@@ -1635,7 +1646,7 @@ prefectServer:
     # Fixed name used by both the bundled-postgres path (upstream creates it)
     # and the sharedPostgresql path (templates/prefect-shared-postgresql-connection.yaml
     # creates it when prefectServer.postgresql.enabled=false).
-    name: prefect-server-postgresql-connection
+    name: dlh-prefect-postgresql-connection
 
 prefectWorker:
   worker:

@@ -1399,6 +1399,50 @@
               }
             },
             "databases": {
+              "description": "New map-based shared PostgreSQL contract for application-specific database provisioning; legacy list entries should move to provisioning.database-list.",
+              "type": "object",
+              "additionalProperties": true,
+              "properties": {
+                "prefect": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "properties": {
+                    "enabled": { "type": "boolean" },
+                    "database": { "type": "string" },
+                    "username": { "type": "string" },
+                    "password": {
+                      "type": "object",
+                      "additionalProperties": true,
+                      "properties": {
+                        "existingSecret": { "type": "string" },
+                        "key": { "type": "string" }
+                      }
+                    },
+                    "connectionSecret": {
+                      "type": "object",
+                      "additionalProperties": true,
+                      "properties": {
+                        "create": { "type": "boolean" },
+                        "name": { "type": "string" }
+                      }
+                    }
+                  },
+                  "allOf": [
+                    {
+                      "if": {
+                        "properties": { "enabled": { "const": true } },
+                        "required": ["enabled"]
+                      },
+                      "then": {
+                        "required": ["database", "username", "password", "connectionSecret"]
+                      }
+                    }
+                  ]
+                }
+              }
+            },
+            "database-list": {
+              "description": "Legacy list-based shared PostgreSQL contract kept for non-Prefect integrations during migration.",
               "type": "array",
               "items": {
                 "type": "object",

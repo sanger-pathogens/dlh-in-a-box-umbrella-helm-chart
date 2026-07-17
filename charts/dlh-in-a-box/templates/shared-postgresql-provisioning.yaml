@@ -1,9 +1,10 @@
 {{- $sharedPostgresql := .Values.sharedPostgresql | default dict -}}
 {{- $external := get $sharedPostgresql "external" | default dict -}}
-{{- $bundled := get $sharedPostgresql "bundled" | default dict -}}
-{{- $provisioning := $sharedPostgresql.provisioning | default dict -}}
+{{- $provisioning := get $sharedPostgresql "provisioning" | default dict -}}
+{{- $provisioningDatabases := get $provisioning "databases" | default dict -}}
+{{- $provisioningDatabaseList := get $provisioning "database-list" | default list -}}
+
 {{- if and $sharedPostgresql.enabled (default true $provisioning.enabled) -}}
-{{- $auth := $bundled.auth | default dict -}}
 {{- $image := $provisioning.image | default dict -}}
 {{- $adminSecret := $provisioning.adminSecret | default dict -}}
 apiVersion: batch/v1
@@ -91,9 +92,12 @@ spec:
                 fi
               }
 
-              {{- range $index, $database := default list $provisioning.databases }}
-              provision_database {{ $database.name | quote }} {{ $database.database | quote }} {{ $database.username | quote }} "APP_{{ $index }}_PASSWORD"
-              {{- end }}
+{{- range $name, $database := $provisioningDatabases }}
+              provision_database {{ $name | quote }} {{ $database.database | quote }} {{ $database.username | quote }} "APP_{{ $name | replace "-" "_" | upper }}_PASSWORD"
+{{- end }}
+{{- range $database := $provisioningDatabaseList }}
+              provision_database {{ $database.name | quote }} {{ $database.database | quote }} {{ $database.username | quote }} "APP_{{ $database.name | replace "-" "_" | upper }}_PASSWORD"
+{{- end }}
           env:
             - name: PGHOST
               value: {{ include "dlh-in-a-box.sharedPostgresql.serviceName" . | quote }}
@@ -108,14 +112,21 @@ spec:
                   name: {{ $external.existingSecret | quote }}
                   key: {{ default "postgres-password" $external.passwordKey | quote }}
                   {{- else }}
-                  name: {{ default $auth.existingSecret $adminSecret.name | quote }}
+                  name: {{ default $adminSecret.name $adminSecret.name | quote }}
                   key: {{ default "postgres-password" $adminSecret.passwordKey | quote }}
                   {{- end }}
-            {{- range $index, $database := default list $provisioning.databases }}
-            - name: APP_{{ $index }}_PASSWORD
+{{- range $name, $database := $provisioningDatabases }}
+            - name: APP_{{ $name | replace "-" "_" | upper }}_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{- if and (get (get $database "password" | default dict) "existingSecret") (ne (get (get $database "password" | default dict) "existingSecret") "") -}}{{ (get (get $database "password" | default dict) "existingSecret") | quote }}{{- else -}}{{ default (printf "dlh-%s-postgresql" $name) (get $database "secretName") | quote }}{{- end }}
+                  key: {{ default "password" (get (get $database "password" | default dict) "key") | quote }}
+{{- end }}
+{{- range $database := $provisioningDatabaseList }}
+            - name: APP_{{ $database.name | replace "-" "_" | upper }}_PASSWORD
               valueFrom:
                 secretKeyRef:
                   name: {{ $database.secretName | quote }}
                   key: {{ default "password" $database.passwordKey | quote }}
-            {{- end }}
+{{- end }}
 {{- end -}}
