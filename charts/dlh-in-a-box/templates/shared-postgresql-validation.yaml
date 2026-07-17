@@ -23,9 +23,13 @@
 {{- if $sharedPostgresql.enabled -}}
 {{- $provisioning := get $sharedPostgresql "provisioning" | default dict -}}
 {{- $provisioningDatabases := get $provisioning "databases" | default dict -}}
+{{- $provisioningDatabaseList := get $provisioning "database-list" | default list -}}
 
 {{- if not (kindIs "map" $provisioningDatabases) -}}
-  {{- fail "sharedPostgresql.provisioning.databases must be a map/object using the new map-based contract. Legacy database-list is no longer supported." -}}
+  {{- fail "sharedPostgresql.provisioning.databases must be a map/object." -}}
+{{- end -}}
+{{- if not (kindIs "slice" $provisioningDatabaseList) -}}
+  {{- fail "sharedPostgresql.provisioning.database-list must be a list/array." -}}
 {{- end -}}
 
 {{- $prefectDb := get $provisioningDatabases "prefect" | default dict -}}

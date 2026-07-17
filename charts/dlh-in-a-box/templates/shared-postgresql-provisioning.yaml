@@ -2,6 +2,7 @@
 {{- $external := get $sharedPostgresql "external" | default dict -}}
 {{- $provisioning := get $sharedPostgresql "provisioning" | default dict -}}
 {{- $provisioningDatabases := get $provisioning "databases" | default dict -}}
+{{- $provisioningDatabaseList := get $provisioning "database-list" | default list -}}
 
 {{- if and $sharedPostgresql.enabled (default true $provisioning.enabled) -}}
 {{- $image := $provisioning.image | default dict -}}
@@ -92,7 +93,10 @@ spec:
               }
 
 {{- range $name, $database := $provisioningDatabases }}
-              provision_database {{ $name | quote }} {{ $database.database | quote }} {{ $database.username | quote }} "APP_{{ upper $name }}_PASSWORD"
+              provision_database {{ $name | quote }} {{ $database.database | quote }} {{ $database.username | quote }} "APP_{{ $name | replace "-" "_" | upper }}_PASSWORD"
+{{- end }}
+{{- range $database := $provisioningDatabaseList }}
+              provision_database {{ $database.name | quote }} {{ $database.database | quote }} {{ $database.username | quote }} "APP_{{ $database.name | replace "-" "_" | upper }}_PASSWORD"
 {{- end }}
           env:
             - name: PGHOST
@@ -112,10 +116,17 @@ spec:
                   key: {{ default "postgres-password" $adminSecret.passwordKey | quote }}
                   {{- end }}
 {{- range $name, $database := $provisioningDatabases }}
-            - name: APP_{{ upper $name }}_PASSWORD
+            - name: APP_{{ $name | replace "-" "_" | upper }}_PASSWORD
               valueFrom:
                 secretKeyRef:
                   name: {{- if and (get (get $database "password" | default dict) "existingSecret") (ne (get (get $database "password" | default dict) "existingSecret") "") -}}{{ (get (get $database "password" | default dict) "existingSecret") | quote }}{{- else -}}{{ default (printf "dlh-%s-postgresql" $name) (get $database "secretName") | quote }}{{- end }}
                   key: {{ default "password" (get (get $database "password" | default dict) "key") | quote }}
+{{- end }}
+{{- range $database := $provisioningDatabaseList }}
+            - name: APP_{{ $database.name | replace "-" "_" | upper }}_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $database.secretName | quote }}
+                  key: {{ default "password" $database.passwordKey | quote }}
 {{- end }}
 {{- end -}}
