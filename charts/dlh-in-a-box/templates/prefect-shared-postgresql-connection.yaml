@@ -83,6 +83,6 @@ metadata:
     app.kubernetes.io/component: prefect-server
 type: Opaque
 stringData:
-  connection-string: {{ printf "postgresql+asyncpg://%s:%s@%s:%s/%s" $prefectDb.username (default $prefectPassword "") (include "dlh-in-a-box.sharedPostgresql.serviceName" .) (include "dlh-in-a-box.sharedPostgresql.port" .) $prefectDb.database | quote }}
+  connection-string: {{ printf "postgresql+asyncpg://%s:%s@%s:%s/%s" $prefectDb.username (default $prefectPassword "" | urlquery) (include "dlh-in-a-box.sharedPostgresql.serviceName" .) (include "dlh-in-a-box.sharedPostgresql.port" .) $prefectDb.database | quote }}
   {{- end -}}
 {{- end -}}
