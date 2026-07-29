@@ -615,7 +615,7 @@ keycloak:
             {{- end }}
             credentials:
               - type: password
-                value: {{ printf "$(env:%s:change-me)" (default "KC_BOOTSTRAP_USER_PASSWORD" $user.passwordEnvVar) | quote }}
+                value: {{ printf "$(env:%s)" (default "KC_BOOTSTRAP_USER_PASSWORD" $user.passwordEnvVar) | quote }}
                 temporary: {{ default false $user.temporaryPassword }}
             {{- if $user.groups }}
             groups:
@@ -651,7 +651,7 @@ keycloak:
             standardFlowEnabled: true
             directAccessGrantsEnabled: false
             serviceAccountsEnabled: false
-            secret: "$(env:KC_TRINO_CLIENT_SECRET:change-me)"
+            secret: "$(env:KC_TRINO_CLIENT_SECRET)"
             redirectUris:
             {{- range .Values.global.identity.external.clients.trino.redirectUris }}
               - {{ . | quote }}
@@ -702,7 +702,7 @@ keycloak:
             standardFlowEnabled: true
             directAccessGrantsEnabled: false
             serviceAccountsEnabled: false
-            secret: "$(env:KC_SUPERSET_CLIENT_SECRET:change-me)"
+            secret: "$(env:KC_SUPERSET_CLIENT_SECRET)"
             redirectUris:
             {{- range .Values.global.identity.external.clients.superset.redirectUris }}
               - {{ . | quote }}
@@ -727,7 +727,7 @@ keycloak:
             standardFlowEnabled: true
             directAccessGrantsEnabled: false
             serviceAccountsEnabled: false
-            secret: "$(env:KC_DATAHUB_CLIENT_SECRET:change-me)"
+            secret: "$(env:KC_DATAHUB_CLIENT_SECRET)"
             redirectUris:
             {{- range .Values.global.identity.external.clients.datahub.redirectUris }}
               - {{ . | quote }}
@@ -776,7 +776,7 @@ keycloak:
             standardFlowEnabled: true
             directAccessGrantsEnabled: false
             serviceAccountsEnabled: false
-            secret: "$(env:KC_MINIO_CLIENT_SECRET:change-me)"
+            secret: "$(env:KC_MINIO_CLIENT_SECRET)"
             redirectUris:
             {{- range .Values.global.identity.external.clients.minio.redirectUris }}
               - {{ . | quote }}
@@ -814,7 +814,7 @@ keycloak:
             standardFlowEnabled: true
             directAccessGrantsEnabled: false
             serviceAccountsEnabled: false
-            secret: "$(env:KC_VAULT_CLIENT_SECRET:change-me)"
+            secret: "$(env:KC_VAULT_CLIENT_SECRET)"
             redirectUris:
             {{- range .Values.global.identity.external.clients.vault.redirectUris }}
               - {{ . | quote }}
@@ -839,7 +839,7 @@ keycloak:
             standardFlowEnabled: true
             directAccessGrantsEnabled: false
             serviceAccountsEnabled: false
-            secret: "$(env:KC_HEADLAMP_CLIENT_SECRET:change-me)"
+            secret: "$(env:KC_HEADLAMP_CLIENT_SECRET)"
             redirectUris:
             {{- range .Values.global.identity.external.clients.headlamp.redirectUris }}
               - {{ . | quote }}
@@ -864,7 +864,7 @@ keycloak:
             standardFlowEnabled: true
             directAccessGrantsEnabled: false
             serviceAccountsEnabled: false
-            secret: "$(env:KC_JUPYTERHUB_CLIENT_SECRET:change-me)"
+            secret: "$(env:KC_JUPYTERHUB_CLIENT_SECRET)"
             attributes:
               access.token.lifespan: {{ printf "%d" (int (default 28800 .Values.global.identity.external.clients.jupyterhub.accessTokenLifespanSeconds)) | quote }}
             redirectUris:
@@ -903,7 +903,7 @@ keycloak:
             standardFlowEnabled: true
             directAccessGrantsEnabled: false
             serviceAccountsEnabled: false
-            secret: "$(env:KC_CLOUDBEAVER_CLIENT_SECRET:change-me)"
+            secret: "$(env:KC_CLOUDBEAVER_CLIENT_SECRET)"
             redirectUris:
             {{- range .Values.global.identity.external.clients.cloudbeaverProxy.redirectUris }}
               - {{ . | quote }}
@@ -928,7 +928,7 @@ keycloak:
             standardFlowEnabled: true
             directAccessGrantsEnabled: false
             serviceAccountsEnabled: false
-            secret: "$(env:KC_RANGER_CLIENT_SECRET:change-me)"
+            secret: "$(env:KC_RANGER_CLIENT_SECRET)"
             redirectUris:
             {{- range .Values.global.identity.external.clients.rangerProxy.redirectUris }}
               - {{ . | quote }}
@@ -953,7 +953,7 @@ keycloak:
             standardFlowEnabled: true
             directAccessGrantsEnabled: false
             serviceAccountsEnabled: false
-            secret: "$(env:KC_PREFECT_CLIENT_SECRET:change-me)"
+            secret: "$(env:KC_PREFECT_CLIENT_SECRET)"
             redirectUris:
             {{- range .Values.global.identity.external.clients.prefectProxy.redirectUris }}
               - {{ . | quote }}
@@ -978,7 +978,7 @@ keycloak:
             standardFlowEnabled: {{ .Values.global.identity.external.clients.prefectAutomation.standardFlowEnabled }}
             directAccessGrantsEnabled: {{ .Values.global.identity.external.clients.prefectAutomation.directAccessGrantsEnabled }}
             serviceAccountsEnabled: {{ .Values.global.identity.external.clients.prefectAutomation.serviceAccountsEnabled }}
-            secret: "$(env:{{ .Values.global.identity.external.clients.prefectAutomation.configCliSecretKey }}:change-me)"
+            secret: "$(env:{{ .Values.global.identity.external.clients.prefectAutomation.configCliSecretKey }})"
             defaultClientScopes:
               - profile
               - email
@@ -1068,7 +1068,7 @@ keycloak:
                 bindDn:
                   - {{ include "dlh-in-a-box.identity.directory.bindDn" $ | quote }}
                 bindCredential:
-                  - "$(env:LDAP_BIND_PASSWORD:change-me)"
+                  - "$(env:LDAP_BIND_PASSWORD)"
                 authType:
                   - simple
                 {{- end }}

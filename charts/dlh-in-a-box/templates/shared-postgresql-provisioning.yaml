@@ -119,7 +119,7 @@ spec:
             - name: APP_{{ $name | replace "-" "_" | upper }}_PASSWORD
               valueFrom:
                 secretKeyRef:
-                  name: {{- if and (get (get $database "password" | default dict) "existingSecret") (ne (get (get $database "password" | default dict) "existingSecret") "") -}}{{ (get (get $database "password" | default dict) "existingSecret") | quote }}{{- else -}}{{ default (printf "dlh-%s-postgresql" $name) (get $database "secretName") | quote }}{{- end }}
+                  name: {{ if and (get (get $database "password" | default dict) "existingSecret") (ne (get (get $database "password" | default dict) "existingSecret") "") -}}{{ (get (get $database "password" | default dict) "existingSecret") | quote }}{{- else -}}{{ default (printf "dlh-%s-postgresql" $name) (get $database "secretName") | quote }}{{- end }}
                   key: {{ default "password" (get (get $database "password" | default dict) "key") | quote }}
 {{- end }}
 {{- range $database := $provisioningDatabaseList }}
