@@ -17,7 +17,12 @@ metadata:
     app.kubernetes.io/component: shared-postgresql-provisioner
   annotations:
     "helm.sh/hook": post-install,post-upgrade
-    "helm.sh/hook-weight": "5"
+    # Must run before any hook that expects per-app database roles/passwords
+    # to already exist, including hooks from vendored subcharts (e.g. the
+    # Superset chart's init-db Job) that carry no explicit hook-weight and
+    # therefore default to weight 0. A negative weight here guarantees this
+    # job always runs first regardless of what other charts add later.
+    "helm.sh/hook-weight": "-10"
     "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded
 spec:
   backoffLimit: {{ default 6 $provisioning.backoffLimit }}
