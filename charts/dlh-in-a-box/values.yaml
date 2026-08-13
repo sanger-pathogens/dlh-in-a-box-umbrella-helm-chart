@@ -125,13 +125,6 @@ global:
           clientSecretKey: vaultClientSecret
           redirectUris: []
           webOrigins: []
-        headlamp:
-          enabled: false
-          clientId: ""
-          existingSecret: dlh-oidc-clients
-          clientSecretKey: headlampClientSecret
-          redirectUris: []
-          webOrigins: []
         jupyterhub:
           enabled: false
           clientId: ""
@@ -821,31 +814,6 @@ keycloak:
             {{- end }}
             webOrigins:
             {{- range .Values.global.identity.external.clients.vault.webOrigins }}
-              - {{ . | quote }}
-            {{- end }}
-            defaultClientScopes:
-              - profile
-              - email
-              - roles
-              - platform-access
-        {{- end }}
-        {{- if .Values.global.identity.external.clients.headlamp.enabled }}
-          - clientId: {{ .Values.global.identity.external.clients.headlamp.clientId | quote }}
-            name: Headlamp
-            description: OIDC client for Headlamp browser login
-            enabled: true
-            protocol: openid-connect
-            publicClient: false
-            standardFlowEnabled: true
-            directAccessGrantsEnabled: false
-            serviceAccountsEnabled: false
-            secret: "$(env:KC_HEADLAMP_CLIENT_SECRET)"
-            redirectUris:
-            {{- range .Values.global.identity.external.clients.headlamp.redirectUris }}
-              - {{ . | quote }}
-            {{- end }}
-            webOrigins:
-            {{- range .Values.global.identity.external.clients.headlamp.webOrigins }}
               - {{ . | quote }}
             {{- end }}
             defaultClientScopes:
