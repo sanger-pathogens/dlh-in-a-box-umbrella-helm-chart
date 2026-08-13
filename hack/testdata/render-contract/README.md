@@ -71,7 +71,6 @@ These fixtures are expected to render successfully and prove supported paths:
 | --- | --- |
 | `prefect-automation-enabled.yaml` | machine access for Prefect can be enabled when the required proxy and client wiring exist |
 | `prefect-direct-grant-enabled.yaml` | developer direct-grant access for Prefect can be enabled when the required client wiring exists |
-| `bootstrap-users-base.yaml` | shared starting point for the bundled-Keycloak bootstrap-user fallback tests |
 
 ### Governance and authorization failures
 
@@ -122,14 +121,12 @@ configuration:
 | `prefect-token-audience-mismatch.yaml` | Prefect machine and developer bearer-token clients disagree on token audience |
 | `cloudbeaver-missing-secret.yaml` | CloudBeaver auth-proxy config secret missing |
 
-### Bundled Keycloak bootstrap and `keycloakLocal` edge cases
+### `keycloakLocal` edge cases
 
 These fixtures target the local auth-heavy modes:
 
 | File | What it targets |
 | --- | --- |
-| `bootstrap-password-auth-without-ldap.yaml` | Trino password auth enabled while using bootstrap users without LDAP |
-| `bootstrap-usersync-without-ldap.yaml` | Ranger usersync enabled while using bootstrap users without LDAP |
 | `keycloak-local-registration-disabled.yaml` | `keycloakLocal` mode without self-registration enabled |
 | `keycloak-local-trino-password-auth-enabled.yaml` | `keycloakLocal` mode trying to use LDAP-style Trino password auth |
 | `keycloak-local-usersync-enabled.yaml` | `keycloakLocal` mode with Ranger LDAP usersync still enabled |

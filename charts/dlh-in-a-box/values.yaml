@@ -47,7 +47,6 @@ global:
           roles:
             - realm-admin
         configCliEnvExistingSecret: dlh-keycloak-config-cli-env
-        bootstrapUsers: []
     external:
       oidc:
         issuer: ""
@@ -572,65 +571,6 @@ keycloak:
               - name: access
                 description: {{ printf "Browser access entitlement for %s" $appName | quote }}
           {{- end }}
-        {{- end }}
-        {{- end }}
-        {{- $bootstrapUsers := default (list) .Values.global.identity.provider.keycloak.bootstrapUsers }}
-        {{- $managedGroups := fromJsonArray (include "dlh-in-a-box.identity.keycloakManagedGroupsJson" $) }}
-        {{- $seededGroups := dict }}
-        {{- range $groupName := $managedGroups }}
-          {{- $_ := set $seededGroups (toString $groupName) true }}
-        {{- end }}
-        {{- range $user := $bootstrapUsers }}
-          {{- range $group := default (list) $user.groups }}
-            {{- $_ := set $seededGroups (toString $group) true }}
-          {{- end }}
-        {{- end }}
-        {{- if gt (len $seededGroups) 0 }}
-        groups:
-        {{- range $groupName := keys $seededGroups | sortAlpha }}
-          - name: {{ $groupName | quote }}
-        {{- end }}
-        {{- end }}
-        {{- if gt (len $bootstrapUsers) 0 }}
-        users:
-        {{- range $user := $bootstrapUsers }}
-          - username: {{ $user.username | quote }}
-            enabled: {{ default true $user.enabled }}
-            emailVerified: true
-            {{- if $user.email }}
-            email: {{ $user.email | quote }}
-            {{- end }}
-            {{- if $user.firstName }}
-            firstName: {{ $user.firstName | quote }}
-            {{- end }}
-            {{- if $user.lastName }}
-            lastName: {{ $user.lastName | quote }}
-            {{- end }}
-            credentials:
-              - type: password
-                value: {{ printf "$(env:%s)" (default "KC_BOOTSTRAP_USER_PASSWORD" $user.passwordEnvVar) | quote }}
-                temporary: {{ default false $user.temporaryPassword }}
-            {{- if $user.groups }}
-            groups:
-            {{- range $group := $user.groups }}
-              - {{ $group | quote }}
-            {{- end }}
-            {{- end }}
-            {{- if $user.realmRoles }}
-            realmRoles:
-            {{- range $role := $user.realmRoles }}
-              - {{ $role | quote }}
-            {{- end }}
-            {{- end }}
-            {{- if $user.clientRoles }}
-            clientRoles:
-            {{- range $clientName := keys $user.clientRoles | sortAlpha }}
-              {{ $clientName | quote }}:
-              {{- range $role := (get $user.clientRoles $clientName | default (list)) }}
-                - {{ $role | quote }}
-              {{- end }}
-            {{- end }}
-            {{- end }}
         {{- end }}
         {{- end }}
         clients:

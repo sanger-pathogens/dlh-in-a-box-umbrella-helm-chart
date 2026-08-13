@@ -434,18 +434,6 @@ expect_fail \
   -f "${FIXTURE_DIR}/missing-directory-url.yaml"
 
 expect_fail \
-  "global.identity.directory.ldap.enabled must be true when Trino LDAP PASSWORD auth is enabled through the shared identity contract." \
-  -f "${LOCAL_VALUES}" \
-  -f "${FIXTURE_DIR}/bootstrap-users-base.yaml" \
-  -f "${FIXTURE_DIR}/bootstrap-password-auth-without-ldap.yaml"
-
-expect_fail \
-  "global.authorization.ranger.usersync.enabled must be false when using bundled Keycloak bootstrapUsers without an organizational LDAP connection." \
-  -f "${LOCAL_VALUES}" \
-  -f "${FIXTURE_DIR}/bootstrap-users-base.yaml" \
-  -f "${FIXTURE_DIR}/bootstrap-usersync-without-ldap.yaml"
-
-expect_fail \
   "global.identity.provider.keycloak.registration.enabled must be true when global.identity.directory.mode=keycloakLocal." \
   -f "${LOCAL_VALUES}" \
   -f "${FIXTURE_DIR}/keycloak-local-registration-disabled.yaml"

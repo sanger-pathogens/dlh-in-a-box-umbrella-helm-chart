@@ -162,39 +162,7 @@
                     }
                   }
                 },
-                "configCliEnvExistingSecret": { "type": "string" },
-                "bootstrapUsers": {
-                  "type": "array",
-                  "items": {
-                    "type": "object",
-                    "additionalProperties": false,
-                    "properties": {
-                      "username": { "type": "string", "minLength": 1 },
-                      "email": { "type": "string" },
-                      "firstName": { "type": "string" },
-                      "lastName": { "type": "string" },
-                      "enabled": { "type": "boolean" },
-                      "passwordEnvVar": { "type": "string", "minLength": 1 },
-                      "temporaryPassword": { "type": "boolean" },
-                      "groups": {
-                        "type": "array",
-                        "items": { "type": "string" }
-                      },
-                      "realmRoles": {
-                        "type": "array",
-                        "items": { "type": "string" }
-                      },
-                      "clientRoles": {
-                        "type": "object",
-                        "additionalProperties": {
-                          "type": "array",
-                          "items": { "type": "string" }
-                        }
-                      }
-                    },
-                    "required": ["username", "passwordEnvVar"]
-                  }
-                }
+                "configCliEnvExistingSecret": { "type": "string" }
               }
             }
           }
