@@ -58,7 +58,7 @@
 {{- $configCliEnvSecretName := default "" $keycloakProvider.configCliEnvExistingSecret -}}
 {{- $hasSupersetOauthClientId := false -}}
 {{- $hasSupersetOauthClientSecret := false -}}
-{{- $supportedAccessModelApps := list "superset" "datahub" "trinoUi" "jupyterhub" "cloudbeaver" "prefect" "ranger" -}}
+{{- $supportedAccessModelApps := list "superset" "datahub" "trinoUi" "jupyterhub" "cloudbeaver" "prefect" "ranger" "keycloak" "minio" -}}
 {{- $accessModelRoleKeys := dict -}}
 {{- $accessModelAppAccess := dict -}}
 
@@ -90,6 +90,9 @@
     {{- fail (printf "global.identity.external.clients.%s.allowedGroups is no longer supported. Browser access is derived from global.identity.accessRoles appAccess and enforced with Keycloak client roles." $clientName) -}}
   {{- end -}}
 {{- end -}}
+{{- if and (default false $identity.enabled) (eq (len $accessRoles) 0) -}}
+{{- fail "global.identity.accessRoles must define at least one role when shared identity is enabled." -}}
+{{- end -}}
   {{- range $roleKey, $role := $accessRoles -}}
     {{- $roleEnabled := true -}}
     {{- if hasKey $role "enabled" -}}
@@ -103,12 +106,15 @@
     {{- end -}}
     {{- range $appName, $_ := get $role "appAccess" | default dict -}}
       {{- if not (has $appName $supportedAccessModelApps) -}}
-        {{- fail (printf "global.identity.accessRoles.%s.appAccess.%s is not supported. Allowed app access keys are superset, datahub, trinoUi, jupyterhub, cloudbeaver, prefect, and ranger." $roleKey $appName) -}}
+        {{- fail (printf "global.identity.accessRoles.%s.appAccess.%s is not supported. Allowed app access keys are superset, datahub, trinoUi, jupyterhub, cloudbeaver, prefect, ranger, keycloak, and minio." $roleKey $appName) -}}
       {{- end -}}
       {{- if and $roleEnabled $_ -}}
         {{- $_ := set $accessModelAppAccess $appName true -}}
       {{- end -}}
     {{- end -}}
+  {{- end -}}
+  {{- if and (default false $identity.enabled) (gt (len $accessRoles) 0) (eq (len $accessModelRoleKeys) 0) -}}
+    {{- fail "global.identity.accessRoles must have at least one role with enabled=true when shared identity is enabled." -}}
   {{- end -}}
   {{- range $launcherName, $launcher := get $platformHomeValues "launchers" | default dict -}}
     {{- if hasKey ($launcher | default dict) "requiredGroups" -}}

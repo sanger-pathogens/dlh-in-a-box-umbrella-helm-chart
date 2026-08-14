@@ -16,6 +16,8 @@ global:
           prefect: true
           ranger: true
           trinoUi: true
+          keycloak: true
+          minio: true
       platform-user:
         enabled: true
         appAccess:

@@ -495,6 +495,11 @@ expect_fail \
   -f "${FIXTURE_DIR}/access-model-ranger-override.yaml"
 
 expect_fail \
+  "global.identity.accessRoles must have at least one role with enabled=true when shared identity is enabled." \
+  -f "${DEV_VALUES}" \
+  -f "${FIXTURE_DIR}/all-access-roles-disabled.yaml"
+
+expect_fail \
   "global.identity.external.clients.cloudbeaverProxy.allowedGroups is no longer supported. Browser access is derived from global.identity.accessRoles appAccess and enforced with Keycloak client roles." \
   -f "${DEV_VALUES}" \
   -f "${FIXTURE_DIR}/oauth2-proxy-allowed-groups.yaml"

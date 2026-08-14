@@ -79,7 +79,9 @@
             "jupyterhub": { "type": "boolean" },
             "cloudbeaver": { "type": "boolean" },
             "prefect": { "type": "boolean" },
-            "ranger": { "type": "boolean" }
+            "ranger": { "type": "boolean" },
+            "keycloak": { "type": "boolean" },
+            "minio": { "type": "boolean" }
           }
         }
       }
