@@ -303,7 +303,7 @@ This describes the data sources the platform should expose. It is the seed for:
 - governance checks
 - imported or bootstrapped access rules
 
-### `global.identity.accessModel`
+### `global.identity.accessRoles`
 
 This is the durable role catalog the platform cares about.
 

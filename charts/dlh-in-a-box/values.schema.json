@@ -62,35 +62,6 @@
         "retentionNotes"
       ]
     },
-    "accessModel": {
-      "type": "object",
-      "additionalProperties": true,
-      "properties": {
-        "builtinRoles": {
-          "type": "object",
-          "additionalProperties": {
-            "$ref": "#/definitions/accessModelRole"
-          },
-          "properties": {
-            "platform-admin": {
-              "$ref": "#/definitions/accessModelRole"
-            },
-            "platform-user": {
-              "$ref": "#/definitions/accessModelRole"
-            },
-            "platform-viewer": {
-              "$ref": "#/definitions/accessModelRole"
-            }
-          }
-        },
-        "additionalRoles": {
-          "type": "object",
-          "additionalProperties": {
-            "$ref": "#/definitions/accessModelRole"
-          }
-        }
-      }
-    },
     "accessModelRole": {
       "type": "object",
       "additionalProperties": true,
@@ -121,8 +92,11 @@
           "type": "boolean",
           "description": "Enable the shared external identity contract used by Trino and the optional UI integrations."
         },
-        "accessModel": {
-          "$ref": "#/definitions/accessModel",
+        "accessRoles": {
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/definitions/accessModelRole"
+          },
           "description": "Keycloak-centered catalog of platform roles and app access."
         },
         "provider": {

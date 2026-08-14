@@ -15,7 +15,6 @@
 {{- $portalHealth := get $platformHomeValues "health" | default dict -}}
 {{- $global := .Values.global | default dict -}}
 {{- $identity := get $global "identity" | default dict -}}
-{{- $accessModel := get $identity "accessModel" | default dict -}}
 {{- $accessModelRoles := fromJson (include "dlh-in-a-box.identity.accessModelRolesJson" .) -}}
 {{- $directory := get $identity "directory" | default dict -}}
 {{- $directoryMode := include "dlh-in-a-box.identity.directoryMode" . -}}

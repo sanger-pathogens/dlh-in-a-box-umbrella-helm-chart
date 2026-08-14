@@ -332,7 +332,7 @@ assert_contains "${prefect_job_runner_manifest}" "\"default\": \"dlh-dev\""
 assert_contains "${prefect_job_runner_manifest}" "\"default\": \"prefect-job-runner\""
 assert_contains "${prefect_job_runner_manifest}" "sync-base-job-template"
 assert_contains "${prefect_job_runner_manifest}" "prefect work-pool update"
-assert_contains "${dev_manifest}" "\"accessModel\": {"
+assert_contains "${dev_manifest}" "\"accessRoles\": {"
 assert_contains "${prod_manifest}" "\"platform-admin\""
 assert_contains "${dev_manifest}" "\"roles\": ["
 assert_contains "${prod_manifest}" "\"roles\": ["
@@ -471,36 +471,36 @@ expect_fail \
   -f "${FIXTURE_DIR}/legacy-trino-authentication-type.yaml"
 
 expect_fail_any \
-  "global.authorization.platformRoles is no longer supported. Define platform roles under global.identity.accessModel." \
+  "global.authorization.platformRoles is no longer supported. Define platform roles under global.identity.accessRoles." \
   "global.authorization.platformRoles is no longer supported" \
   -- \
   -f "${DEV_VALUES}" \
   -f "${FIXTURE_DIR}/invalid-platform-role-app.yaml"
 
 expect_fail_any \
-  "global.identity.accessModel.builtinRoles.platform-admin.appAccess: Additional property notARealApp is not allowed" \
+  "global.identity.accessRoles.platform-admin.appAccess: Additional property notARealApp is not allowed" \
   "additional properties 'notARealApp' not allowed" \
   -- \
   -f "${DEV_VALUES}" \
   -f "${FIXTURE_DIR}/invalid-access-model-app.yaml"
 
 expect_fail \
-  "global.identity.accessModel.groupRoleMappings is no longer supported. Assign Keycloak realm roles directly to users for app access, and define data access roles under global.authorization.ranger.dataRoles." \
+  "global.identity.accessModel is no longer supported. Move platform roles directly under global.identity.accessRoles." \
   -f "${DEV_VALUES}" \
   -f "${FIXTURE_DIR}/access-model-group-role-mappings.yaml"
 
 expect_fail \
-  "global.identity.accessModel.builtinRoles.platform-viewer.ranger is not supported. Keycloak roles control app access only; define Ranger data roles under global.authorization.ranger.dataRoles." \
+  "global.identity.accessRoles.platform-viewer.ranger is not supported. Keycloak roles control app access only; define Ranger data roles under global.authorization.ranger.dataRoles." \
   -f "${DEV_VALUES}" \
   -f "${FIXTURE_DIR}/access-model-ranger-override.yaml"
 
 expect_fail \
-  "global.identity.external.clients.cloudbeaverProxy.allowedGroups is no longer supported. Browser access is derived from global.identity.accessModel appAccess and enforced with Keycloak client roles." \
+  "global.identity.external.clients.cloudbeaverProxy.allowedGroups is no longer supported. Browser access is derived from global.identity.accessRoles appAccess and enforced with Keycloak client roles." \
   -f "${DEV_VALUES}" \
   -f "${FIXTURE_DIR}/oauth2-proxy-allowed-groups.yaml"
 
 expect_fail \
-  "platformHome.launchers.vault.requiredGroups is no longer supported. Use platformHome.launchers.vault.requiredRoles with Keycloak realm role names from global.identity.accessModel." \
+  "platformHome.launchers.vault.requiredGroups is no longer supported. Use platformHome.launchers.vault.requiredRoles with Keycloak realm role names from global.identity.accessRoles." \
   -f "${DEV_VALUES}" \
   -f "${FIXTURE_DIR}/platform-home-required-groups.yaml"
 
@@ -515,7 +515,7 @@ expect_fail \
   -f "${FIXTURE_DIR}/jupyterhub-group-env.yaml"
 
 expect_fail \
-  "datahub.auth.groupProvisioning is no longer supported. DataHub browser access must not depend on OIDC group claims; use global.identity.accessModel roles and client roles." \
+  "datahub.auth.groupProvisioning is no longer supported. DataHub browser access must not depend on OIDC group claims; use global.identity.accessRoles and client roles." \
   -f "${DEV_VALUES}" \
   -f "${FIXTURE_DIR}/datahub-group-provisioning.yaml"
 

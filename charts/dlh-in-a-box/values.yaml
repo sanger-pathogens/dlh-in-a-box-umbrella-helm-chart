@@ -5,31 +5,29 @@ global:
   imagePullSecrets: []
   identity: &identity_defaults
     enabled: false
-    accessModel:
-      builtinRoles:
-        platform-admin:
-          enabled: true
-          appAccess:
-            superset: true
-            datahub: true
-            jupyterhub: true
-            cloudbeaver: true
-            prefect: true
-            ranger: true
-            trinoUi: true
-        platform-user:
-          enabled: true
-          appAccess:
-            superset: true
-            datahub: true
-            jupyterhub: true
-            cloudbeaver: true
-        platform-viewer:
-          enabled: true
-          appAccess:
-            superset: true
-            datahub: true
-      additionalRoles: {}
+    accessRoles:
+      platform-admin:
+        enabled: true
+        appAccess:
+          superset: true
+          datahub: true
+          jupyterhub: true
+          cloudbeaver: true
+          prefect: true
+          ranger: true
+          trinoUi: true
+      platform-user:
+        enabled: true
+        appAccess:
+          superset: true
+          datahub: true
+          jupyterhub: true
+          cloudbeaver: true
+      platform-viewer:
+        enabled: true
+        appAccess:
+          superset: true
+          datahub: true
     provider:
       mode: externalOidc
       keycloak:
