@@ -54,7 +54,6 @@ global:
           clientId: platform-home
           redirectUris:
             - http://dlh-platform-home.data-lakehouse-local.svc.cluster.local/
-            - http://dlh-platform-home.data-lakehouse-local.svc.cluster.local/access-control
           webOrigins:
             - http://dlh-platform-home.data-lakehouse-local.svc.cluster.local
         cloudbeaverProxy:

@@ -1,0 +1,9 @@
+global:
+  identity:
+    accessRoles:
+      platform-admin:
+        enabled: false
+      platform-user:
+        enabled: false
+      platform-viewer:
+        enabled: false

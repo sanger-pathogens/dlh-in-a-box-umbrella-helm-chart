@@ -417,7 +417,7 @@ rather than obvious small templates.
 | `values.schema.json` | formalizes valid input shape and helps catch broken values early |
 | `templates/identity-validation.yaml` | blocks unsupported identity combinations before resources render |
 | `templates/governance-validation.yaml` | blocks incomplete or unsafe governed-data setups |
-| `templates/platform-home.yaml` | contains the landing page, embedded JavaScript, embedded Python helper API, launcher logic, health checks, and access-control UI |
+| `templates/platform-home.yaml` | contains the landing page, embedded JavaScript, embedded Python helper API, launcher logic, and health checks |
 | `templates/cloudbeaver.yaml` | contains CloudBeaver bootstrap, proxy-header expectations, trust-store creation, and optional shared-connection seeding |
 | `templates/ranger-admin.yaml` | builds the Ranger Admin deployment and bootstraps it against PostgreSQL |
 | `templates/ranger-automation.yaml` | embeds the large Python reconciliation logic for roles, policies, usersync, local-user sync, and exception audits |

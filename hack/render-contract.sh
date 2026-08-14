@@ -173,13 +173,15 @@ assert_contains "${local_manifest}" 'add_header Strict-Transport-Security "max-a
 assert_contains "${local_manifest}" 'add_header X-Content-Type-Options "nosniff" always;'
 assert_contains "${local_manifest}" 'add_header Referrer-Policy "strict-origin-when-cross-origin" always;'
 assert_contains "${local_manifest}" "name: dlh-cloudbeaver"
-assert_contains "${local_manifest}" "/access-control"
+assert_not_contains "${local_manifest}" "\"url\": \"/access-control\""
+assert_not_contains "${local_manifest}" "Access Control"
+assert_not_contains "${local_manifest}" "access-control-reconcile"
+assert_not_contains "${local_manifest}" "role-management-panel"
 assert_not_contains "${local_manifest}" "ldap-directory"
 assert_not_contains "${local_manifest}" "access-control.name=ranger"
 assert_contains "${local_manifest}" "access-control.name=file"
 assert_contains "${local_manifest}" "registrationAllowed: true"
 assert_contains "${local_manifest}" "verifyEmail: false"
-assert_contains "${local_manifest}" "\"accessControlEnabled\": false"
 assert_not_contains "${local_manifest}" "platform-app-cloudbeaver"
 assert_not_contains "${local_manifest}" "platform-app-prefect"
 assert_contains "${local_manifest}" "name: platform-access"

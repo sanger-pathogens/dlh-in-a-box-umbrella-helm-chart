@@ -1230,39 +1230,6 @@
               }
             }
           }
-        },
-        "adminTools": {
-          "type": "array",
-          "items": {
-            "type": "object",
-            "additionalProperties": true,
-            "properties": {
-              "id": { "type": "string" },
-              "name": { "type": "string" },
-              "summary": { "type": "string" },
-              "url": { "type": "string" },
-              "icon": { "type": "string" },
-              "iconUrl": { "type": "string" },
-              "iconAlt": { "type": "string" },
-              "iconBackground": { "type": "string" },
-              "iconText": { "type": "string" },
-              "health": {
-                "type": "object",
-                "additionalProperties": true,
-                "properties": {
-                  "targetUrl": { "type": "string" },
-                  "expectedStatusCodes": {
-                    "type": "array",
-                    "items": { "type": "integer", "minimum": 100, "maximum": 599 }
-                  },
-                  "bodyIncludes": { "type": "string" },
-                  "timeoutSeconds": { "type": "integer", "minimum": 1 },
-                  "public": { "type": "boolean" }
-                }
-              },
-              "group": { "type": "string" }
-            }
-          }
         }
       }
     },
