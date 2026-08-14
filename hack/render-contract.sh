@@ -194,6 +194,13 @@ assert_not_contains "${local_manifest}" "name: dlh-ranger-admin-usersync"
 assert_contains "${local_manifest}" "name: dlh-ranger-admin-keycloak-sync"
 assert_contains "${dev_manifest}" "name: dlh-ranger-admin-keycloak-sync"
 assert_contains "${prod_manifest}" "name: dlh-ranger-admin-keycloak-sync"
+assert_contains "${local_manifest}" "\"minio-console\": {"
+assert_contains "${local_manifest}" "\"mode\": \"minio-sso\""
+assert_contains "${local_manifest}" "\"internalApiUrl\": \"http://dlh-minio:9001\""
+assert_not_contains "${dev_manifest}" "\"minio-console\": {"
+assert_not_contains "${prod_manifest}" "\"minio-console\": {"
+assert_not_contains "${dev_manifest}" "vault-wrapped-token"
+assert_not_contains "${prod_manifest}" "vault-wrapped-token"
 assert_not_contains "${dev_manifest}" '"platformRoleMembershipSource"'
 assert_not_contains "${prod_manifest}" '"platformRoleMembershipSource"'
 assert_contains "${local_manifest}" "keycloak_ranger_sync.py"
@@ -507,9 +514,9 @@ expect_fail \
   -f "${FIXTURE_DIR}/oauth2-proxy-allowed-groups.yaml"
 
 expect_fail \
-  "platformHome.launchers.vault.requiredGroups is no longer supported. Use platformHome.launchers.vault.requiredRoles with Keycloak realm role names from global.identity.accessRoles." \
+  "platformHome.launchers is no longer supported. JupyterHub is served as a regular app tile; MinIO Console is enabled automatically when minio.enabled=true." \
   -f "${DEV_VALUES}" \
-  -f "${FIXTURE_DIR}/platform-home-required-groups.yaml"
+  -f "${FIXTURE_DIR}/platform-home-launchers-unsupported.yaml"
 
 expect_fail \
   "global.dataCatalogs.redcap.authorizedGroups is no longer supported. Use authorizedRoles or explicit Ranger bootstrap policies with Ranger role names." \

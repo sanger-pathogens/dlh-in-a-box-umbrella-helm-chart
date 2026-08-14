@@ -3,7 +3,6 @@
 {{- $port := default 8080 .Values.platformHome.service.port -}}
 {{- $apiPort := default 18080 (dig "api" "port" 18080 .Values.platformHome) -}}
 {{- $platformHomeValues := .Values.platformHome | default dict -}}
-{{- $launchers := get $platformHomeValues "launchers" | default dict -}}
 {{- $keycloakBrowserBaseUrl := trimSuffix "/" (default "" (get $platformHomeValues "keycloakBrowserBaseUrl")) -}}
 {{- $branding := .Values.platformHome.branding | default dict -}}
 {{- $theme := get $platformHomeValues "theme" | default dict -}}
@@ -76,30 +75,19 @@
   {{- end -}}
 {{- end -}}
 {{- $portalLaunchers := dict -}}
-{{- range $launcherName := keys $launchers | sortAlpha -}}
-  {{- $launcher := get $launchers $launcherName | default dict -}}
-  {{- if default false (get $launcher "enabled") -}}
-    {{- $launcherRequiredRoles := get $launcher "requiredRoles" -}}
-    {{- if not $launcherRequiredRoles -}}
-      {{- if eq $launcherName "minio-console" -}}
-        {{- $launcherRequiredRoles = get $appRequiredRoles "minio" -}}
-      {{- else -}}
-        {{- $launcherRequiredRoles = list -}}
-      {{- end -}}
-    {{- end -}}
-    {{- $_ := set $portalLaunchers $launcherName (dict
-      "mode" (default "redirect" (get $launcher "mode"))
-      "path" (default (printf "/launch/%s" $launcherName) (get $launcher "path"))
-      "targetUrl" (default "" (get $launcher "targetUrl"))
-      "completeUrl" (default "" (get $launcher "completeUrl"))
-      "internalApiUrl" (default "" (get $launcher "internalApiUrl"))
-      "redirectUri" (default "" (get $launcher "redirectUri"))
-      "authMount" (default "" (get $launcher "authMount"))
-      "role" (default "" (get $launcher "role"))
-      "wrapTtl" (default "" (get $launcher "wrapTtl"))
-      "requiredRoles" $launcherRequiredRoles
-    ) -}}
-  {{- end -}}
+{{- if .Values.minio.enabled -}}
+  {{- $_ := set $portalLaunchers "minio-console" (dict
+    "mode" "minio-sso"
+    "path" "/launch/minio-console"
+    "targetUrl" ""
+    "completeUrl" ""
+    "internalApiUrl" (printf "http://%s:9001" (include "dlh-in-a-box.minio.serviceName" .))
+    "redirectUri" ""
+    "authMount" ""
+    "role" ""
+    "wrapTtl" ""
+    "requiredRoles" (get $appRequiredRoles "minio")
+  ) -}}
 {{- end -}}
 {{- $adminTools := list -}}
 {{- if $rangerBrowserUrl -}}
@@ -193,12 +181,11 @@
 {{- if and .Values.jupyterhub.enabled (default false (dig "jupyterhub" "enabled" false $clients)) -}}
   {{- $appMeta := get $itemMeta "jupyterhub" | default dict -}}
   {{- $jupyterhubOrigin := trimSuffix "/" (first (default (list) (dig "jupyterhub" "webOrigins" list $clients))) -}}
-  {{- $jupyterhubLaunch := get $portalLaunchers "jupyterhub" | default dict -}}
   {{- $apps = append $apps (dict
     "id" "jupyterhub"
     "name" "JupyterHub"
     "summary" "Interactive notebooks and shared code workspace"
-    "url" (default $jupyterhubOrigin (get $jupyterhubLaunch "path"))
+    "url" $jupyterhubOrigin
     "group" "Analysis"
     "icon" "JH"
     "iconText" (default "JH" (get $appMeta "iconText"))

@@ -425,53 +425,15 @@ async function apiRequest(path, options = {}) {
   return payload;
 }
 
-async function launchPortalTarget(target, options = {}) {
+async function launchPortalTarget(target) {
   if (!target) {
     return;
   }
   setPortalNotice("info", `Opening ${escapeHtml(humanizeSlug(target))}...`);
   const payload = await apiRequest(`/api/launch/${encodeURIComponent(target)}`);
   const targetUrl = String(payload?.url || "").trim();
-  const launchMode = String(payload?.mode || "redirect").trim().toLowerCase();
   if (!targetUrl) {
     throw new Error(`The portal launcher for ${humanizeSlug(target)} did not return a URL.`);
-  }
-
-  if (launchMode === "popup") {
-    const completeUrl = String(payload?.completeUrl || "").trim();
-    const popup = window.open(
-      targetUrl,
-      `${target}-launcher`,
-      "popup=yes,width=720,height=860,noopener=yes",
-    );
-    if (!popup) {
-      if (!options.interactive) {
-        throw new Error(`Your browser blocked the ${humanizeSlug(target)} sign-in window. Return to the portal and open it again from the launch card.`);
-      }
-      window.location.assign(targetUrl);
-      return;
-    }
-    await new Promise((resolve, reject) => {
-      const startedAt = Date.now();
-      const timer = window.setInterval(() => {
-        if (popup.closed) {
-          window.clearInterval(timer);
-          resolve();
-          return;
-        }
-        if (Date.now() - startedAt > 120000) {
-          window.clearInterval(timer);
-          try {
-            popup.close();
-          } catch (error) {
-            console.warn("Unable to close the launcher popup after timeout.", error);
-          }
-          reject(new Error(`${humanizeSlug(target)} sign-in did not finish before the launcher timed out.`));
-        }
-      }, 1000);
-    });
-    window.location.replace(completeUrl || targetUrl);
-    return;
   }
 
   window.location.replace(targetUrl);
@@ -582,7 +544,7 @@ async function bootstrap() {
       return;
     }
     event.preventDefault();
-    launchPortalTarget(launchTarget, { interactive: true }).catch((error) => {
+    launchPortalTarget(launchTarget).catch((error) => {
       setPortalNotice("error", escapeHtml(error.message || `Unable to open ${humanizeSlug(launchTarget)}.`));
     });
   });

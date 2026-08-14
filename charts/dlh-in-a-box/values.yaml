@@ -1138,7 +1138,6 @@ platformHome:
     enabled: false
     refreshIntervalSeconds: 90
   itemMeta: {}
-  launchers: {}
 
 jupyterhub:
   enabled: false

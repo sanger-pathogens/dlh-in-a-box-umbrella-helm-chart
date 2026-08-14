@@ -190,6 +190,15 @@ app.kubernetes.io/managed-by: {{ .Release.Service }}
 {{- printf "%s-cloudbeaver" .Release.Name -}}
 {{- end -}}
 
+{{- define "dlh-in-a-box.minio.serviceName" -}}
+{{- $minio := .Values.minio | default dict -}}
+{{- if $minio.fullnameOverride -}}
+{{- $minio.fullnameOverride -}}
+{{- else -}}
+{{- printf "%s-minio" .Release.Name -}}
+{{- end -}}
+{{- end -}}
+
 {{- define "dlh-in-a-box.sharedPostgresql.serviceName" -}}
 {{- $sharedPostgresql := .Values.sharedPostgresql | default dict -}}
 {{- $external := get $sharedPostgresql "external" | default dict -}}

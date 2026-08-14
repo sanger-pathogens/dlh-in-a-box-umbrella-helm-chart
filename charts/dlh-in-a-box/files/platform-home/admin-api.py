@@ -162,7 +162,6 @@ def authenticate(handler, require_admin=True):
         raise ApiError(403, "Platform administration is limited to platform administrators.")
     merged = dict(claims)
     merged.update(profile if isinstance(profile, dict) else {})
-    merged["accessToken"] = token
     merged["roles"] = roles
     merged["is_admin"] = is_admin
     return merged
@@ -226,56 +225,6 @@ def resolve_launcher(name, profile):
         if not target_url:
             raise ApiError(500, "That portal launcher is missing its targetUrl.")
         return {"mode": "redirect", "url": target_url}
-
-    if mode == "vault-oidc":
-        internal_api_url = str(launcher.get("internalApiUrl") or "").rstrip("/")
-        redirect_uri = str(launcher.get("redirectUri") or "").strip()
-        complete_url = str(launcher.get("completeUrl") or "").strip()
-        role = str(launcher.get("role") or "").strip()
-        if not internal_api_url or not redirect_uri:
-            raise ApiError(500, "The Vault launcher is missing its internal API URL or redirect URI.")
-        payload = {"redirect_uri": redirect_uri}
-        if role:
-            payload["role"] = role
-        response = launcher_request(f"{internal_api_url}/v1/auth/oidc/oidc/auth_url", payload)
-        auth_url = str(((response.get("data") or {}).get("auth_url")) or "").strip()
-        if not auth_url:
-            raise ApiError(502, "Vault did not return an OIDC authorization URL.")
-        return {
-            "mode": "popup",
-            "url": auth_url,
-            "completeUrl": complete_url or redirect_uri.rsplit("/ui/vault/auth/oidc/oidc/callback", 1)[0] + "/ui/",
-        }
-
-    if mode == "vault-wrapped-token":
-        internal_api_url = str(launcher.get("internalApiUrl") or "").rstrip("/")
-        target_url = str(launcher.get("targetUrl") or "").strip()
-        auth_mount = str(launcher.get("authMount") or "").strip()
-        role = str(launcher.get("role") or "").strip()
-        wrap_ttl = str(launcher.get("wrapTtl") or "").strip()
-        access_token = str(profile.get("accessToken") or "").strip()
-        if not internal_api_url or not target_url or not auth_mount or not role:
-            raise ApiError(500, "The Vault launcher is missing its internal API URL, auth mount, role, or target URL.")
-        if not access_token:
-            raise ApiError(401, "Your session is no longer valid. Please sign in again.")
-        request_headers = {}
-        if wrap_ttl:
-            request_headers["X-Vault-Wrap-TTL"] = wrap_ttl
-        response = launcher_request(
-            f"{internal_api_url}/v1/auth/{urllib.parse.quote(auth_mount, safe='')}/login",
-            {"jwt": access_token, "role": role},
-            request_headers,
-        )
-        wrap_token = str(((response.get("wrap_info") or {}).get("token")) or "").strip()
-        if not wrap_token:
-            raise ApiError(502, "Vault did not return a wrapped login token.")
-        parsed_target = urllib.parse.urlparse(target_url)
-        existing_query = urllib.parse.parse_qsl(parsed_target.query, keep_blank_values=True)
-        existing_query.append(("wrapped_token", wrap_token))
-        launched_url = urllib.parse.urlunparse(
-            parsed_target._replace(query=urllib.parse.urlencode(existing_query))
-        )
-        return {"mode": "redirect", "url": launched_url}
 
     if mode == "minio-sso":
         internal_api_url = str(launcher.get("internalApiUrl") or "").rstrip("/")

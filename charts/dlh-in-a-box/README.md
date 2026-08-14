@@ -197,7 +197,7 @@ These sections configure repo-owned or heavily wrapped features:
 
 | Values path | What it controls |
 | --- | --- |
-| `platformHome` | landing page, launchers, health checks, and admin UI |
+| `platformHome` | landing page, health checks, and admin UI |
 | `cloudbeaver` | CloudBeaver image, bootstrap secrets, auth-proxy headers, trust store wiring |
 | `prefect` | high-level Prefect toggles and optional flow-run job-runner Kubernetes primitives |
 | `prefect-auth-proxy` | oauth2-proxy in front of Prefect |

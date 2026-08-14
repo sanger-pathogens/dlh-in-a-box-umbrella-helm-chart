@@ -52,8 +52,6 @@ global:
           clientId: platform-home
           redirectUris:
             - https://portal.data-platform.example.org/
-            - https://portal.data-platform.example.org/launch/vault
-            - https://portal.data-platform.example.org/launch/jupyterhub
           webOrigins:
             - https://portal.data-platform.example.org
         jupyterhub:
@@ -308,26 +306,6 @@ platformHome:
     className: nginx
     host: portal.data-platform.example.org
     tlsSecretName: prod-example-wildcard
-  launchers:
-    jupyterhub:
-      enabled: true
-      mode: redirect
-      path: /launch/jupyterhub
-      targetUrl: https://jupyterhub.data-platform.example.org/hub/oauth_login?next=%2Fhub%2F
-      requiredRoles:
-        - platform-admin
-        - platform-user
-    vault:
-      enabled: true
-      mode: vault-wrapped-token
-      path: /launch/vault
-      internalApiUrl: http://platform-vault.platform-secrets.svc.cluster.local:8200
-      targetUrl: https://vault.data-platform.example.org/ui/vault/auth
-      authMount: portal-jwt
-      role: platform-home-launch
-      wrapTtl: 5m
-      requiredRoles:
-        - platform-admin
 
 jupyterhub:
   enabled: true

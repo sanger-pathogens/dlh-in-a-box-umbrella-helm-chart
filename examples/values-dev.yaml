@@ -52,8 +52,6 @@ global:
           clientId: platform-home
           redirectUris:
             - https://portal.dev.example.org/
-            - https://portal.dev.example.org/launch/vault
-            - https://portal.dev.example.org/launch/jupyterhub
           webOrigins:
             - https://portal.dev.example.org
         jupyterhub:
@@ -326,26 +324,6 @@ platformHome:
     className: nginx
     host: portal.dev.example.org
     tlsSecretName: dev-example-tls
-  launchers:
-    jupyterhub:
-      enabled: true
-      mode: redirect
-      path: /launch/jupyterhub
-      targetUrl: https://jupyterhub.dev.example.org/hub/oauth_login?next=%2Fhub%2F
-      requiredRoles:
-        - platform-admin
-        - platform-user
-    vault:
-      enabled: true
-      mode: vault-wrapped-token
-      path: /launch/vault
-      internalApiUrl: http://platform-vault.platform-secrets.svc.cluster.local:8200
-      targetUrl: https://vault.dev.example.org/ui/vault/auth
-      authMount: portal-jwt
-      role: platform-home-launch
-      wrapTtl: 5m
-      requiredRoles:
-        - platform-admin
 
 jupyterhub:
   enabled: true

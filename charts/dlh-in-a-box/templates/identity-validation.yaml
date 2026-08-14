@@ -116,15 +116,8 @@
   {{- if and (default false $identity.enabled) (gt (len $accessRoles) 0) (eq (len $accessModelRoleKeys) 0) -}}
     {{- fail "global.identity.accessRoles must have at least one role with enabled=true when shared identity is enabled." -}}
   {{- end -}}
-  {{- range $launcherName, $launcher := get $platformHomeValues "launchers" | default dict -}}
-    {{- if hasKey ($launcher | default dict) "requiredGroups" -}}
-      {{- fail (printf "platformHome.launchers.%s.requiredGroups is no longer supported. Use platformHome.launchers.%s.requiredRoles with Keycloak realm role names from global.identity.accessRoles." $launcherName $launcherName) -}}
-    {{- end -}}
-    {{- range $roleName := get ($launcher | default dict) "requiredRoles" | default list -}}
-      {{- if not (hasKey $accessModelRoleKeys (toString $roleName)) -}}
-        {{- fail (printf "platformHome.launchers.%s.requiredRoles references unknown or disabled platform role %s." $launcherName $roleName) -}}
-      {{- end -}}
-    {{- end -}}
+  {{- if hasKey $platformHomeValues "launchers" -}}
+    {{- fail "platformHome.launchers is no longer supported. JupyterHub is served as a regular app tile; MinIO Console is enabled automatically when minio.enabled=true." -}}
   {{- end -}}
 {{- if and (default false $identity.enabled) (or (not $hasEnvironment) (not (has $environment (list "local" "dev" "prod")))) -}}
 {{- fail "global.environment must be set to local, dev, or prod when shared identity is enabled." -}}
