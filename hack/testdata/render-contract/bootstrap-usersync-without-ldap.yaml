@@ -1,5 +1,0 @@
-global:
-  authorization:
-    ranger:
-      usersync:
-        enabled: true

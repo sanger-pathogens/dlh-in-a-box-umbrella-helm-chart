@@ -6,17 +6,7 @@ is provided in values.
 {{- $authorization := get .Values.global "authorization" | default (dict) -}}
 {{- $ranger := get $authorization "ranger" | default (dict) -}}
 {{- $rangerTrino := get $ranger "trino" | default (dict) -}}
-{{- $identity := get .Values.global "identity" | default dict -}}
-{{- $directory := get $identity "directory" | default dict -}}
-{{- $ldap := get $directory "ldap" | default dict -}}
-{{- $external := get $identity "external" | default dict -}}
-{{- $clients := get $external "clients" | default dict -}}
-{{- $trinoClient := get $clients "trino" | default dict -}}
-{{- $keycloakProvider := get (get $identity "provider" | default (dict)) "keycloak" | default (dict) -}}
-{{- $bootstrapUsersEnabled := gt (len (default (list) $keycloakProvider.bootstrapUsers)) 0 -}}
-{{- $ldapEnabled := and (default false (get $trinoClient "passwordAuthEnabled")) (default false (get $ldap "enabled")) -}}
-{{- $bootstrapOnlyMode := and $bootstrapUsersEnabled (not $ldapEnabled) -}}
-{{- $rangerTrinoEnabled := and (default false $ranger.enabled) (default false $rangerTrino.enabled) (not $bootstrapOnlyMode) -}}
+{{- $rangerTrinoEnabled := and (default false $ranger.enabled) (default false $rangerTrino.enabled) -}}
 {{- if and (not $rangerTrinoEnabled) (eq .Values.accessControl.type "configmap") }}
 apiVersion: v1
 kind: ConfigMap

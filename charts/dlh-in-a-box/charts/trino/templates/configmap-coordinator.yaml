@@ -1,7 +1,5 @@
 {{- $coordinatorJmx := merge .Values.jmx.coordinator (omit .Values.jmx "coordinator" "worker") -}}
 {{- $identity := get .Values.global "identity" | default (dict) -}}
-{{- $provider := get $identity "provider" | default (dict) -}}
-{{- $keycloakProvider := get $provider "keycloak" | default (dict) -}}
 {{- $externalIdentity := get $identity "external" | default (dict) -}}
 {{- $oidc := get $externalIdentity "oidc" | default (dict) -}}
 {{- $identityClients := get $externalIdentity "clients" | default (dict) -}}
@@ -40,9 +38,7 @@
 {{- $ldapTrustedCaPath := printf "%s/auth/ldap/ca/%s" .Values.server.config.path $ldapTrustedCaCertKey -}}
 {{- $ldapUseTrustedCa := and $ldapEnabled (not $ldapAllowInsecure) $ldapTrustedCaSecretName -}}
 {{- $ldapUserBindPattern := default (default "" $ldap.userBindPattern) $trinoIdentity.ldapUserBindPattern -}}
-{{- $bootstrapUsersEnabled := gt (len (default (list) $keycloakProvider.bootstrapUsers)) 0 -}}
-{{- $bootstrapOnlyMode := and $bootstrapUsersEnabled (not $ldapEnabled) -}}
-{{- $rangerTrinoEnabled := and $rangerEnabled (default false $rangerTrino.enabled) (not $bootstrapOnlyMode) -}}
+{{- $rangerTrinoEnabled := and $rangerEnabled (default false $rangerTrino.enabled) -}}
 {{- if $identityEnabled }}
   {{- if not $issuer }}{{- fail "An OIDC issuer is required when Trino identity integration is enabled. Set global.identity.external.oidc.issuer or use identity.provider.mode=bundledKeycloak." }}{{- end }}
   {{- if not $trinoIdentity.clientId }}{{- fail "global.identity.external.clients.trino.clientId is required when Trino identity integration is enabled." }}{{- end }}

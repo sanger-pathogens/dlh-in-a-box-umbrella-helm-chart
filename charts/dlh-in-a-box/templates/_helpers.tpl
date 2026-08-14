@@ -283,10 +283,6 @@ app.kubernetes.io/managed-by: {{ .Release.Service }}
 {{- $appClients | toJson -}}
 {{- end -}}
 
-{{- define "dlh-in-a-box.identity.keycloakManagedGroupsJson" -}}
-{{- list | toJson -}}
-{{- end -}}
-
 {{- define "dlh-in-a-box.identity.directory.url" -}}
 {{- $identity := .Values.global.identity | default dict -}}
 {{- $directory := get $identity "directory" | default dict -}}
