@@ -5,9 +5,22 @@ global:
   imagePullSecrets: []
   identity: &identity_defaults
     enabled: false
+    # accessRoles is an open map, not a fixed enum — platform-admin below is just
+    # a starting point shipped disabled by default. Add, rename, or remove roles
+    # freely; each key becomes a Keycloak realm role, and appAccess accepts any
+    # of: superset, datahub, trinoUi, jupyterhub, cloudbeaver, prefect, ranger,
+    # keycloak, minio. For example:
+    #
+    # data-scientist:
+    #   enabled: true
+    #   label: Data Scientist
+    #   description: Read/query access to approved catalogs via Trino and notebooks.
+    #   appAccess:
+    #     jupyterhub: true
+    #     cloudbeaver: true
     accessRoles:
       platform-admin:
-        enabled: true
+        enabled: false
         appAccess:
           superset: true
           datahub: true
@@ -18,18 +31,6 @@ global:
           trinoUi: true
           keycloak: true
           minio: true
-      platform-user:
-        enabled: true
-        appAccess:
-          superset: true
-          datahub: true
-          jupyterhub: true
-          cloudbeaver: true
-      platform-viewer:
-        enabled: true
-        appAccess:
-          superset: true
-          datahub: true
     provider:
       mode: externalOidc
       keycloak:

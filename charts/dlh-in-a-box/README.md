@@ -311,6 +311,14 @@ It defines Keycloak platform roles and the app access derived from those roles.
 Ranger receives the same role names from Keycloak; the chart no longer supports
 `global.authorization.platformRoles` or group-to-role mappings.
 
+This is an open map, not a fixed set of role names. The chart ships
+`platform-admin` as a starting point — disabled by default — but a deployer
+can add, rename, or remove roles freely.
+Each key becomes a Keycloak realm role; `appAccess` accepts any of `superset`,
+`datahub`, `trinoUi`, `jupyterhub`, `cloudbeaver`, `prefect`, `ranger`,
+`keycloak`, and `minio`. See the commented example in `values.yaml` for the
+shape of a custom role.
+
 ### `global.authorization.platformRoleExceptions`
 
 These are controlled, direct-user exceptions for unusual cases. They are not
