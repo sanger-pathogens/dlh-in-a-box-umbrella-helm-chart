@@ -126,7 +126,7 @@ After changing anything related to this folder:
 ```bash
 ./scripts/helm-dependency-update.sh
 ./scripts/license-check.sh
-./scripts/lint.sh
+./scripts/verify.sh
 ./scripts/package.sh
 ```
 

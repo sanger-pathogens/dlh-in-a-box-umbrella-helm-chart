@@ -30,7 +30,7 @@ jobs:
         run: ./scripts/helm/helm-dependency-update.sh
 
       - name: Lint chart
-        run: ./scripts/lint.sh
+        run: ./scripts/verify.sh
 
       - name: Render chart
         run: ./scripts/helm/template.sh

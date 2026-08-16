@@ -106,7 +106,7 @@ Run:
 
 ```bash
 ./scripts/helm-dependency-update.sh
-./scripts/lint.sh
+./scripts/verify.sh
 ./scripts/template.sh
 rm -rf dist
 ./scripts/package.sh
@@ -131,7 +131,7 @@ HELM_REGISTRY_CONFIG="${tmp}/registry/config.json" \
 ./scripts/helm-dependency-update.sh
 ```
 
-If `scripts/lint.sh` fails because a render-contract expected message drifted,
+If `scripts/verify.sh` fails because a render-contract expected message drifted,
 compare the actual template failure with the corresponding validation template.
 Update the contract only when the chart behavior is already correct and the
 test expectation is stale.

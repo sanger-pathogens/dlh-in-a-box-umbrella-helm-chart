@@ -68,7 +68,7 @@ Before publishing a new chart version:
    the current source tree.
 2. Run `scripts/repo/license-check.sh` to verify required notice files and local
    modification markers are still present.
-3. Run `scripts/lint.sh` and package the chart.
+3. Run `scripts/verify.sh` and package the chart.
 4. If any dependency version changes, re-check whether the upstream license or
    `NOTICE` file changed before release.
 

@@ -817,7 +817,7 @@ const sessions = [
         "Use this to discourage fixing CI by editing workflow YAML first. Usually debug the local script first.",
       ]),
       imageSlide("Maintainer script flow", image("mermaid", "scriptFlow"), [
-        "scripts/lint.sh is the main local validation entrypoint.",
+        "scripts/verify.sh is the main local validation entrypoint.",
         "docs-check enforces guide coverage, links, and Mermaid validity.",
         "render-contract catches both positive renders and expected failures.",
         "package and smoke-install cover release and cluster integration concerns.",
@@ -828,7 +828,7 @@ const sessions = [
         ["./scripts/helm-dependency-update.sh", "Chart.lock and packaged archives match Chart.yaml"],
         ["./scripts/docs-check.sh", "Guide coverage, local links, and Mermaid diagrams validate"],
         ["./scripts/render-contract.sh", "Supported renders succeed and unsafe values fail"],
-        ["./scripts/lint.sh", "Main local validation path passes"],
+        ["./scripts/verify.sh", "Main local validation path passes"],
         ["./scripts/template.sh", "Maintained example overlays render"],
         ["./scripts/package.sh", "The chart can be packaged"],
         ["./scripts/smoke-install.sh", "Auth-heavy local path installs and becomes ready"],
@@ -862,7 +862,7 @@ const sessions = [
       demoSlide("Guided checkpoint: prepare a safe change", [
         "Identify the ownership boundary first",
         "Choose the narrowest validation command",
-        "Run ./scripts/lint.sh before opening or updating a PR",
+        "Run ./scripts/verify.sh before opening or updating a PR",
         "Use smoke-install only for auth-heavy integrated runtime changes",
       ], [
         "Can the developer pick a check for a docs-only change?",

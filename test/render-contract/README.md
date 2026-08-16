@@ -160,7 +160,7 @@ After changing any fixture in this folder, run:
 
 ```bash
 ./scripts/render-contract.sh
-./scripts/lint.sh
+./scripts/verify.sh
 ```
 
 ## Common Mistakes

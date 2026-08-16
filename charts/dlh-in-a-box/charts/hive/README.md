@@ -209,7 +209,7 @@ After changing anything here, run:
 
 ```bash
 ./scripts/template.sh
-./scripts/lint.sh
+./scripts/verify.sh
 ```
 
 Use `helm template` output to confirm the expected number of metastore Services

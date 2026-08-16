@@ -79,7 +79,7 @@ jobs:
         run: ./scripts/helm/helm-dependency-update.sh
 
       - name: Lint and license checks
-        run: ./scripts/lint.sh
+        run: ./scripts/verify.sh
 
       - name: Package chart
         run: ./scripts/helm/package.sh charts/dlh-in-a-box dist "${{ steps.version.outputs.chart_version }}" "${{ steps.version.outputs.app_version }}"

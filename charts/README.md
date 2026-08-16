@@ -110,7 +110,7 @@ After changing anything in this tree, the normal checks are:
 
 ```bash
 ./scripts/helm-dependency-update.sh
-./scripts/lint.sh
+./scripts/verify.sh
 ./scripts/template.sh
 ./scripts/package.sh
 ```

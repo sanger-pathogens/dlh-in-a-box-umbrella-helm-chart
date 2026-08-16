@@ -66,7 +66,7 @@ flowchart TD
 
 ## How The Scripts Fit Together
 
-The scripts are divided into two subdirectories, joined by `lint.sh`
+The scripts are divided into two subdirectories, joined by `verify.sh`
 
 `helm/` is for scripts that wrap helm commands, such as helm package or helm lint.
 `repo/` is for scripts that enforce repo structure and policies, for example presence and contents
@@ -75,7 +75,7 @@ of repo guide files, and presence of required license files.
 ## Script Behaviour
 See the guide files for subdirectories of scripts for documentation on individual maintainer scripts.
 
-### `lint.sh`
+### `verify.sh`
 
 What it does:
 
@@ -120,7 +120,7 @@ From the repository root:
 ```bash
 ./scripts/helm/helm-dependency-update.sh
 ./scripts/repo/docs-check.sh
-./scripts/lint.sh
+./scripts/verify.sh
 ./scripts/helm/template.sh
 ./scripts/helm/package.sh
 ```
@@ -166,7 +166,7 @@ If you need to:
 ## Common Mistakes
 
 - treating `helm/smoke-install.sh` as equivalent to a simple manual `helm install`
-- forgetting that `lint.sh` already runs several other scripts
+- forgetting that `verify.sh` already runs several other scripts
 - changing dependencies without refreshing `Chart.lock` and packaged archives
 - debugging auth changes with `values-local.yaml` instead of the smoke path
 - adding large real-world YAML examples under `/testdata/`

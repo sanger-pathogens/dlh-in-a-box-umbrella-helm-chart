@@ -15,7 +15,7 @@ Before opening a pull request, run:
 ```bash
 ./scripts/helm-dependency-update.sh
 SKIP_MERMAID_CHECK=1 ./scripts/docs-check.sh
-./scripts/lint.sh
+./scripts/verify.sh
 ./scripts/template.sh
 ./scripts/package.sh
 ```

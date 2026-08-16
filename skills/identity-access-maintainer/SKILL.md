@@ -83,7 +83,7 @@ Run:
 
 ```bash
 ./scripts/render-contract.sh
-./scripts/lint.sh
+./scripts/verify.sh
 ./scripts/template.sh
 ```
 

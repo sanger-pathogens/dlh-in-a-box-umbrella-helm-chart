@@ -545,7 +545,7 @@ enablement, not a full platform profile.
 
 - `scripts/helm/template.sh` renders the chart against every example file unless you
   pass a smaller list
-- `scripts/lint.sh` lints the chart against every example file
+- `../scripts/verify.sh` lints the chart against every example file
 - `scripts/helm/smoke-install.sh` uses `values-local-auth.yaml`
 - `test/render-contract.sh` uses the shared and local auth baselines as inputs
   for many negative tests
@@ -561,7 +561,7 @@ When an example changes, you should ask:
 For example changes, the normal validation path is:
 
 ```bash
-./scripts/lint.sh
+./scripts/verify.sh
 ./scripts/template.sh
 ```
 

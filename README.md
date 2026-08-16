@@ -534,7 +534,7 @@ From the repository root:
 ```bash
 ./scripts/helm-dependency-update.sh
 ./scripts/docs-check.sh
-./scripts/lint.sh
+./scripts/verify.sh
 ./scripts/template.sh
 ./scripts/package.sh
 ./scripts/smoke-install.sh

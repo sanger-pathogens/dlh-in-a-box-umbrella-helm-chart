@@ -95,7 +95,7 @@ After changing files in this folder, run:
 
 ```bash
 ./scripts/template.sh examples/values-local-auth.yaml
-./scripts/lint.sh
+./scripts/verify.sh
 ```
 
 Use the local auth smoke install when you changed a browser asset that could

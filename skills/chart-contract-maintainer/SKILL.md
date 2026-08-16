@@ -56,7 +56,7 @@ Use exact `expect_fail` for chart-authored validation messages.
 
 ## Validation Message Drift
 
-If `scripts/lint.sh` fails because expected failure text no longer matches:
+If `scripts/verify.sh` fails because expected failure text no longer matches:
 
 1. Inspect the actual failure output.
 2. Inspect the corresponding validation template.
@@ -87,7 +87,7 @@ Run from repo root:
 
 ```bash
 ./scripts/render-contract.sh
-./scripts/lint.sh
+./scripts/verify.sh
 ./scripts/template.sh
 ```
 

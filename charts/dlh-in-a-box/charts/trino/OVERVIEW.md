@@ -134,7 +134,7 @@ After changing anything in this folder, run:
 
 ```bash
 ./scripts/template.sh
-./scripts/lint.sh
+./scripts/verify.sh
 ```
 
 If the change touched auth, access control, or catalog rendering, also run

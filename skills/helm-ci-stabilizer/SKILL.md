@@ -11,7 +11,7 @@ Use this skill for failures in:
 - `.github/workflows/helm-publish.yaml`
 - `.github/workflows/helm-smoke-install.yaml`
 - `scripts/helm/helm-dependency-update.sh`
-- `scripts/lint.sh`
+- `scripts/verify.sh`
 - `scripts/helm/template.sh`
 - `scripts/helm/package.sh`
 - `scripts/helm/smoke-install.sh`
@@ -43,7 +43,7 @@ Normal gate:
 
 ```bash
 ./scripts/helm-dependency-update.sh
-./scripts/lint.sh
+./scripts/verify.sh
 ./scripts/template.sh
 rm -rf dist
 ./scripts/package.sh

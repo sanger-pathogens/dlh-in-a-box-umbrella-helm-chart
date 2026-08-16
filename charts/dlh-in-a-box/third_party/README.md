@@ -100,7 +100,7 @@ After changing anything here, run:
 
 ```bash
 ./scripts/license-check.sh
-./scripts/lint.sh
+./scripts/verify.sh
 ```
 
 ## Common Mistakes
