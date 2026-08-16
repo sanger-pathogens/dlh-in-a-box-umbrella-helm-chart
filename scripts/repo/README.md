@@ -17,40 +17,22 @@ flowchart TD
     Source[chart source and example files]
   end
 
-  subgraph Checks["Maintainer scripts"]
-    Deps[helm-dependency-update.sh]
+  subgraph RepoScripts["Repo Scripts"]
     Docs[docs-check.sh]
     Security[security-check.sh]
     License[license-check.sh]
-    Lint[lint.sh]
-    Template[template.sh]
-    Package[package.sh]
-    Smoke[smoke-install.sh]
   end
 
   subgraph Outputs["Outputs"]
-    Lockfiles[updated Chart.lock and archives]
-    Rendered[rendered manifests]
-    PackageOut[chart package]
-    SmokeRun[local smoke install]
+    ValidatedChart[validated chart and repo structure]
   end
 
-  Source --> Deps
   Source --> Docs
-  Source --> Lint
-  Source --> Template
-  Source --> Package
-  Source --> Smoke
-  Deps --> Lockfiles
-  Deps --> Docs
-  Docs --> Lint
-  Security --> Lint
-  License --> Lint
-  Lint --> Template
-  Template --> Rendered
-  Template --> Package
-  Package --> PackageOut
-  Smoke --> SmokeRun
+  Source --> Security
+  Source --> License
+  Docs --> ValidatedChart
+  Security --> ValidatedChart
+  License --> ValidatedChart
 ```
 
 ## What Lives In This Folder

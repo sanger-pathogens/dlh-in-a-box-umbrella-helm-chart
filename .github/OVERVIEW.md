@@ -144,8 +144,8 @@ If you need to:
 
 After changing this folder:
 
-- run the relevant local scripts from `../scripts/` that the workflow mirrors
-- run `./hack/docs-check.sh` if you changed guide text here
+- run the relevant local scripts from `scripts/` that the workflow mirrors
+- run `./scripts/repo/docs-check.sh` if you changed guide text here
 - inspect workflow YAML carefully because GitHub-only failures are easy to miss
 
 ## Common Mistakes
