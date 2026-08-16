@@ -142,7 +142,7 @@ end
 RUBY
 
 if [[ "${SKIP_MERMAID_CHECK:-0}" != "1" ]]; then
-  python3 "${ROOT_DIR}/hack/validate_mermaid.py" \
+  python3 "${ROOT_DIR}/scripts/validate_mermaid.py" \
     --root "${ROOT_DIR}" \
     --include "README.md" \
     --include ".github/**/*.md" \
