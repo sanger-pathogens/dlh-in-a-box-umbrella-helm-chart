@@ -68,7 +68,7 @@ The pattern is:
 1. a dependency is bundled or vendored in the chart
 2. the repo keeps the relevant upstream notice or license text here
 3. the summary notice file points at or incorporates that provenance
-4. `scripts/license-check.sh` verifies the expected compliance files are still
+4. `scripts/repo/license-check.sh` verifies the expected compliance files are still
    present
 
 ## Update Triggers

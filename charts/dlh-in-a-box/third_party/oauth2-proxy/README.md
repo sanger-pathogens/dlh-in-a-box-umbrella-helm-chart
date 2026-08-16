@@ -61,7 +61,7 @@ Review this folder when:
 
 - the bundled `oauth2-proxy` dependency version changes
 - packaged dependency archives are refreshed
-- `scripts/license-check.sh` reports missing or stale coverage
+- `scripts/repo/license-check.sh` reports missing or stale coverage
 
 The maintenance step is to compare the upstream project license with the copy
 in this folder and update the copy if upstream changed.

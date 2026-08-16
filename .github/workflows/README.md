@@ -189,7 +189,7 @@ If you need to:
 - change validation or package steps: start with `helm-lint.yaml`
 - change release versioning or GHCR behavior: start with `helm-publish.yaml`
 - change the disposable-cluster smoke path: start with
-  `helm-smoke-install.yaml` and `../../scripts/smoke-install.sh`
+  `helm-smoke-install.yaml` and `scripts/helm/smoke-install.sh`
 
 ## Validation
 

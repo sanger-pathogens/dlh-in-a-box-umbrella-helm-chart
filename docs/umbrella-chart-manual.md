@@ -465,7 +465,7 @@ helm upgrade --install dlh charts/dlh-in-a-box \
 | Example class | Secret expectation |
 | --- | --- |
 | local minimal examples | may include safe demo-oriented local credentials |
-| local auth-heavy smoke profile | demo secrets are seeded by `scripts/smoke-install.sh` when that exact file is used |
+| local auth-heavy smoke profile | demo secrets are seeded by `scripts/helm/smoke-install.sh` when that exact file is used |
 | shared dev, prod, and external-auth profiles | expect real hostnames, OIDC client secrets, directory bind secrets, and storage credentials to exist already |
 
 ## Repository And Chart Structure
@@ -1164,7 +1164,7 @@ If you need to change one specific thing, start here.
 | local Hive behavior | `charts/dlh-in-a-box/charts/hive/` | this subchart is fully repo-owned |
 | Trino catalog or access rule integration | vendored Trino patch points under `charts/dlh-in-a-box/charts/trino/templates/` | only a small patch set is locally owned |
 | example install shapes | `examples/*.yaml` | these files define supported install profiles |
-| local validation, smoke, or package behavior | `scripts/*.sh` and `scripts/validate_mermaid.py` | workflows mirror these scripts |
+| local validation, smoke, or package behavior | `scripts/*.sh` and `scripts/repo/validate_mermaid.py` | workflows mirror these scripts |
 | CI or publish behavior | `.github/workflows/*.yaml` | this is where validation and release automation live |
 | this manual and its PDF | `docs/umbrella-chart-manual.md`, `docs/build-manual.mjs`, and `docs/manual-print.css` | the PDF is generated directly from the Markdown source |
 
@@ -1307,7 +1307,7 @@ failures immediately, check whether you meant to use the simpler
 ### The Auth-Heavy Local Profile Fails Manually
 
 `values-local-auth.yaml` is the smoke profile. It expects demo secrets that
-`scripts/smoke-install.sh` seeds when that exact file is used.
+`scripts/helm/smoke-install.sh` seeds when that exact file is used.
 
 If you install it manually without those secrets, failures are expected.
 
@@ -1399,7 +1399,7 @@ renders.
 
 ### Smoke Install Environment Variables
 
-These variables affect `scripts/smoke-install.sh`:
+These variables affect `scripts/helm/smoke-install.sh`:
 
 | Variable | Meaning |
 | --- | --- |

@@ -58,7 +58,7 @@ Good changes usually update these together:
 ## Dependency updates
 
 - When you change chart dependencies, run
-  `scripts/helm-dependency-update.sh` so `Chart.lock` and packaged dependency
+  `scripts/helm/helm-dependency-update.sh` so `Chart.lock` and packaged dependency
   archives stay aligned.
 - Review upstream release notes and licenses before upgrading dependencies.
 

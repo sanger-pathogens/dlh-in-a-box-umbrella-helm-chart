@@ -3,7 +3,7 @@
 This skill covers the README-first documentation system and folder guide checks.
 
 Read [SKILL.md](SKILL.md) when adding directories, moving docs, editing guide
-files, changing Mermaid blocks, or fixing `scripts/docs-check.sh` failures.
+files, changing Mermaid blocks, or fixing `scripts/repo/docs-check.sh` failures.
 
 ```mermaid
 flowchart TD

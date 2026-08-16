@@ -224,7 +224,7 @@ What it tests:
 
 Required inputs:
 
-- normally none from the user, because `scripts/smoke-install.sh` seeds the demo
+- normally none from the user, because `scripts/helm/smoke-install.sh` seeds the demo
   secrets for this file
 
 What it omits:
@@ -543,10 +543,10 @@ enablement, not a full platform profile.
 
 ## How This Folder Connects To The Rest Of The Repo
 
-- `../scripts/template.sh` renders the chart against every example file unless you
+- `scripts/helm/template.sh` renders the chart against every example file unless you
   pass a smaller list
-- `../scripts/lint.sh` lints the chart against every example file
-- `../scripts/smoke-install.sh` uses `values-local-auth.yaml`
+- `scripts/lint.sh` lints the chart against every example file
+- `scripts/helm/smoke-install.sh` uses `values-local-auth.yaml`
 - `test/render-contract.sh` uses the shared and local auth baselines as inputs
   for many negative tests
 

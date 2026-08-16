@@ -131,7 +131,7 @@ HELM_REGISTRY_CONFIG="${tmp}/registry/config.json" \
 ./scripts/helm-dependency-update.sh
 ```
 
-If `../../scripts/lint.sh` fails because a render-contract expected message drifted,
+If `scripts/lint.sh` fails because a render-contract expected message drifted,
 compare the actual template failure with the corresponding validation template.
 Update the contract only when the chart behavior is already correct and the
 test expectation is stale.
@@ -220,7 +220,7 @@ The workflow links are available under:
 - https://github.com/sanger-pathogens/dlh-in-a-box-umbrella-helm-chart/actions/workflows/helm-publish.yaml
 
 If `Update dependencies` fails transiently, rerun or inspect whether the retry
-wrapper in `scripts/helm-dependency-update.sh` needs adjustment.
+wrapper in `scripts/helm/helm-dependency-update.sh` needs adjustment.
 
 ## GHCR Notes
 

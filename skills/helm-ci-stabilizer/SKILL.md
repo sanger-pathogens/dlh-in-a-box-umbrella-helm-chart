@@ -10,11 +10,11 @@ Use this skill for failures in:
 - `.github/workflows/helm-lint.yaml`
 - `.github/workflows/helm-publish.yaml`
 - `.github/workflows/helm-smoke-install.yaml`
-- `scripts/helm-dependency-update.sh`
+- `scripts/helm/helm-dependency-update.sh`
 - `scripts/lint.sh`
-- `scripts/template.sh`
-- `scripts/package.sh`
-- `scripts/smoke-install.sh`
+- `scripts/helm/template.sh`
+- `scripts/helm/package.sh`
+- `scripts/helm/smoke-install.sh`
 
 ## First Moves
 
@@ -80,7 +80,7 @@ Do not commit temporary Helm or Docker config.
 - inspect `Chart.yaml`, `Chart.lock`, and packaged archives
 - retry with clean Helm registry config
 - check OCI dependencies and GHCR/Docker Hub auth
-- keep retry behavior in `scripts/helm-dependency-update.sh` if CI flakes
+- keep retry behavior in `scripts/helm/helm-dependency-update.sh` if CI flakes
 
 `Lint chart` or `Lint and license checks`:
 

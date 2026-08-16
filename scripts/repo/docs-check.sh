@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 cd "${ROOT_DIR}"
 
 DOCS_CHECK_IGNORE=(
@@ -142,7 +142,7 @@ end
 RUBY
 
 if [[ "${SKIP_MERMAID_CHECK:-0}" != "1" ]]; then
-  python3 "${ROOT_DIR}/scripts/validate_mermaid.py" \
+  python3 "${ROOT_DIR}/scripts/repo/validate_mermaid.py" \
     --root "${ROOT_DIR}" \
     --include "README.md" \
     --include ".github/**/*.md" \
