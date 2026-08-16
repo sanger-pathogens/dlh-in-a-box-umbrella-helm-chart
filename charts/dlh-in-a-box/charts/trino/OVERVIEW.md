@@ -133,8 +133,8 @@ If you need to:
 After changing anything in this folder, run:
 
 ```bash
-./hack/template.sh
-./hack/lint.sh
+./scripts/template.sh
+./scripts/lint.sh
 ```
 
 If the change touched auth, access control, or catalog rendering, also run

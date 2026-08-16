@@ -208,8 +208,8 @@ If you need to:
 After changing anything here, run:
 
 ```bash
-./hack/template.sh
-./hack/lint.sh
+./scripts/template.sh
+./scripts/lint.sh
 ```
 
 Use `helm template` output to confirm the expected number of metastore Services

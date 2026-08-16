@@ -85,7 +85,7 @@ It then checks either:
 - that the render succeeds and contains the expected strings
 - or that the render fails with the expected message
 
-`hack/lint.sh` includes that render-contract script, so these fixtures are part
+`scripts/lint.sh` includes that render-contract script, so these fixtures are part
 of the normal repo validation path.
 
 ## Common Tasks

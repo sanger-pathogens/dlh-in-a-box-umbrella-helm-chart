@@ -82,15 +82,15 @@ Use or extend fixtures under `../../ test/render-contract/` for:
 Run:
 
 ```bash
-./hack/render-contract.sh
-./hack/lint.sh
-./hack/template.sh
+./scripts/render-contract.sh
+./scripts/lint.sh
+./scripts/template.sh
 ```
 
 For smoke-sensitive identity changes, also run or request:
 
 ```bash
-./hack/smoke-install.sh charts/dlh-in-a-box examples/values-local-auth.yaml
+./scripts/smoke-install.sh charts/dlh-in-a-box examples/values-local-auth.yaml
 ```
 
 Smoke install touches a Kubernetes cluster, so confirm the current context and

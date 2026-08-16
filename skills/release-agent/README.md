@@ -39,5 +39,5 @@ flowchart TD
 After editing this skill, run:
 
 ```bash
-SKIP_MERMAID_CHECK=1 ./hack/docs-check.sh
+SKIP_MERMAID_CHECK=1 ./scripts/docs-check.sh
 ```

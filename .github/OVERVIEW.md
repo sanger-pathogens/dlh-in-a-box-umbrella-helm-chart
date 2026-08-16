@@ -66,7 +66,7 @@ This folder answers repo-governance questions such as:
 - how publish and smoke-install workflows are triggered
 - how release notes are grouped
 
-The repo's local scripts live in `hack/`. This folder points GitHub at those
+The repo's local scripts live in `scripts/`. This folder points GitHub at those
 scripts rather than duplicating the logic conceptually.
 
 ## Important Behavior By File
@@ -144,7 +144,7 @@ If you need to:
 
 After changing this folder:
 
-- run the relevant local scripts from `hack/` that the workflow mirrors
+- run the relevant local scripts from `../scripts/` that the workflow mirrors
 - run `./hack/docs-check.sh` if you changed guide text here
 - inspect workflow YAML carefully because GitHub-only failures are easy to miss
 

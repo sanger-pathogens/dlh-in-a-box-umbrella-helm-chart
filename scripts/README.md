@@ -315,11 +315,11 @@ Useful knobs from the actual script:
 From the repository root:
 
 ```bash
-./hack/helm-dependency-update.sh
-./hack/docs-check.sh
-./hack/lint.sh
-./hack/template.sh
-./hack/package.sh
+./scripts/helm-dependency-update.sh
+./scripts/docs-check.sh
+./scripts/lint.sh
+./scripts/template.sh
+./scripts/package.sh
 ```
 
 If you changed sign-in, access rules, browser proxies, or the local auth
@@ -366,7 +366,7 @@ If you need to:
 - forgetting that `lint.sh` already runs several other scripts
 - changing dependencies without refreshing `Chart.lock` and packaged archives
 - debugging auth changes with `values-local.yaml` instead of the smoke path
-- adding large real-world YAML examples under `hack/testdata/`
+- adding large real-world YAML examples under `/testdata/`
 - assuming local Mermaid validation works without Docker
 
 ## When You Can Ignore This Folder

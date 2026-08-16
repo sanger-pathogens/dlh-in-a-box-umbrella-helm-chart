@@ -3,7 +3,7 @@
 This folder contains the GitHub Actions jobs for this repository.
 
 These workflows do not invent a second validation system. They mostly call the
-local scripts under `hack/` so CI and local maintainer workflows stay aligned.
+local scripts under `scripts/` so CI and local maintainer workflows stay aligned.
 
 ## Who Should Read This
 
@@ -189,7 +189,7 @@ If you need to:
 - change validation or package steps: start with `helm-lint.yaml`
 - change release versioning or GHCR behavior: start with `helm-publish.yaml`
 - change the disposable-cluster smoke path: start with
-  `helm-smoke-install.yaml` and `hack/smoke-install.sh`
+  `helm-smoke-install.yaml` and `../../scripts/smoke-install.sh`
 
 ## Validation
 

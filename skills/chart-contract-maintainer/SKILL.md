@@ -56,7 +56,7 @@ Use exact `expect_fail` for chart-authored validation messages.
 
 ## Validation Message Drift
 
-If `hack/lint.sh` fails because expected failure text no longer matches:
+If `scripts/lint.sh` fails because expected failure text no longer matches:
 
 1. Inspect the actual failure output.
 2. Inspect the corresponding validation template.
@@ -86,17 +86,17 @@ When deprecating values:
 Run from repo root:
 
 ```bash
-./hack/render-contract.sh
-./hack/lint.sh
-./hack/template.sh
+./scripts/render-contract.sh
+./scripts/lint.sh
+./scripts/template.sh
 ```
 
 For package-impacting changes, also run:
 
 ```bash
-./hack/helm-dependency-update.sh
+./scripts/helm-dependency-update.sh
 rm -rf dist
-./hack/package.sh
+./scripts/package.sh
 ```
 
 If a single overlay fails, isolate it:

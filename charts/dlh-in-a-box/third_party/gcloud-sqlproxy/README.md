@@ -59,7 +59,7 @@ component, and if so, is this still the right upstream license text?
 After changing this folder, run:
 
 ```bash
-./hack/license-check.sh
+./scripts/license-check.sh
 ```
 
 ## Common Mistakes

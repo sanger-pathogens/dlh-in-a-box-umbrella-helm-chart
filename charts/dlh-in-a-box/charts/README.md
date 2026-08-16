@@ -124,10 +124,10 @@ If you need to:
 After changing anything related to this folder:
 
 ```bash
-./hack/helm-dependency-update.sh
-./hack/license-check.sh
-./hack/lint.sh
-./hack/package.sh
+./scripts/helm-dependency-update.sh
+./scripts/license-check.sh
+./scripts/lint.sh
+./scripts/package.sh
 ```
 
 ## Common Mistakes

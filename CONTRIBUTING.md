@@ -13,11 +13,11 @@ assuming you can open a pull request.
 Before opening a pull request, run:
 
 ```bash
-./hack/helm-dependency-update.sh
-SKIP_MERMAID_CHECK=1 ./hack/docs-check.sh
-./hack/lint.sh
-./hack/template.sh
-./hack/package.sh
+./scripts/helm-dependency-update.sh
+SKIP_MERMAID_CHECK=1 ./scripts/docs-check.sh
+./scripts/lint.sh
+./scripts/template.sh
+./scripts/package.sh
 ```
 
 Equivalent convenience targets exist in the repository root:
@@ -43,7 +43,7 @@ Secrets that file needs.
 Full Mermaid checking needs Docker. If Docker is not running, use:
 
 ```bash
-SKIP_MERMAID_CHECK=1 ./hack/docs-check.sh
+SKIP_MERMAID_CHECK=1 ./scripts/docs-check.sh
 ```
 
 ## Keep These Things In Sync
@@ -58,7 +58,7 @@ Good changes usually update these together:
 ## Dependency updates
 
 - When you change chart dependencies, run
-  `./hack/helm-dependency-update.sh` so `Chart.lock` and packaged dependency
+  `scripts/helm-dependency-update.sh` so `Chart.lock` and packaged dependency
   archives stay aligned.
 - Review upstream release notes and licenses before upgrading dependencies.
 

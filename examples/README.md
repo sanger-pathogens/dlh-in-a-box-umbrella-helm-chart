@@ -224,7 +224,7 @@ What it tests:
 
 Required inputs:
 
-- normally none from the user, because `hack/smoke-install.sh` seeds the demo
+- normally none from the user, because `scripts/smoke-install.sh` seeds the demo
   secrets for this file
 
 What it omits:
@@ -543,10 +543,10 @@ enablement, not a full platform profile.
 
 ## How This Folder Connects To The Rest Of The Repo
 
-- `hack/template.sh` renders the chart against every example file unless you
+- `../scripts/template.sh` renders the chart against every example file unless you
   pass a smaller list
-- `hack/lint.sh` lints the chart against every example file
-- `hack/smoke-install.sh` uses `values-local-auth.yaml`
+- `../scripts/lint.sh` lints the chart against every example file
+- `../scripts/smoke-install.sh` uses `values-local-auth.yaml`
 - `test/render-contract.sh` uses the shared and local auth baselines as inputs
   for many negative tests
 
@@ -561,8 +561,8 @@ When an example changes, you should ask:
 For example changes, the normal validation path is:
 
 ```bash
-./hack/lint.sh
-./hack/template.sh
+./scripts/lint.sh
+./scripts/template.sh
 ```
 
 If you changed `values-local-auth.yaml` or anything identity-related, also run:
@@ -574,7 +574,7 @@ make smoke-install
 If you changed validation rules that examples are supposed to satisfy, also run:
 
 ```bash
-./hack/render-contract.sh
+./scripts/render-contract.sh
 ```
 
 ## Common Mistakes

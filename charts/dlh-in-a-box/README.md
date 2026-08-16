@@ -459,11 +459,11 @@ If you need to:
 From the repository root:
 
 ```bash
-./hack/helm-dependency-update.sh
-./hack/docs-check.sh
-./hack/lint.sh
-./hack/template.sh
-./hack/package.sh
+./scripts/helm-dependency-update.sh
+./scripts/docs-check.sh
+./scripts/lint.sh
+./scripts/template.sh
+./scripts/package.sh
 make smoke-install
 ```
 

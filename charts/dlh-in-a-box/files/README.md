@@ -94,8 +94,8 @@ If you need to:
 After changing files in this folder, run:
 
 ```bash
-./hack/template.sh examples/values-local-auth.yaml
-./hack/lint.sh
+./scripts/template.sh examples/values-local-auth.yaml
+./scripts/lint.sh
 ```
 
 Use the local auth smoke install when you changed a browser asset that could

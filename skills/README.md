@@ -76,5 +76,5 @@ Each skill folder should include:
 If you add or edit skills, run:
 
 ```bash
-SKIP_MERMAID_CHECK=1 ./hack/docs-check.sh
+SKIP_MERMAID_CHECK=1 ./scripts/docs-check.sh
 ```

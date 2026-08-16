@@ -27,13 +27,13 @@ jobs:
           version: v3.12.0
 
       - name: Update dependencies
-        run: ./hack/helm-dependency-update.sh
+        run: ./scripts/helm-dependency-update.sh
 
       - name: Lint chart
-        run: ./hack/lint.sh
+        run: ./scripts/lint.sh
 
       - name: Render chart
-        run: ./hack/template.sh
+        run: ./scripts/template.sh
 
       - name: Package chart
-        run: ./hack/package.sh
+        run: ./scripts/package.sh

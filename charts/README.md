@@ -109,10 +109,10 @@ If you need to:
 After changing anything in this tree, the normal checks are:
 
 ```bash
-./hack/helm-dependency-update.sh
-./hack/lint.sh
-./hack/template.sh
-./hack/package.sh
+./scripts/helm-dependency-update.sh
+./scripts/lint.sh
+./scripts/template.sh
+./scripts/package.sh
 ```
 
 ## Common Mistakes

@@ -52,7 +52,7 @@ If you know nothing about this repo yet, start with this file. It explains:
 | get one local install working | this file's first-success path | [examples/README.md](examples/README.md) |
 | understand the chart internals | [charts/dlh-in-a-box/README.md](charts/dlh-in-a-box/README.md) | [charts/dlh-in-a-box/templates/_README.txt](charts/dlh-in-a-box/templates/_README.txt) |
 | change example overlays | [examples/README.md](examples/README.md) | `examples/*.yaml` |
-| run maintainer checks | [hack/README.md](hack/README.md) | `make help` |
+| run maintainer checks | [hack/README.md](scripts/README.md) | `make help` |
 | understand repo automation | [.github/OVERVIEW.md](.github/OVERVIEW.md) | [.github/workflows/README.md](.github/workflows/README.md) |
 | reuse agent-maintainer workflows | [skills/README.md](skills/README.md) | `skills/*/SKILL.md` |
 
@@ -199,7 +199,7 @@ Known repo facts:
 From the repository root:
 
 ```bash
-./hack/helm-dependency-update.sh
+./scripts/helm-dependency-update.sh
 helm upgrade --install dlh charts/dlh-in-a-box \
   -n data-lakehouse-local \
   --create-namespace \
@@ -500,7 +500,7 @@ The detailed explanation of that distinction lives in
 | Hive-specific render logic | `charts/dlh-in-a-box/charts/hive/` | local subchart owned by this repo |
 | Trino patch points | `charts/dlh-in-a-box/charts/trino/OVERVIEW.md` then `templates/_README.txt` | most Trino code is upstream, only a few files are locally patched |
 | example install profiles | `examples/` | each overlay is documented there |
-| local validation or smoke scripts | `hack/` | scripts and their test fixtures live there |
+| local validation or smoke scripts | `scripts/` | scripts and their test fixtures live there |
 | GitHub review, CI, or release flow | `.github/` | ownership, issue forms, and workflows live there |
 | documentation support assets | `docs/assets/` | chart icon and similar shared assets live there |
 
@@ -510,7 +510,7 @@ The detailed explanation of that distinction lives in
 | --- | --- | --- |
 | `charts/` | chart source tree | includes the published chart, local subcharts, vendored Trino source, and packaged archives |
 | `examples/` | example values overlays | the best place to learn install profiles |
-| `hack/` | local maintainer scripts | CI mirrors these scripts closely |
+| `scripts/` | local maintainer scripts | CI mirrors these scripts closely |
 | `.github/` | GitHub-only repo automation | review routing, issue forms, and workflows |
 | `.vscode/` | optional editor settings | convenience only, no runtime effect |
 | `docs/` | small doc support area | not the main home for platform docs |
@@ -532,12 +532,12 @@ The detailed explanation of that distinction lives in
 From the repository root:
 
 ```bash
-./hack/helm-dependency-update.sh
-./hack/docs-check.sh
-./hack/lint.sh
-./hack/template.sh
-./hack/package.sh
-./hack/smoke-install.sh
+./scripts/helm-dependency-update.sh
+./scripts/docs-check.sh
+./scripts/lint.sh
+./scripts/template.sh
+./scripts/package.sh
+./scripts/smoke-install.sh
 ```
 
 Convenience targets from `Makefile`:
@@ -575,7 +575,7 @@ The next most useful guides are:
   for the chart's values, dependency ownership, auth model, and runtime rules
 - [examples/README.md](examples/README.md)
   for install profiles and overlay selection
-- [hack/README.md](hack/README.md)
+- [hack/README.md](scripts/README.md)
   for scripts, CI parity, and local validation
 - [charts/dlh-in-a-box/templates/_README.txt](charts/dlh-in-a-box/templates/_README.txt)
   for the repo-owned render logic

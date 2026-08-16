@@ -69,7 +69,7 @@ There is no runtime validation path for this folder.
 If you change the guide, run:
 
 ```bash
-./hack/docs-check.sh
+./scripts/docs-check.sh
 ```
 
 ## Common Mistakes

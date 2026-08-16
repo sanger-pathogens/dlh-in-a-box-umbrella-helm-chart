@@ -159,8 +159,8 @@ That work belongs under `../../examples`, not here.
 After changing any fixture in this folder, run:
 
 ```bash
-./hack/render-contract.sh
-./hack/lint.sh
+./scripts/render-contract.sh
+./scripts/lint.sh
 ```
 
 ## Common Mistakes

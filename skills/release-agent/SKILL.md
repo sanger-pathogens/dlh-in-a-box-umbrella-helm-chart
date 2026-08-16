@@ -105,11 +105,11 @@ Use the same Helm version as CI when possible. CI currently uses Helm `v3.12.0`.
 Run:
 
 ```bash
-./hack/helm-dependency-update.sh
-./hack/lint.sh
-./hack/template.sh
+./scripts/helm-dependency-update.sh
+./scripts/lint.sh
+./scripts/template.sh
 rm -rf dist
-./hack/package.sh
+./scripts/package.sh
 ```
 
 Expected package path:
@@ -128,10 +128,10 @@ mkdir -p "${tmp}/docker" "${tmp}/registry"
 printf '{}' > "${tmp}/registry/config.json"
 DOCKER_CONFIG="${tmp}/docker" \
 HELM_REGISTRY_CONFIG="${tmp}/registry/config.json" \
-./hack/helm-dependency-update.sh
+./scripts/helm-dependency-update.sh
 ```
 
-If `hack/lint.sh` fails because a render-contract expected message drifted,
+If `../../scripts/lint.sh` fails because a render-contract expected message drifted,
 compare the actual template failure with the corresponding validation template.
 Update the contract only when the chart behavior is already correct and the
 test expectation is stale.
@@ -220,7 +220,7 @@ The workflow links are available under:
 - https://github.com/sanger-pathogens/dlh-in-a-box-umbrella-helm-chart/actions/workflows/helm-publish.yaml
 
 If `Update dependencies` fails transiently, rerun or inspect whether the retry
-wrapper in `hack/helm-dependency-update.sh` needs adjustment.
+wrapper in `scripts/helm-dependency-update.sh` needs adjustment.
 
 ## GHCR Notes
 
@@ -282,7 +282,7 @@ Add the badge to:
 Run:
 
 ```bash
-SKIP_MERMAID_CHECK=1 ./hack/docs-check.sh
+SKIP_MERMAID_CHECK=1 ./scripts/docs-check.sh
 ```
 
 Then commit and push the README badge update.

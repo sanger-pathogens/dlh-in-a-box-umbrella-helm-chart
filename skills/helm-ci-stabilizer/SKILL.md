@@ -10,11 +10,11 @@ Use this skill for failures in:
 - `.github/workflows/helm-lint.yaml`
 - `.github/workflows/helm-publish.yaml`
 - `.github/workflows/helm-smoke-install.yaml`
-- `hack/helm-dependency-update.sh`
-- `hack/lint.sh`
-- `hack/template.sh`
-- `hack/package.sh`
-- `hack/smoke-install.sh`
+- `scripts/helm-dependency-update.sh`
+- `scripts/lint.sh`
+- `scripts/template.sh`
+- `scripts/package.sh`
+- `scripts/smoke-install.sh`
 
 ## First Moves
 
@@ -42,18 +42,18 @@ CI uses Helm `v3.12.0`. Prefer that version when reproducing.
 Normal gate:
 
 ```bash
-./hack/helm-dependency-update.sh
-./hack/lint.sh
-./hack/template.sh
+./scripts/helm-dependency-update.sh
+./scripts/lint.sh
+./scripts/template.sh
 rm -rf dist
-./hack/package.sh
+./scripts/package.sh
 ```
 
 For smoke failures, use the workflow-equivalent path only when a Kubernetes
 context or kind cluster is available:
 
 ```bash
-./hack/smoke-install.sh charts/dlh-in-a-box examples/values-local-auth.yaml
+./scripts/smoke-install.sh charts/dlh-in-a-box examples/values-local-auth.yaml
 ```
 
 ## Clean Helm State
@@ -68,7 +68,7 @@ mkdir -p "${tmp}/docker" "${tmp}/registry"
 printf '{}' > "${tmp}/registry/config.json"
 DOCKER_CONFIG="${tmp}/docker" \
 HELM_REGISTRY_CONFIG="${tmp}/registry/config.json" \
-./hack/helm-dependency-update.sh
+./scripts/helm-dependency-update.sh
 ```
 
 Do not commit temporary Helm or Docker config.
@@ -80,7 +80,7 @@ Do not commit temporary Helm or Docker config.
 - inspect `Chart.yaml`, `Chart.lock`, and packaged archives
 - retry with clean Helm registry config
 - check OCI dependencies and GHCR/Docker Hub auth
-- keep retry behavior in `hack/helm-dependency-update.sh` if CI flakes
+- keep retry behavior in `scripts/helm-dependency-update.sh` if CI flakes
 
 `Lint chart` or `Lint and license checks`:
 
