@@ -450,7 +450,7 @@ applications.
 | `DLH-C3-VALIDATE-LINT` | Helm Lint Workflow | `DLH-C2-VALIDATION` | `.github/workflows/helm-lint.yaml`; `hack/lint.sh` | Runs automated checks for licensing, documentation, security, rendering rules, shell scripts, JSON schema, and Helm syntax. |
 | `DLH-C3-VALIDATE-DEPS` | Dependency Refresh Check | `DLH-C2-VALIDATION` | `hack/helm-dependency-update.sh`; `Chart.lock` | Refreshes Helm dependency archives and updates lock metadata so packaged dependencies remain reproducible. |
 | `DLH-C3-VALIDATE-RENDER` | Example Render Checks | `DLH-C2-VALIDATION` | `hack/template.sh`; `examples/*.yaml` | Renders every maintained example configuration file to verify that supported installation profiles produce valid manifests. |
-| `DLH-C3-VALIDATE-CONTRACT` | Render Contract Checks | `DLH-C2-VALIDATION` | `hack/render-contract.sh`; `hack/testdata/render-contract/` | Verifies expected render outputs and expected failure modes for the chart's documented configuration rules. |
+| `DLH-C3-VALIDATE-CONTRACT` | Render Contract Checks | `DLH-C2-VALIDATION` | `test/render-contract.sh`; `test/render-contract/` | Verifies expected render outputs and expected failure modes for the chart's documented configuration rules. |
 | `DLH-C3-VALIDATE-SMOKE` | Smoke Install Workflow | `DLH-C2-VALIDATION` | `.github/workflows/helm-smoke-install.yaml`; `hack/smoke-install.sh` | Installs an identity- and governance-oriented local profile into a disposable cluster to test an integrated runtime path. |
 
 ### Publish Components

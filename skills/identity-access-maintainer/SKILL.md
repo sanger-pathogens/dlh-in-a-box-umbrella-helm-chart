@@ -33,8 +33,8 @@ catalog governance, and app launch behavior.
 - `examples/values-dev.yaml`
 - `examples/values-prod.yaml`
 - `examples/values-shared-auth.yaml`
-- `hack/render-contract.sh`
-- `hack/testdata/render-contract/*.yaml`
+- `test/render-contract.sh`
+- `test/render-contract/*.yaml`
 - `specs/ranger-keycloak-integration.md`
 
 ## Workflow
@@ -65,7 +65,7 @@ Preserve these invariants unless the user explicitly asks to redesign them:
 
 ## Common Negative Fixtures
 
-Use or extend fixtures under `hack/testdata/render-contract/` for:
+Use or extend fixtures under `../../ test/render-contract/` for:
 
 - deprecated `groupRoleMappings`
 - deprecated `authorizedGroups`

@@ -15,9 +15,9 @@ chart values.
 - `charts/dlh-in-a-box/templates/*-validation.yaml`
 - `charts/dlh-in-a-box/templates/*.yaml`
 - `examples/*.yaml`
-- `hack/render-contract.sh`
-- `hack/testdata/render-contract/*.yaml`
-- `hack/testdata/render-contract/README.md`
+- `test/render-contract.sh`
+- `test/render-contract/*.yaml`
+- `test/render-contract/README.md`
 - `charts/dlh-in-a-box/README.md`
 - `charts/dlh-in-a-box/templates/_README.txt`
 
@@ -42,14 +42,14 @@ Use positive renders for supported behavior:
 - `examples/values-local-auth.yaml`
 - `examples/values-dev.yaml`
 - `examples/values-prod.yaml`
-- focused fixture overlays from `hack/testdata/render-contract/`
+- focused fixture overlays from `test/render-contract/`
 
 Use negative fixtures for rejected behavior:
 
 - one fixture per invalid scenario
 - short fixture names that describe the failure
-- expected failure text in `hack/render-contract.sh`
-- fixture description in `hack/testdata/render-contract/README.md`
+- expected failure text in `test/render-contract.sh`
+- fixture description in `test/render-contract/README.md`
 
 Prefer `expect_fail_any` when Helm schema wording differs across tool versions.
 Use exact `expect_fail` for chart-authored validation messages.

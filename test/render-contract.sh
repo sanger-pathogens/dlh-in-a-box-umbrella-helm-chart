@@ -5,7 +5,7 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "${ROOT_DIR}"
 
 CHART_PATH="${ROOT_DIR}/charts/dlh-in-a-box"
-FIXTURE_DIR="${ROOT_DIR}/hack/testdata/render-contract"
+FIXTURE_DIR="${ROOT_DIR}/test/render-contract"
 LOCAL_VALUES="${ROOT_DIR}/examples/values-local-auth.yaml"
 DEV_VALUES="${ROOT_DIR}/examples/values-dev.yaml"
 PROD_VALUES="${ROOT_DIR}/examples/values-prod.yaml"

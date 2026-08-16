@@ -547,7 +547,7 @@ enablement, not a full platform profile.
   pass a smaller list
 - `hack/lint.sh` lints the chart against every example file
 - `hack/smoke-install.sh` uses `values-local-auth.yaml`
-- `hack/render-contract.sh` uses the shared and local auth baselines as inputs
+- `test/render-contract.sh` uses the shared and local auth baselines as inputs
   for many negative tests
 
 When an example changes, you should ask:

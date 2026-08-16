@@ -1,9 +1,6 @@
-# Script Test Data
-
-This folder contains small fake input files used by maintainer scripts.
-
-They are intentionally not full deployments. Their job is to isolate one rule
-or one render contract at a time.
+# Chart Test Suite
+This folder contains tests for the Helm chart, designed to isolate and test
+one rule or render contract at a time.
 
 ## Who Should Read This
 
@@ -38,26 +35,47 @@ flowchart TD
 
 ## What Lives In This Folder
 
-| Path | Ownership | What it is for |
-| --- | --- | --- |
-| `render-contract/` | repo-owned fixtures | tiny YAML overlays used by `hack/render-contract.sh` |
-| `README.md` | repo-owned guide | this folder manual |
+| Path | What it is for                                                                                       |
+| --- |------------------------------------------------------------------------------------------------------|
+| `render-contract.sh` | Script that performs testing against the provided values file using the overlays in `render-contract` |
+| `render-contract/` | YAML overlays used by `render-contract.sh`                                                       |
+| `README.md` | Guide file for this folder                                                                           |
+
+## Test Script Behaviour
+
+What `render-contract.sh` does:
+
+- renders the chart against known-good baselines
+- merges small one-purpose fixture files from `test/render-contract/`
+- checks that expected strings appear or do not appear
+- checks that invalid inputs fail with the right messages
+
+Why it matters:
+
+- many of the chart's guarantees are about rejecting bad configuration
+- this script is the concrete proof that those rejections still happen
+
+Use the script when:
+
+- changing validation logic
+- changing auth and governance behavior
+- changing what the example overlays are expected to render
 
 ## Fixture Philosophy
 
-These fixtures are designed around one rule:
+Test fixtures are designed around one rule:
 
 - one small input
 - one focused behavior
 - one easy-to-understand expected outcome
 
-That matters because the repo already has full example overlays under
+The repo already has full example overlays under
 `examples/`. The fixtures here exist so validation logic can be tested without
 turning every edge case into a giant environment file.
 
 ## How This Folder Fits Into Validation
 
-`hack/render-contract.sh` takes:
+`render-contract.sh` takes:
 
 - a known-good baseline example from `examples/`
 - one focused overlay from this folder
@@ -79,23 +97,19 @@ If you need to:
 - test a new allowed configuration: add a focused expected-pass overlay
 - test a new forbidden configuration: add a focused expected-fail overlay
 
-Do not add a full environment here when a three-line overlay would prove the
-point.
-
 ## Validation
 
 After changing files in this folder, run:
 
 ```bash
-./hack/render-contract.sh
-./hack/lint.sh
+./render-contract.sh
 ```
 
 ## Common Mistakes
 
 - copying a whole example values file into this folder
 - testing several unrelated rules in one fixture
-- adding a fixture file but forgetting to wire it into `hack/render-contract.sh`
+- adding a fixture file but forgetting to wire it into `render-contract.sh`
 
 ## When You Can Ignore This Folder
 

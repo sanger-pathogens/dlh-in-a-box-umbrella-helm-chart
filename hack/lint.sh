@@ -7,6 +7,6 @@ bash -n "${ROOT_DIR}"/hack/*.sh
 "${ROOT_DIR}"/hack/license-check.sh
 "${ROOT_DIR}"/hack/docs-check.sh
 "${ROOT_DIR}"/hack/security-check.sh
-"${ROOT_DIR}"/hack/render-contract.sh
+"${ROOT_DIR}"/test/render-contract.sh
 "${ROOT_DIR}"/hack/helm-lint.sh
 

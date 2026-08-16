@@ -17,13 +17,11 @@ If you are maintaining this repo, this folder is your operational toolbox.
 flowchart TD
   subgraph Inputs["Inputs"]
     Source[chart source and example files]
-    TestData[testdata fixtures]
   end
 
   subgraph Checks["Maintainer scripts"]
     Deps[helm-dependency-update.sh]
     Docs[docs-check.sh]
-    Contract[render-contract.sh]
     Security[security-check.sh]
     License[license-check.sh]
     Lint[lint.sh]
@@ -45,11 +43,9 @@ flowchart TD
   Source --> Template
   Source --> Package
   Source --> Smoke
-  TestData --> Contract
   Deps --> Lockfiles
   Deps --> Docs
   Docs --> Lint
-  Contract --> Lint
   Security --> Lint
   License --> Lint
   Lint --> Template
@@ -67,13 +63,11 @@ flowchart TD
 | `docs-check.sh` | guide files | no repo-tracked writes expected | enforce guide coverage, links, and Mermaid validity |
 | `license-check.sh` | `Chart.lock`, notices, vendored licenses, archives | no repo-tracked writes expected | enforce bundled license hygiene |
 | `security-check.sh` | workflows, chart templates, examples | no repo-tracked writes expected | catch a few specific risky patterns |
-| `render-contract.sh` | chart, example baselines, test fixtures | temp files only | prove good renders still work and unsafe combinations still fail |
 | `lint.sh` | chart, examples, schema, the other scripts | no repo-tracked writes expected | run the main validation path |
 | `template.sh` | chart and selected example files | manifests to stdout only | render the chart without installing it |
 | `package.sh` | chart source | `dist/*.tgz` | create publishable chart package |
 | `smoke-install.sh` | chart, one values file, current kube context | cluster resources, optional diagnostic artifacts | install locally and wait for readiness |
 | `validate_mermaid.py` | Markdown guides and Docker | no repo-tracked writes expected | render-check Mermaid blocks through `mermaid-cli` |
-| `testdata/` | fixture inputs for scripts | none on its own | support render-contract and related checks |
 
 ## How The Scripts Fit Together
 
@@ -81,7 +75,6 @@ The simplest mental model is:
 
 - `docs-check.sh` protects the guide system
 - `license-check.sh` and `security-check.sh` enforce repo hygiene
-- `render-contract.sh` proves the validation rules still behave as intended
 - `lint.sh` is the main umbrella entrypoint that runs most of the above
 - `template.sh` proves the tracked example overlays still render
 - `package.sh` proves the chart can still be packaged
@@ -190,26 +183,6 @@ What it does:
 This is not a full security audit. It is a focused set of repo-specific guard
 rails.
 
-### `render-contract.sh`
-
-What it does:
-
-- renders the chart against known-good baselines
-- merges small one-purpose fixture files from `hack/testdata/render-contract/`
-- checks that expected strings appear or do not appear
-- checks that invalid inputs fail with the right messages
-
-Why it matters:
-
-- many of the chart's guarantees are about rejecting bad configuration
-- this script is the concrete proof that those rejections still happen
-
-Use this when:
-
-- changing validation logic
-- changing auth and governance behavior
-- changing what the example overlays are expected to render
-
 ### `lint.sh`
 
 What it does:
@@ -217,7 +190,7 @@ What it does:
 - runs `license-check.sh`
 - runs `docs-check.sh`
 - runs `security-check.sh`
-- runs `render-contract.sh`
+- runs `../test/render-contract.sh`
 - syntax-checks shell scripts
 - parses `values.schema.json`
 - runs `helm lint` for the chart alone and then against every example overlay
@@ -381,7 +354,6 @@ local and CI behavior to stay aligned.
 If you need to:
 
 - prove docs are still structurally valid: run `./hack/docs-check.sh`
-- prove validation failures still fail: run `./hack/render-contract.sh`
 - check one example overlay only: run `./hack/template.sh examples/my-file.yaml`
 - build a chart package with explicit versions: run
   `./hack/package.sh charts/dlh-in-a-box dist <chart-version> <app-version>`
