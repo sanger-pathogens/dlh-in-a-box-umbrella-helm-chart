@@ -808,18 +808,6 @@
               }
             },
             "importCatalogAcls": { "type": "boolean" },
-            "exceptionRoleAudit": {
-              "type": "object",
-              "additionalProperties": true,
-              "properties": {
-                "enabled": { "type": "boolean" },
-                "prefix": { "type": "string" },
-                "schedule": { "type": "string" },
-                "gracePeriodDays": { "type": "integer", "minimum": 0 },
-                "deleteExpired": { "type": "boolean" },
-                "logUndocumented": { "type": "boolean" }
-              }
-            },
             "bootstrapPolicies": {
               "type": "array",
               "items": { "type": "object" }

@@ -1,7 +1,6 @@
 {{- $authorization := .Values.global.authorization | default dict -}}
 {{- $ranger := get $authorization "ranger" | default dict -}}
 {{- $rangerTrino := get $ranger "trino" | default dict -}}
-{{- $exceptionRoleAudit := get $ranger "exceptionRoleAudit" | default dict -}}
 {{- $identity := .Values.global.identity | default dict -}}
 {{- $provider := get $identity "provider" | default dict -}}
 {{- $providerMode := default "externalOidc" $provider.mode -}}
@@ -43,18 +42,6 @@
 {{- end -}}
 {{- $keycloakRangerSyncEnabled := and (default false $identity.enabled) (eq $providerMode "bundledKeycloak") $localUserSyncRequested -}}
 {{- $localUserSyncImage := get $localUserSync "image" | default $usersyncImage -}}
-{{- $exceptionRoleAuditEnabled := true -}}
-{{- if hasKey $exceptionRoleAudit "enabled" -}}
-  {{- $exceptionRoleAuditEnabled = $exceptionRoleAudit.enabled -}}
-{{- end -}}
-{{- $exceptionRoleAuditDeleteExpired := true -}}
-{{- if hasKey $exceptionRoleAudit "deleteExpired" -}}
-  {{- $exceptionRoleAuditDeleteExpired = $exceptionRoleAudit.deleteExpired -}}
-{{- end -}}
-{{- $exceptionRoleAuditLogUndocumented := true -}}
-{{- if hasKey $exceptionRoleAudit "logUndocumented" -}}
-  {{- $exceptionRoleAuditLogUndocumented = $exceptionRoleAudit.logUndocumented -}}
-{{- end -}}
 {{- $importCatalogAcls := false -}}
 {{- if hasKey $ranger "importCatalogAcls" -}}
   {{- $importCatalogAcls = $ranger.importCatalogAcls -}}
@@ -85,14 +72,6 @@ data:
         "trinoEnabled" (and (default false $ranger.enabled) (default false $rangerTrino.enabled))
         "importCatalogAcls" $importCatalogAcls
         "bootstrapPolicies" $bootstrapPolicies
-        "exceptionRoleAudit" (dict
-          "enabled" $exceptionRoleAuditEnabled
-          "prefix" (default "exception-" $exceptionRoleAudit.prefix)
-          "schedule" (default "23 * * * *" $exceptionRoleAudit.schedule)
-          "gracePeriodDays" (default 7 $exceptionRoleAudit.gracePeriodDays)
-          "deleteExpired" $exceptionRoleAuditDeleteExpired
-          "logUndocumented" $exceptionRoleAuditLogUndocumented
-        )
       )
       "accessRoles" $accessRoles
       "catalogs" (.Values.global.dataCatalogs | default (dict))
@@ -124,8 +103,6 @@ data:
     | toPrettyJson | nindent 4 }}
   bootstrap.py: |
 {{ .Files.Get "files/ranger-automation/bootstrap.py" | nindent 4 }}
-  exception_audit.py: |
-{{ .Files.Get "files/ranger-automation/exception_audit.py" | nindent 4 }}
   usersync.py: |
 {{ .Files.Get "files/ranger-automation/usersync.py" | nindent 4 }}
   keycloak_ranger_sync.py: |
@@ -503,58 +480,6 @@ spec:
                     secretKeyRef:
                       name: {{ .Values.keycloak.auth.existingSecret }}
                       key: {{ default "adminPassword" .Values.keycloak.auth.passwordSecretKey }}
-              volumeMounts:
-                - name: automation
-                  mountPath: /opt/ranger-automation
-                  readOnly: true
-          volumes:
-            - name: automation
-              configMap:
-                name: {{ include "dlh-in-a-box.ranger.admin.serviceName" . }}-automation
-                defaultMode: 0555
-{{- end }}
-{{- if $exceptionRoleAuditEnabled }}
----
-apiVersion: batch/v1
-kind: CronJob
-metadata:
-  name: {{ include "dlh-in-a-box.ranger.admin.serviceName" . }}-exception-audit
-  namespace: {{ .Release.Namespace }}
-  labels:
-    {{- include "dlh-in-a-box.labels" . | nindent 4 }}
-    app.kubernetes.io/component: ranger-exception-audit
-spec:
-  schedule: {{ default "23 * * * *" $exceptionRoleAudit.schedule | quote }}
-  concurrencyPolicy: Forbid
-  successfulJobsHistoryLimit: 1
-  failedJobsHistoryLimit: 3
-  jobTemplate:
-    spec:
-      backoffLimit: 3
-      template:
-        metadata:
-          labels:
-            app.kubernetes.io/instance: {{ .Release.Name }}
-            app.kubernetes.io/name: {{ include "dlh-in-a-box.name" . }}
-            app.kubernetes.io/component: ranger-exception-audit
-        spec:
-          restartPolicy: OnFailure
-          containers:
-            - name: ranger-exception-audit
-              image: "{{ $ranger.bootstrap.image.repository }}:{{ $ranger.bootstrap.image.tag }}"
-              imagePullPolicy: {{ $ranger.bootstrap.image.pullPolicy }}
-              command:
-                - python
-                - -u
-                - /opt/ranger-automation/exception_audit.py
-              env:
-                - name: RANGER_URL
-                  value: {{ include "dlh-in-a-box.ranger.admin.url" . | quote }}
-                - name: RANGER_ADMIN_PASSWORD
-                  valueFrom:
-                    secretKeyRef:
-                      name: {{ $ranger.admin.existingSecret }}
-                      key: {{ default "rangerAdminPassword" $ranger.admin.adminPasswordKey }}
               volumeMounts:
                 - name: automation
                   mountPath: /opt/ranger-automation
