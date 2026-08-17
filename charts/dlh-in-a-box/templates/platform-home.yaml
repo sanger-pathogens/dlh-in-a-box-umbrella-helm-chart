@@ -3,7 +3,6 @@
 {{- $port := default 8080 .Values.platformHome.service.port -}}
 {{- $apiPort := default 18080 (dig "api" "port" 18080 .Values.platformHome) -}}
 {{- $platformHomeValues := .Values.platformHome | default dict -}}
-{{- $launchers := get $platformHomeValues "launchers" | default dict -}}
 {{- $keycloakBrowserBaseUrl := trimSuffix "/" (default "" (get $platformHomeValues "keycloakBrowserBaseUrl")) -}}
 {{- $branding := .Values.platformHome.branding | default dict -}}
 {{- $theme := get $platformHomeValues "theme" | default dict -}}
@@ -15,38 +14,16 @@
 {{- $portalHealth := get $platformHomeValues "health" | default dict -}}
 {{- $global := .Values.global | default dict -}}
 {{- $identity := get $global "identity" | default dict -}}
-{{- $accessModel := get $identity "accessModel" | default dict -}}
 {{- $accessModelRoles := fromJson (include "dlh-in-a-box.identity.accessModelRolesJson" .) -}}
-{{- $directory := get $identity "directory" | default dict -}}
-{{- $directoryMode := include "dlh-in-a-box.identity.directoryMode" . -}}
-{{- $keycloakLocalMode := eq $directoryMode "keycloakLocal" -}}
-{{- $ldap := get $directory "ldap" | default dict -}}
 {{- $authorization := get $global "authorization" | default dict -}}
-{{- $platformRoleExceptions := get $authorization "platformRoleExceptions" | default (list) -}}
 {{- $ranger := get $authorization "ranger" | default dict -}}
 {{- $rangerAdmin := get $ranger "admin" | default dict -}}
-{{- $usersyncEnabled := dig "usersync" "enabled" true $ranger -}}
 {{- $external := get $identity "external" | default dict -}}
 {{- $clients := get $external "clients" | default dict -}}
 {{- $rangerProxyIdentity := get $clients "rangerProxy" | default dict -}}
 {{- $oidc := get $external "oidc" | default dict -}}
 {{- $rangerBrowserUrl := default (default "" (get $rangerAdmin "browserUrl")) (first (default (list) (get $rangerProxyIdentity "webOrigins"))) -}}
 {{- $adminRequiredRoles := list "platform-admin" -}}
-{{- $ldapEnabled := default false $ldap.enabled -}}
-{{- $ldapUrl := include "dlh-in-a-box.identity.directory.url" . -}}
-{{- $ldapUserBaseDn := include "dlh-in-a-box.identity.directory.userBaseDn" . -}}
-{{- $ldapGroupBaseDn := include "dlh-in-a-box.identity.directory.groupBaseDn" . -}}
-{{- $ldapBindDn := include "dlh-in-a-box.identity.directory.bindDn" . -}}
-{{- $ldapAllowAnonymousRead := default false $ldap.allowAnonymousRead -}}
-{{- $ldapEffectiveBindDn := ternary "" $ldapBindDn $ldapAllowAnonymousRead -}}
-{{- $ldapBindSecretName := include "dlh-in-a-box.identity.directory.bindSecretName" . -}}
-{{- $ldapBindPasswordKey := include "dlh-in-a-box.identity.directory.bindSecretKey" . -}}
-{{- $ldapTrustedCaSecretName := include "dlh-in-a-box.identity.directory.trustedCaSecretName" . -}}
-{{- $ldapTrustedCaCertKey := include "dlh-in-a-box.identity.directory.trustedCaCertKey" . -}}
-{{- $ldapTrustedCaPath := printf "/opt/platform-home-api/ldap-ca/%s" $ldapTrustedCaCertKey -}}
-{{- $ldapUseTrustedCa := and $ldapEnabled (not (default false $ldap.allowInsecure)) (ne $ldapTrustedCaSecretName "") -}}
-{{- $ldapHostAliases := default (list) $ldap.hostAliases -}}
-{{- $accessControlStateConfigMapName := printf "%s-access-control-state" $serviceName -}}
 {{- $brandingTitle := default "Data Platform" $branding.title -}}
 {{- $brandingSubtitle := default "" $branding.subtitle -}}
 {{- $brandingLogoUrl := default "" $branding.logoUrl -}}
@@ -55,26 +32,6 @@
 {{- $metaThemeColor := default "#1f5f7a" (get $theme "metaThemeColor") -}}
 {{- $fontBodyFamily := default "system-ui, -apple-system, BlinkMacSystemFont, \"Segoe UI\", sans-serif" (get $themeFonts "bodyFamily") -}}
 {{- $fontHeadingFamily := default "Georgia, \"Times New Roman\", serif" (get $themeFonts "headingFamily") -}}
-{{- $accessControlNotice := "Access Control is read-only because Keycloak owns platform roles and role membership. Use Keycloak Admin to change routine role membership." -}}
-{{- $portalLaunchers := dict -}}
-{{- range $launcherName := keys $launchers | sortAlpha -}}
-  {{- $launcher := get $launchers $launcherName | default dict -}}
-  {{- if default false (get $launcher "enabled") -}}
-    {{- $_ := set $portalLaunchers $launcherName (dict
-      "mode" (default "redirect" (get $launcher "mode"))
-      "path" (default (printf "/launch/%s" $launcherName) (get $launcher "path"))
-      "targetUrl" (default "" (get $launcher "targetUrl"))
-      "completeUrl" (default "" (get $launcher "completeUrl"))
-      "internalApiUrl" (default "" (get $launcher "internalApiUrl"))
-      "redirectUri" (default "" (get $launcher "redirectUri"))
-      "authMount" (default "" (get $launcher "authMount"))
-      "role" (default "" (get $launcher "role"))
-      "wrapTtl" (default "" (get $launcher "wrapTtl"))
-      "requiredRoles" (default (list) (get $launcher "requiredRoles"))
-    ) -}}
-  {{- end -}}
-{{- end -}}
-{{- $platformRoleViews := list -}}
 {{- $appRequiredRoles := dict
   "superset" (list)
   "datahub" (list)
@@ -82,6 +39,9 @@
   "cloudbeaver" (list)
   "prefect" (list)
   "trinoUi" (list)
+  "keycloak" (list)
+  "minio" (list)
+  "ranger" (list)
 -}}
 {{- range $roleKey := keys $accessModelRoles | sortAlpha -}}
   {{- $role := get $accessModelRoles $roleKey | default dict -}}
@@ -104,85 +64,32 @@
   {{- if default false (get $roleApps "trinoUi") -}}
     {{- $_ := set $appRequiredRoles "trinoUi" (uniq (append (get $appRequiredRoles "trinoUi") $roleKey)) -}}
   {{- end -}}
-  {{- $declaredExceptions := list -}}
-  {{- range $exception := $platformRoleExceptions -}}
-    {{- if eq (default "" (get $exception "platformRole")) $roleKey -}}
-      {{- $declaredExceptions = append $declaredExceptions (dict
-        "username" (default "" (get $exception "username"))
-        "approvalRef" (default "" (get $exception "approvalRef"))
-        "reason" (default "" (get $exception "reason"))
-        "grantedBy" (default "" (get $exception "grantedBy"))
-        "expiresAt" (default "" (get $exception "expiresAt"))
-      ) -}}
-    {{- end -}}
+  {{- if default false (get $roleApps "keycloak") -}}
+    {{- $_ := set $appRequiredRoles "keycloak" (uniq (append (get $appRequiredRoles "keycloak") $roleKey)) -}}
   {{- end -}}
-  {{- $policySummaries := list -}}
-  {{- range $policy := (get $ranger "bootstrapPolicies" | default (list)) -}}
-    {{- $policyRoles := list -}}
-    {{- range $item := (get $policy "policyItems" | default (list)) -}}
-      {{- $policyRoles = concat $policyRoles (get $item "roles" | default (list)) -}}
-    {{- end -}}
-    {{- range $item := (get $policy "dataMaskPolicyItems" | default (list)) -}}
-      {{- $policyRoles = concat $policyRoles (get $item "roles" | default (list)) -}}
-    {{- end -}}
-    {{- range $item := (get $policy "rowFilterPolicyItems" | default (list)) -}}
-      {{- $policyRoles = concat $policyRoles (get $item "roles" | default (list)) -}}
-    {{- end -}}
-    {{- $policyRoles = uniq $policyRoles -}}
-    {{- if has $roleKey $policyRoles -}}
-      {{- $policyType := default 0 (get $policy "policyType") -}}
-      {{- $policyKind := "access" -}}
-      {{- if eq (printf "%v" $policyType) "1" -}}
-        {{- $policyKind = "data-mask" -}}
-      {{- else if eq (printf "%v" $policyType) "2" -}}
-        {{- $policyKind = "row-filter" -}}
-      {{- end -}}
-      {{- $policySummaries = append $policySummaries (dict
-        "name" (default "" (get $policy "name"))
-        "description" (default "" (get $policy "description"))
-        "kind" $policyKind
-      ) -}}
-    {{- end -}}
+  {{- if default false (get $roleApps "minio") -}}
+    {{- $_ := set $appRequiredRoles "minio" (uniq (append (get $appRequiredRoles "minio") $roleKey)) -}}
   {{- end -}}
-  {{- $platformRoleViews = append $platformRoleViews (dict
-    "key" $roleKey
-    "name" $roleKey
-    "displayName" (default "" (get $role "label"))
-    "manageable" true
-    "description" (default "" (get $role "description"))
-    "directoryGroups" (list)
-    "users" (list)
-    "nestedRoles" (list)
-    "apps" (dict
-      "superset" (default false (get $roleApps "superset"))
-      "datahub" (default false (get $roleApps "datahub"))
-      "trinoUi" (default false (get $roleApps "trinoUi"))
-      "jupyterhub" (default false (get $roleApps "jupyterhub"))
-      "cloudbeaver" (default false (get $roleApps "cloudbeaver"))
-      "prefect" (default false (get $roleApps "prefect"))
-    )
-    "declaredExceptions" $declaredExceptions
-    "policySummaries" $policySummaries
+  {{- if default false (get $roleApps "ranger") -}}
+    {{- $_ := set $appRequiredRoles "ranger" (uniq (append (get $appRequiredRoles "ranger") $roleKey)) -}}
+  {{- end -}}
+{{- end -}}
+{{- $portalLaunchers := dict -}}
+{{- if .Values.minio.enabled -}}
+  {{- $_ := set $portalLaunchers "minio-console" (dict
+    "mode" "minio-sso"
+    "path" "/launch/minio-console"
+    "targetUrl" ""
+    "completeUrl" ""
+    "internalApiUrl" (printf "http://%s:9001" (include "dlh-in-a-box.minio.serviceName" .))
+    "redirectUri" ""
+    "authMount" ""
+    "role" ""
+    "wrapTtl" ""
+    "requiredRoles" (get $appRequiredRoles "minio")
   ) -}}
 {{- end -}}
 {{- $adminTools := list -}}
-{{- $roleManagementEnabled := and (default false $ranger.enabled) (gt (len $platformRoleViews) 0) (not $keycloakLocalMode) -}}
-{{- if $roleManagementEnabled -}}
-  {{- $toolMeta := get $itemMeta "access-control" | default dict -}}
-  {{- $adminTools = append $adminTools (dict
-    "id" "access-control"
-    "name" "Access Control"
-    "summary" "Assign LDAP groups and governed user exceptions to platform roles"
-    "url" "/access-control"
-    "icon" "AC"
-    "iconText" (default "AC" (get $toolMeta "iconText"))
-    "iconUrl" (default "" (get $toolMeta "iconUrl"))
-    "iconAlt" (default "Access control icon" (get $toolMeta "iconAlt"))
-    "iconBackground" (default "" (get $toolMeta "iconBackground"))
-    "health" (get $toolMeta "health" | default dict)
-    "group" "Governance & Access"
-  ) -}}
-{{- end -}}
 {{- if $rangerBrowserUrl -}}
   {{- $toolMeta := get $itemMeta "ranger-admin" | default dict -}}
   {{- $adminTools = append $adminTools (dict
@@ -197,6 +104,7 @@
     "iconBackground" (default "" (get $toolMeta "iconBackground"))
     "health" (get $toolMeta "health" | default dict)
     "group" "Governance & Access"
+    "requiredRoles" (get $appRequiredRoles "ranger")
   ) -}}
 {{- end -}}
 {{- if $keycloakBrowserBaseUrl -}}
@@ -213,6 +121,7 @@
     "iconBackground" (default "" (get $toolMeta "iconBackground"))
     "health" (get $toolMeta "health" | default dict)
     "group" "Governance & Access"
+    "requiredRoles" (get $appRequiredRoles "keycloak")
   ) -}}
 {{- end -}}
 {{- if default false (dig "trino" "enabled" false $clients) -}}
@@ -232,21 +141,21 @@
     "requiredRoles" (get $appRequiredRoles "trinoUi")
   ) -}}
 {{- end -}}
-{{- range $tool := (get $platformHomeValues "adminTools" | default (list)) -}}
-  {{- $toolId := default "" (get $tool "id") -}}
-  {{- $toolMeta := get $itemMeta $toolId | default dict -}}
+{{- if .Values.minio.enabled -}}
+  {{- $toolMeta := get $itemMeta "minio" | default dict -}}
   {{- $adminTools = append $adminTools (dict
-    "id" $toolId
-    "name" (default "" (get $tool "name"))
-    "summary" (default "" (get $tool "summary"))
-    "url" (default "" (get $tool "url"))
-    "icon" (default "" (get $tool "icon"))
-    "iconText" (default (default "" (get $toolMeta "iconText")) (default "" (get $tool "icon")))
-    "iconUrl" (default (default "" (get $toolMeta "iconUrl")) (default "" (get $tool "iconUrl")))
-    "iconAlt" (default (default "" (get $toolMeta "iconAlt")) (default "" (get $tool "iconAlt")))
-    "iconBackground" (default (default "" (get $toolMeta "iconBackground")) (default "" (get $tool "iconBackground")))
-    "health" (mergeOverwrite (get $toolMeta "health" | default dict) (get $tool "health" | default dict))
-    "group" (default "Platform Operations" (get $tool "group"))
+    "id" "minio-console"
+    "name" "MinIO Console"
+    "summary" "Browse buckets and manage object storage"
+    "url" "/launch/minio-console"
+    "icon" "MI"
+    "iconText" (default "MI" (get $toolMeta "iconText"))
+    "iconUrl" (default "" (get $toolMeta "iconUrl"))
+    "iconAlt" (default "MinIO logo" (get $toolMeta "iconAlt"))
+    "iconBackground" (default "" (get $toolMeta "iconBackground"))
+    "health" (get $toolMeta "health" | default dict)
+    "group" "Platform Operations"
+    "requiredRoles" (get $appRequiredRoles "minio")
   ) -}}
 {{- end -}}
 {{- $apps := list -}}
@@ -289,12 +198,11 @@
 {{- if and .Values.jupyterhub.enabled (default false (dig "jupyterhub" "enabled" false $clients)) -}}
   {{- $appMeta := get $itemMeta "jupyterhub" | default dict -}}
   {{- $jupyterhubOrigin := trimSuffix "/" (first (default (list) (dig "jupyterhub" "webOrigins" list $clients))) -}}
-  {{- $jupyterhubLaunch := get $portalLaunchers "jupyterhub" | default dict -}}
   {{- $apps = append $apps (dict
     "id" "jupyterhub"
     "name" "JupyterHub"
     "summary" "Interactive notebooks and shared code workspace"
-    "url" (default $jupyterhubOrigin (get $jupyterhubLaunch "path"))
+    "url" $jupyterhubOrigin
     "group" "Analysis"
     "icon" "JH"
     "iconText" (default "JH" (get $appMeta "iconText"))
@@ -340,35 +248,6 @@
     "health" (get $appMeta "health" | default dict)
     "requiredRoles" (get $appRequiredRoles "cloudbeaver")
   ) -}}
-{{- end -}}
-{{- $demoAppsConfig := get $platformHomeValues "demoApps" | default (list) -}}
-{{- $demoApps := list -}}
-{{- if kindIs "slice" $demoAppsConfig -}}
-  {{- $demoApps = $demoAppsConfig -}}
-{{- else -}}
-  {{- range $appId := keys $demoAppsConfig | sortAlpha -}}
-    {{- $demoApps = append $demoApps (mergeOverwrite (dict "id" $appId) (get $demoAppsConfig $appId | default dict)) -}}
-  {{- end -}}
-{{- end -}}
-{{- range $app := $demoApps -}}
-  {{- $appId := default "" (get $app "id") -}}
-  {{- if default true (get $app "enabled") -}}
-    {{- $appMeta := get $itemMeta $appId | default dict -}}
-    {{- $apps = append $apps (dict
-      "id" $appId
-      "name" (default $appId (get $app "name"))
-      "summary" (default "" (get $app "summary"))
-      "url" (default "" (get $app "url"))
-      "group" (default "Data Access" (get $app "group"))
-      "icon" (default "" (get $app "icon"))
-      "iconText" (default (default "" (get $appMeta "iconText")) (default "" (get $app "iconText")))
-      "iconUrl" (default (default "" (get $appMeta "iconUrl")) (default "" (get $app "iconUrl")))
-      "iconAlt" (default (printf "%s logo" (default $appId (get $app "name"))) (default (default "" (get $appMeta "iconAlt")) (default "" (get $app "iconAlt"))))
-      "iconBackground" (default (default "" (get $appMeta "iconBackground")) (default "" (get $app "iconBackground")))
-      "health" (mergeOverwrite (get $appMeta "health" | default dict) (get $app "health" | default dict))
-      "requiredRoles" (default (list "platform-admin") (get $app "requiredRoles"))
-    ) -}}
-  {{- end -}}
 {{- end -}}
 {{- $healthItems := list -}}
 {{- range $app := $apps -}}
@@ -416,7 +295,6 @@
     "refreshIntervalSeconds" (default 90 (get $portalHealth "refreshIntervalSeconds"))
   )
   "identity" (dict
-    "directoryMode" $directoryMode
     "rolesClaim" (default "platform_roles" $oidc.rolesClaim)
     "keycloak" (dict
       "baseUrl" (default (include "dlh-in-a-box.keycloak.browserBaseUrl" .) .Values.platformHome.keycloakBrowserBaseUrl)
@@ -428,54 +306,19 @@
   "admin" (dict
     "requiredRoles" $adminRequiredRoles
     "tools" $portalAdminTools
-    "roleManagementEnabled" $roleManagementEnabled
-    "accessControlEnabled" $roleManagementEnabled
-    "accessControlNotice" (ternary $accessControlNotice "" $keycloakLocalMode)
-    "accessControlPath" "/access-control"
   )
 -}}
 {{- $platformHomeAdminConfig := dict
   "admin" (dict
     "requiredRoles" $adminRequiredRoles
-    "roleManagementEnabled" $roleManagementEnabled
-    "accessControlEnabled" $roleManagementEnabled
-    "accessControlNotice" (ternary $accessControlNotice "" $keycloakLocalMode)
-    "accessControlPath" "/access-control"
   )
   "adminTools" $adminTools
   "launchers" $portalLaunchers
-  "roles" $platformRoleViews
   "health" (dict
     "enabled" (default false (get $portalHealth "enabled"))
     "refreshIntervalSeconds" (default 90 (get $portalHealth "refreshIntervalSeconds"))
   )
   "items" $healthItems
-  "ranger" (dict
-    "enabled" (default false $ranger.enabled)
-    "browserUrl" $rangerBrowserUrl
-    "usersyncEnabled" $usersyncEnabled
-    "membershipSource" "keycloak"
-    "directoryMode" $directoryMode
-  )
-  "ldap" (dict
-    "enabled" $ldapEnabled
-    "url" $ldapUrl
-    "userBaseDn" $ldapUserBaseDn
-    "groupBaseDn" $ldapGroupBaseDn
-    "bindDn" $ldapEffectiveBindDn
-    "usernameAttribute" (default "uid" $ldap.usernameAttribute)
-    "firstNameAttribute" (default "givenName" $ldap.firstNameAttribute)
-    "lastNameAttribute" (default "sn" $ldap.lastNameAttribute)
-    "emailAttribute" (default "mail" $ldap.emailAttribute)
-    "userSearchFilter" (default "(uid=*)" $ldap.userSearchFilter)
-    "groupNameAttribute" (default "cn" $ldap.groupNameAttribute)
-    "groupSearchFilter" (default "(cn=*)" $ldap.groupSearchFilter)
-    "allowInsecure" (default false $ldap.allowInsecure)
-    "trustedCaPath" (ternary $ldapTrustedCaPath "" $ldapUseTrustedCa)
-  )
-  "state" (dict
-    "configMapName" $accessControlStateConfigMapName
-  )
 -}}
 {{- $platformHomeChecksum := (printf "%s\n%s\n%s\n%s\n%s\n%s\n%s" (toPrettyJson $portalConfig) (toPrettyJson $platformHomeAdminConfig) (toPrettyJson $theme) (.Files.Get "files/platform-home/app.js") (.Files.Get "files/platform-home/admin-api.py") (.Files.Get "files/platform-home/styles.css") (.Files.Get "files/platform-home/keycloak.js") | sha256sum) -}}
 apiVersion: v1
@@ -554,65 +397,10 @@ data:
               <div id="admin-tools" class="group-stack"></div>
             </section>
           </section>
-          <section id="role-management-panel" class="panel panel-secondary is-hidden">
-            <div class="panel-header access-control-header">
-              <div>
-                <p class="eyebrow">Access control</p>
-                <h2>Platform access control</h2>
-                <p class="detail-note">Manage LDAP-backed platform role assignments and governed direct-user exceptions without leaving the portal.</p>
-              </div>
-              <button id="access-control-back" class="secondary-button compact-button is-hidden" type="button">Back to portal</button>
-            </div>
-            <div id="role-management-status" class="status-banner is-hidden"></div>
-            <div class="role-management-layout">
-              <aside class="role-catalog-shell">
-                <h3 class="role-catalog-title">Platform roles</h3>
-                <div id="role-catalog" class="role-catalog"></div>
-              </aside>
-              <section id="role-detail" class="role-detail panel-subtle">
-                <p class="panel-note">Select a platform role to review LDAP groups, active exceptions, and policy impact.</p>
-              </section>
-            </div>
-          </section>
         </main>
         <main id="anonymous-state" class="content content-minimal"></main>
       </div>
       <script src="/app.js"></script>
-    </body>
-    </html>
-  admin.html: |
-    <!doctype html>
-    <html lang="en">
-    <head>
-      <meta charset="utf-8" />
-      <meta name="viewport" content="width=device-width, initial-scale=1" />
-      <meta name="theme-color" content="{{ $metaThemeColor }}" />
-      <title>{{ $brandingTitle }}</title>
-      {{- if $brandingFaviconUrl }}
-      <link rel="icon" href="{{ $brandingFaviconUrl }}" type="image/x-icon" />
-      {{- end }}
-      <meta http-equiv="refresh" content="0; url=/" />
-    </head>
-    <body>
-      <script>
-        try {
-          {{- if $keycloakLocalMode }}
-          window.sessionStorage.setItem("platform-home-route-notice", JSON.stringify({
-            level: "info",
-            message: {{ $accessControlNotice | quote }}
-          }));
-          {{- else }}
-          window.sessionStorage.setItem("platform-home-target-section", "access-control");
-          {{- end }}
-        } catch (error) {
-          console.warn("Unable to persist the administration redirect target.", error);
-        }
-        {{- if $keycloakLocalMode }}
-        window.location.replace("/");
-        {{- else }}
-        window.location.replace("/access-control");
-        {{- end }}
-      </script>
     </body>
     </html>
   app.js: |
@@ -739,65 +527,6 @@ data:
     }
 ---
 apiVersion: v1
-kind: ServiceAccount
-metadata:
-  name: {{ $serviceName }}-admin-api
-  namespace: {{ .Release.Namespace }}
-  labels:
-    {{- include "dlh-in-a-box.labels" . | nindent 4 }}
-    app.kubernetes.io/component: platform-home
----
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: {{ $accessControlStateConfigMapName }}
-  namespace: {{ .Release.Namespace }}
-  labels:
-    {{- include "dlh-in-a-box.labels" . | nindent 4 }}
-    app.kubernetes.io/component: platform-home
-data:
-  state.json: |
-    {
-      "version": 1,
-      "exceptions": []
-    }
----
-apiVersion: rbac.authorization.k8s.io/v1
-kind: Role
-metadata:
-  name: {{ $serviceName }}-admin-api
-  namespace: {{ .Release.Namespace }}
-  labels:
-    {{- include "dlh-in-a-box.labels" . | nindent 4 }}
-    app.kubernetes.io/component: platform-home
-rules:
-  - apiGroups: [""]
-    resources: ["configmaps"]
-    verbs: ["create"]
-  - apiGroups: [""]
-    resources: ["configmaps"]
-    resourceNames:
-      - {{ $accessControlStateConfigMapName }}
-    verbs: ["get", "update", "patch"]
----
-apiVersion: rbac.authorization.k8s.io/v1
-kind: RoleBinding
-metadata:
-  name: {{ $serviceName }}-admin-api
-  namespace: {{ .Release.Namespace }}
-  labels:
-    {{- include "dlh-in-a-box.labels" . | nindent 4 }}
-    app.kubernetes.io/component: platform-home
-subjects:
-  - kind: ServiceAccount
-    name: {{ $serviceName }}-admin-api
-    namespace: {{ .Release.Namespace }}
-roleRef:
-  apiGroup: rbac.authorization.k8s.io
-  kind: Role
-  name: {{ $serviceName }}-admin-api
----
-apiVersion: v1
 kind: Service
 metadata:
   name: {{ $serviceName }}
@@ -841,13 +570,9 @@ spec:
         app.kubernetes.io/name: {{ include "dlh-in-a-box.name" . }}
         app.kubernetes.io/component: platform-home
     spec:
-      serviceAccountName: {{ $serviceName }}-admin-api
+      automountServiceAccountToken: false
       {{- with .Values.global.imagePullSecrets }}
       imagePullSecrets:
-        {{- toYaml . | nindent 8 }}
-      {{- end }}
-      {{- with $ldapHostAliases }}
-      hostAliases:
         {{- toYaml . | nindent 8 }}
       {{- end }}
       containers:
@@ -882,16 +607,12 @@ spec:
           image: "{{ .Values.platformHome.api.image.repository }}:{{ .Values.platformHome.api.image.tag }}"
           imagePullPolicy: {{ .Values.platformHome.api.image.pullPolicy }}
           command:
-            - /bin/sh
-            - -ec
-            - |
-              python -m pip install --no-cache-dir ldap3 >/tmp/platform-home-api-pip.log
-              python -u /opt/platform-home-api/admin-api.py
+            - python
+            - -u
+            - /opt/platform-home-api/admin-api.py
           env:
             - name: PORT
               value: {{ $apiPort | quote }}
-            - name: RANGER_URL
-              value: {{ include "dlh-in-a-box.ranger.admin.url" . | quote }}
             - name: IDENTITY_USERINFO_URL
               value: {{ include "dlh-in-a-box.identity.internalUserInfoUrl" . | quote }}
             - name: IDENTITY_EXPECTED_ISSUER
@@ -900,27 +621,6 @@ spec:
               value: {{ default "platform_roles" $oidc.rolesClaim | quote }}
             - name: PLATFORM_ADMIN_ROLES
               value: {{ join "," $adminRequiredRoles | quote }}
-            - name: POD_NAMESPACE
-              valueFrom:
-                fieldRef:
-                  fieldPath: metadata.namespace
-            - name: ACCESS_CONTROL_STATE_CONFIGMAP_NAME
-              value: {{ $accessControlStateConfigMapName | quote }}
-            - name: ACCESS_CONTROL_STATE_CONFIGMAP_KEY
-              value: "state.json"
-            - name: RANGER_ADMIN_PASSWORD
-              valueFrom:
-                secretKeyRef:
-                  name: {{ default "dlh-ranger-admin" $rangerAdmin.existingSecret }}
-                  key: {{ default "rangerAdminPassword" $rangerAdmin.adminPasswordKey }}
-                  optional: true
-            {{- if $ldapBindSecretName }}
-            - name: LDAP_BIND_PASSWORD
-              valueFrom:
-                secretKeyRef:
-                  name: {{ $ldapBindSecretName }}
-                  key: {{ $ldapBindPasswordKey }}
-            {{- end }}
           ports:
             - name: admin-api
               containerPort: {{ $apiPort }}
@@ -941,11 +641,6 @@ spec:
             - name: admin-api
               mountPath: /opt/platform-home-api
               readOnly: true
-            {{- if $ldapUseTrustedCa }}
-            - name: ldap-trusted-ca
-              mountPath: /opt/platform-home-api/ldap-ca
-              readOnly: true
-            {{- end }}
       volumes:
         - name: assets
           configMap:
@@ -957,110 +652,6 @@ spec:
         - name: nginx-config
           configMap:
             name: {{ $serviceName }}-nginx
-        {{- if $ldapUseTrustedCa }}
-        - name: ldap-trusted-ca
-          secret:
-            secretName: {{ $ldapTrustedCaSecretName }}
-            items:
-              - key: {{ $ldapTrustedCaCertKey }}
-                path: {{ $ldapTrustedCaCertKey }}
-        {{- end }}
----
-apiVersion: batch/v1
-kind: CronJob
-metadata:
-  name: {{ $serviceName }}-access-control-reconcile
-  namespace: {{ .Release.Namespace }}
-  labels:
-    {{- include "dlh-in-a-box.labels" . | nindent 4 }}
-    app.kubernetes.io/component: platform-home
-spec:
-  schedule: "*/15 * * * *"
-  concurrencyPolicy: Forbid
-  successfulJobsHistoryLimit: 1
-  failedJobsHistoryLimit: 3
-  jobTemplate:
-    spec:
-      backoffLimit: 2
-      template:
-        metadata:
-          labels:
-            app.kubernetes.io/instance: {{ .Release.Name }}
-            app.kubernetes.io/name: {{ include "dlh-in-a-box.name" . }}
-            app.kubernetes.io/component: platform-home
-        spec:
-          serviceAccountName: {{ $serviceName }}-admin-api
-          restartPolicy: OnFailure
-          {{- with .Values.global.imagePullSecrets }}
-          imagePullSecrets:
-            {{- toYaml . | nindent 12 }}
-          {{- end }}
-          containers:
-            - name: platform-home-access-control-reconcile
-              image: "{{ .Values.platformHome.api.image.repository }}:{{ .Values.platformHome.api.image.tag }}"
-              imagePullPolicy: {{ .Values.platformHome.api.image.pullPolicy }}
-              command:
-                - /bin/sh
-                - -ec
-                - |
-                  python -m pip install --no-cache-dir ldap3 >/tmp/platform-home-api-pip.log
-                  python /opt/platform-home-api/admin-api.py reconcile-expired
-              env:
-                - name: PORT
-                  value: {{ $apiPort | quote }}
-                - name: RANGER_URL
-                  value: {{ include "dlh-in-a-box.ranger.admin.url" . | quote }}
-                - name: IDENTITY_USERINFO_URL
-                  value: {{ include "dlh-in-a-box.identity.internalUserInfoUrl" . | quote }}
-                - name: IDENTITY_EXPECTED_ISSUER
-                  value: {{ include "dlh-in-a-box.identity.issuer" . | quote }}
-                - name: OIDC_ROLES_CLAIM
-                  value: {{ default "platform_roles" $oidc.rolesClaim | quote }}
-                - name: PLATFORM_ADMIN_ROLES
-                  value: {{ join "," $adminRequiredRoles | quote }}
-                - name: POD_NAMESPACE
-                  valueFrom:
-                    fieldRef:
-                      fieldPath: metadata.namespace
-                - name: ACCESS_CONTROL_STATE_CONFIGMAP_NAME
-                  value: {{ $accessControlStateConfigMapName | quote }}
-                - name: ACCESS_CONTROL_STATE_CONFIGMAP_KEY
-                  value: "state.json"
-                - name: RANGER_ADMIN_PASSWORD
-                  valueFrom:
-                    secretKeyRef:
-                      name: {{ default "dlh-ranger-admin" $rangerAdmin.existingSecret }}
-                      key: {{ default "rangerAdminPassword" $rangerAdmin.adminPasswordKey }}
-                      optional: true
-                {{- if $ldapBindSecretName }}
-                - name: LDAP_BIND_PASSWORD
-                  valueFrom:
-                    secretKeyRef:
-                      name: {{ $ldapBindSecretName }}
-                      key: {{ $ldapBindPasswordKey }}
-                {{- end }}
-              volumeMounts:
-                - name: admin-api
-                  mountPath: /opt/platform-home-api
-                  readOnly: true
-                {{- if $ldapUseTrustedCa }}
-                - name: ldap-trusted-ca
-                  mountPath: /opt/platform-home-api/ldap-ca
-                  readOnly: true
-                {{- end }}
-          volumes:
-            - name: admin-api
-              configMap:
-                name: {{ $serviceName }}-api
-                defaultMode: 0555
-            {{- if $ldapUseTrustedCa }}
-            - name: ldap-trusted-ca
-              secret:
-                secretName: {{ $ldapTrustedCaSecretName }}
-                items:
-                  - key: {{ $ldapTrustedCaCertKey }}
-                    path: {{ $ldapTrustedCaCertKey }}
-            {{- end }}
 ---
 {{- if .Values.platformHome.ingress.enabled }}
 apiVersion: networking.k8s.io/v1

@@ -6,6 +6,21 @@ global:
   domain: local.test
   identity:
     enabled: true
+    accessRoles:
+      platform-admin:
+        enabled: true
+      platform-user:
+        enabled: true
+        appAccess:
+          superset: true
+          datahub: true
+          jupyterhub: true
+          cloudbeaver: true
+      platform-viewer:
+        enabled: true
+        appAccess:
+          superset: true
+          datahub: true
     provider:
       mode: bundledKeycloak
       keycloak:
@@ -54,7 +69,6 @@ global:
           clientId: platform-home
           redirectUris:
             - http://dlh-platform-home.data-lakehouse-local.svc.cluster.local/
-            - http://dlh-platform-home.data-lakehouse-local.svc.cluster.local/access-control
           webOrigins:
             - http://dlh-platform-home.data-lakehouse-local.svc.cluster.local
         cloudbeaverProxy:

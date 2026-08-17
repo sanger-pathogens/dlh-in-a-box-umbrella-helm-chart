@@ -173,13 +173,15 @@ assert_contains "${local_manifest}" 'add_header Strict-Transport-Security "max-a
 assert_contains "${local_manifest}" 'add_header X-Content-Type-Options "nosniff" always;'
 assert_contains "${local_manifest}" 'add_header Referrer-Policy "strict-origin-when-cross-origin" always;'
 assert_contains "${local_manifest}" "name: dlh-cloudbeaver"
-assert_contains "${local_manifest}" "/access-control"
+assert_not_contains "${local_manifest}" "\"url\": \"/access-control\""
+assert_not_contains "${local_manifest}" "Access Control"
+assert_not_contains "${local_manifest}" "access-control-reconcile"
+assert_not_contains "${local_manifest}" "role-management-panel"
 assert_not_contains "${local_manifest}" "ldap-directory"
 assert_not_contains "${local_manifest}" "access-control.name=ranger"
 assert_contains "${local_manifest}" "access-control.name=file"
 assert_contains "${local_manifest}" "registrationAllowed: true"
 assert_contains "${local_manifest}" "verifyEmail: false"
-assert_contains "${local_manifest}" "\"accessControlEnabled\": false"
 assert_not_contains "${local_manifest}" "platform-app-cloudbeaver"
 assert_not_contains "${local_manifest}" "platform-app-prefect"
 assert_contains "${local_manifest}" "name: platform-access"
@@ -192,6 +194,17 @@ assert_not_contains "${local_manifest}" "name: dlh-ranger-admin-usersync"
 assert_contains "${local_manifest}" "name: dlh-ranger-admin-keycloak-sync"
 assert_contains "${dev_manifest}" "name: dlh-ranger-admin-keycloak-sync"
 assert_contains "${prod_manifest}" "name: dlh-ranger-admin-keycloak-sync"
+assert_contains "${local_manifest}" "\"minio-console\": {"
+assert_contains "${local_manifest}" "\"mode\": \"minio-sso\""
+assert_contains "${local_manifest}" "\"internalApiUrl\": \"http://dlh-minio:9001\""
+assert_contains "${local_manifest}" "\"id\": \"minio-console\""
+assert_contains "${local_manifest}" "\"url\": \"/launch/minio-console\""
+assert_not_contains "${dev_manifest}" "\"minio-console\": {"
+assert_not_contains "${prod_manifest}" "\"minio-console\": {"
+assert_not_contains "${dev_manifest}" "\"id\": \"minio-console\""
+assert_not_contains "${prod_manifest}" "\"id\": \"minio-console\""
+assert_not_contains "${dev_manifest}" "vault-wrapped-token"
+assert_not_contains "${prod_manifest}" "vault-wrapped-token"
 assert_not_contains "${dev_manifest}" '"platformRoleMembershipSource"'
 assert_not_contains "${prod_manifest}" '"platformRoleMembershipSource"'
 assert_contains "${local_manifest}" "keycloak_ranger_sync.py"
@@ -332,7 +345,7 @@ assert_contains "${prefect_job_runner_manifest}" "\"default\": \"dlh-dev\""
 assert_contains "${prefect_job_runner_manifest}" "\"default\": \"prefect-job-runner\""
 assert_contains "${prefect_job_runner_manifest}" "sync-base-job-template"
 assert_contains "${prefect_job_runner_manifest}" "prefect work-pool update"
-assert_contains "${dev_manifest}" "\"accessModel\": {"
+assert_contains "${dev_manifest}" "\"accessRoles\": {"
 assert_contains "${prod_manifest}" "\"platform-admin\""
 assert_contains "${dev_manifest}" "\"roles\": ["
 assert_contains "${prod_manifest}" "\"roles\": ["
@@ -471,38 +484,43 @@ expect_fail \
   -f "${FIXTURE_DIR}/legacy-trino-authentication-type.yaml"
 
 expect_fail_any \
-  "global.authorization.platformRoles is no longer supported. Define platform roles under global.identity.accessModel." \
+  "global.authorization.platformRoles is no longer supported. Define platform roles under global.identity.accessRoles." \
   "global.authorization.platformRoles is no longer supported" \
   -- \
   -f "${DEV_VALUES}" \
   -f "${FIXTURE_DIR}/invalid-platform-role-app.yaml"
 
 expect_fail_any \
-  "global.identity.accessModel.builtinRoles.platform-admin.appAccess: Additional property notARealApp is not allowed" \
+  "global.identity.accessRoles.platform-admin.appAccess: Additional property notARealApp is not allowed" \
   "additional properties 'notARealApp' not allowed" \
   -- \
   -f "${DEV_VALUES}" \
   -f "${FIXTURE_DIR}/invalid-access-model-app.yaml"
 
 expect_fail \
-  "global.identity.accessModel.groupRoleMappings is no longer supported. Assign Keycloak realm roles directly to users for app access, and define data access roles under global.authorization.ranger.dataRoles." \
+  "global.identity.accessModel is no longer supported. Move platform roles directly under global.identity.accessRoles." \
   -f "${DEV_VALUES}" \
   -f "${FIXTURE_DIR}/access-model-group-role-mappings.yaml"
 
 expect_fail \
-  "global.identity.accessModel.builtinRoles.platform-viewer.ranger is not supported. Keycloak roles control app access only; define Ranger data roles under global.authorization.ranger.dataRoles." \
+  "global.identity.accessRoles.platform-viewer.ranger is not supported. Keycloak roles control app access only; define Ranger data roles under global.authorization.ranger.dataRoles." \
   -f "${DEV_VALUES}" \
   -f "${FIXTURE_DIR}/access-model-ranger-override.yaml"
 
 expect_fail \
-  "global.identity.external.clients.cloudbeaverProxy.allowedGroups is no longer supported. Browser access is derived from global.identity.accessModel appAccess and enforced with Keycloak client roles." \
+  "global.identity.accessRoles must have at least one role with enabled=true when shared identity is enabled." \
+  -f "${DEV_VALUES}" \
+  -f "${FIXTURE_DIR}/all-access-roles-disabled.yaml"
+
+expect_fail \
+  "global.identity.external.clients.cloudbeaverProxy.allowedGroups is no longer supported. Browser access is derived from global.identity.accessRoles appAccess and enforced with Keycloak client roles." \
   -f "${DEV_VALUES}" \
   -f "${FIXTURE_DIR}/oauth2-proxy-allowed-groups.yaml"
 
 expect_fail \
-  "platformHome.launchers.vault.requiredGroups is no longer supported. Use platformHome.launchers.vault.requiredRoles with Keycloak realm role names from global.identity.accessModel." \
+  "platformHome.launchers is no longer supported. JupyterHub is served as a regular app tile; MinIO Console is enabled automatically when minio.enabled=true." \
   -f "${DEV_VALUES}" \
-  -f "${FIXTURE_DIR}/platform-home-required-groups.yaml"
+  -f "${FIXTURE_DIR}/platform-home-launchers-unsupported.yaml"
 
 expect_fail \
   "global.dataCatalogs.redcap.authorizedGroups is no longer supported. Use authorizedRoles or explicit Ranger bootstrap policies with Ranger role names." \
@@ -515,7 +533,7 @@ expect_fail \
   -f "${FIXTURE_DIR}/jupyterhub-group-env.yaml"
 
 expect_fail \
-  "datahub.auth.groupProvisioning is no longer supported. DataHub browser access must not depend on OIDC group claims; use global.identity.accessModel roles and client roles." \
+  "datahub.auth.groupProvisioning is no longer supported. DataHub browser access must not depend on OIDC group claims; use global.identity.accessRoles and client roles." \
   -f "${DEV_VALUES}" \
   -f "${FIXTURE_DIR}/datahub-group-provisioning.yaml"
 

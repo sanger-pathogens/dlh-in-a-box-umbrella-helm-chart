@@ -6,6 +6,21 @@ global:
   domain: shared.example.org
   identity:
     enabled: true
+    accessRoles:
+      platform-admin:
+        enabled: true
+      platform-user:
+        enabled: true
+        appAccess:
+          superset: true
+          datahub: true
+          jupyterhub: true
+          cloudbeaver: true
+      platform-viewer:
+        enabled: true
+        appAccess:
+          superset: true
+          datahub: true
     provider:
       mode: externalOidc
     external:

@@ -8,7 +8,7 @@
 {{- $providerMode := default "externalOidc" $provider.mode -}}
 {{- $directory := get $identity "directory" | default dict -}}
 {{- $keycloakLocalMode := eq (default "keycloakLocal" (get $directory "mode")) "keycloakLocal" -}}
-{{- $accessModel := get $identity "accessModel" | default dict -}}
+{{- $accessRoles := get $identity "accessRoles" | default dict -}}
 {{- $ldap := get $directory "ldap" | default dict -}}
 {{- $ldapAllowAnonymousRead := default false $ldap.allowAnonymousRead -}}
 {{- $ldapEffectiveBindDn := ternary "" (include "dlh-in-a-box.identity.directory.bindDn" .) $ldapAllowAnonymousRead -}}
@@ -105,7 +105,7 @@ data:
           "logUndocumented" $exceptionRoleAuditLogUndocumented
         )
       )
-      "accessModel" $accessModel
+      "accessRoles" $accessRoles
       "platformRoleExceptions" $platformRoleExceptions
       "catalogs" (.Values.global.dataCatalogs | default (dict))
       "trinoJdbcUrl" (include "dlh-in-a-box.ranger.trinoJdbcUrl" .)

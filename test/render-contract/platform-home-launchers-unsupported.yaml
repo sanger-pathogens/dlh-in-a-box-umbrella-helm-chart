@@ -1,0 +1,4 @@
+platformHome:
+  launchers:
+    vault:
+      enabled: true

@@ -62,35 +62,6 @@
         "retentionNotes"
       ]
     },
-    "accessModel": {
-      "type": "object",
-      "additionalProperties": true,
-      "properties": {
-        "builtinRoles": {
-          "type": "object",
-          "additionalProperties": {
-            "$ref": "#/definitions/accessModelRole"
-          },
-          "properties": {
-            "platform-admin": {
-              "$ref": "#/definitions/accessModelRole"
-            },
-            "platform-user": {
-              "$ref": "#/definitions/accessModelRole"
-            },
-            "platform-viewer": {
-              "$ref": "#/definitions/accessModelRole"
-            }
-          }
-        },
-        "additionalRoles": {
-          "type": "object",
-          "additionalProperties": {
-            "$ref": "#/definitions/accessModelRole"
-          }
-        }
-      }
-    },
     "accessModelRole": {
       "type": "object",
       "additionalProperties": true,
@@ -108,7 +79,9 @@
             "jupyterhub": { "type": "boolean" },
             "cloudbeaver": { "type": "boolean" },
             "prefect": { "type": "boolean" },
-            "ranger": { "type": "boolean" }
+            "ranger": { "type": "boolean" },
+            "keycloak": { "type": "boolean" },
+            "minio": { "type": "boolean" }
           }
         }
       }
@@ -121,8 +94,11 @@
           "type": "boolean",
           "description": "Enable the shared external identity contract used by Trino and the optional UI integrations."
         },
-        "accessModel": {
-          "$ref": "#/definitions/accessModel",
+        "accessRoles": {
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/definitions/accessModelRole"
+          },
           "description": "Keycloak-centered catalog of platform roles and app access."
         },
         "provider": {
@@ -1252,39 +1228,6 @@
                   "public": { "type": "boolean" }
                 }
               }
-            }
-          }
-        },
-        "adminTools": {
-          "type": "array",
-          "items": {
-            "type": "object",
-            "additionalProperties": true,
-            "properties": {
-              "id": { "type": "string" },
-              "name": { "type": "string" },
-              "summary": { "type": "string" },
-              "url": { "type": "string" },
-              "icon": { "type": "string" },
-              "iconUrl": { "type": "string" },
-              "iconAlt": { "type": "string" },
-              "iconBackground": { "type": "string" },
-              "iconText": { "type": "string" },
-              "health": {
-                "type": "object",
-                "additionalProperties": true,
-                "properties": {
-                  "targetUrl": { "type": "string" },
-                  "expectedStatusCodes": {
-                    "type": "array",
-                    "items": { "type": "integer", "minimum": 100, "maximum": 599 }
-                  },
-                  "bodyIncludes": { "type": "string" },
-                  "timeoutSeconds": { "type": "integer", "minimum": 1 },
-                  "public": { "type": "boolean" }
-                }
-              },
-              "group": { "type": "string" }
             }
           }
         }
