@@ -542,8 +542,3 @@ expect_fail_any \
   -- \
   -f "${DEV_VALUES}" \
   -f "${FIXTURE_DIR}/ranger-membership-source.yaml"
-
-expect_fail \
-  "global.authorization.platformRoleExceptions[0].approvalRef must be set." \
-  -f "${DEV_VALUES}" \
-  -f "${FIXTURE_DIR}/exception-missing-metadata.yaml"

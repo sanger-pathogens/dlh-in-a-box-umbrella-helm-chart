@@ -233,7 +233,6 @@ global:
         syncGroupsToKeycloak: true
         hostAliases: []
   authorization: &authorization_defaults
-    platformRoleExceptions: []
     ranger:
       enabled: false
       serviceName: trino

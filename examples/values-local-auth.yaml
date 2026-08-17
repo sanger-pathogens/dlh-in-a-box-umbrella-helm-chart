@@ -104,7 +104,6 @@ global:
       ldap:
         enabled: false
   authorization:
-    platformRoleExceptions: []
     ranger:
       enabled: true
       serviceName: trino

@@ -739,12 +739,6 @@
       "type": "object",
       "additionalProperties": true,
       "properties": {
-        "platformRoleExceptions": {
-          "type": "array",
-          "items": {
-            "$ref": "#/definitions/platformRoleException"
-          }
-        },
         "ranger": {
           "type": "object",
           "additionalProperties": true,
@@ -853,22 +847,6 @@
           }
         }
       }
-    },
-    "platformRoleException": {
-      "type": "object",
-      "additionalProperties": true,
-      "properties": {
-        "platformRole": { "type": "string" },
-        "username": { "type": "string" },
-        "approvalRef": { "type": "string" },
-        "reason": { "type": "string" },
-        "grantedBy": { "type": "string" },
-        "expiresAt": {
-          "type": "string",
-          "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$"
-        }
-      },
-      "required": ["platformRole", "username", "approvalRef", "reason", "grantedBy", "expiresAt"]
     }
   },
   "properties": {

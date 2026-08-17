@@ -319,18 +319,6 @@ Each key becomes a Keycloak realm role; `appAccess` accepts any of `superset`,
 `keycloak`, and `minio`. See the commented example in `values.yaml` for the
 shape of a custom role.
 
-### `global.authorization.platformRoleExceptions`
-
-These are controlled, direct-user exceptions for unusual cases. They are not
-the normal access-management path.
-
-The chart expects extra metadata such as:
-
-- approval reference
-- reason
-- granted by
-- expiry
-
 ### `global.authorization.ranger.bootstrapPolicies`
 
 These are the policies the chart can reconcile into Ranger.
