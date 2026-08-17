@@ -245,7 +245,6 @@ global:
         - admin
       superGroups: []
       dataRoles: {}
-      syncAccessModelRoles: true
       useRangerGroups: false
       postgresql:
         enabled: true

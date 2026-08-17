@@ -63,10 +63,6 @@
   {{- $importCatalogAcls = $rangerBootstrap.importCatalogAcls -}}
 {{- end -}}
 {{- $bootstrapPolicies := get $ranger "bootstrapPolicies" | default (get $rangerBootstrap "policies" | default (list)) -}}
-{{- $syncAccessModelRoles := true -}}
-{{- if hasKey $ranger "syncAccessModelRoles" -}}
-  {{- $syncAccessModelRoles = $ranger.syncAccessModelRoles -}}
-{{- end -}}
 {{- if $ranger.enabled }}
 apiVersion: v1
 kind: ConfigMap
@@ -87,7 +83,6 @@ data:
         "superUsers" ($ranger.superUsers | default (list))
         "superGroups" ($ranger.superGroups | default (list))
         "dataRoles" ($ranger.dataRoles | default dict)
-        "syncAccessModelRoles" $syncAccessModelRoles
         "trinoEnabled" (and (default false $ranger.enabled) (default false $rangerTrino.enabled))
         "importCatalogAcls" $importCatalogAcls
         "bootstrapPolicies" $bootstrapPolicies

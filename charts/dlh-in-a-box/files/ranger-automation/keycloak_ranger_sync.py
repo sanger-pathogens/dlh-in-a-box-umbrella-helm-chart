@@ -227,38 +227,6 @@ def normalize_names(items):
     return sorted({str(item).strip() for item in (items or []) if str(item).strip()})
 
 
-def role_member(name, is_admin=False):
-    return {"name": str(name), "isAdmin": bool(is_admin)}
-
-
-def normalize_role_members(items):
-    members = {}
-    for item in items or []:
-        if isinstance(item, dict):
-            name = str(item.get("name", "")).strip()
-            is_admin = bool(item.get("isAdmin", False))
-        else:
-            name = str(item).strip()
-            is_admin = False
-        if not name:
-            continue
-        members[name] = members.get(name, False) or is_admin
-    return [role_member(name, members[name]) for name in sorted(members)]
-
-
-def access_model_role_names(config):
-    access_roles = config.get("accessRoles") or {}
-    role_names = []
-    for role_name in sorted(access_roles.keys()):
-        raw_role = access_roles.get(role_name) or {}
-        if isinstance(raw_role, dict) and raw_role.get("enabled") is False:
-            continue
-        name = str(role_name or "").strip()
-        if name:
-            role_names.append(name)
-    return normalize_names(role_names)
-
-
 def list_ranger_users():
     users = []
     start_index = 0
@@ -280,116 +248,9 @@ def list_ranger_users():
     return users
 
 
-def list_roles():
-    roles = []
-    start_index = 0
-    page_size = 200
-    while True:
-        page = ranger_request(
-            "GET",
-            f"/service/public/v2/api/roles?startIndex={start_index}&pageSize={page_size}",
-            ok=(200,),
-        ) or []
-        roles.extend(page)
-        if len(page) < page_size:
-            break
-        start_index += page_size
-    return roles
-
-
-def get_role(role_name):
-    for role in list_roles():
-        if str(role.get("name", "")).strip() == str(role_name).strip():
-            return role
-    return None
-
-
-def role_create_path(create_missing_principals):
-    create_missing = "true" if create_missing_principals else "false"
-    return f"/service/public/v2/api/roles?createNonExistUserGroup={create_missing}"
-
-
-def role_update_path(role_id, create_missing_principals):
-    create_missing = "true" if create_missing_principals else "false"
-    return f"/service/public/v2/api/roles/{role_id}?createNonExistUserGroup={create_missing}"
-
-
-def upsert_role(role, create_missing_principals):
-    payload = {
-        "name": role["name"],
-        "description": role.get("description", ""),
-        "isEnabled": True,
-        "users": normalize_role_members(role.get("users", [])),
-        "groups": normalize_role_members(role.get("groups", [])),
-        "roles": normalize_role_members(role.get("roles", [])),
-    }
-    existing = get_role(role["name"])
-    if existing:
-        payload["id"] = existing["id"]
-        payload["guid"] = existing.get("guid")
-        payload["version"] = existing.get("version")
-        payload["createdByUser"] = existing.get("createdByUser")
-        ranger_request("PUT", role_update_path(existing["id"], create_missing_principals), payload, ok=(200,))
-    else:
-        ranger_request("POST", role_create_path(create_missing_principals), payload, ok=(200, 201))
-
-
-def keycloak_role_exists(config, token, role_name):
-    realm = config["identity"]["keycloak"]["realm"]
-    encoded = urllib.parse.quote(role_name, safe="")
-    payload = keycloak_request(
-        config,
-        token,
-        "GET",
-        f"/admin/realms/{realm}/roles/{encoded}",
-        ok=(200, 404),
-    )
-    return isinstance(payload, dict) and str(payload.get("name") or "").strip() == role_name
-
-
-def keycloak_user_realm_role_names(config, token, user_id):
-    realm = config["identity"]["keycloak"]["realm"]
-    roles = keycloak_request(
-        config,
-        token,
-        "GET",
-        f"/admin/realms/{realm}/users/{user_id}/role-mappings/realm",
-        ok=(200,),
-    ) or []
-    return normalize_names(role.get("name") for role in roles)
-
-
 def keycloak_users(config, token):
     realm = config["identity"]["keycloak"]["realm"]
     return keycloak_list(config, token, f"/admin/realms/{realm}/users")
-
-
-def keycloak_role_memberships(config, token, role_names):
-    role_names = normalize_names(role_names)
-    memberships = {}
-    for role_name in role_names:
-        if not keycloak_role_exists(config, token, role_name):
-            print(f"WARNING: Keycloak realm role {role_name} does not exist; skipping Ranger role sync.")
-            continue
-        memberships[role_name] = {"users": [], "groups": []}
-
-    if not memberships:
-        return memberships
-
-    for user in keycloak_users(config, token):
-        username = str(user.get("username") or "").strip()
-        email = str(user.get("email") or "").strip()
-        enabled = bool(user.get("enabled", True))
-        user_id = str(user.get("id") or "").strip()
-        if not username or not user_id or not should_sync_user(username, email, enabled):
-            continue
-        direct_roles = set(keycloak_user_realm_role_names(config, token, user_id))
-        for role_name in sorted(set(memberships) & direct_roles):
-            memberships[role_name]["users"].append(username)
-
-    for role_name in memberships:
-        memberships[role_name]["users"] = normalize_names(memberships[role_name]["users"])
-    return memberships
 
 
 def sync_ranger_users(users):
@@ -439,24 +300,6 @@ def sync_local_principals(config, token):
     return synced_users, normalized_count, logged_out_count
 
 
-def sync_ranger_roles(memberships, create_missing_principals):
-    synced = 0
-    for role_name in sorted(memberships):
-        members = memberships[role_name]
-        upsert_role(
-            {
-                "name": role_name,
-                "description": f"Synced from Keycloak realm role {role_name}.",
-                "users": members.get("users", []),
-                "groups": members.get("groups", []),
-                "roles": [],
-            },
-            create_missing_principals,
-        )
-        synced += 1
-    return synced
-
-
 def sync():
     config = load_config()
     wait_for_ranger()
@@ -473,27 +316,9 @@ def sync():
             logged_out_count,
         ) = sync_local_principals(config, token)
 
-    if not (config.get("ranger") or {}).get("syncAccessModelRoles", True):
-        print(
-            "Synced Keycloak users to Ranger "
-            f"({synced_users} users, "
-            f"{normalized_count} Keycloak accounts normalized, "
-            f"{logged_out_count} stale Keycloak sessions cleared); "
-            "access-model role projection is disabled."
-        )
-        return
-
-    role_names = access_model_role_names(config)
-    if not role_names:
-        print("No platform access-model roles are configured; skipping Ranger Keycloak sync.")
-        return
-
-    memberships = keycloak_role_memberships(config, token, role_names)
-
-    synced_roles = sync_ranger_roles(memberships, create_missing_principals=local_mode)
     print(
-        "Synced Keycloak realm roles to Ranger "
-        f"({synced_roles} roles, local principals: {synced_users} users, "
+        "Synced Keycloak users to Ranger "
+        f"({synced_users} users, "
         f"{normalized_count} Keycloak accounts normalized, "
         f"{logged_out_count} stale Keycloak sessions cleared)."
     )

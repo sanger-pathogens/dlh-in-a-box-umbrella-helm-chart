@@ -779,7 +779,6 @@
                 }
               }
             },
-            "syncAccessModelRoles": { "type": "boolean" },
             "useRangerGroups": { "type": "boolean" },
             "admin": {
               "type": "object",
