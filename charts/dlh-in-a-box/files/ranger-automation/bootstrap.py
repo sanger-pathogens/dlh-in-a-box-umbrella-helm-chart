@@ -381,39 +381,22 @@ def upsert_role(role):
         request("POST", role_create_path(), payload, ok=(200, 201))
 
 
-def data_role_usernames(config):
-    usernames = set()
-    for role in ((config.get("ranger") or {}).get("dataRoles") or {}).values():
-        if not isinstance(role, dict) or role.get("enabled") is False:
-            continue
-        usernames.update(normalize_names(role.get("users", [])))
-        usernames.update(normalize_names(role.get("adminUsers", [])))
-    return usernames
-
-
 def reconcile_data_roles(config):
     data_roles = (config.get("ranger") or {}).get("dataRoles") or {}
     for role_name in sorted(data_roles):
         role_config = data_roles.get(role_name) or {}
         if not isinstance(role_config, dict) or role_config.get("enabled") is False:
             continue
-        users = [
-            role_member(username, False)
-            for username in normalize_names(role_config.get("users", []))
-        ]
-        admin_users = [
-            role_member(username, True)
-            for username in normalize_names(role_config.get("adminUsers", []))
-        ]
+        existing = get_role(None, role_name)
         upsert_role(
             {
                 "name": role_name,
                 "description": role_config.get("description")
                 or f"Data access role managed by Ranger bootstrap: {role_name}.",
                 "isEnabled": True,
-                "users": users + admin_users,
-                "groups": [],
-                "roles": [],
+                "users": (existing or {}).get("users", []),
+                "groups": (existing or {}).get("groups", []),
+                "roles": (existing or {}).get("roles", []),
             }
         )
         print(f"Reconciled Ranger data role: {role_name}")
