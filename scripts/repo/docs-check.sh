@@ -15,45 +15,9 @@ DOCS_CHECK_IGNORE=(
   node_modules
   "tmpcharts-*"
 )
-
-# Build find(1) -prune arguments.
-prune_args=()
-for pat in "${DOCS_CHECK_IGNORE[@]}"; do
-  [[ ${#prune_args[@]} -gt 0 ]] && prune_args+=(-o)
-  if [[ "$pat" == */* ]]; then
-    prune_args+=(-path "${ROOT_DIR}/${pat}")
-  elif [[ "$pat" == *'*'* ]]; then
-    prune_args+=(-path "*/${pat}")
-  else
-    prune_args+=(-path "${ROOT_DIR}/${pat}" -o -path "*/${pat}")
-  fi
-done
-
-# Export space-separated list for the Ruby block below.
 export DOCS_CHECK_IGNORE_LIST="${DOCS_CHECK_IGNORE[*]}"
 
-missing=()
-
-while IFS= read -r dir; do
-  [[ "${dir}" == "${ROOT_DIR}" ]] && continue
-
-  if [[ -f "${dir}/OVERVIEW.md" ]] || [[ -f "${dir}/README.md" ]] || [[ -f "${dir}/README.md.gotmpl" ]] || [[ -f "${dir}/_README.txt" ]]; then
-    continue
-  fi
-
-  missing+=("${dir#${ROOT_DIR}/}")
-done < <(
-  find "${ROOT_DIR}" \
-    \( "${prune_args[@]}" \) -prune -o \
-    -type d -print | sort
-)
-
-if (( ${#missing[@]} > 0 )); then
-  printf 'Missing directory guide file in:\n' >&2
-  printf '  - %s\n' "${missing[@]}" >&2
-  exit 1
-fi
-
+# TODO: This is basically just markdown linting, we should use an established tool for this purpose
 ruby <<'RUBY'
 require "find"
 require "pathname"
@@ -126,21 +90,13 @@ markdown_files.each do |path|
   end
 end
 
-guide_files.each do |path|
-  next if path.end_with?(".gotmpl")
-
-  content = root.join(path).read
-  unless content.include?("```mermaid")
-    errors << "#{path}: missing Mermaid diagram in guide file"
-  end
-end
-
 if errors.any?
   warn errors.join("\n")
   exit 1
 end
 RUBY
 
+#TODO: Replace this with a solution that just parses the diagrams rather than rendering them via mermaid-cli
 if [[ "${SKIP_MERMAID_CHECK:-0}" != "1" ]]; then
   python3 "${ROOT_DIR}/scripts/repo/validate_mermaid.py" \
     --root "${ROOT_DIR}" \

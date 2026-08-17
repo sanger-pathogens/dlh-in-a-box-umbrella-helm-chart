@@ -3,38 +3,6 @@
 This folder contains the local scripts that validate repo structure and enforce
 compliance with repo policies.
 
-## Who Should Read This
-
-| Reader | Why this guide matters |
-| --- | --- |
-| contributor | to know which script to run before opening a change |
-| maintainer | to understand CI parity, side effects, and failure modes |
-| reviewer | to see what local evidence a change should come with |
-
-```mermaid
-flowchart TD
-  subgraph Inputs["Inputs"]
-    Source[chart source and example files]
-  end
-
-  subgraph RepoScripts["Repo Scripts"]
-    Docs[docs-check.sh]
-    Security[security-check.sh]
-    License[license-check.sh]
-  end
-
-  subgraph Outputs["Outputs"]
-    ValidatedChart[validated chart and repo structure]
-  end
-
-  Source --> Docs
-  Source --> Security
-  Source --> License
-  Docs --> ValidatedChart
-  Security --> ValidatedChart
-  License --> ValidatedChart
-```
-
 ## What Lives In This Folder
 
 | Script or path | Reads | Writes or side effects | Main job |
@@ -56,18 +24,9 @@ The simplest mental model is:
 
 What it does:
 
-- ensures important directories still have a local guide file
 - checks Markdown fence balance
 - checks local Markdown links
-- requires every guide file to contain a Mermaid block
 - optionally renders Mermaid blocks with Docker via `repo/validate_mermaid.py`
-
-Nuance that is easy to miss:
-
-- a directory can satisfy the guide-file presence check with `README.md`,
-  `OVERVIEW.md`, `_README.txt`, or `README.md.gotmpl`
-- the Mermaid-diagram requirement is skipped for `.gotmpl` guide files because
-  those are template sources rather than rendered local guides
 
 Inputs it cares about:
 
@@ -78,7 +37,6 @@ Inputs it cares about:
 
 Common failure modes:
 
-- a new folder was added without a guide
 - a local link target moved
 - a Mermaid block is invalid
 

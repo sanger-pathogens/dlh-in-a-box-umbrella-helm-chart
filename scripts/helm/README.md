@@ -3,45 +3,6 @@
 This folder contains the local scripts that check, render, package, and test
 the chart.
 
-## Who Should Read This
-
-| Reader | Why this guide matters |
-| --- | --- |
-| contributor | to know which script to run before opening a change |
-| maintainer | to understand CI parity, side effects, and failure modes |
-| reviewer | to see what local evidence a change should come with |
-
-```mermaid
-flowchart TD
-  subgraph Inputs["Inputs"]
-    Source[chart source and example files]
-  end
-
-  subgraph HelmScripts["Helm scripts"]
-    Deps[helm-dependency-update.sh]
-    Template[template.sh]
-    Package[package.sh]
-    Smoke[smoke-install.sh]
-  end
-
-  subgraph Outputs["Outputs"]
-    Lockfiles[updated Chart.lock and archives]
-    Rendered[rendered manifests]
-    PackageOut[chart package]
-    SmokeRun[local smoke install]
-  end
-
-  Source --> Deps
-  Source --> Template
-  Source --> Package
-  Source --> Smoke
-  Deps --> Lockfiles
-  Template --> Rendered
-  Template --> Package
-  Package --> PackageOut
-  Smoke --> SmokeRun
-```
-
 ## What Lives In This Folder
 
 | Script or path | Reads | Writes or side effects | Main job |
