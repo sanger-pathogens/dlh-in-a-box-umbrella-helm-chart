@@ -86,13 +86,8 @@ data:
         "serviceAdminGroups" ($ranger.serviceAdminGroups | default (list))
         "superUsers" ($ranger.superUsers | default (list))
         "superGroups" ($ranger.superGroups | default (list))
-        "legacyManagedUsers" ($ranger.legacyManagedUsers | default (list))
-        "legacyManagedGroups" ($ranger.legacyManagedGroups | default (list))
-        "legacyManagedRoles" ($ranger.legacyManagedRoles | default (list))
-        "legacyManagedPolicies" ($ranger.legacyManagedPolicies | default (list))
         "dataRoles" ($ranger.dataRoles | default dict)
         "syncAccessModelRoles" $syncAccessModelRoles
-        "cleanup" ($ranger.cleanup | default dict)
         "trinoEnabled" (and (default false $ranger.enabled) (default false $rangerTrino.enabled))
         "importCatalogAcls" $importCatalogAcls
         "bootstrapPolicies" $bootstrapPolicies

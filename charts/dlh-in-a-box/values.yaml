@@ -244,22 +244,8 @@ global:
       superUsers:
         - admin
       superGroups: []
-      legacyManagedUsers: []
-      legacyManagedGroups: []
-      legacyManagedRoles: []
-      legacyManagedPolicies: []
       dataRoles: {}
       syncAccessModelRoles: true
-      cleanup:
-        enabled: true
-        dryRun: false
-        staleUsers: []
-        staleUserPatterns:
-          - "^codex-"
-          - "-test-sync$"
-        staleGroups: []
-        staleRoles: []
-        stalePolicies: []
       useRangerGroups: false
       postgresql:
         enabled: true

@@ -768,22 +768,6 @@
               "type": "array",
               "items": { "type": "string" }
             },
-            "legacyManagedUsers": {
-              "type": "array",
-              "items": { "type": "string" }
-            },
-            "legacyManagedGroups": {
-              "type": "array",
-              "items": { "type": "string" }
-            },
-            "legacyManagedRoles": {
-              "type": "array",
-              "items": { "type": "string" }
-            },
-            "legacyManagedPolicies": {
-              "type": "array",
-              "items": { "type": "string" }
-            },
             "dataRoles": {
               "type": "object",
               "additionalProperties": {
@@ -796,34 +780,6 @@
               }
             },
             "syncAccessModelRoles": { "type": "boolean" },
-            "cleanup": {
-              "type": "object",
-              "additionalProperties": true,
-              "properties": {
-                "enabled": { "type": "boolean" },
-                "dryRun": { "type": "boolean" },
-                "staleUsers": {
-                  "type": "array",
-                  "items": { "type": "string" }
-                },
-                "staleUserPatterns": {
-                  "type": "array",
-                  "items": { "type": "string" }
-                },
-                "staleGroups": {
-                  "type": "array",
-                  "items": { "type": "string" }
-                },
-                "staleRoles": {
-                  "type": "array",
-                  "items": { "type": "string" }
-                },
-                "stalePolicies": {
-                  "type": "array",
-                  "items": { "type": "string" }
-                }
-              }
-            },
             "useRangerGroups": { "type": "boolean" },
             "admin": {
               "type": "object",
