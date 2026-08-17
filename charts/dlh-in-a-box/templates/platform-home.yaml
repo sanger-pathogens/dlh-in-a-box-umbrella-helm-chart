@@ -141,6 +141,23 @@
     "requiredRoles" (get $appRequiredRoles "trinoUi")
   ) -}}
 {{- end -}}
+{{- if .Values.minio.enabled -}}
+  {{- $toolMeta := get $itemMeta "minio" | default dict -}}
+  {{- $adminTools = append $adminTools (dict
+    "id" "minio-console"
+    "name" "MinIO Console"
+    "summary" "Browse buckets and manage object storage"
+    "url" "/launch/minio-console"
+    "icon" "MI"
+    "iconText" (default "MI" (get $toolMeta "iconText"))
+    "iconUrl" (default "" (get $toolMeta "iconUrl"))
+    "iconAlt" (default "MinIO logo" (get $toolMeta "iconAlt"))
+    "iconBackground" (default "" (get $toolMeta "iconBackground"))
+    "health" (get $toolMeta "health" | default dict)
+    "group" "Platform Operations"
+    "requiredRoles" (get $appRequiredRoles "minio")
+  ) -}}
+{{- end -}}
 {{- $apps := list -}}
 {{- if and .Values.superset.enabled (default false (dig "superset" "enabled" false $clients)) -}}
   {{- $supersetOrigin := trimSuffix "/" (first (default (list) (dig "superset" "webOrigins" list $clients))) -}}
