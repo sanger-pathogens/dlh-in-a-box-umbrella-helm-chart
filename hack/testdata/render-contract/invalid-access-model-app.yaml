@@ -1,7 +1,6 @@
 global:
   identity:
-    accessModel:
-      builtinRoles:
-        platform-admin:
-          appAccess:
-            notARealApp: true
+    accessRoles:
+      platform-admin:
+        appAccess:
+          notARealApp: true

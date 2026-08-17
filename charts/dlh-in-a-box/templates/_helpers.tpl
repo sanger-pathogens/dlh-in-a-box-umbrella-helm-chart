@@ -190,6 +190,15 @@ app.kubernetes.io/managed-by: {{ .Release.Service }}
 {{- printf "%s-cloudbeaver" .Release.Name -}}
 {{- end -}}
 
+{{- define "dlh-in-a-box.minio.serviceName" -}}
+{{- $minio := .Values.minio | default dict -}}
+{{- if $minio.fullnameOverride -}}
+{{- $minio.fullnameOverride -}}
+{{- else -}}
+{{- printf "%s-minio" .Release.Name -}}
+{{- end -}}
+{{- end -}}
+
 {{- define "dlh-in-a-box.sharedPostgresql.serviceName" -}}
 {{- $sharedPostgresql := .Values.sharedPostgresql | default dict -}}
 {{- $external := get $sharedPostgresql "external" | default dict -}}
@@ -221,20 +230,8 @@ app.kubernetes.io/managed-by: {{ .Release.Service }}
 
 {{- define "dlh-in-a-box.identity.accessModelRolesJson" -}}
 {{- $identity := .Values.global.identity | default dict -}}
-{{- $accessModel := get $identity "accessModel" | default dict -}}
 {{- $roles := dict -}}
-{{- $builtinRoles := get $accessModel "builtinRoles" | default dict -}}
-{{- range $roleKey := list "platform-admin" "platform-user" "platform-viewer" -}}
-  {{- $role := get $builtinRoles $roleKey | default dict -}}
-  {{- $roleEnabled := true -}}
-  {{- if hasKey $role "enabled" -}}
-    {{- $roleEnabled = get $role "enabled" -}}
-  {{- end -}}
-  {{- if $roleEnabled -}}
-    {{- $_ := set $roles $roleKey $role -}}
-  {{- end -}}
-{{- end -}}
-{{- range $roleKey, $role := get $accessModel "additionalRoles" | default dict -}}
+{{- range $roleKey, $role := get $identity "accessRoles" | default dict -}}
   {{- $roleEnabled := true -}}
   {{- if hasKey $role "enabled" -}}
     {{- $roleEnabled = get $role "enabled" -}}

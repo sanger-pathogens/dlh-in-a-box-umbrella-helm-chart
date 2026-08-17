@@ -2,20 +2,19 @@ global:
   environment: prod
   domain: prod.example.com
   identity:
-    accessModel:
-      additionalRoles:
-        bronze-reader:
-          description: Approved read-only users for the bronze catalog.
-        bronze-writer:
-          description: Approved read-write users for the bronze catalog.
-        silver-reader:
-          description: Approved read-only users for the silver catalog.
-        silver-writer:
-          description: Approved read-write users for the silver catalog.
-        geospatial-reader:
-          description: Approved read-only users for the geospatial catalog.
-        geospatial-writer:
-          description: Approved read-write users for the geospatial catalog.
+    accessRoles:
+      bronze-reader:
+        description: Approved read-only users for the bronze catalog.
+      bronze-writer:
+        description: Approved read-write users for the bronze catalog.
+      silver-reader:
+        description: Approved read-only users for the silver catalog.
+      silver-writer:
+        description: Approved read-write users for the silver catalog.
+      geospatial-reader:
+        description: Approved read-only users for the geospatial catalog.
+      geospatial-writer:
+        description: Approved read-write users for the geospatial catalog.
   authorization:
     platformRoleExceptions: []
     ranger:

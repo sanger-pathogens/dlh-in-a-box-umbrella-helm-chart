@@ -197,7 +197,7 @@ These sections configure repo-owned or heavily wrapped features:
 
 | Values path | What it controls |
 | --- | --- |
-| `platformHome` | landing page, launchers, health checks, and admin UI |
+| `platformHome` | landing page, health checks, and admin UI |
 | `cloudbeaver` | CloudBeaver image, bootstrap secrets, auth-proxy headers, trust store wiring |
 | `prefect` | high-level Prefect toggles and optional flow-run job-runner Kubernetes primitives |
 | `prefect-auth-proxy` | oauth2-proxy in front of Prefect |
@@ -303,13 +303,21 @@ This describes the data sources the platform should expose. It is the seed for:
 - governance checks
 - imported or bootstrapped access rules
 
-### `global.identity.accessModel`
+### `global.identity.accessRoles`
 
 This is the durable role catalog the platform cares about.
 
 It defines Keycloak platform roles and the app access derived from those roles.
 Ranger receives the same role names from Keycloak; the chart no longer supports
 `global.authorization.platformRoles` or group-to-role mappings.
+
+This is an open map, not a fixed set of role names. The chart ships
+`platform-admin` as a starting point — disabled by default — but a deployer
+can add, rename, or remove roles freely.
+Each key becomes a Keycloak realm role; `appAccess` accepts any of `superset`,
+`datahub`, `trinoUi`, `jupyterhub`, `cloudbeaver`, `prefect`, `ranger`,
+`keycloak`, and `minio`. See the commented example in `values.yaml` for the
+shape of a custom role.
 
 ### `global.authorization.platformRoleExceptions`
 
@@ -417,7 +425,7 @@ rather than obvious small templates.
 | `values.schema.json` | formalizes valid input shape and helps catch broken values early |
 | `templates/identity-validation.yaml` | blocks unsupported identity combinations before resources render |
 | `templates/governance-validation.yaml` | blocks incomplete or unsafe governed-data setups |
-| `templates/platform-home.yaml` | contains the landing page, embedded JavaScript, embedded Python helper API, launcher logic, health checks, and access-control UI |
+| `templates/platform-home.yaml` | contains the landing page, embedded JavaScript, embedded Python helper API, launcher logic, and health checks |
 | `templates/cloudbeaver.yaml` | contains CloudBeaver bootstrap, proxy-header expectations, trust-store creation, and optional shared-connection seeding |
 | `templates/ranger-admin.yaml` | builds the Ranger Admin deployment and bootstraps it against PostgreSQL |
 | `templates/ranger-automation.yaml` | embeds the large Python reconciliation logic for roles, policies, usersync, local-user sync, and exception audits |

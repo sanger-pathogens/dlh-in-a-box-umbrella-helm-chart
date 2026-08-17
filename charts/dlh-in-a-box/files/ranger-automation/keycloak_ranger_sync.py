@@ -247,17 +247,10 @@ def normalize_role_members(items):
 
 
 def access_model_role_names(config):
-    access_model = config.get("accessModel") or {}
+    access_roles = config.get("accessRoles") or {}
     role_names = []
-    for role_name in sorted((access_model.get("builtinRoles") or {}).keys()):
-        raw_role = (access_model.get("builtinRoles") or {}).get(role_name) or {}
-        if isinstance(raw_role, dict) and raw_role.get("enabled") is False:
-            continue
-        name = str(role_name or "").strip()
-        if name:
-            role_names.append(name)
-    for role_name in sorted((access_model.get("additionalRoles") or {}).keys()):
-        raw_role = (access_model.get("additionalRoles") or {}).get(role_name) or {}
+    for role_name in sorted(access_roles.keys()):
+        raw_role = access_roles.get(role_name) or {}
         if isinstance(raw_role, dict) and raw_role.get("enabled") is False:
             continue
         name = str(role_name or "").strip()
