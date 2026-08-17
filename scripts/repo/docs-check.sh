@@ -96,9 +96,8 @@ if errors.any?
 end
 RUBY
 
-#TODO: Replace this with a solution that just parses the diagrams rather than rendering them via mermaid-cli
 if [[ "${SKIP_MERMAID_CHECK:-0}" != "1" ]]; then
-  python3 "${ROOT_DIR}/scripts/repo/validate_mermaid.py" \
+  node "${ROOT_DIR}/scripts/repo/validate_mermaid.mjs" \
     --root "${ROOT_DIR}" \
     --include "README.md" \
     --include ".github/**/*.md" \
