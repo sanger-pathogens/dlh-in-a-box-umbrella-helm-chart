@@ -3,24 +3,7 @@
 This folder contains the local scripts that check, render, package, and test
 the chart.
 
-## What Lives In This Folder
-
-| Script or path | Reads | Writes or side effects | Main job |
-| --- | --- | --- | --- |
-| `helm-dependency-update.sh` | `Chart.yaml` | updates `Chart.lock` and packaged archives | refresh dependencies |
-| `template.sh` | chart and selected example files | manifests to stdout only | render the chart without installing it |
-| `package.sh` | chart source | `dist/*.tgz` | create publishable chart package |
-| `smoke-install.sh` | chart, one values file, current kube context | cluster resources, optional diagnostic artifacts | install locally and wait for readiness |
-
-## How The Scripts Fit Together
-
-The simplest mental model is:
-
-- `template.sh` proves the tracked example overlays still render
-- `package.sh` proves the chart can still be packaged
-- `smoke-install.sh` is the heavy, cluster-touching end-to-end local auth test
-
-## Script-By-Script Behavior
+## Script Behavior
 
 ### `helm-dependency-update.sh`
 

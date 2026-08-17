@@ -3,23 +3,7 @@
 This folder contains the local scripts that validate repo structure and enforce
 compliance with repo policies.
 
-## What Lives In This Folder
-
-| Script or path | Reads | Writes or side effects | Main job |
-| --- | --- | --- | --- |
-| `docs-check.sh` | guide files | no repo-tracked writes expected | enforce guide coverage, links, and Mermaid validity |
-| `license-check.sh` | `Chart.lock`, notices, vendored licenses, archives | no repo-tracked writes expected | enforce bundled license hygiene |
-| `security-check.sh` | workflows, chart templates, examples | no repo-tracked writes expected | catch a few specific risky patterns |
-| `validate_mermaid.py` | Markdown guides and Docker | no repo-tracked writes expected | render-check Mermaid blocks through `mermaid-cli` |
-
-## How The Scripts Fit Together
-
-The simplest mental model is:
-
-- `docs-check.sh` protects the guide system
-- `license-check.sh` and `security-check.sh` enforce repo hygiene
-
-## Script-By-Script Behavior
+## Script Behavior
 ### `docs-check.sh`
 
 What it does:

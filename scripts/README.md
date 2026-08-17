@@ -102,22 +102,3 @@ To run the hooks at any point, use `pre-commit` to run on staged files, or `pre-
 
 On first run, these hooks may take a couple of minutes to install and run the helm dependency update and Mermaid validate steps.
 Subsequent runs will be much faster, especially if the chart and mermaid diagrams have not changed.
-
-## The Main Local Validation Path
-Run the pre-commit hooks to validate your changes.
-
-```commandline
-pre-commit run
-```
-
-If you changed sign-in, access rules, browser proxies, or the local auth
-overlay, also run:
-
-```bash
-make smoke-install
-```
-
-If you want a thin local wrapper without smoke semantics, `make local-install`
-exists in the root `Makefile`, but it should not be treated as equivalent to
-`smoke-install`.
-
