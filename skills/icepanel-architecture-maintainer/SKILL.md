@@ -62,7 +62,7 @@ Run:
 
 ```bash
 python3 docs/architecture/validate_dlh_icepanel_json.py
-SKIP_MERMAID_CHECK=1 ./hack/docs-check.sh
+SKIP_MERMAID_CHECK=1 ./scripts/docs-check.sh
 ```
 
 If architecture diagrams were regenerated, inspect at least a sample of the

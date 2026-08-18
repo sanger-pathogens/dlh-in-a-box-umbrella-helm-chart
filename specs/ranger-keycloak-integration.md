@@ -268,9 +268,9 @@ Chart repository validation:
 
 ```bash
 python3 -m json.tool charts/dlh-in-a-box/values.schema.json >/dev/null
-./hack/docs-check.sh
-./hack/render-contract.sh
-./hack/template.sh examples/values-dev.yaml
+./scripts/docs-check.sh
+./scripts/render-contract.sh
+./scripts/template.sh examples/values-dev.yaml
 ```
 
 Infra repository validation:

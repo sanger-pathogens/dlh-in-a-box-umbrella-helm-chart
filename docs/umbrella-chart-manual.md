@@ -167,7 +167,7 @@ If you already have a cluster and a safe current context, you can skip this.
 From the repository root:
 
 ```bash
-./hack/helm-dependency-update.sh
+./scripts/helm-dependency-update.sh
 helm upgrade --install dlh charts/dlh-in-a-box \
   -n data-lakehouse-local \
   --create-namespace \
@@ -465,7 +465,7 @@ helm upgrade --install dlh charts/dlh-in-a-box \
 | Example class | Secret expectation |
 | --- | --- |
 | local minimal examples | may include safe demo-oriented local credentials |
-| local auth-heavy smoke profile | demo secrets are seeded by `hack/smoke-install.sh` when that exact file is used |
+| local auth-heavy smoke profile | demo secrets are seeded by `scripts/helm/smoke-install.sh` when that exact file is used |
 | shared dev, prod, and external-auth profiles | expect real hostnames, OIDC client secrets, directory bind secrets, and storage credentials to exist already |
 
 ## Repository And Chart Structure
@@ -476,7 +476,7 @@ helm upgrade --install dlh charts/dlh-in-a-box \
 | --- | --- | --- |
 | `charts/dlh-in-a-box/` | the published umbrella chart | this is the center of gravity of the repo |
 | `examples/` | example values overlays | use this to choose and understand install profiles |
-| `hack/` | local validation, packaging, smoke, and contract scripts | CI mirrors these scripts closely |
+| `scripts/` | local validation, packaging, smoke, and contract scripts | CI mirrors these scripts closely |
 | `.github/` | review routing, issue forms, and workflows | this is where release and CI policy lives |
 | `docs/` | small docs support area plus this manual | the main narrative now lives next to the code, not only here |
 | `references/` | out-of-scope reference material | useful context, not part of the published chart surface |
@@ -1164,7 +1164,7 @@ If you need to change one specific thing, start here.
 | local Hive behavior | `charts/dlh-in-a-box/charts/hive/` | this subchart is fully repo-owned |
 | Trino catalog or access rule integration | vendored Trino patch points under `charts/dlh-in-a-box/charts/trino/templates/` | only a small patch set is locally owned |
 | example install shapes | `examples/*.yaml` | these files define supported install profiles |
-| local validation, smoke, or package behavior | `hack/*.sh` and `hack/validate_mermaid.py` | workflows mirror these scripts |
+| local validation, smoke, or package behavior | `scripts/*.sh` and `scripts/repo/validate_mermaid.py` | workflows mirror these scripts |
 | CI or publish behavior | `.github/workflows/*.yaml` | this is where validation and release automation live |
 | this manual and its PDF | `docs/umbrella-chart-manual.md`, `docs/build-manual.mjs`, and `docs/manual-print.css` | the PDF is generated directly from the Markdown source |
 
@@ -1307,7 +1307,7 @@ failures immediately, check whether you meant to use the simpler
 ### The Auth-Heavy Local Profile Fails Manually
 
 `values-local-auth.yaml` is the smoke profile. It expects demo secrets that
-`hack/smoke-install.sh` seeds when that exact file is used.
+`scripts/helm/smoke-install.sh` seeds when that exact file is used.
 
 If you install it manually without those secrets, failures are expected.
 
@@ -1399,7 +1399,7 @@ renders.
 
 ### Smoke Install Environment Variables
 
-These variables affect `hack/smoke-install.sh`:
+These variables affect `scripts/helm/smoke-install.sh`:
 
 | Variable | Meaning |
 | --- | --- |

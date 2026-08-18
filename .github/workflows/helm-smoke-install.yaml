@@ -37,7 +37,7 @@ jobs:
           cluster_name: dlh-ci
 
       - name: Install validated local-auth overlay
-        run: ./hack/smoke-install.sh charts/dlh-in-a-box examples/values-local-auth.yaml
+        run: ./scripts/helm/smoke-install.sh charts/dlh-in-a-box examples/values-local-auth.yaml
 
       - name: Upload smoke-test diagnostics
         if: failure()

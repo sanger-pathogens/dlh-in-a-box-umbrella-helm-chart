@@ -1,9 +1,9 @@
 # Render-Check Test Files
 
-This folder contains the focused YAML overlays used by `hack/render-contract.sh`.
+This folder contains the focused YAML overlays used by `../../../ test/render-contract.sh`.
 
 Each file is intentionally small. The script merges one of these overlays onto
-top of a known-good baseline example from `examples/`, then checks whether the
+top of a known-good baseline example from `../../examples`, then checks whether the
 render should pass or fail.
 
 ## Who Should Read This
@@ -48,12 +48,12 @@ flowchart TD
 
 ## How The Script Uses This Folder
 
-`hack/render-contract.sh` currently uses baseline examples from:
+`../../../ test/render-contract.sh` currently uses baseline examples from:
 
-- `examples/values-local-auth.yaml`
-- `examples/values-dev.yaml`
-- `examples/values-prod.yaml`
-- `examples/values-shared-auth.yaml`
+- `../../examples/values-local-auth.yaml`
+- `../../examples/values-dev.yaml`
+- `../../examples/values-prod.yaml`
+- `../../examples/values-shared-auth.yaml`
 
 The fixtures in this folder are never meant to stand alone. They are overlays.
 
@@ -131,7 +131,7 @@ These fixtures target the local auth-heavy modes:
 | `keycloak-local-trino-password-auth-enabled.yaml` | `keycloakLocal` mode trying to use LDAP-style Trino password auth |
 | `keycloak-local-usersync-enabled.yaml` | `keycloakLocal` mode with Ranger LDAP usersync still enabled |
 | `keycloak-local-ldap-enabled.yaml` | `keycloakLocal` mode with LDAP directory mode still enabled |
-| `keycloak-local-email-verification-disabled.yaml` | focused edge-case fixture for local Keycloak registration behavior; if it is not referenced in `hack/render-contract.sh`, it is inert until explicitly added |
+| `keycloak-local-email-verification-disabled.yaml` | focused edge-case fixture for local Keycloak registration behavior; if it is not referenced in `../../../ test/render-contract.sh`, it is inert until explicitly added |
 
 ## How To Add A New Fixture
 
@@ -140,7 +140,7 @@ Keep the pattern consistent:
 1. choose the smallest baseline example that already has most required settings
 2. add only the keys needed to prove the new rule
 3. give the file a name that says what should fail or pass
-4. wire the file into `hack/render-contract.sh`
+4. wire the file into `../../../ test/render-contract.sh`
 5. assert on a specific success marker or failure message
 
 ## What Not To Do
@@ -152,21 +152,20 @@ Do not use this folder for:
 - fixtures that test several unrelated behaviors at once
 - documentation examples meant for users
 
-That work belongs under `examples/`, not here.
+That work belongs under `../../examples`, not here.
 
 ## Validation
 
 After changing any fixture in this folder, run:
 
-```bash
-./hack/render-contract.sh
-./hack/lint.sh
+```commandline
+make render-contract
 ```
 
 ## Common Mistakes
 
 - adding a fixture file without adding the corresponding assertion in
-  `hack/render-contract.sh`
+  `render-contract.sh`
 - putting too much content in one file so the failure reason becomes unclear
 - reusing a baseline that hides the specific rule you were trying to test
 

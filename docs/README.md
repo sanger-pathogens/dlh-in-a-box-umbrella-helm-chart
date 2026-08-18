@@ -62,7 +62,7 @@ they describe. That means:
 
 - chart behavior is explained under `charts/dlh-in-a-box/`
 - example behavior is explained under `examples/`
-- script behavior is explained under `hack/`
+- script behavior is explained under `scripts/`
 
 `docs/` now only holds the shared residue that still makes sense centrally.
 
@@ -101,7 +101,7 @@ Do not assume it is part of the public newcomer path.
 If you change the public docs support material here, run:
 
 ```bash
-./hack/docs-check.sh
+./scripts/docs-check.sh
 ```
 
 ## Common Mistakes

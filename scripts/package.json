@@ -1,0 +1,11 @@
+{
+  "name": "dlh-scripts",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "glob": "^11.x",
+    "minimatch": "^10.x",
+    "jsdom": "^25.x",
+    "mermaid": "^11.x"
+  }
+}

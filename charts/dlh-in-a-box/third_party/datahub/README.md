@@ -49,7 +49,7 @@ Review this folder when:
 - the `datahub` dependency version changes
 - the `datahubPrerequisites` bundle changes in a way that affects DataHub legal
   material
-- `hack/license-check.sh` reports missing or stale notice coverage
+- `scripts/repo/license-check.sh` reports missing or stale notice coverage
 
 The practical maintenance step is simple: compare the current upstream DataHub
 `NOTICE` file with the copy in this folder and update the copy if upstream
@@ -70,7 +70,7 @@ It is only for provenance of the bundled notice file.
 After changing this folder, run:
 
 ```bash
-./hack/license-check.sh
+./scripts/license-check.sh
 ```
 
 ## Common Mistakes

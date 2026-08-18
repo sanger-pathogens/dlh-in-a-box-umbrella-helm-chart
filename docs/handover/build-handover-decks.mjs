@@ -119,7 +119,7 @@ const mermaidSources = {
     title: "GitHub workflow inventory",
   },
   scriptFlow: {
-    source: "hack/README.md",
+    source: "scripts/README.md",
     block: 0,
     title: "Maintainer script flow",
   },
@@ -212,7 +212,7 @@ const sessions = [
         "The handover audience should know both paths, but only one is the first manual success path.",
       ]),
       demoSlide("Guided checkpoint: orient a new maintainer", [
-        "./hack/helm-dependency-update.sh",
+        "./scripts/helm-dependency-update.sh",
         "helm template dlh charts/dlh-in-a-box -f examples/values-local.yaml >/tmp/dlh-local.yaml",
         "helm lint charts/dlh-in-a-box -f examples/values-local.yaml",
       ], [
@@ -227,7 +227,7 @@ const sessions = [
         ["Chart metadata, dependency list, publish version", "charts/dlh-in-a-box/Chart.yaml"],
         ["Shared defaults or public values contract", "charts/dlh-in-a-box/values.yaml and values.schema.json"],
         ["Supported install profile", "examples/*.yaml"],
-        ["Local validation or smoke behavior", "hack/*.sh"],
+        ["Local validation or smoke behavior", "scripts/*.sh"],
         ["CI or release behavior", ".github/workflows/*.yaml"],
       ], "Source: README.md; manual Contributor Change Map.", [
         "This is not a complete change map, just the triage version for session one.",
@@ -388,7 +388,7 @@ const sessions = [
         "OIDC client wiring and oauth2-proxy entrypoints.",
         "Ranger bootstrap and local-user sync.",
         "platformHome launchpad and protected app access.",
-      ], "Source: README.md; hack/smoke-install.sh guide.", [
+      ], "Source: README.md; scripts/smoke-install.sh guide.", [
         "The smoke path validates integration that simple local installs deliberately skip.",
       ]),
       tableSlide("Secrets and inputs by profile class", ["Class", "Secret posture", "Maintainer habit"], [
@@ -400,7 +400,7 @@ const sessions = [
         "Connect this slide to the security check. The repo enforces that non-local examples stay free of inline sensitive values.",
       ]),
       demoSlide("Guided checkpoint: choose and render a profile", [
-        "./hack/helm-dependency-update.sh",
+        "./scripts/helm-dependency-update.sh",
         "helm template dlh charts/dlh-in-a-box -f examples/values-local.yaml >/tmp/dlh-local.yaml",
         "helm template dlh charts/dlh-in-a-box -f examples/values-dev.yaml -f examples/values-external-s3.yaml >/tmp/dlh-dev-s3.yaml",
       ], [
@@ -491,7 +491,7 @@ const sessions = [
         "Open charts/dlh-in-a-box/values.yaml",
         "Open charts/dlh-in-a-box/values.schema.json",
         "Open charts/dlh-in-a-box/templates/identity-validation.yaml",
-        "Render one positive and one negative contract fixture with ./hack/render-contract.sh",
+        "Render one positive and one negative contract fixture with ./scripts/render-contract.sh",
       ], [
         "Can they explain whether a rule belongs in schema or a validation template?",
         "Can they explain what a render-contract fixture is proving?",
@@ -787,7 +787,7 @@ const sessions = [
     title: "Maintainer Workflow, CI, Releases, And Change Ownership",
     promise: "Developers can make changes through the right ownership boundary and prove them with local and CI-equivalent checks.",
     sources: [
-      "hack/README.md",
+      "scripts/README.md",
       ".github/workflows/README.md",
       "docs/umbrella-chart-manual.md",
       "charts/README.md",
@@ -817,21 +817,21 @@ const sessions = [
         "Use this to discourage fixing CI by editing workflow YAML first. Usually debug the local script first.",
       ]),
       imageSlide("Maintainer script flow", image("mermaid", "scriptFlow"), [
-        "hack/lint.sh is the main local validation entrypoint.",
+        "scripts/verify.sh is the main local validation entrypoint.",
         "docs-check enforces guide coverage, links, and Mermaid validity.",
         "render-contract catches both positive renders and expected failures.",
         "package and smoke-install cover release and cluster integration concerns.",
-      ], "Source: hack/README.md Mermaid.", [
+      ], "Source: scripts/README.md Mermaid.", [
         "Connect this to the recent CI fix pattern: docs-check caught missing guide files before Helm did anything interesting.",
       ]),
       tableSlide("Main local commands", ["Command", "What it proves"], [
-        ["./hack/helm-dependency-update.sh", "Chart.lock and packaged archives match Chart.yaml"],
-        ["./hack/docs-check.sh", "Guide coverage, local links, and Mermaid diagrams validate"],
-        ["./hack/render-contract.sh", "Supported renders succeed and unsafe values fail"],
-        ["./hack/lint.sh", "Main local validation path passes"],
-        ["./hack/template.sh", "Maintained example overlays render"],
-        ["./hack/package.sh", "The chart can be packaged"],
-        ["./hack/smoke-install.sh", "Auth-heavy local path installs and becomes ready"],
+        ["./scripts/helm-dependency-update.sh", "Chart.lock and packaged archives match Chart.yaml"],
+        ["./scripts/docs-check.sh", "Guide coverage, local links, and Mermaid diagrams validate"],
+        ["./scripts/render-contract.sh", "Supported renders succeed and unsafe values fail"],
+        ["./scripts/verify.sh", "Main local validation path passes"],
+        ["./scripts/template.sh", "Maintained example overlays render"],
+        ["./scripts/package.sh", "The chart can be packaged"],
+        ["./scripts/smoke-install.sh", "Auth-heavy local path installs and becomes ready"],
       ], "Source: manual Main Local Commands.", [
         "This slide is a checklist, not a command tutorial. Use it to choose the smallest meaningful check.",
       ]),
@@ -862,7 +862,7 @@ const sessions = [
       demoSlide("Guided checkpoint: prepare a safe change", [
         "Identify the ownership boundary first",
         "Choose the narrowest validation command",
-        "Run ./hack/lint.sh before opening or updating a PR",
+        "Run ./scripts/verify.sh before opening or updating a PR",
         "Use smoke-install only for auth-heavy integrated runtime changes",
       ], [
         "Can the developer pick a check for a docs-only change?",

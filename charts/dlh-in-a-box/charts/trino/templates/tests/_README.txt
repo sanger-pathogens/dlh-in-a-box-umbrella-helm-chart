@@ -83,9 +83,7 @@ Ranger integration, the change usually belongs outside this folder.
 The normal repo validation commands are still:
 
 ```bash
-./hack/render-contract.sh
-./hack/template.sh
-./hack/lint.sh
+make verify
 ```
 
 If you do change these tests, also review the rendered Helm test manifests so

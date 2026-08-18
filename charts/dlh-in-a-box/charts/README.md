@@ -123,11 +123,8 @@ If you need to:
 
 After changing anything related to this folder:
 
-```bash
-./hack/helm-dependency-update.sh
-./hack/license-check.sh
-./hack/lint.sh
-./hack/package.sh
+```commandline
+make verify
 ```
 
 ## Common Mistakes

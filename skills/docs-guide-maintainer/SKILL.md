@@ -42,7 +42,7 @@ not duplicate every paragraph.
 Local development can skip render validation:
 
 ```bash
-SKIP_MERMAID_CHECK=1 ./hack/docs-check.sh
+SKIP_MERMAID_CHECK=1 ./scripts/docs-check.sh
 ```
 
 CI or strict local checks may require Docker for Mermaid rendering.
@@ -74,7 +74,7 @@ Moving documentation:
 Editing workflow docs:
 
 1. Keep `.github/workflows/README.md` aligned with actual workflow YAML.
-2. Keep `hack/README.md` aligned with local scripts.
+2. Keep `scripts/README.md` aligned with local scripts.
 3. Do not describe a CI behavior that no local script can reproduce unless the
    workflow truly adds behavior.
 
@@ -83,11 +83,11 @@ Editing workflow docs:
 Run:
 
 ```bash
-SKIP_MERMAID_CHECK=1 ./hack/docs-check.sh
+SKIP_MERMAID_CHECK=1 ./scripts/docs-check.sh
 ```
 
 If Docker is available and the change is Mermaid-heavy, also run:
 
 ```bash
-./hack/docs-check.sh
+./scripts/docs-check.sh
 ```

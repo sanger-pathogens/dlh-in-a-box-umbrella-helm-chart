@@ -76,13 +76,13 @@ jobs:
           } >> "${GITHUB_OUTPUT}"
 
       - name: Update dependencies
-        run: ./hack/helm-dependency-update.sh
+        run: ./scripts/helm/helm-dependency-update.sh
 
       - name: Lint and license checks
-        run: ./hack/lint.sh
+        run: ./scripts/verify.sh
 
       - name: Package chart
-        run: ./hack/package.sh charts/dlh-in-a-box dist "${{ steps.version.outputs.chart_version }}" "${{ steps.version.outputs.app_version }}"
+        run: ./scripts/helm/package.sh charts/dlh-in-a-box dist "${{ steps.version.outputs.chart_version }}" "${{ steps.version.outputs.app_version }}"
 
       - name: Log in to GHCR
         env:

@@ -4,9 +4,7 @@ Describe the user-facing or maintainer-facing change.
 
 ## Validation
 
-- [ ] `./hack/lint.sh`
-- [ ] `./hack/template.sh`
-- [ ] `./hack/package.sh`
+- [ ] `make verify`
 
 ## Checklist
 
