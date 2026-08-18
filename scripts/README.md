@@ -20,7 +20,6 @@ flowchart TD
     Package[package.sh]
     Smoke[smoke-install.sh]
   end
-  Lint[lint.sh]
 
   subgraph Outputs["Outputs"]
     Lockfiles[updated Chart.lock and archives]
@@ -32,19 +31,19 @@ flowchart TD
 
   Source --> Deps
   Source --> Docs
-  Source --> Lint
+  Source --> License
+  Source --> Security
   Source --> Template
   Source --> Package
   Source --> Smoke
   Deps --> Lockfiles
-  Docs --> Lint
-  Security --> Lint
-  License --> Lint
+  Docs --> ValidatedChart
+  Security --> ValidatedChart
+  License --> ValidatedChart
   Template --> Rendered
   Template --> Package
   Package --> PackageOut
   Smoke --> SmokeRun
-  Lint --> ValidatedChart
 ```
 
 ## What Lives In This Folder
@@ -56,7 +55,7 @@ flowchart TD
 
 ## How The Scripts Fit Together
 
-The scripts are divided into two subdirectories, joined by `verify.sh`
+The scripts are divided into two subdirectories.
 
 `helm/` is for scripts that wrap helm commands, such as helm package or helm lint.
 `repo/` is for scripts that enforce repo structure and policies, for example presence and contents
@@ -64,20 +63,6 @@ of repo guide files, and presence of required license files.
 
 ## Script Behaviour
 See the guide files for subdirectories of scripts for documentation on individual maintainer scripts.
-
-### `verify.sh`
-
-What it does:
-
-- runs `repo/license-check.sh`
-- runs `repo/docs-check.sh`
-- runs `repo/security-check.sh`
-- runs `../test/render-contract.sh`
-- syntax-checks shell scripts
-- parses `values.schema.json`
-- runs `helm lint` for the chart alone and then against every example overlay
-
-This is the main local validation entrypoint mirrored by CI.
 
 ## Pre-Commit Hooks
 Some of these maintainer scripts are used as Git pre-commit hooks. On each commit, this repo's pre-commit hooks will:

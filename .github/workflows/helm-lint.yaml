@@ -40,8 +40,20 @@ jobs:
       - name: Update dependencies
         run: ./scripts/helm/helm-dependency-update.sh
 
-      - name: Lint chart
-        run: ./scripts/verify.sh
+      - name: License check
+        run: ./scripts/repo/license-check.sh
+
+      - name: Security check
+        run: ./scripts/repo/security-check.sh
+
+      - name: Documentation check
+        run: ./scripts/repo/docs-check.sh
+
+      - name: Test chart
+        run: ./test/render-contract.sh
+
+      - name: Helm lint
+        run: ./scripts/helm/helm-lint.sh
 
       - name: Render chart
         run: ./scripts/helm/template.sh
