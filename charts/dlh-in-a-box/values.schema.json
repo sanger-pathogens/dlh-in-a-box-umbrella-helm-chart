@@ -771,11 +771,7 @@
               "type": "object",
               "additionalProperties": true,
               "properties": {
-                "enabled": { "type": "boolean" },
-                "policies": {
-                  "type": "array",
-                  "items": { "type": "object" }
-                }
+                "enabled": { "type": "boolean" }
               }
             },
             "trino": {

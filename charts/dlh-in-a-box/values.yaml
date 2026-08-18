@@ -294,7 +294,6 @@ global:
           repository: python
           tag: 3.12-slim
           pullPolicy: IfNotPresent
-        policies: []
       trino:
         enabled: false
         auditMode: log4j
