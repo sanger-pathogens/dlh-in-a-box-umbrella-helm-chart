@@ -233,7 +233,6 @@ global:
         syncGroupsToKeycloak: true
         hostAliases: []
   authorization: &authorization_defaults
-    platformRoleExceptions: []
     ranger:
       enabled: false
       serviceName: trino
@@ -244,22 +243,7 @@ global:
       superUsers:
         - admin
       superGroups: []
-      legacyManagedUsers: []
-      legacyManagedGroups: []
-      legacyManagedRoles: []
-      legacyManagedPolicies: []
       dataRoles: {}
-      syncAccessModelRoles: true
-      cleanup:
-        enabled: true
-        dryRun: false
-        staleUsers: []
-        staleUserPatterns:
-          - "^codex-"
-          - "-test-sync$"
-        staleGroups: []
-        staleRoles: []
-        stalePolicies: []
       useRangerGroups: false
       postgresql:
         enabled: true
@@ -305,13 +289,6 @@ global:
           attempts: 120
           delaySeconds: 5
       importCatalogAcls: false
-      exceptionRoleAudit:
-        enabled: true
-        prefix: exception-
-        schedule: "23 * * * *"
-        gracePeriodDays: 7
-        deleteExpired: true
-        logUndocumented: true
       bootstrapPolicies: []
       bootstrap:
         enabled: true

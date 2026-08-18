@@ -739,12 +739,6 @@
       "type": "object",
       "additionalProperties": true,
       "properties": {
-        "platformRoleExceptions": {
-          "type": "array",
-          "items": {
-            "$ref": "#/definitions/platformRoleException"
-          }
-        },
         "ranger": {
           "type": "object",
           "additionalProperties": true,
@@ -768,67 +762,14 @@
               "type": "array",
               "items": { "type": "string" }
             },
-            "legacyManagedUsers": {
-              "type": "array",
-              "items": { "type": "string" }
-            },
-            "legacyManagedGroups": {
-              "type": "array",
-              "items": { "type": "string" }
-            },
-            "legacyManagedRoles": {
-              "type": "array",
-              "items": { "type": "string" }
-            },
-            "legacyManagedPolicies": {
-              "type": "array",
-              "items": { "type": "string" }
-            },
             "dataRoles": {
               "type": "object",
               "additionalProperties": {
                 "type": "object",
-                "additionalProperties": true,
+                "additionalProperties": false,
                 "properties": {
                   "enabled": { "type": "boolean" },
-                  "description": { "type": "string" },
-                  "users": {
-                    "type": "array",
-                    "items": { "type": "string" }
-                  },
-                  "adminUsers": {
-                    "type": "array",
-                    "items": { "type": "string" }
-                  }
-                }
-              }
-            },
-            "syncAccessModelRoles": { "type": "boolean" },
-            "cleanup": {
-              "type": "object",
-              "additionalProperties": true,
-              "properties": {
-                "enabled": { "type": "boolean" },
-                "dryRun": { "type": "boolean" },
-                "staleUsers": {
-                  "type": "array",
-                  "items": { "type": "string" }
-                },
-                "staleUserPatterns": {
-                  "type": "array",
-                  "items": { "type": "string" }
-                },
-                "staleGroups": {
-                  "type": "array",
-                  "items": { "type": "string" }
-                },
-                "staleRoles": {
-                  "type": "array",
-                  "items": { "type": "string" }
-                },
-                "stalePolicies": {
-                  "type": "array",
-                  "items": { "type": "string" }
+                  "description": { "type": "string" }
                 }
               }
             },
@@ -867,18 +808,6 @@
               }
             },
             "importCatalogAcls": { "type": "boolean" },
-            "exceptionRoleAudit": {
-              "type": "object",
-              "additionalProperties": true,
-              "properties": {
-                "enabled": { "type": "boolean" },
-                "prefix": { "type": "string" },
-                "schedule": { "type": "string" },
-                "gracePeriodDays": { "type": "integer", "minimum": 0 },
-                "deleteExpired": { "type": "boolean" },
-                "logUndocumented": { "type": "boolean" }
-              }
-            },
             "bootstrapPolicies": {
               "type": "array",
               "items": { "type": "object" }
@@ -906,22 +835,6 @@
           }
         }
       }
-    },
-    "platformRoleException": {
-      "type": "object",
-      "additionalProperties": true,
-      "properties": {
-        "platformRole": { "type": "string" },
-        "username": { "type": "string" },
-        "approvalRef": { "type": "string" },
-        "reason": { "type": "string" },
-        "grantedBy": { "type": "string" },
-        "expiresAt": {
-          "type": "string",
-          "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$"
-        }
-      },
-      "required": ["platformRole", "username", "approvalRef", "reason", "grantedBy", "expiresAt"]
     }
   },
   "properties": {

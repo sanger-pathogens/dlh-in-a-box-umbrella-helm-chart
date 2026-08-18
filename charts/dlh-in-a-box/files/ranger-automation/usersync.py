@@ -98,24 +98,6 @@ def attr_value(entry, name):
         return ""
 
 
-def escape_ldap_filter_value(value):
-    escaped = []
-    for char in str(value or ""):
-        if char == "\\":
-            escaped.append("\\5c")
-        elif char == "*":
-            escaped.append("\\2a")
-        elif char == "(":
-            escaped.append("\\28")
-        elif char == ")":
-            escaped.append("\\29")
-        elif char == "\x00":
-            escaped.append("\\00")
-        else:
-            escaped.append(char)
-    return "".join(escaped)
-
-
 def normalize_names(values):
     seen = set()
     normalized = []
@@ -184,28 +166,6 @@ def search_user_by_dn(conn, ldap_cfg, member_dn):
     return conn.entries[0]
 
 
-def search_user_by_username(conn, ldap_cfg, username):
-    username = str(username or "").strip()
-    if not username:
-        return None
-    username_attribute = ldap_cfg["usernameAttribute"]
-    search_filter = f"({username_attribute}={escape_ldap_filter_value(username)})"
-    conn.search(
-        ldap_cfg["userBaseDn"],
-        search_filter,
-        search_scope=SUBTREE,
-        attributes=[
-            ldap_cfg["usernameAttribute"],
-            ldap_cfg["firstNameAttribute"],
-            ldap_cfg["lastNameAttribute"],
-            ldap_cfg["emailAttribute"],
-        ],
-    )
-    if not conn.entries:
-        return None
-    return conn.entries[0]
-
-
 def synced_user_from_entry(entry, ldap_cfg):
     username = attr_value(entry, ldap_cfg["usernameAttribute"])
     if not username:
@@ -218,27 +178,8 @@ def synced_user_from_entry(entry, ldap_cfg):
     )
 
 
-def direct_ldap_usernames(config):
-    usernames = set()
-    for exception in config.get("platformRoleExceptions", []) or []:
-        username = str((exception or {}).get("username") or "").strip()
-        if username:
-            usernames.add(username)
-
-    usernames -= protected_usernames(config)
-    service_username = str((config.get("ranger") or {}).get("serviceUsername") or "").strip()
-    if service_username:
-        usernames.discard(service_username)
-    return usernames
-
-
 def desired_usernames(config, synced_ldap_users):
     desired = set(normalize_names(synced_ldap_users))
-
-    for exception in config.get("platformRoleExceptions", []) or []:
-        username = str((exception or {}).get("username") or "").strip()
-        if username:
-            desired.add(username)
 
     service_username = str((config.get("ranger") or {}).get("serviceUsername") or "").strip()
     if service_username:
@@ -382,20 +323,6 @@ def sync(config):
                 users.setdefault(member_dn, build_synced_user(member_dn))
 
         groups[group_name] = sorted(member_names)
-
-    direct_users = direct_ldap_usernames(config)
-    for username in sorted(direct_users):
-        if username in users:
-            continue
-        user_entry = search_user_by_username(conn, ldap_cfg, username)
-        if user_entry is None:
-            print(f"WARNING: approved user {username} was not found in LDAP during Ranger usersync.")
-            continue
-        synced_username, synced_user = synced_user_from_entry(user_entry, ldap_cfg)
-        if not synced_username or not synced_user:
-            print(f"WARNING: approved user {username} resolved in LDAP without a usable username attribute.")
-            continue
-        users[synced_username] = synced_user
 
     if users:
         ranger_request(
