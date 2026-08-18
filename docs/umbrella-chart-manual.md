@@ -345,7 +345,7 @@ flowchart TD
   subgraph Validation["Render-time checks"]
     Schema[values schema]
     IdentityValidation[identity validation]
-    GovernanceValidation[governance validation]
+    AuthorizationValidation[authorization validation]
   end
 
   subgraph ChartLogic["Chart logic"]
@@ -362,10 +362,10 @@ flowchart TD
 
   Values --> Schema
   Values --> IdentityValidation
-  Values --> GovernanceValidation
+  Values --> AuthorizationValidation
   Identity --> IdentityValidation
-  Authorization --> GovernanceValidation
-  Catalogs --> GovernanceValidation
+  Authorization --> AuthorizationValidation
+  Catalogs --> AuthorizationValidation
   Values --> UmbrellaTemplates
   Identity --> UmbrellaTemplates
   Authorization --> UmbrellaTemplates
@@ -378,7 +378,7 @@ flowchart TD
   Values --> DependencyCharts
   Schema --> Release
   IdentityValidation --> Release
-  GovernanceValidation --> Release
+  AuthorizationValidation --> Release
   UmbrellaTemplates --> Release
   LocalHive --> Release
   VendoredTrino --> Release
@@ -657,7 +657,7 @@ Two files are the main fail-fast safety rails:
 | File | What it blocks |
 | --- | --- |
 | `templates/identity-validation.yaml` | unsupported identity combinations, missing client wiring, invalid local Keycloak versus LDAP combinations, and inconsistent app-auth assumptions |
-| `templates/governance-validation.yaml` | a missing `global.environment` when `global.dataCatalogs` is set, and deprecated catalog `authorizedGroups`/`authorizedUsers` ACL settings |
+| `templates/authorization-validation.yaml` | a missing `global.environment` when `global.dataCatalogs` is set, deprecated catalog `authorizedGroups`/`authorizedUsers` ACL settings, and `authorizedRoles` entries that reference an undeclared Ranger data role |
 | `templates/shared-postgresql-validation.yaml` | conflicting or incomplete `sharedPostgresql`/`sharedPostgresql.external` settings, and bundled per-app postgres pods left enabled alongside a shared instance |
 
 `values.schema.json` also enforces input shape, but it is not the whole story.
@@ -882,15 +882,18 @@ basis, PHI identifiers, retention, and so on) is not part of this chart. If an
 institution needs to track and enforce that, it lives outside the chart, in
 whatever system owns the dataset's schema/classification decisions.
 
-### What The Governance Validation Layer Enforces
+### What The Authorization Validation Layer Enforces
 
-`governance-validation.yaml` enforces two things:
+`authorization-validation.yaml` enforces three things:
 
 - `global.environment` must be set to `local`, `dev`, or `prod` whenever
   `global.dataCatalogs` is non-empty
 - outside `local`, a catalog's `authorizedGroups` or `authorizedUsers` key is
   rejected — catalog access must go through `authorizedRoles` or an explicit
   Ranger bootstrap policy using Ranger role names
+- when Ranger is enabled, every role listed under a catalog's
+  `authorizedRoles.read`/`.write` must be declared (and not disabled) under
+  `global.authorization.ranger.dataRoles`
 
 ### Ranger Automation Flow
 
@@ -1153,7 +1156,7 @@ If you need to change one specific thing, start here.
 | shared defaults or values contract | `charts/dlh-in-a-box/values.yaml` | this defines the umbrella chart surface |
 | input shape validation | `charts/dlh-in-a-box/values.schema.json` | schema catches structural mistakes early |
 | supported auth combinations | `charts/dlh-in-a-box/templates/identity-validation.yaml` | this file rejects invalid identity modes |
-| catalog ACL and environment rules | `charts/dlh-in-a-box/templates/governance-validation.yaml` | this file rejects deprecated catalog ACL settings and a missing `global.environment` |
+| catalog ACL and environment rules | `charts/dlh-in-a-box/templates/authorization-validation.yaml` | this file rejects deprecated catalog ACL settings, a missing `global.environment`, and `authorizedRoles` referencing an undeclared Ranger data role |
 | launchpad UI or helper API | `charts/dlh-in-a-box/templates/platform-home.yaml` | most launchpad logic is inline there |
 | CloudBeaver bootstrap or trust behavior | `charts/dlh-in-a-box/templates/cloudbeaver.yaml` | repo-owned wrapper logic lives there |
 | Ranger roles, policies, usersync, or exception audits | `charts/dlh-in-a-box/templates/ranger-automation.yaml` | this is the main reconciliation engine |

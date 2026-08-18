@@ -77,7 +77,7 @@ flowchart TD
 | `_helpers.tpl` | repo-owned | shared naming, URL, secret, identity, directory, and group helpers used across the umbrella chart |
 | `_ranger-admin.tpl` | repo-owned | helper text blocks for Ranger Admin bootstrap files |
 | `identity-validation.yaml` | repo-owned | fail-fast contract checks for shared identity modes and app wiring |
-| `governance-validation.yaml` | repo-owned | fail-fast contract checks for platform roles, exceptions, and governed catalogs |
+| `authorization-validation.yaml` | repo-owned | fail-fast contract checks for catalog and Ranger authorization settings |
 | `platform-home.yaml` | repo-owned | inline launchpad UI plus helper API and access-control admin behavior |
 | `cloudbeaver.yaml` | repo-owned | CloudBeaver service, config, storage, bootstrap, trust-store, and optional ingress wiring |
 | `ranger-admin.yaml` | repo-owned | Ranger Admin bootstrap ConfigMap, Service, and Deployment |
@@ -95,7 +95,7 @@ you are editing first-party repo behavior.
 The easiest way to think about this folder is by responsibility:
 
 - `_helpers.tpl` and `_ranger-admin.tpl` define reusable building blocks
-- `identity-validation.yaml` and `governance-validation.yaml` reject invalid
+- `identity-validation.yaml` and `authorization-validation.yaml` reject invalid
   values combinations before resources render
 - `platform-home.yaml`, `cloudbeaver.yaml`, and `ranger-browser-proxy.yaml`
   own browser-facing repo-specific apps and wrappers
@@ -159,29 +159,25 @@ Important behaviors checked here include:
 If a newcomer sees `helm template` fail before any YAML is emitted, this file
 is often why.
 
-### `governance-validation.yaml`
+### `authorization-validation.yaml`
 
-This file is the governance equivalent of `identity-validation.yaml`.
+This file validates that catalog and Ranger authorization settings are
+internally consistent before Ranger resources render.
 
-It validates that the platform's authorization model is internally consistent
-before Ranger resources render.
+Checks include:
 
-Important checks include:
-
-- every platform role needs a description
-- app entitlements under platform roles must use supported app names
-- nested roles must point at real platform roles
-- Ranger role names derived from platform roles must stay unique
-- every documented platform-role exception needs approval metadata, reason,
-  grantor, and expiry date
 - `global.environment` must be set to `local`, `dev`, or `prod` whenever
   `global.dataCatalogs` is non-empty
 - deprecated catalog `authorizedGroups`/`authorizedUsers` ACL settings are
   rejected outside `local` (catalog access must go through Ranger roles)
+- when Ranger is enabled, every role listed under a catalog's
+  `authorizedRoles.read`/`.write` must be declared (and not disabled) under
+  `global.authorization.ranger.dataRoles`
 
 Dataset sensitivity/classification metadata (data type, IRB status, consent
-basis, PHI identifiers, etc.) is no longer declared or enforced here; see
-`docs/governance/` in the deploying repo for where that now lives.
+basis, PHI identifiers, etc.) is not part of this chart; an institution
+tracking that keeps it in whatever system owns the dataset's
+schema/classification decisions.
 
 ### `platform-home.yaml`
 
@@ -344,8 +340,8 @@ If you need to:
 - add or change a shared naming rule: start in `_helpers.tpl`
 - tighten or relax supported auth combinations: edit
   `identity-validation.yaml`
-- change governed-catalog requirements or platform-role rules: edit
-  `governance-validation.yaml`
+- change catalog or Ranger authorization rules: edit
+  `authorization-validation.yaml`
 - change the launchpad UI or helper API: edit `platform-home.yaml`
 - change CloudBeaver seeding, trust, or auth-proxy integration: edit
   `cloudbeaver.yaml`

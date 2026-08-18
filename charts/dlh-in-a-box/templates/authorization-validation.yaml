@@ -1,0 +1,46 @@
+{{- $global := .Values.global | default dict -}}
+{{- $hasEnvironment := hasKey $global "environment" -}}
+{{- $environment := default "" $global.environment -}}
+{{- $catalogs := $global.dataCatalogs | default dict -}}
+{{- $authorization := $global.authorization | default dict -}}
+{{- $ranger := get $authorization "ranger" | default dict -}}
+
+{{- if and (gt (len $catalogs) 0) (or (not $hasEnvironment) (not (has $environment (list "local" "dev" "prod")))) -}}
+  {{- fail "global.environment must be set to local, dev, or prod when global.dataCatalogs is not empty." -}}
+{{- end -}}
+
+{{- if and (gt (len $catalogs) 0) (ne $environment "local") -}}
+  {{- range $catalogName, $catalog := $catalogs -}}
+    {{- if hasKey $catalog "authorizedGroups" -}}
+      {{- fail (printf "global.dataCatalogs.%s.authorizedGroups is no longer supported. Use authorizedRoles or explicit Ranger bootstrap policies with Ranger role names." $catalogName) -}}
+    {{- end -}}
+    {{- if hasKey $catalog "authorizedUsers" -}}
+      {{- fail (printf "global.dataCatalogs.%s.authorizedUsers is no longer supported. Grant catalog access to Ranger roles only, via authorizedRoles or explicit Ranger bootstrap policies with Ranger role names." $catalogName) -}}
+    {{- end -}}
+  {{- end -}}
+{{- end -}}
+
+{{- if default false $ranger.enabled -}}
+  {{- $dataRoles := get $ranger "dataRoles" | default dict -}}
+  {{- $enabledDataRoleNames := list -}}
+  {{- range $roleName, $roleConfig := $dataRoles -}}
+    {{- $roleEnabled := true -}}
+    {{- if and (kindIs "map" $roleConfig) (hasKey $roleConfig "enabled") -}}
+      {{- $roleEnabled = $roleConfig.enabled -}}
+    {{- end -}}
+    {{- if $roleEnabled -}}
+      {{- $enabledDataRoleNames = append $enabledDataRoleNames $roleName -}}
+    {{- end -}}
+  {{- end -}}
+
+  {{- range $catalogName, $catalog := $catalogs -}}
+    {{- $authorizedRoles := get $catalog "authorizedRoles" | default dict -}}
+    {{- $roleRead := get $authorizedRoles "read" | default (list) -}}
+    {{- $roleWrite := get $authorizedRoles "write" | default (list) -}}
+    {{- range $roleName := concat $roleRead $roleWrite -}}
+      {{- if not (has $roleName $enabledDataRoleNames) -}}
+        {{- fail (printf "global.dataCatalogs.%s.authorizedRoles references role %q, which is not declared (or is disabled) in global.authorization.ranger.dataRoles." $catalogName $roleName) -}}
+      {{- end -}}
+    {{- end -}}
+  {{- end -}}
+{{- end -}}
