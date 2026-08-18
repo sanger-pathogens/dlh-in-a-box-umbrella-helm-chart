@@ -277,19 +277,6 @@ global:
   dataCatalogs:
     redcap:
       type: deltaLake
-      governance:
-        dataType: research
-        classification: restricted-identifiable
-        containsDirectIdentifiers: true
-        containsQuasiIdentifiers: true
-        consentBasis: consent-and-dcc-approval
-        irbStatus: required-approved
-        sharingStatus: internal-only
-        ownerPi: redcap-pi
-        dataSteward: data-platform-team
-        sourceSystem: redcap
-        approvalReference: DCC-DEV-001
-        retentionNotes: Retain according to approved study retention schedule.
 
 trino:
   accessControl:

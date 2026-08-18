@@ -78,8 +78,6 @@ These fixtures exercise the governance validation template:
 
 | File | What it targets |
 | --- | --- |
-| `missing-governance.yaml` | catalog governance block missing in `dev` or `prod` |
-| `missing-fine-grained-policy.yaml` | restricted catalog missing column allowlist, masking, or row-filter policy coverage |
 | `invalid-platform-role-app.yaml` | deprecated `global.authorization.platformRoles` is rejected |
 | `invalid-access-model-app.yaml` | unsupported app access key in the identity access model |
 | `access-model-group-role-mappings.yaml` | deprecated access-model group-to-role mappings |

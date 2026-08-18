@@ -181,64 +181,12 @@ global:
   dataCatalogs:
     bronze:
       type: deltaLake
-      governance:
-        dataType: surveillance
-        classification: restricted-deidentified
-        containsDirectIdentifiers: false
-        containsQuasiIdentifiers: true
-        consentBasis: approved-surveillance-use
-        irbStatus: required-approved
-        sharingStatus: approved-secondary-use
-        ownerPi: surveillance-pi
-        dataSteward: data-platform-team
-        sourceSystem: surveillance-bronze
-        approvalReference: DCC-PROD-BRONZE
-        retentionNotes: Retain under the surveillance data retention schedule.
     silver:
       type: deltaLake
-      governance:
-        dataType: derived
-        classification: internal-deidentified
-        containsDirectIdentifiers: false
-        containsQuasiIdentifiers: true
-        consentBasis: approved-internal-analytics
-        irbStatus: not-required
-        sharingStatus: internal-only
-        ownerPi: surveillance-pi
-        dataSteward: analytics-team
-        sourceSystem: surveillance-silver
-        approvalReference: INT-PROD-SILVER
-        retentionNotes: Retain according to the shared environment retention standard.
     gold:
       type: deltaLake
-      governance:
-        dataType: derived
-        classification: public
-        containsDirectIdentifiers: false
-        containsQuasiIdentifiers: false
-        consentBasis: approved-public-release
-        irbStatus: not-required
-        sharingStatus: public
-        ownerPi: surveillance-pi
-        dataSteward: analytics-team
-        sourceSystem: surveillance-gold
-        approvalReference: PUB-PROD-GOLD
-        retentionNotes: Retain under the publication archive schedule.
     geospatial:
       type: hive
-      governance:
-        dataType: routineClinical
-        classification: restricted-deidentified
-        containsDirectIdentifiers: false
-        containsQuasiIdentifiers: true
-        consentBasis: approved-internal-analytics
-        irbStatus: required-approved
-        sharingStatus: internal-only
-        ownerPi: geospatial-pi
-        dataSteward: gis-team
-        sourceSystem: geospatial-reference
-        approvalReference: DCC-PROD-GEOSPATIAL
-        retentionNotes: Retain according to the clinical support retention schedule.
 
 prefectWorker:
   worker:

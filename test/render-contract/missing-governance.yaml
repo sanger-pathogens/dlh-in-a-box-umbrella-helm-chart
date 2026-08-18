@@ -1,4 +1,0 @@
-global:
-  dataCatalogs:
-    unclassified:
-      type: deltaLake

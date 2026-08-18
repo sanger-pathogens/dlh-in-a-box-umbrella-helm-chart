@@ -174,16 +174,14 @@ Important checks include:
 - Ranger role names derived from platform roles must stay unique
 - every documented platform-role exception needs approval metadata, reason,
   grantor, and expiry date
-- governed catalogs in `dev` and `prod` must include the required governance
-  metadata fields
-- public sharing and restricted-data rules cannot contradict classification
-- restricted catalogs need either imported ACLs or explicit Ranger bootstrap
-  policies
-- restricted identifiable catalogs that contain identifiers need fine-grained
-  masking or row-filter policies
+- `global.environment` must be set to `local`, `dev`, or `prod` whenever
+  `global.dataCatalogs` is non-empty
+- deprecated catalog `authorizedGroups`/`authorizedUsers` ACL settings are
+  rejected outside `local` (catalog access must go through Ranger roles)
 
-This file is what stops the chart from silently deploying an inconsistent
-governance model.
+Dataset sensitivity/classification metadata (data type, IRB status, consent
+basis, PHI identifiers, etc.) is no longer declared or enforced here; see
+`docs/governance/` in the deploying repo for where that now lives.
 
 ### `platform-home.yaml`
 

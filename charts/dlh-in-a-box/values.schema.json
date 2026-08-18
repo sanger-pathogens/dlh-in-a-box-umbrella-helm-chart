@@ -18,50 +18,6 @@
         }
       }
     },
-    "catalogGovernance": {
-      "type": "object",
-      "additionalProperties": false,
-      "properties": {
-        "dataType": {
-          "type": "string",
-          "enum": ["research", "surveillance", "routineClinical", "derived", "public"]
-        },
-        "classification": {
-          "type": "string",
-          "enum": ["restricted-identifiable", "restricted-deidentified", "internal-deidentified", "public"]
-        },
-        "containsDirectIdentifiers": { "type": "boolean" },
-        "containsQuasiIdentifiers": { "type": "boolean" },
-        "consentBasis": { "type": "string", "minLength": 1 },
-        "irbStatus": {
-          "type": "string",
-          "enum": ["required-approved", "required-pending", "not-required"]
-        },
-        "sharingStatus": {
-          "type": "string",
-          "enum": ["pi-exclusive", "internal-only", "approved-secondary-use", "public"]
-        },
-        "ownerPi": { "type": "string", "minLength": 1 },
-        "dataSteward": { "type": "string", "minLength": 1 },
-        "sourceSystem": { "type": "string", "minLength": 1 },
-        "approvalReference": { "type": "string", "minLength": 1 },
-        "retentionNotes": { "type": "string", "minLength": 1 }
-      },
-      "required": [
-        "dataType",
-        "classification",
-        "containsDirectIdentifiers",
-        "containsQuasiIdentifiers",
-        "consentBasis",
-        "irbStatus",
-        "sharingStatus",
-        "ownerPi",
-        "dataSteward",
-        "sourceSystem",
-        "approvalReference",
-        "retentionNotes"
-      ]
-    },
     "accessModelRole": {
       "type": "object",
       "additionalProperties": true,
@@ -946,10 +902,6 @@
                 "authorizedRoles": {
                   "description": "Catalog-level role access lists used by generated Trino access rules and Ranger catalog ACL import.",
                   "$ref": "#/definitions/catalogAcl"
-                },
-                "governance": {
-                  "description": "Mandatory governance metadata for shared, development, and production datasets.",
-                  "$ref": "#/definitions/catalogGovernance"
                 }
               }
             }

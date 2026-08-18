@@ -215,19 +215,6 @@ global:
   dataCatalogs:
     default:
       type: deltaLake
-      governance:
-        dataType: derived
-        classification: internal-deidentified
-        containsDirectIdentifiers: false
-        containsQuasiIdentifiers: false
-        consentBasis: approved-internal-analytics
-        irbStatus: not-required
-        sharingStatus: internal-only
-        ownerPi: platform-owner
-        dataSteward: data-platform-team
-        sourceSystem: curated-lakehouse
-        approvalReference: INT-DEFAULT-001
-        retentionNotes: Retain according to the shared environment retention standard.
 
 trino:
   ingress:
