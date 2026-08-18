@@ -287,11 +287,9 @@ global:
         readiness:
           attempts: 120
           delaySeconds: 5
-      importCatalogAcls: false
       bootstrapPolicies: []
       bootstrap:
         enabled: true
-        importCatalogAcls: false
         image:
           repository: python
           tag: 3.12-slim

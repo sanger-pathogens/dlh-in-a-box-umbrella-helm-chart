@@ -169,7 +169,6 @@ global:
         enabled: true
         schedule: "*/15 * * * *"
         syncSource: LDAP
-      importCatalogAcls: false
       bootstrapPolicies:
         - name: trino-redcap-access
           description: Allow analyst and principal-investigator roles to read the redcap catalog and platform administrators to manage it.

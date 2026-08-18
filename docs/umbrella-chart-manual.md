@@ -870,7 +870,7 @@ only carries the connection/type shape a catalog needs to render.
 | Concept | What it means in this chart |
 | --- | --- |
 | `global.authorization.ranger.dataRoles` | Ranger role definitions the chart can reconcile |
-| `global.dataCatalogs.<name>.authorizedRoles` | catalog-wide read/write Ranger role grants, imported as a Ranger policy when `global.authorization.ranger.importCatalogAcls=true` |
+| `global.dataCatalogs.<name>.authorizedRoles` | catalog-wide read/write Ranger role grants; a catalog with any role listed gets a generated Ranger policy for the whole catalog |
 | `global.authorization.ranger.bootstrapPolicies` | explicit policy definitions the chart can reconcile into Ranger, including fine-grained (column-level, masking, row-filter) policies |
 
 Catalog access can only be granted to Ranger roles. A catalog's `authorizedGroups`
@@ -1375,7 +1375,7 @@ renders.
 | oauth2-proxy | the browser-auth boundary used in front of some apps |
 | platform role | a durable named role in the chart's authorization model |
 | platform role exception | a controlled direct-user exception with metadata and expiry |
-| catalog ACL | the `authorizedRoles` read/write Ranger role lists on a catalog in `global.dataCatalogs`, imported as a Ranger policy when `importCatalogAcls=true` |
+| catalog ACL | the `authorizedRoles` read/write Ranger role lists on a catalog in `global.dataCatalogs`; any role listed generates a Ranger policy for the whole catalog |
 
 ## Secrets And Environment Appendix
 

@@ -397,9 +397,6 @@ def build_catalog_acl_policies(config):
     write_accesses = read_accesses + ["insert", "create", "delete", "drop", "alter", "grant", "revoke"]
     policies = []
 
-    if not config["ranger"].get("importCatalogAcls", False):
-        return policies
-
     for catalog_name, catalog in config.get("catalogs", {}).items():
         roles_acl = catalog.get("authorizedRoles", {}) or {}
         read_item = access_item([], [], roles_acl.get("read", []), read_accesses)

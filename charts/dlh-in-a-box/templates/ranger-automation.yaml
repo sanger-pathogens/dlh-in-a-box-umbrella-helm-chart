@@ -42,12 +42,6 @@
 {{- end -}}
 {{- $keycloakRangerSyncEnabled := and (default false $identity.enabled) (eq $providerMode "bundledKeycloak") $localUserSyncRequested -}}
 {{- $localUserSyncImage := get $localUserSync "image" | default $usersyncImage -}}
-{{- $importCatalogAcls := false -}}
-{{- if hasKey $ranger "importCatalogAcls" -}}
-  {{- $importCatalogAcls = $ranger.importCatalogAcls -}}
-{{- else if hasKey $rangerBootstrap "importCatalogAcls" -}}
-  {{- $importCatalogAcls = $rangerBootstrap.importCatalogAcls -}}
-{{- end -}}
 {{- $bootstrapPolicies := get $ranger "bootstrapPolicies" | default (get $rangerBootstrap "policies" | default (list)) -}}
 {{- if $ranger.enabled }}
 apiVersion: v1
@@ -70,7 +64,6 @@ data:
         "superGroups" ($ranger.superGroups | default (list))
         "dataRoles" ($ranger.dataRoles | default dict)
         "trinoEnabled" (and (default false $ranger.enabled) (default false $rangerTrino.enabled))
-        "importCatalogAcls" $importCatalogAcls
         "bootstrapPolicies" $bootstrapPolicies
       )
       "accessRoles" $accessRoles

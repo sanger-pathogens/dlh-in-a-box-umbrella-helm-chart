@@ -126,7 +126,6 @@ global:
         enabled: false
         schedule: "*/15 * * * *"
         syncSource: LDAP
-      importCatalogAcls: false
       bootstrapPolicies:
         - name: trino-default-read
           description: Local read-only access for the default catalog.

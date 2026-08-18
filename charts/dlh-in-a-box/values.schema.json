@@ -763,7 +763,6 @@
                 }
               }
             },
-            "importCatalogAcls": { "type": "boolean" },
             "bootstrapPolicies": {
               "type": "array",
               "items": { "type": "object" }
@@ -773,7 +772,6 @@
               "additionalProperties": true,
               "properties": {
                 "enabled": { "type": "boolean" },
-                "importCatalogAcls": { "type": "boolean" },
                 "policies": {
                   "type": "array",
                   "items": { "type": "object" }
