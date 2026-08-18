@@ -166,7 +166,6 @@ assert_not_contains "${default_manifest}" "FSLolaWeb"
 assert_not_contains "${default_manifest}" "SourceSansPro"
 assert_contains "${local_manifest}" "name: dlh-ranger-admin"
 assert_contains "${local_manifest}" "clusterIP: None"
-assert_contains "${local_manifest}" "name: dlh-ranger-admin-exception-audit"
 assert_contains "${local_manifest}" "name: dlh-platform-home"
 assert_contains "${local_manifest}" "Administration"
 assert_contains "${local_manifest}" 'add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;'
@@ -224,8 +223,6 @@ assert_not_contains "${local_manifest}" "psycopg[binary]"
 assert_contains "${dev_manifest}" "name: dlh-keycloak-config-cli-env"
 assert_contains "${prod_manifest}" "name: dlh-keycloak-config-cli-env"
 assert_contains "${prod_manifest}" "name: dlh-ranger-postgresql"
-assert_contains "${dev_manifest}" "name: dlh-ranger-admin-exception-audit"
-assert_contains "${prod_manifest}" "name: dlh-ranger-admin-exception-audit"
 assert_contains "${dev_manifest}" "KC_CLOUDBEAVER_CLIENT_SECRET"
 assert_contains "${prod_manifest}" "KC_CLOUDBEAVER_CLIENT_SECRET"
 assert_contains "${dev_manifest}" "https://portal.dev.example.org/"
@@ -542,8 +539,3 @@ expect_fail_any \
   -- \
   -f "${DEV_VALUES}" \
   -f "${FIXTURE_DIR}/ranger-membership-source.yaml"
-
-expect_fail \
-  "global.authorization.platformRoleExceptions[0].approvalRef must be set." \
-  -f "${DEV_VALUES}" \
-  -f "${FIXTURE_DIR}/exception-missing-metadata.yaml"

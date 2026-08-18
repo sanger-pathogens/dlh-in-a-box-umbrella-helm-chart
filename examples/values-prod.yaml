@@ -148,7 +148,6 @@ global:
         trustedCaCertKey: ca.crt
         allowInsecure: false
   authorization:
-    platformRoleExceptions: []
     ranger:
       enabled: true
       serviceName: trino

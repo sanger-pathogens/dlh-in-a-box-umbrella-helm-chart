@@ -16,7 +16,6 @@ global:
       geospatial-writer:
         description: Approved read-write users for the geospatial catalog.
   authorization:
-    platformRoleExceptions: []
     ranger:
       enabled: true
       importCatalogAcls: false

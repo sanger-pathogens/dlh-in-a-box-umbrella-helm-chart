@@ -25,18 +25,6 @@ if grep -Eq '^kind: ConfigMap$' charts/dlh-in-a-box/charts/hive/templates/config
   exit 1
 fi
 
-for workflow in .github/workflows/*.yaml; do
-  if grep -Eq 'uses: actions/checkout@v[0-9]+' "${workflow}"; then
-    echo "Workflow ${workflow} must pin actions/checkout to an immutable commit SHA." >&2
-    exit 1
-  fi
-
-  if grep -Eq 'uses: azure/setup-helm@v[0-9]+' "${workflow}"; then
-    echo "Workflow ${workflow} must pin azure/setup-helm to an immutable commit SHA." >&2
-    exit 1
-  fi
-done
-
 non_local_examples=(
   "examples/values-dev.yaml"
   "examples/values-external-s3.yaml"

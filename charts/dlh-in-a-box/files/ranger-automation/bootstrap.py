@@ -80,53 +80,6 @@ def normalize_names(items):
     return sorted({str(item) for item in items if str(item).strip()})
 
 
-def cleanup_config(config):
-    return ((config.get("ranger") or {}).get("cleanup") or {})
-
-
-def cleanup_enabled(config):
-    cleanup = cleanup_config(config)
-    return bool(cleanup.get("enabled", True))
-
-
-def cleanup_dry_run(config):
-    return bool(cleanup_config(config).get("dryRun", False))
-
-
-def cleanup_names(config, legacy_key, cleanup_key):
-    ranger_cfg = config.get("ranger") or {}
-    names = normalize_names(ranger_cfg.get(legacy_key, []))
-    if cleanup_enabled(config):
-        names = normalize_names(names + normalize_names(cleanup_config(config).get(cleanup_key, [])))
-    return names
-
-
-def cleanup_user_matches_patterns(config, username):
-    if not cleanup_enabled(config):
-        return False
-    username = str(username or "").strip()
-    if not username:
-        return False
-    for pattern in normalize_names(cleanup_config(config).get("staleUserPatterns", [])):
-        try:
-            if re.search(pattern, username):
-                return True
-        except re.error as exc:
-            print(f"WARNING: invalid Ranger cleanup staleUserPattern ignored: {pattern}: {exc}")
-    return False
-
-
-def cleanup_user_names(config):
-    names = set(cleanup_names(config, "legacyManagedUsers", "staleUsers"))
-    if cleanup_enabled(config):
-        names.update(
-            str(user.get("name", "")).strip()
-            for user in list_users()
-            if cleanup_user_matches_patterns(config, str(user.get("name", "")).strip())
-        )
-    return sorted(name for name in names if name)
-
-
 def role_member(name, is_admin=False):
     return {"name": str(name), "isAdmin": bool(is_admin)}
 
@@ -268,37 +221,6 @@ def list_users():
     return users
 
 
-def list_groups():
-    groups = []
-    start_index = 0
-    page_size = 200
-    while True:
-        payload = request(
-            "GET",
-            f"/service/xusers/groups?startIndex={start_index}&pageSize={page_size}",
-            ok=(200,),
-        ) or {}
-        batch = payload.get("vXGroups", []) or []
-        if not batch:
-            break
-        groups.extend(batch)
-        total_count = int(payload.get("totalCount", len(groups)) or len(groups))
-        if len(groups) >= total_count:
-            break
-        start_index += len(batch)
-    return groups
-
-
-def get_user(username):
-    username = str(username or "").strip()
-    if not username:
-        return None
-    for user in list_users():
-        if str(user.get("name", "")).strip() == username:
-            return user
-    return None
-
-
 def build_managed_user(username, first_name="", last_name="", email_address=""):
     username = str(username or "").strip()
     first_name = str(first_name or "").strip() or username
@@ -381,42 +303,35 @@ def upsert_role(role):
         request("POST", role_create_path(), payload, ok=(200, 201))
 
 
-def data_role_usernames(config):
-    usernames = set()
-    for role in ((config.get("ranger") or {}).get("dataRoles") or {}).values():
-        if not isinstance(role, dict) or role.get("enabled") is False:
-            continue
-        usernames.update(normalize_names(role.get("users", [])))
-        usernames.update(normalize_names(role.get("adminUsers", [])))
-    return usernames
-
-
-def reconcile_data_roles(config):
+def reconcile_data_roles(config, service_name):
     data_roles = (config.get("ranger") or {}).get("dataRoles") or {}
+    desired_role_names = set()
     for role_name in sorted(data_roles):
         role_config = data_roles.get(role_name) or {}
         if not isinstance(role_config, dict) or role_config.get("enabled") is False:
             continue
-        users = [
-            role_member(username, False)
-            for username in normalize_names(role_config.get("users", []))
-        ]
-        admin_users = [
-            role_member(username, True)
-            for username in normalize_names(role_config.get("adminUsers", []))
-        ]
+        desired_role_names.add(role_name)
+        existing = get_role(None, role_name)
         upsert_role(
             {
                 "name": role_name,
                 "description": role_config.get("description")
                 or f"Data access role managed by Ranger bootstrap: {role_name}.",
                 "isEnabled": True,
-                "users": users + admin_users,
-                "groups": [],
-                "roles": [],
+                "users": (existing or {}).get("users", []),
+                "groups": (existing or {}).get("groups", []),
+                "roles": (existing or {}).get("roles", []),
             }
         )
         print(f"Reconciled Ranger data role: {role_name}")
+
+    for role in list_roles():
+        role_name = str(role.get("name", "")).strip()
+        if not role_name or role_name in desired_role_names:
+            continue
+        detach_role_from_policies(service_name, role_name)
+        delete_role(service_name, role_name)
+        print(f"Deleted Ranger role not declared in dataRoles: {role_name}")
 
 
 def policy_path(policy_id):
@@ -664,186 +579,6 @@ def policy_principal_usernames(config, policies):
     return usernames
 
 
-def purge_legacy_roles(config, service_name):
-    existing_roles_by_name = {
-        str(role.get("name", "")): role
-        for role in list_roles()
-        if str(role.get("name", "")).strip()
-    }
-    for stale_role_name in cleanup_names(config, "legacyManagedRoles", "staleRoles"):
-        if stale_role_name in existing_roles_by_name:
-            if cleanup_dry_run(config):
-                print(f"DRY RUN: would delete stale managed Ranger role: {stale_role_name}")
-                continue
-            detach_role_from_policies(service_name, stale_role_name)
-            delete_role(service_name, stale_role_name)
-            print(f"Deleted stale managed Ranger role: {stale_role_name}")
-
-
-def filter_user_from_role_members(items, username):
-    filtered = []
-    removed = False
-    for item in items or []:
-        name = str(item.get("name", "")).strip() if isinstance(item, dict) else str(item).strip()
-        if name == username:
-            removed = True
-            continue
-        filtered.append(item)
-    return filtered, removed
-
-
-def detach_user_from_roles(service_name, username):
-    for role in list_roles():
-        filtered_users, removed = filter_user_from_role_members(role.get("users", []), username)
-        if not removed:
-            continue
-        payload = {
-            "id": role["id"],
-            "guid": role.get("guid"),
-            "version": role.get("version"),
-            "createdByUser": role.get("createdByUser"),
-            "name": role["name"],
-            "description": role.get("description", ""),
-            "isEnabled": bool(role.get("isEnabled", True)),
-            "users": normalize_role_members(filtered_users),
-            "groups": normalize_role_members(role.get("groups", [])),
-            "roles": normalize_role_members(role.get("roles", [])),
-        }
-        request("PUT", role_update_path(role["id"]), payload, ok=(200,))
-        print(f"Detached legacy user {username} from Ranger role: {role['name']}")
-
-
-def filter_user_from_policy_items(items, username):
-    filtered_items = []
-    removed = False
-    for item in items or []:
-        updated_item = dict(item)
-        users = normalize_names(name for name in item.get("users", []) if str(name) != username)
-        removed = removed or len(users) != len(item.get("users", []) or [])
-        updated_item["users"] = users
-        updated_item["groups"] = normalize_names(item.get("groups", []))
-        updated_item["roles"] = normalize_names(item.get("roles", []))
-        if updated_item["users"] or updated_item["groups"] or updated_item["roles"]:
-            filtered_items.append(updated_item)
-    return filtered_items, removed
-
-
-def detach_user_from_policies(service_name, username):
-    for policy in list_policies(service_name):
-        updated_policy = dict(policy)
-        removed = False
-        for key in [
-            "policyItems",
-            "denyPolicyItems",
-            "allowExceptions",
-            "denyExceptions",
-            "dataMaskPolicyItems",
-            "rowFilterPolicyItems",
-        ]:
-            filtered_items, key_removed = filter_user_from_policy_items(policy.get(key, []), username)
-            updated_policy[key] = filtered_items
-            removed = removed or key_removed
-
-        if not removed:
-            continue
-
-        has_principals = any(
-            updated_policy.get(key)
-            for key in [
-                "policyItems",
-                "denyPolicyItems",
-                "allowExceptions",
-                "denyExceptions",
-                "dataMaskPolicyItems",
-                "rowFilterPolicyItems",
-            ]
-        )
-        if has_principals:
-            request("PUT", policy_path(policy["id"]), updated_policy, ok=(200,))
-            print(f"Detached legacy user {username} from Ranger policy: {policy['name']}")
-        else:
-            request("DELETE", policy_path(policy["id"]), ok=(204, 404))
-            print(f"Deleted stale Ranger policy with no remaining principals: {policy['name']}")
-
-
-def delete_user_by_name(username):
-    user = get_user(username)
-    if not user:
-        return
-    request(
-        "DELETE",
-        f"/service/xusers/secure/users/id/{user['id']}?forceDelete=true",
-        ok=(200, 204, 404),
-        parse_json=False,
-    )
-    print(f"Deleted stale Ranger user: {username}")
-
-
-def purge_legacy_users(config, service_name, protected_usernames=None):
-    protected_usernames = set(normalize_names(protected_usernames or []))
-    for username in cleanup_user_names(config):
-        if username in protected_usernames:
-            print(f"Skipping stale Ranger user cleanup because it is still desired: {username}")
-            continue
-        if cleanup_dry_run(config):
-            print(f"DRY RUN: would delete stale Ranger user: {username}")
-            continue
-        detach_user_from_roles(service_name, username)
-        detach_user_from_policies(service_name, username)
-        delete_user_by_name(username)
-
-
-def delete_group_by_name(group_name):
-    existing = None
-    for group in list_groups():
-        name = str(group.get("name", "")).strip()
-        if name == group_name:
-            existing = group
-            break
-    if not existing:
-        return
-    request(
-        "DELETE",
-        f"/service/xusers/groups/{existing['id']}",
-        ok=(200, 204, 404),
-        parse_json=False,
-    )
-    print(f"Deleted stale Ranger group: {group_name}")
-
-
-def purge_legacy_groups(config):
-    for group_name in cleanup_names(config, "legacyManagedGroups", "staleGroups"):
-        if cleanup_dry_run(config):
-            print(f"DRY RUN: would delete stale Ranger group: {group_name}")
-            continue
-        delete_group_by_name(group_name)
-
-
-def delete_policy_by_name(service_name, policy_name):
-    path = (
-        "/service/public/v2/api/service/"
-        + urllib.parse.quote(service_name, safe="")
-        + "/policy/"
-        + urllib.parse.quote(policy_name, safe="")
-    )
-    try:
-        existing = request("GET", path, ok=(200,))
-    except urllib.error.HTTPError as exc:
-        if exc.code == 404:
-            return
-        raise
-    request("DELETE", policy_path(existing["id"]), ok=(200, 204, 404))
-    print(f"Deleted stale Ranger policy: {policy_name}")
-
-
-def purge_legacy_policies(config, service_name):
-    for policy_name in cleanup_names(config, "legacyManagedPolicies", "stalePolicies"):
-        if cleanup_dry_run(config):
-            print(f"DRY RUN: would delete stale Ranger policy: {policy_name}")
-            continue
-        delete_policy_by_name(service_name, policy_name)
-
-
 def normalize_policy_resource(value):
     normalized = as_resource(value)
     normalized["values"] = sorted(str(item) for item in normalized.get("values", []))
@@ -952,8 +687,7 @@ def main():
     config = load_config()
     service_name = config["ranger"]["serviceName"]
     upsert_service(config)
-    purge_legacy_roles(config, service_name)
-    reconcile_data_roles(config)
+    reconcile_data_roles(config, service_name)
 
     policies = []
     policies.extend(build_trino_baseline_policies(config))
@@ -963,9 +697,6 @@ def main():
 
     desired_policy_usernames = policy_principal_usernames(config, policies)
     ensure_users_exist(desired_policy_usernames)
-    purge_legacy_users(config, service_name, desired_policy_usernames)
-    purge_legacy_groups(config)
-    purge_legacy_policies(config, service_name)
 
     for policy in policies:
         upsert_policy(service_name, policy)

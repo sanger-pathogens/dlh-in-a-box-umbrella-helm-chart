@@ -3,35 +3,9 @@
 {{- $environment := default "" $global.environment -}}
 {{- $catalogs := $global.dataCatalogs | default dict -}}
 {{- $authorization := $global.authorization | default dict -}}
-{{- $platformRoleExceptions := get $authorization "platformRoleExceptions" | default (list) -}}
 {{- $ranger := get $authorization "ranger" | default dict -}}
 {{- $bootstrapPolicies := get $ranger "bootstrapPolicies" | default (dig "bootstrap" "policies" (list) $ranger) -}}
 {{- $importCatalogAcls := default false $ranger.importCatalogAcls -}}
-{{- $accessModelRoles := fromJson (include "dlh-in-a-box.identity.accessModelRolesJson" .) -}}
-{{- $platformRoleKeys := dict -}}
-
-{{- range $roleKey, $_ := $accessModelRoles -}}
-  {{- $_ := set $platformRoleKeys $roleKey true -}}
-{{- end -}}
-
-{{- if and (gt (len $platformRoleExceptions) 0) (not (default false $ranger.enabled)) -}}
-  {{- fail "global.authorization.platformRoleExceptions requires global.authorization.ranger.enabled=true." -}}
-{{- end -}}
-{{- range $idx, $exception := $platformRoleExceptions -}}
-  {{- $prefix := printf "global.authorization.platformRoleExceptions[%d]" $idx -}}
-  {{- range $field := list "platformRole" "username" "approvalRef" "reason" "grantedBy" "expiresAt" -}}
-    {{- if not (trim (default "" (get $exception $field))) -}}
-      {{- fail (printf "%s.%s must be set." $prefix $field) -}}
-    {{- end -}}
-  {{- end -}}
-  {{- $targetRole := default "" (get $exception "platformRole") -}}
-  {{- if not (hasKey $platformRoleKeys $targetRole) -}}
-    {{- fail (printf "%s.platformRole references unknown platform role %s." $prefix $targetRole) -}}
-  {{- end -}}
-  {{- if not (regexMatch "^[0-9]{4}-[0-9]{2}-[0-9]{2}$" (default "" (get $exception "expiresAt"))) -}}
-    {{- fail (printf "%s.expiresAt must use YYYY-MM-DD format." $prefix) -}}
-  {{- end -}}
-{{- end -}}
 
 {{- if and (gt (len $catalogs) 0) (or (not $hasEnvironment) (not (has $environment (list "local" "dev" "prod")))) -}}
   {{- fail "global.environment must be set to local, dev, or prod when global.dataCatalogs is not empty." -}}

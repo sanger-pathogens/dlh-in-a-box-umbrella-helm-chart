@@ -64,7 +64,12 @@ async function setupMermaidDom() {
   });
   global.window = dom.window;
   global.document = dom.window.document;
-  global.navigator = dom.window.navigator;
+  // Node 21+ defines a built-in `navigator` global as a getter with no
+  // setter, so a plain assignment throws under newer Node versions.
+  Object.defineProperty(global, 'navigator', {
+    value: dom.window.navigator,
+    configurable: true,
+  });
   global.self = dom.window; // some libs check `self`, not `window`
 
   // Import mermaid only now, so it (and dompurify) see the real window

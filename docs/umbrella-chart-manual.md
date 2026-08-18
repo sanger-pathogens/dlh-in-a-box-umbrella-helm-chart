@@ -877,7 +877,6 @@ That means the docs must say something explicit that the code already implies:
 | Concept | What it means in this chart |
 | --- | --- |
 | `global.authorization.platformRoles` | durable named platform roles that carry app entitlements and map into Ranger roles |
-| `global.authorization.platformRoleExceptions` | controlled direct-user exceptions with approval metadata and expiry |
 | `global.dataCatalogs.<name>.governance` | catalog-level metadata used to validate whether a catalog may be exposed |
 | `global.authorization.ranger.bootstrapPolicies` | policy definitions the chart can reconcile into Ranger |
 
