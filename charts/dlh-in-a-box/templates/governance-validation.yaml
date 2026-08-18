@@ -35,14 +35,14 @@
     {{- if hasKey $catalog "authorizedGroups" -}}
       {{- fail (printf "global.dataCatalogs.%s.authorizedGroups is no longer supported. Use authorizedRoles or explicit Ranger bootstrap policies with Ranger role names." $catalogName) -}}
     {{- end -}}
+    {{- if hasKey $catalog "authorizedUsers" -}}
+      {{- fail (printf "global.dataCatalogs.%s.authorizedUsers is no longer supported. Grant catalog access to Ranger roles only, via authorizedRoles or explicit Ranger bootstrap policies with Ranger role names." $catalogName) -}}
+    {{- end -}}
     {{- $authorizedRoles := get $catalog "authorizedRoles" | default dict -}}
-    {{- $authorizedUsers := get $catalog "authorizedUsers" | default dict -}}
     {{- $roleRead := get $authorizedRoles "read" | default (list) -}}
     {{- $roleWrite := get $authorizedRoles "write" | default (list) -}}
-    {{- $userRead := get $authorizedUsers "read" | default (list) -}}
-    {{- $userWrite := get $authorizedUsers "write" | default (list) -}}
     {{- $allRoles := concat $roleRead $roleWrite -}}
-    {{- $allSubjects := concat $allRoles (concat $userRead $userWrite) -}}
+    {{- $allSubjects := $allRoles -}}
     {{- $hasWildcard := false -}}
     {{- range $subject := $allSubjects -}}
       {{- if eq (toString $subject) "*" -}}

@@ -402,9 +402,8 @@ def build_catalog_acl_policies(config):
 
     for catalog_name, catalog in config.get("catalogs", {}).items():
         roles_acl = catalog.get("authorizedRoles", {}) or {}
-        users_acl = catalog.get("authorizedUsers", {}) or {}
-        read_item = access_item(users_acl.get("read", []), [], roles_acl.get("read", []), read_accesses)
-        write_item = access_item(users_acl.get("write", []), [], roles_acl.get("write", []), write_accesses)
+        read_item = access_item([], [], roles_acl.get("read", []), read_accesses)
+        write_item = access_item([], [], roles_acl.get("write", []), write_accesses)
         policy_items = [item for item in [read_item, write_item] if item]
 
         if policy_items:

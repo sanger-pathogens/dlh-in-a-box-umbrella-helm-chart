@@ -16,7 +16,7 @@ global:
   dataCatalogs:
     default:
       type: deltaLake
-      authorizedUsers:
+      authorizedRoles:
         read: ["superset"]
         write: ["local-admin"]
 

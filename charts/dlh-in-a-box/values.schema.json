@@ -944,11 +944,7 @@
                   "enum": ["deltaLake", "hive"]
                 },
                 "authorizedRoles": {
-                  "description": "Preferred catalog-level role access lists used by generated Trino access rules and Ranger catalog ACL import.",
-                  "$ref": "#/definitions/catalogAcl"
-                },
-                "authorizedUsers": {
-                  "description": "Simple catalog-level access-control lists used by generated Trino access rules.",
+                  "description": "Catalog-level role access lists used by generated Trino access rules and Ranger catalog ACL import.",
                   "$ref": "#/definitions/catalogAcl"
                 },
                 "governance": {

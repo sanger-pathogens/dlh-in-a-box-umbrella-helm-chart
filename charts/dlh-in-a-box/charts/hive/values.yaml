@@ -49,6 +49,6 @@ ingress:
 # dataCatalogs:
 #   default:
 #     type: deltaLake  # deltaLake or hive
-#     authorizedUsers:
+#     authorizedRoles:
 #       read: []
 #       write: []

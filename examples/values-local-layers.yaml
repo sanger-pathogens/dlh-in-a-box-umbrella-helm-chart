@@ -16,22 +16,22 @@ global:
   dataCatalogs:
     bronze:
       type: deltaLake
-      authorizedUsers:
+      authorizedRoles:
         read: ["dlh_team", "surveillance_dashboard", "datahub"]
         write: ["admin"]
     silver:
       type: deltaLake
-      authorizedUsers:
+      authorizedRoles:
         read: ["dlh_team", "surveillance_dashboard"]
         write: ["admin"]
     gold:
       type: deltaLake
-      authorizedUsers:
+      authorizedRoles:
         read: ["dlh_team", "surveillance_dashboard"]
         write: ["admin"]
     geospatial:
       type: hive
-      authorizedUsers:
+      authorizedRoles:
         read: ["dlh_team", "surveillance_dashboard"]
         write: ["admin"]
 
