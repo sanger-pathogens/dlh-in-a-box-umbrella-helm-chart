@@ -95,8 +95,8 @@ After changing these files, run:
 
 ```bash
 python3 -c 'import ast; ast.parse(open("charts/dlh-in-a-box/files/platform-home/admin-api.py").read())'
-./scripts/template.sh examples/values-local-auth.yaml
-./scripts/smoke-install.sh charts/dlh-in-a-box examples/values-local-auth.yaml
+make template
+make smoke-install
 ```
 
 The template check proves the asset still renders into the chart. The smoke

@@ -56,7 +56,7 @@ Use exact `expect_fail` for chart-authored validation messages.
 
 ## Validation Message Drift
 
-If `scripts/verify.sh` fails because expected failure text no longer matches:
+If `test/render-contract.sh` fails because expected failure text no longer matches:
 
 1. Inspect the actual failure output.
 2. Inspect the corresponding validation template.
@@ -86,17 +86,7 @@ When deprecating values:
 Run from repo root:
 
 ```bash
-./scripts/render-contract.sh
-./scripts/verify.sh
-./scripts/template.sh
-```
-
-For package-impacting changes, also run:
-
-```bash
-./scripts/helm-dependency-update.sh
-rm -rf dist
-./scripts/package.sh
+make verify
 ```
 
 If a single overlay fails, isolate it:

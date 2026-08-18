@@ -4,9 +4,7 @@ Describe the user-facing or maintainer-facing change.
 
 ## Validation
 
-- [ ] `./scripts/lint.sh`
-- [ ] `./scripts/helm/template.sh`
-- [ ] `./scripts/helm/package.sh`
+- [ ] `make verify`
 
 ## Checklist
 

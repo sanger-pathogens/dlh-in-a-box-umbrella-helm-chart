@@ -123,11 +123,8 @@ If you need to:
 
 After changing anything related to this folder:
 
-```bash
-./scripts/helm-dependency-update.sh
-./scripts/license-check.sh
-./scripts/verify.sh
-./scripts/package.sh
+```commandline
+make verify
 ```
 
 ## Common Mistakes

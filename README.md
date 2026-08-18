@@ -532,12 +532,7 @@ The detailed explanation of that distinction lives in
 From the repository root:
 
 ```bash
-./scripts/helm-dependency-update.sh
-./scripts/docs-check.sh
-./scripts/verify.sh
-./scripts/template.sh
-./scripts/package.sh
-./scripts/smoke-install.sh
+make verify
 ```
 
 Convenience targets from `Makefile`:
@@ -556,6 +551,7 @@ make smoke-install
 
 What these do:
 
+- `verify` runs all the other targets except actual installation steps
 - `deps` refreshes dependency archives and `Chart.lock`
 - `docs-check` verifies guide coverage, local links, and Mermaid rendering
 - `render-contract` proves supported render combinations still succeed and bad

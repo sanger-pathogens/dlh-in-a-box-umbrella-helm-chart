@@ -68,7 +68,7 @@ If you add new assets, document:
 After changing assets here:
 
 - update any references in Markdown or `Chart.yaml`
-- run `./hack/docs-check.sh`
+- run `make docs-check`
 
 ## Common Mistakes
 

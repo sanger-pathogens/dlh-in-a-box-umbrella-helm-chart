@@ -105,11 +105,8 @@ Use the same Helm version as CI when possible. CI currently uses Helm `v3.12.0`.
 Run:
 
 ```bash
-./scripts/helm-dependency-update.sh
-./scripts/verify.sh
-./scripts/template.sh
 rm -rf dist
-./scripts/package.sh
+make verify
 ```
 
 Expected package path:
@@ -131,7 +128,7 @@ HELM_REGISTRY_CONFIG="${tmp}/registry/config.json" \
 ./scripts/helm-dependency-update.sh
 ```
 
-If `scripts/verify.sh` fails because a render-contract expected message drifted,
+If `test/render-contract.sh` fails because a render-contract expected message drifted,
 compare the actual template failure with the corresponding validation template.
 Update the contract only when the chart behavior is already correct and the
 test expectation is stale.

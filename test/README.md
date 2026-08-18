@@ -85,7 +85,7 @@ It then checks either:
 - that the render succeeds and contains the expected strings
 - or that the render fails with the expected message
 
-`scripts/verify.sh` includes that render-contract script, so these fixtures are part
+`make verify` and the GitHub Actions on this repo include the render-contract script, so these fixtures are part
 of the normal repo validation path.
 
 ## Common Tasks

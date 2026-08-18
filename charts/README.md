@@ -106,13 +106,11 @@ If you need to:
 
 ## Validation
 
-After changing anything in this tree, the normal checks are:
+After changing anything in this tree, the pre-commit hooks will test, lint, render and package the chart.
+Alternatively, run the checks manually:
 
 ```bash
-./scripts/helm-dependency-update.sh
-./scripts/verify.sh
-./scripts/template.sh
-./scripts/package.sh
+make verify
 ```
 
 ## Common Mistakes

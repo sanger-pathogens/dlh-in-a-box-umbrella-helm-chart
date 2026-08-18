@@ -99,8 +99,7 @@ It is intentionally narrow: provenance copies and the guides that explain them.
 After changing anything here, run:
 
 ```bash
-./scripts/license-check.sh
-./scripts/verify.sh
+make verify
 ```
 
 ## Common Mistakes

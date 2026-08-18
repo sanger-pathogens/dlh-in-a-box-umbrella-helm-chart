@@ -467,22 +467,11 @@ If you need to:
 From the repository root:
 
 ```bash
-./scripts/helm-dependency-update.sh
-./scripts/docs-check.sh
-./scripts/verify.sh
-./scripts/template.sh
-./scripts/package.sh
+make verify
 make smoke-install
 ```
 
-How to choose the right checks:
-
-- doc-only or guide-structure changes: `docs-check.sh`
-- values, validation, or dependency changes: `verify.sh` and `template.sh`
-- chart packaging or dependency changes: `helm-dependency-update.sh` and
-  `package.sh`
-- auth, Ranger, browser proxy, or `values-local-auth.yaml` changes:
-  `make smoke-install`
+Use the smoke install if changing auth, Ranger, browser proxy, or `values-local-auth.yaml`
 
 ## Common Mistakes
 

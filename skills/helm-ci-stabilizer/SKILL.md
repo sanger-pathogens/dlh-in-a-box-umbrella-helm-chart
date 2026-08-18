@@ -11,7 +11,6 @@ Use this skill for failures in:
 - `.github/workflows/helm-publish.yaml`
 - `.github/workflows/helm-smoke-install.yaml`
 - `scripts/helm/helm-dependency-update.sh`
-- `scripts/verify.sh`
 - `scripts/helm/template.sh`
 - `scripts/helm/package.sh`
 - `scripts/helm/smoke-install.sh`
@@ -42,18 +41,15 @@ CI uses Helm `v3.12.0`. Prefer that version when reproducing.
 Normal gate:
 
 ```bash
-./scripts/helm-dependency-update.sh
-./scripts/verify.sh
-./scripts/template.sh
 rm -rf dist
-./scripts/package.sh
+make verify
 ```
 
 For smoke failures, use the workflow-equivalent path only when a Kubernetes
 context or kind cluster is available:
 
 ```bash
-./scripts/smoke-install.sh charts/dlh-in-a-box examples/values-local-auth.yaml
+make smoke-install
 ```
 
 ## Clean Helm State

@@ -158,15 +158,14 @@ That work belongs under `../../examples`, not here.
 
 After changing any fixture in this folder, run:
 
-```bash
-./scripts/render-contract.sh
-./scripts/verify.sh
+```commandline
+make render-contract
 ```
 
 ## Common Mistakes
 
 - adding a fixture file without adding the corresponding assertion in
-  `../../../ test/render-contract.sh`
+  `render-contract.sh`
 - putting too much content in one file so the failure reason becomes unclear
 - reusing a baseline that hides the specific rule you were trying to test
 

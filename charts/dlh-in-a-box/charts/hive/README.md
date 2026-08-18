@@ -207,9 +207,8 @@ If you need to:
 
 After changing anything here, run:
 
-```bash
-./scripts/template.sh
-./scripts/verify.sh
+```commandline
+make verify
 ```
 
 Use `helm template` output to confirm the expected number of metastore Services

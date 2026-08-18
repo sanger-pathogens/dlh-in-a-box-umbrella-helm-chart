@@ -213,8 +213,7 @@ If you need to:
 After changing these templates, run:
 
 ```bash
-./hack/template.sh
-./hack/lint.sh
+make verify
 ```
 
 Check the rendered output for:

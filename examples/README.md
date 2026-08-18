@@ -545,7 +545,6 @@ enablement, not a full platform profile.
 
 - `scripts/helm/template.sh` renders the chart against every example file unless you
   pass a smaller list
-- `../scripts/verify.sh` lints the chart against every example file
 - `scripts/helm/smoke-install.sh` uses `values-local-auth.yaml`
 - `test/render-contract.sh` uses the shared and local auth baselines as inputs
   for many negative tests
@@ -561,8 +560,7 @@ When an example changes, you should ask:
 For example changes, the normal validation path is:
 
 ```bash
-./scripts/verify.sh
-./scripts/template.sh
+make verify
 ```
 
 If you changed `values-local-auth.yaml` or anything identity-related, also run:
@@ -571,11 +569,6 @@ If you changed `values-local-auth.yaml` or anything identity-related, also run:
 make smoke-install
 ```
 
-If you changed validation rules that examples are supposed to satisfy, also run:
-
-```bash
-./scripts/render-contract.sh
-```
 
 ## Common Mistakes
 

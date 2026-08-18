@@ -62,14 +62,12 @@ This is an engineering-facing compliance record, not formal legal advice.
 
 ## Release checklist
 
-Before publishing a new chart version:
+Before publishing a new chart version, run the verification scripts:
+```commandline
+make verify
+```
 
-1. Run `scripts/helm/helm-dependency-update.sh` so local packaged dependencies match
-   the current source tree.
-2. Run `scripts/repo/license-check.sh` to verify required notice files and local
-   modification markers are still present.
-3. Run `scripts/verify.sh` and package the chart.
-4. If any dependency version changes, re-check whether the upstream license or
+If any dependency version changes, re-check whether the upstream license or
    `NOTICE` file changed before release.
 
 ## Important caveat

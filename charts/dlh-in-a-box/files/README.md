@@ -93,13 +93,16 @@ If you need to:
 
 After changing files in this folder, run:
 
-```bash
-./scripts/template.sh examples/values-local-auth.yaml
-./scripts/verify.sh
+```commandline
+make template
 ```
 
 Use the local auth smoke install when you changed a browser asset that could
 affect actual login flow.
+
+```commandline
+make smoke-install
+```
 
 ## Common Mistakes
 
