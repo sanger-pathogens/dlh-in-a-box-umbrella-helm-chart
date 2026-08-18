@@ -114,7 +114,6 @@ global:
         - admins
       useRangerGroups: false
       postgresql:
-        enabled: true
         existingSecret: dlh-ranger-postgresql
         passwordKey: password
         adminPasswordKey: postgres-password

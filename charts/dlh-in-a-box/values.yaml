@@ -246,7 +246,6 @@ global:
       dataRoles: {}
       useRangerGroups: false
       postgresql:
-        enabled: true
         host: ""
         database: ranger
         username: rangeradmin
