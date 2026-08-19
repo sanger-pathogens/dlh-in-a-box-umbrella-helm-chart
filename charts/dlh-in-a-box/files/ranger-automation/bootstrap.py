@@ -3,7 +3,6 @@ import datetime
 import json
 import os
 import re
-import secrets
 import time
 import urllib.error
 import urllib.parse
@@ -200,73 +199,6 @@ def list_policies(service_name):
     return request("GET", path, ok=(200,)) or []
 
 
-def list_users():
-    users = []
-    start_index = 0
-    page_size = 200
-    while True:
-        payload = request(
-            "GET",
-            f"/service/xusers/users?startIndex={start_index}&pageSize={page_size}",
-            ok=(200,),
-        ) or {}
-        batch = payload.get("vXUsers", []) or []
-        if not batch:
-            break
-        users.extend(batch)
-        total_count = int(payload.get("totalCount", len(users)) or len(users))
-        if len(users) >= total_count:
-            break
-        start_index += len(batch)
-    return users
-
-
-def build_managed_user(username, first_name="", last_name="", email_address=""):
-    username = str(username or "").strip()
-    first_name = str(first_name or "").strip() or username
-    last_name = str(last_name or "").strip() or "User"
-    email_address = str(email_address or "").strip()
-    return {
-        "name": username,
-        "firstName": first_name,
-        "lastName": last_name,
-        "emailAddress": email_address,
-        "password": secrets.token_urlsafe(32),
-        "status": 1,
-        "isVisible": 1,
-        "userSource": 1,
-        "userRoleList": ["ROLE_USER"],
-        "syncSource": "KEYCLOAK_LOCAL",
-    }
-
-
-def ensure_users_exist(usernames):
-    existing_usernames = {
-        str(user.get("name", "")).strip()
-        for user in list_users()
-        if str(user.get("name", "")).strip()
-    }
-    missing = [
-        build_managed_user(username)
-        for username in normalize_names(usernames)
-        if username not in existing_usernames
-    ]
-    if not missing:
-        return
-    created = []
-    for user in missing:
-        try:
-            request("POST", "/service/xusers/users", user, ok=(200, 201))
-            created.append(user["name"])
-        except urllib.error.HTTPError as exc:
-            detail = str(getattr(exc, "ranger_body", "")).lower()
-            if exc.code == 400 and "duplicate" in detail:
-                continue
-            raise
-    if created:
-        print("Seeded Ranger users: " + ", ".join(sorted(created)))
-
-
 def get_role(service_name, role_name):
     del service_name
     for role in list_roles():
@@ -397,14 +329,10 @@ def build_catalog_acl_policies(config):
     write_accesses = read_accesses + ["insert", "create", "delete", "drop", "alter", "grant", "revoke"]
     policies = []
 
-    if not config["ranger"].get("importCatalogAcls", False):
-        return policies
-
     for catalog_name, catalog in config.get("catalogs", {}).items():
         roles_acl = catalog.get("authorizedRoles", {}) or {}
-        users_acl = catalog.get("authorizedUsers", {}) or {}
-        read_item = access_item(users_acl.get("read", []), [], roles_acl.get("read", []), read_accesses)
-        write_item = access_item(users_acl.get("write", []), [], roles_acl.get("write", []), write_accesses)
+        read_item = access_item([], [], roles_acl.get("read", []), read_accesses)
+        write_item = access_item([], [], roles_acl.get("write", []), write_accesses)
         policy_items = [item for item in [read_item, write_item] if item]
 
         if policy_items:
@@ -428,155 +356,83 @@ def build_catalog_acl_policies(config):
     return policies
 
 
-def policy_resource_values(policy, resource_key):
-    resource = (policy.get("resources") or {}).get(resource_key)
-    if resource is None:
-        return []
-    if isinstance(resource, dict):
-        values = resource.get("values", resource.get("value", []))
-        if isinstance(values, list):
-            return normalize_names(values)
-        return normalize_names([values])
-    if isinstance(resource, list):
-        return normalize_names(resource)
-    return normalize_names([resource])
-
-
-def policy_has_resource(policy, resource_key):
-    return resource_key in (policy.get("resources") or {})
-
-
-def has_self_trinouser_policy(policies):
-    for policy in policies or []:
-        values = policy_resource_values(policy, "trinouser")
-        if "{USER}" in values:
-            return True
-    return False
+BASELINE_TRINO_POLICIES = {
+    "selfQueryExecution": {
+        "name": "all - queryid",
+        "description": "Lets each authenticated user execute their own queries.",
+        "resources": {"queryid": "*"},
+        "accesses": ["execute"],
+    },
+    "selfImpersonation": {
+        "name": "all - trinouser",
+        "description": "Lets each authenticated principal become the matching Trino user.",
+        "resources": {"trinouser": "{USER}"},
+        "accesses": ["impersonate"],
+    },
+    "systemCatalogMetadata": {
+        "name": "all - system",
+        "description": "Allows each authenticated user to read JDBC metadata in the system catalog.",
+        "resources": {"catalog": "system", "schema": "jdbc", "table": "*", "column": "*"},
+        "accesses": ["select", "show", "use"],
+    },
+}
 
 
 def build_trino_baseline_policies(config):
     service_name = config["ranger"]["serviceName"]
     if not config["ranger"].get("trinoEnabled", False):
-        return []
-    bootstrap_policies = config["ranger"].get("bootstrapPolicies", []) or []
-    has_explicit_queryid_policy = any(
-        policy_has_resource(policy, "queryid") for policy in bootstrap_policies
-    )
-    has_explicit_self_trinouser_policy = has_self_trinouser_policy(bootstrap_policies)
-    has_explicit_system_policy = any(
-        str((policy.get("resources") or {}).get("catalog")) == "system"
-        for policy in bootstrap_policies
-    )
+        return [], []
+
+    toggles = config["ranger"].get("baselinePolicies") or {}
     policies = []
-    if not has_explicit_queryid_policy:
-        policies.append(
-            normalize_policy(
-                {
-                    "name": "all - queryid",
-                    "description": "Required Trino/Ranger baseline policy that lets each authenticated user execute their own queries.",
-                    "resources": {
-                        "queryid": "*",
+    removed_names = []
+    for key, defaults in BASELINE_TRINO_POLICIES.items():
+        toggle = toggles.get(key) or {}
+        name = str(toggle.get("name") or defaults["name"])
+        if toggle.get("enabled", True):
+            policies.append(
+                normalize_policy(
+                    {
+                        "name": name,
+                        "description": str(toggle.get("description") or defaults["description"]),
+                        "resources": defaults["resources"],
+                        "policyItems": [
+                            {
+                                "users": [],
+                                "groups": ["public"],
+                                "roles": [],
+                                "accesses": [
+                                    {"type": access, "isAllowed": True}
+                                    for access in defaults["accesses"]
+                                ],
+                                "conditions": [],
+                                "delegateAdmin": False,
+                            },
+                        ],
                     },
-                    "policyItems": [
-                        {
-                            "users": [],
-                            "groups": ["public"],
-                            "roles": [],
-                            "accesses": [
-                                {"type": "execute", "isAllowed": True},
-                            ],
-                            "conditions": [],
-                            "delegateAdmin": False,
-                        },
-                    ],
-                },
-                service_name,
+                    service_name,
+                )
             )
-        )
-    if not has_explicit_self_trinouser_policy:
-        policies.append(
-            normalize_policy(
-                {
-                    "name": "all - trinouser",
-                    "description": "Required Trino/Ranger baseline policy that lets each authenticated principal become the matching Trino user.",
-                    "resources": {
-                        "trinouser": "{USER}",
-                    },
-                    "policyItems": [
-                        {
-                            "users": [],
-                            "groups": ["public"],
-                            "roles": [],
-                            "accesses": [
-                                {"type": "impersonate", "isAllowed": True},
-                            ],
-                            "conditions": [],
-                            "delegateAdmin": False,
-                        },
-                    ],
-                },
-                service_name,
-            )
-        )
-    if not has_explicit_system_policy:
-        policies.append(
-            normalize_policy(
-                {
-                    "name": "all - system",
-                    "description": "Allow each authenticated user to read JDBC metadata in the system catalog.",
-                    "resources": {
-                        "catalog": "system",
-                        "schema": "jdbc",
-                        "table": "*",
-                        "column": "*",
-                    },
-                    "policyItems": [
-                        {
-                            "users": [],
-                            "groups": ["public"],
-                            "roles": [],
-                            "accesses": [
-                                {"type": "select", "isAllowed": True},
-                                {"type": "show", "isAllowed": True},
-                                {"type": "use", "isAllowed": True},
-                            ],
-                            "conditions": [],
-                            "delegateAdmin": False,
-                        },
-                    ],
-                },
-                service_name,
-            )
-        )
-    return policies
+        else:
+            removed_names.append(name)
+    return policies, removed_names
 
 
-def usernames_from_policy_items(items):
-    usernames = set()
-    for item in items or []:
-        usernames.update(normalize_names(item.get("users", [])))
-    return usernames
-
-
-def policy_principal_usernames(config, policies):
-    usernames = set()
-    ranger_cfg = config.get("ranger", {}) or {}
-    usernames.update(normalize_names(ranger_cfg.get("serviceAdminUsers", [])))
-    usernames.update(normalize_names(ranger_cfg.get("superUsers", [])))
-    service_username = str(ranger_cfg.get("serviceUsername") or "").strip()
-    if service_username:
-        usernames.add(service_username)
-    for policy in policies or []:
-        for key in [
-            "policyItems",
-            "denyPolicyItems",
-            "allowExceptions",
-            "denyExceptions",
-            "dataMaskPolicyItems",
-            "rowFilterPolicyItems",
-        ]:
-            usernames.update(usernames_from_policy_items(policy.get(key, [])))
-    return usernames
+def delete_policy_by_name(service_name, name):
+    path = (
+        "/service/public/v2/api/service/"
+        + urllib.parse.quote(service_name, safe="")
+        + "/policy/"
+        + urllib.parse.quote(name, safe="")
+    )
+    try:
+        existing = request("GET", path, ok=(200,))
+    except urllib.error.HTTPError as exc:
+        if exc.code != 404:
+            raise
+        return
+    if existing:
+        request("DELETE", policy_path(existing["id"]), ok=(204, 404))
 
 
 def normalize_policy_resource(value):
@@ -590,13 +446,13 @@ def normalize_policy_resource(value):
 def policy_item_compare_key(item):
     normalized = json.loads(json.dumps(item or {}))
     for key in ["users", "groups", "roles"]:
-        if key in normalized:
-            normalized[key] = normalize_names(normalized.get(key, []))
-    if "accesses" in normalized:
-        normalized["accesses"] = sorted(
-            normalized.get("accesses", []),
-            key=lambda value: json.dumps(value, sort_keys=True),
-        )
+        normalized[key] = normalize_names(normalized.get(key, []))
+    normalized["conditions"] = normalized.get("conditions", [])
+    normalized["delegateAdmin"] = bool(normalized.get("delegateAdmin", False))
+    normalized["accesses"] = sorted(
+        normalized.get("accesses", []),
+        key=lambda value: json.dumps(value, sort_keys=True),
+    )
     return json.dumps(normalized, sort_keys=True)
 
 
@@ -613,6 +469,7 @@ def merge_policy_item_list(existing_items, desired_items):
 
 def merge_policy_items(existing, desired):
     merged = dict(existing)
+    merged["name"] = desired["name"]
     for key in [
         "policyItems",
         "denyPolicyItems",
@@ -675,10 +532,11 @@ def upsert_policy(service_name, policy):
             else:
                 request("PUT", update_path, merge_policy_items(existing, policy), ok=(200,))
                 print(
-                    "Merged Ranger policy "
-                    + repr(name)
-                    + " into existing colliding policy "
+                    "Renamed colliding Ranger policy "
                     + repr(existing_name)
+                    + " to "
+                    + repr(name)
+                    + " (merged policy items)"
                 )
 
 
@@ -689,18 +547,18 @@ def main():
     upsert_service(config)
     reconcile_data_roles(config, service_name)
 
+    baseline_policies, disabled_baseline_policy_names = build_trino_baseline_policies(config)
     policies = []
-    policies.extend(build_trino_baseline_policies(config))
+    policies.extend(baseline_policies)
     policies.extend(build_catalog_acl_policies(config))
-    for raw_policy in config["ranger"].get("bootstrapPolicies", []):
-        policies.append(normalize_policy(raw_policy, service_name))
-
-    desired_policy_usernames = policy_principal_usernames(config, policies)
-    ensure_users_exist(desired_policy_usernames)
 
     for policy in policies:
         upsert_policy(service_name, policy)
         print(f"Reconciled Ranger policy: {policy['name']}")
+
+    for name in disabled_baseline_policy_names:
+        delete_policy_by_name(service_name, name)
+        print(f"Removed disabled Ranger baseline policy: {name}")
 
 
 if __name__ == "__main__":

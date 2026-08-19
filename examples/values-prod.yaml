@@ -158,7 +158,6 @@ global:
         - admins
       useRangerGroups: false
       postgresql:
-        enabled: true
         existingSecret: dlh-ranger-postgresql
         passwordKey: password
         adminPasswordKey: postgres-password
@@ -171,84 +170,6 @@ global:
         enabled: true
         schedule: "*/15 * * * *"
         syncSource: LDAP
-      importCatalogAcls: false
-      bootstrapPolicies:
-        - name: trino-redcap-access
-          description: Allow analyst and principal-investigator roles to read the redcap catalog and platform administrators to manage it.
-          resources:
-            catalog: redcap
-            schema: "*"
-            table: "*"
-            column: "*"
-          policyItems:
-            - groups: []
-              users: []
-              roles:
-                - platform-user
-                - platform-viewer
-              accesses:
-                - type: select
-                  isAllowed: true
-                - type: show
-                  isAllowed: true
-                - type: use
-                  isAllowed: true
-                - type: execute
-                  isAllowed: true
-              conditions: []
-              delegateAdmin: false
-            - groups: []
-              users: []
-              roles:
-                - platform-admin
-              accesses:
-                - type: select
-                  isAllowed: true
-                - type: show
-                  isAllowed: true
-                - type: use
-                  isAllowed: true
-                - type: execute
-                  isAllowed: true
-                - type: insert
-                  isAllowed: true
-                - type: create
-                  isAllowed: true
-                - type: delete
-                  isAllowed: true
-                - type: drop
-                  isAllowed: true
-                - type: alter
-                  isAllowed: true
-                - type: grant
-                  isAllowed: true
-                - type: revoke
-                  isAllowed: true
-              conditions: []
-              delegateAdmin: false
-        - name: trino-redcap-mask-identifiers
-          description: Mask direct identifier columns for analyst and principal-investigator roles.
-          policyType: 1
-          resources:
-            catalog: redcap
-            schema: patient_data
-            table: participants
-            column:
-              - national_id
-              - phone_number
-          dataMaskPolicyItems:
-            - groups: []
-              users: []
-              roles:
-                - platform-user
-                - platform-viewer
-              accesses:
-                - type: select
-                  isAllowed: true
-              dataMaskInfo:
-                dataMaskType: MASK_SHOW_LAST_4
-              conditions: []
-              delegateAdmin: false
   storage:
     backend: externalS3
     s3:
@@ -260,19 +181,6 @@ global:
   dataCatalogs:
     redcap:
       type: deltaLake
-      governance:
-        dataType: research
-        classification: restricted-identifiable
-        containsDirectIdentifiers: true
-        containsQuasiIdentifiers: true
-        consentBasis: consent-and-dcc-approval
-        irbStatus: required-approved
-        sharingStatus: approved-secondary-use
-        ownerPi: redcap-pi
-        dataSteward: data-platform-team
-        sourceSystem: redcap
-        approvalReference: DCC-PROD-001
-        retentionNotes: Retain according to the approved study retention schedule.
 
 trino:
   accessControl:

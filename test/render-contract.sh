@@ -374,16 +374,6 @@ expect_fail_any \
   -f "${FIXTURE_DIR}/missing-environment.yaml"
 
 expect_fail \
-  "global.dataCatalogs.unclassified.governance is required for dev and prod environments." \
-  -f "${DEV_VALUES}" \
-  -f "${FIXTURE_DIR}/missing-governance.yaml"
-
-expect_fail \
-  "global.dataCatalogs.pii_smoke is restricted-identifiable and contains direct or quasi identifiers, so authorization.ranger.bootstrapPolicies must include a column allowlist, masking policy, or row-filter policy for this catalog." \
-  -f "${DEV_VALUES}" \
-  -f "${FIXTURE_DIR}/missing-fine-grained-policy.yaml"
-
-expect_fail \
   "global.identity.external.clients.prefectAutomation.clientId is required when machine access for Prefect is enabled." \
   -f examples/values-dev.yaml \
   -f "${FIXTURE_DIR}/prefect-automation-missing-client-id.yaml"

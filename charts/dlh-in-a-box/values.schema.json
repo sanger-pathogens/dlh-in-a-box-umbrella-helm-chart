@@ -4,6 +4,15 @@
   "type": "object",
   "additionalProperties": true,
   "definitions": {
+    "baselinePolicyToggle": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "name": { "type": "string" },
+        "description": { "type": "string" }
+      }
+    },
     "catalogAcl": {
       "type": "object",
       "additionalProperties": true,
@@ -17,50 +26,6 @@
           "items": { "type": "string" }
         }
       }
-    },
-    "catalogGovernance": {
-      "type": "object",
-      "additionalProperties": false,
-      "properties": {
-        "dataType": {
-          "type": "string",
-          "enum": ["research", "surveillance", "routineClinical", "derived", "public"]
-        },
-        "classification": {
-          "type": "string",
-          "enum": ["restricted-identifiable", "restricted-deidentified", "internal-deidentified", "public"]
-        },
-        "containsDirectIdentifiers": { "type": "boolean" },
-        "containsQuasiIdentifiers": { "type": "boolean" },
-        "consentBasis": { "type": "string", "minLength": 1 },
-        "irbStatus": {
-          "type": "string",
-          "enum": ["required-approved", "required-pending", "not-required"]
-        },
-        "sharingStatus": {
-          "type": "string",
-          "enum": ["pi-exclusive", "internal-only", "approved-secondary-use", "public"]
-        },
-        "ownerPi": { "type": "string", "minLength": 1 },
-        "dataSteward": { "type": "string", "minLength": 1 },
-        "sourceSystem": { "type": "string", "minLength": 1 },
-        "approvalReference": { "type": "string", "minLength": 1 },
-        "retentionNotes": { "type": "string", "minLength": 1 }
-      },
-      "required": [
-        "dataType",
-        "classification",
-        "containsDirectIdentifiers",
-        "containsQuasiIdentifiers",
-        "consentBasis",
-        "irbStatus",
-        "sharingStatus",
-        "ownerPi",
-        "dataSteward",
-        "sourceSystem",
-        "approvalReference",
-        "retentionNotes"
-      ]
     },
     "accessModelRole": {
       "type": "object",
@@ -807,20 +772,27 @@
                 }
               }
             },
-            "importCatalogAcls": { "type": "boolean" },
-            "bootstrapPolicies": {
-              "type": "array",
-              "items": { "type": "object" }
+            "baselinePolicies": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "selfQueryExecution": { "$ref": "#/definitions/baselinePolicyToggle" },
+                "selfImpersonation": { "$ref": "#/definitions/baselinePolicyToggle" },
+                "systemCatalogMetadata": { "$ref": "#/definitions/baselinePolicyToggle" }
+              }
             },
             "bootstrap": {
               "type": "object",
-              "additionalProperties": true,
+              "additionalProperties": false,
               "properties": {
-                "enabled": { "type": "boolean" },
-                "importCatalogAcls": { "type": "boolean" },
-                "policies": {
-                  "type": "array",
-                  "items": { "type": "object" }
+                "image": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "repository": { "type": "string" },
+                    "tag": { "type": "string" },
+                    "pullPolicy": { "type": "string" }
+                  }
                 }
               }
             },
@@ -944,16 +916,8 @@
                   "enum": ["deltaLake", "hive"]
                 },
                 "authorizedRoles": {
-                  "description": "Preferred catalog-level role access lists used by generated Trino access rules and Ranger catalog ACL import.",
+                  "description": "Catalog-level role access lists used by generated Trino access rules and Ranger catalog ACL import.",
                   "$ref": "#/definitions/catalogAcl"
-                },
-                "authorizedUsers": {
-                  "description": "Simple catalog-level access-control lists used by generated Trino access rules.",
-                  "$ref": "#/definitions/catalogAcl"
-                },
-                "governance": {
-                  "description": "Mandatory governance metadata for shared, development, and production datasets.",
-                  "$ref": "#/definitions/catalogGovernance"
                 }
               }
             }

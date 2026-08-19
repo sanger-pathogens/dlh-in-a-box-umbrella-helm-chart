@@ -124,7 +124,7 @@ override wins where the files overlap.
 | `values-local-superset.yaml` | full profile | local Superset-focused profile |
 | `values-dev.yaml` | full profile | shared development baseline |
 | `values-prod.yaml` | full profile | production-shaped shared baseline |
-| `values-prod-layers.yaml` | full profile | production-shaped layered governance example |
+| `values-prod-layers.yaml` | full profile | production-shaped layered multi-catalog example |
 | `values-shared-auth.yaml` | full profile | shared profile that consumes an external IdP |
 | `values-external-s3.yaml` | specialist overlay | switches storage to an external S3-compatible backend |
 | `values-minio.yaml` | specialist overlay | enables MinIO-backed storage using an existing Secret |
@@ -422,12 +422,12 @@ Use this when:
 
 Purpose:
 
-- show a more explicit multi-catalog governance example for a prod-shaped
-  environment
+- show a more explicit multi-catalog example for a prod-shaped environment
 
 Auth model:
 
-- inherits the production-style governance pattern, not the local auth story
+- inherits the production-style shared-identity pattern, not the local auth
+  story
 
 Storage model:
 
@@ -443,16 +443,18 @@ Main behavior emphasized:
 
 - multiple platform roles
 - multiple Ranger bootstrap policies
-- multiple governed catalogs with explicit metadata
+- multiple catalogs (bronze, silver, gold, geospatial), each with its own
+  read/write bootstrap policies
 
 What it tests:
 
-- how layered catalogs and governance blocks scale beyond one dataset
+- how layered catalogs and per-catalog bootstrap policies scale beyond one
+  dataset
 
 Use this when:
 
-- you are working on governance or layered access examples, not on the simplest
-  install path
+- you are working on layered access examples, not on the simplest install
+  path
 
 ### `values-shared-auth.yaml`
 

@@ -15,7 +15,6 @@ flowchart TD
 
 | Path | Purpose |
 | --- | --- |
-| [build-handover-decks.mjs](build-handover-decks.mjs) | Reproducible generator for the decks, PDFs, previews, and source map. |
 | [pptx/](pptx/) | Editable PowerPoint handover decks with speaker notes. |
 | [pdf/](pdf/) | PDF exports for presentation or handout use. |
 | [previews/](previews/) | Full-slide PNG previews and contact sheets used for visual QA. |

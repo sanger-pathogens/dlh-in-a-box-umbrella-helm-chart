@@ -319,7 +319,7 @@ Each key becomes a Keycloak realm role; `appAccess` accepts any of `superset`,
 `keycloak`, and `minio`. See the commented example in `values.yaml` for the
 shape of a custom role.
 
-### `global.authorization.ranger.bootstrapPolicies`
+### `global.authorization.ranger.baselinePolicies`
 
 These are the policies the chart can reconcile into Ranger.
 
@@ -347,7 +347,7 @@ Ranger plugin for query-time enforcement.
 
 This distinction exists in the actual code:
 
-- `identity-validation.yaml` and `governance-validation.yaml` guard the
+- `identity-validation.yaml` and `authorization-validation.yaml` guard the
   supported combinations
 - the Trino chart patch points generate file access rules by default
 - the Trino Ranger plugin path is only configured when the explicit flag is on
@@ -412,7 +412,7 @@ rather than obvious small templates.
 | `values.yaml` | defines the shared contract across identity, governance, storage, browser tools, and dependency pass-throughs |
 | `values.schema.json` | formalizes valid input shape and helps catch broken values early |
 | `templates/identity-validation.yaml` | blocks unsupported identity combinations before resources render |
-| `templates/governance-validation.yaml` | blocks incomplete or unsafe governed-data setups |
+| `templates/authorization-validation.yaml` | blocks deprecated catalog ACL settings and `authorizedRoles` referencing an undeclared Ranger data role |
 | `templates/platform-home.yaml` | contains the landing page, embedded JavaScript, embedded Python helper API, launcher logic, and health checks |
 | `templates/cloudbeaver.yaml` | contains CloudBeaver bootstrap, proxy-header expectations, trust-store creation, and optional shared-connection seeding |
 | `templates/ranger-admin.yaml` | builds the Ranger Admin deployment and bootstraps it against PostgreSQL |
