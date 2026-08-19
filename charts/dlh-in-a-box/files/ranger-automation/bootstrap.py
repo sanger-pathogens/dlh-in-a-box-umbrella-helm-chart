@@ -399,7 +399,7 @@ def build_trino_baseline_policies(config):
                         "policyItems": [
                             {
                                 "users": [],
-                                "groups": [],
+                                "groups": ["public"],
                                 "roles": [],
                                 "accesses": [
                                     {"type": access, "isAllowed": True}
@@ -446,13 +446,13 @@ def normalize_policy_resource(value):
 def policy_item_compare_key(item):
     normalized = json.loads(json.dumps(item or {}))
     for key in ["users", "groups", "roles"]:
-        if key in normalized:
-            normalized[key] = normalize_names(normalized.get(key, []))
-    if "accesses" in normalized:
-        normalized["accesses"] = sorted(
-            normalized.get("accesses", []),
-            key=lambda value: json.dumps(value, sort_keys=True),
-        )
+        normalized[key] = normalize_names(normalized.get(key, []))
+    normalized["conditions"] = normalized.get("conditions", [])
+    normalized["delegateAdmin"] = bool(normalized.get("delegateAdmin", False))
+    normalized["accesses"] = sorted(
+        normalized.get("accesses", []),
+        key=lambda value: json.dumps(value, sort_keys=True),
+    )
     return json.dumps(normalized, sort_keys=True)
 
 
@@ -469,6 +469,7 @@ def merge_policy_item_list(existing_items, desired_items):
 
 def merge_policy_items(existing, desired):
     merged = dict(existing)
+    merged["name"] = desired["name"]
     for key in [
         "policyItems",
         "denyPolicyItems",
@@ -531,10 +532,11 @@ def upsert_policy(service_name, policy):
             else:
                 request("PUT", update_path, merge_policy_items(existing, policy), ok=(200,))
                 print(
-                    "Merged Ranger policy "
-                    + repr(name)
-                    + " into existing colliding policy "
+                    "Renamed colliding Ranger policy "
                     + repr(existing_name)
+                    + " to "
+                    + repr(name)
+                    + " (merged policy items)"
                 )
 
 
