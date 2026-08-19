@@ -131,7 +131,6 @@ global:
     s3:
       endpoint: http://dlh-minio:9000
       region: us-east-1
-      bucket: dlh-local
       pathStyleAccess: true
       accessKey: minioadmin
       secretKey: minioadmin123

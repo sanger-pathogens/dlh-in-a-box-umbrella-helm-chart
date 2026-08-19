@@ -4,7 +4,6 @@ global:
     s3:
       endpoint: https://s3-compatible.example.net
       region: us-east-1
-      bucket: lakehouse-shared
       pathStyleAccess: true
       existingSecret: lakehouse-object-store-credentials
 

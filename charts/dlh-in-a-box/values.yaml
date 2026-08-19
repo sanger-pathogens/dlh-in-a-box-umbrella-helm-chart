@@ -317,7 +317,6 @@ global:
     s3:
       endpoint: ""
       region: ""
-      bucket: ""
       pathStyleAccess: true
       # Do not commit real credentials in tracked values files. Prefer CI-injected
       # values, environment-specific secrets, or external secret delivery.

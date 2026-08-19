@@ -860,7 +860,7 @@
             "s3": {
               "description": "Connection and credential settings for the S3-compatible object-store endpoint.",
               "type": "object",
-              "additionalProperties": true,
+              "additionalProperties": false,
               "properties": {
                 "endpoint": {
                   "type": "string",
@@ -869,10 +869,6 @@
                 "region": {
                   "type": "string",
                   "description": "Logical region for the configured object store."
-                },
-                "bucket": {
-                  "type": "string",
-                  "description": "Primary bucket used by local examples and generated catalog wiring."
                 },
                 "pathStyleAccess": {
                   "type": "boolean",

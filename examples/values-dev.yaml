@@ -174,7 +174,6 @@ global:
     s3:
       endpoint: https://s3.example-dev.local
       region: us-east-1
-      bucket: redcap-dev
       pathStyleAccess: true
       existingSecret: dlh-dev-object-store-credentials
   dataCatalogs:

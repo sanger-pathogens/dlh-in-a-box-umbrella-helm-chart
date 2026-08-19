@@ -23,7 +23,6 @@ global:
     s3:
       endpoint: https://s3.example.com
       region: us-east-1
-      bucket: dlh-prod
       pathStyleAccess: true
       existingSecret: dlh-prod-object-store-credentials
   dataCatalogs:
