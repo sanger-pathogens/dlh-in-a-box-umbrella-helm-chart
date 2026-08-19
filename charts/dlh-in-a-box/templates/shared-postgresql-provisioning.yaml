@@ -3,6 +3,15 @@
 {{- $provisioning := get $sharedPostgresql "provisioning" | default dict -}}
 {{- $provisioningDatabases := get $provisioning "databases" | default dict -}}
 {{- $provisioningDatabaseList := get $provisioning "database-list" | default list -}}
+{{- $global := .Values.global | default dict -}}
+{{- $catalogs := get $global "dataCatalogs" | default dict -}}
+{{- $hivePostgres := get (get .Values "hive" | default dict) "postgres" | default dict -}}
+{{- $hiveMetastoreProvisioning := get $provisioningDatabases "hiveMetastore" | default dict -}}
+{{- $hiveMetastoreEnabled := default false (get $hiveMetastoreProvisioning "enabled") -}}
+{{- /* hiveMetastore is handled by its own dedicated blocks below (one database
+per dataCatalogs entry, sharing hive.postgres.* as the owner identity) rather
+than the generic single-database-per-name loops, so it's excluded here. */ -}}
+{{- $genericProvisioningDatabases := omit $provisioningDatabases "hiveMetastore" -}}
 
 {{- if and $sharedPostgresql.enabled (default true $provisioning.enabled) -}}
 {{- $image := $provisioning.image | default dict -}}
@@ -97,11 +106,16 @@ spec:
                 fi
               }
 
-{{- range $name, $database := $provisioningDatabases }}
+{{- range $name, $database := $genericProvisioningDatabases }}
               provision_database {{ $name | quote }} {{ $database.database | quote }} {{ $database.username | quote }} "APP_{{ $name | replace "-" "_" | upper }}_PASSWORD"
 {{- end }}
 {{- range $database := $provisioningDatabaseList }}
               provision_database {{ $database.name | quote }} {{ $database.database | quote }} {{ $database.username | quote }} "APP_{{ $database.name | replace "-" "_" | upper }}_PASSWORD"
+{{- end }}
+{{- if $hiveMetastoreEnabled }}
+{{- range $catalogName, $catalog := $catalogs }}
+              provision_database {{ printf "hive-%s" $catalogName | quote }} {{ $catalogName | quote }} {{ $hivePostgres.username | quote }} "APP_HIVE_METASTORE_PASSWORD"
+{{- end }}
 {{- end }}
           env:
             - name: PGHOST
@@ -120,7 +134,7 @@ spec:
                   name: {{ default $adminSecret.name $adminSecret.name | quote }}
                   key: {{ default "postgres-password" $adminSecret.passwordKey | quote }}
                   {{- end }}
-{{- range $name, $database := $provisioningDatabases }}
+{{- range $name, $database := $genericProvisioningDatabases }}
             - name: APP_{{ $name | replace "-" "_" | upper }}_PASSWORD
               valueFrom:
                 secretKeyRef:
@@ -133,5 +147,12 @@ spec:
                 secretKeyRef:
                   name: {{ $database.secretName | quote }}
                   key: {{ default "password" $database.passwordKey | quote }}
+{{- end }}
+{{- if $hiveMetastoreEnabled }}
+            - name: APP_HIVE_METASTORE_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $hivePostgres.existingSecret | quote }}
+                  key: password
 {{- end }}
 {{- end -}}

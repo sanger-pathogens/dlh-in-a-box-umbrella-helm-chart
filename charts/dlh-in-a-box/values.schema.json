@@ -1193,6 +1193,14 @@
                       }
                     }
                   ]
+                },
+                "hiveMetastore": {
+                  "description": "When enabled, provisions one database per global.dataCatalogs entry on the shared PostgreSQL instance, owned by hive.postgres.username/existingSecret (read directly -- no credentials are duplicated here). Requires hive.postgres.host to point at the shared PostgreSQL service.",
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "enabled": { "type": "boolean" }
+                  }
                 }
               }
             },

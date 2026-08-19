@@ -1845,7 +1845,8 @@ hive:
     host: ""
     port: "5432"
     username: ""
-    createDatabase: true
+    # Hive metastore databases are provisioned externally
+    createDatabase: false
     # Do not commit real database passwords in tracked values files.
     password: ""
     existingSecret: ""
