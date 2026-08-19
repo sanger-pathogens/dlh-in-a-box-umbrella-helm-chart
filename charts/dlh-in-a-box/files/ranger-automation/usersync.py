@@ -184,7 +184,7 @@ def desired_usernames(config, synced_ldap_users):
     service_username = str((config.get("ranger") or {}).get("serviceUsername") or "").strip()
     if service_username:
         desired.add(service_username)
-    for policy in (config.get("ranger") or {}).get("bootstrapPolicies", []) or []:
+    for policy in (config.get("ranger") or {}).get("baselinePolicies", []) or []:
         for key in [
             "policyItems",
             "denyPolicyItems",

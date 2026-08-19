@@ -18,7 +18,7 @@ global:
   authorization:
     ranger:
       enabled: true
-      bootstrapPolicies:
+      baselinePolicies:
         - name: bronze-read
           resources:
             catalog: bronze

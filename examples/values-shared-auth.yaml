@@ -139,7 +139,7 @@ global:
       useRangerGroups: false
       admin:
         browserUrl: https://ranger.shared.example.org
-      bootstrapPolicies:
+      baselinePolicies:
         - name: trino-default-read
           description: Shared-environment read access for the default catalog.
           resources:

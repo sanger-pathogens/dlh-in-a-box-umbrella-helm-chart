@@ -14,7 +14,6 @@
 {{- $ldapTrustedCaCertKey := include "dlh-in-a-box.identity.directory.trustedCaCertKey" . -}}
 {{- $ldapTrustedCaPath := printf "/opt/ranger-automation/ldap-ca/%s" $ldapTrustedCaCertKey -}}
 {{- $ldapHostAliases := default (list) $ldap.hostAliases -}}
-{{- $rangerBootstrap := get $ranger "bootstrap" | default dict -}}
 {{- $rangerAdmin := get $ranger "admin" | default dict -}}
 {{- $passwordReconcile := get $rangerAdmin "passwordReconcile" | default dict -}}
 {{- $passwordReconcileImage := get $passwordReconcile "image" | default dict -}}
@@ -42,7 +41,7 @@
 {{- end -}}
 {{- $keycloakRangerSyncEnabled := and (default false $identity.enabled) (eq $providerMode "bundledKeycloak") $localUserSyncRequested -}}
 {{- $localUserSyncImage := get $localUserSync "image" | default $usersyncImage -}}
-{{- $bootstrapPolicies := get $ranger "bootstrapPolicies" | default (list) -}}
+{{- $baselinePolicies := get $ranger "baselinePolicies" | default (list) -}}
 {{- if $ranger.enabled }}
 apiVersion: v1
 kind: ConfigMap
@@ -64,7 +63,7 @@ data:
         "superGroups" ($ranger.superGroups | default (list))
         "dataRoles" ($ranger.dataRoles | default dict)
         "trinoEnabled" (and (default false $ranger.enabled) (default false $rangerTrino.enabled))
-        "bootstrapPolicies" $bootstrapPolicies
+        "baselinePolicies" $baselinePolicies
       )
       "accessRoles" $accessRoles
       "catalogs" (.Values.global.dataCatalogs | default (dict))
@@ -229,7 +228,6 @@ spec:
                   key: {{ default "rangerTagsyncPassword" $rangerAdmin.tagsyncPasswordKey }}
 ---
 {{- end }}
-{{- if (dig "bootstrap" "enabled" true $ranger) }}
 apiVersion: batch/v1
 kind: Job
 metadata:
@@ -278,7 +276,6 @@ spec:
             name: {{ include "dlh-in-a-box.ranger.admin.serviceName" . }}-automation
             defaultMode: 0555
 ---
-{{- end }}
 {{- if $keycloakRangerSyncEnabled }}
 apiVersion: batch/v1
 kind: Job

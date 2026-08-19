@@ -763,15 +763,23 @@
                 }
               }
             },
-            "bootstrapPolicies": {
+            "baselinePolicies": {
               "type": "array",
               "items": { "type": "object" }
             },
             "bootstrap": {
               "type": "object",
-              "additionalProperties": true,
+              "additionalProperties": false,
               "properties": {
-                "enabled": { "type": "boolean" }
+                "image": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "repository": { "type": "string" },
+                    "tag": { "type": "string" },
+                    "pullPolicy": { "type": "string" }
+                  }
+                }
               }
             },
             "trino": {

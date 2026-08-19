@@ -3,7 +3,6 @@ import datetime
 import json
 import os
 import re
-import secrets
 import time
 import urllib.error
 import urllib.parse
@@ -200,73 +199,6 @@ def list_policies(service_name):
     return request("GET", path, ok=(200,)) or []
 
 
-def list_users():
-    users = []
-    start_index = 0
-    page_size = 200
-    while True:
-        payload = request(
-            "GET",
-            f"/service/xusers/users?startIndex={start_index}&pageSize={page_size}",
-            ok=(200,),
-        ) or {}
-        batch = payload.get("vXUsers", []) or []
-        if not batch:
-            break
-        users.extend(batch)
-        total_count = int(payload.get("totalCount", len(users)) or len(users))
-        if len(users) >= total_count:
-            break
-        start_index += len(batch)
-    return users
-
-
-def build_managed_user(username, first_name="", last_name="", email_address=""):
-    username = str(username or "").strip()
-    first_name = str(first_name or "").strip() or username
-    last_name = str(last_name or "").strip() or "User"
-    email_address = str(email_address or "").strip()
-    return {
-        "name": username,
-        "firstName": first_name,
-        "lastName": last_name,
-        "emailAddress": email_address,
-        "password": secrets.token_urlsafe(32),
-        "status": 1,
-        "isVisible": 1,
-        "userSource": 1,
-        "userRoleList": ["ROLE_USER"],
-        "syncSource": "KEYCLOAK_LOCAL",
-    }
-
-
-def ensure_users_exist(usernames):
-    existing_usernames = {
-        str(user.get("name", "")).strip()
-        for user in list_users()
-        if str(user.get("name", "")).strip()
-    }
-    missing = [
-        build_managed_user(username)
-        for username in normalize_names(usernames)
-        if username not in existing_usernames
-    ]
-    if not missing:
-        return
-    created = []
-    for user in missing:
-        try:
-            request("POST", "/service/xusers/users", user, ok=(200, 201))
-            created.append(user["name"])
-        except urllib.error.HTTPError as exc:
-            detail = str(getattr(exc, "ranger_body", "")).lower()
-            if exc.code == 400 and "duplicate" in detail:
-                continue
-            raise
-    if created:
-        print("Seeded Ranger users: " + ", ".join(sorted(created)))
-
-
 def get_role(service_name, role_name):
     del service_name
     for role in list_roles():
@@ -454,7 +386,7 @@ def build_trino_baseline_policies(config):
     service_name = config["ranger"]["serviceName"]
     if not config["ranger"].get("trinoEnabled", False):
         return []
-    bootstrap_policies = config["ranger"].get("bootstrapPolicies", []) or []
+    bootstrap_policies = config["ranger"].get("baselinePolicies", []) or []
     has_explicit_queryid_policy = any(
         policy_has_resource(policy, "queryid") for policy in bootstrap_policies
     )
@@ -545,34 +477,6 @@ def build_trino_baseline_policies(config):
             )
         )
     return policies
-
-
-def usernames_from_policy_items(items):
-    usernames = set()
-    for item in items or []:
-        usernames.update(normalize_names(item.get("users", [])))
-    return usernames
-
-
-def policy_principal_usernames(config, policies):
-    usernames = set()
-    ranger_cfg = config.get("ranger", {}) or {}
-    usernames.update(normalize_names(ranger_cfg.get("serviceAdminUsers", [])))
-    usernames.update(normalize_names(ranger_cfg.get("superUsers", [])))
-    service_username = str(ranger_cfg.get("serviceUsername") or "").strip()
-    if service_username:
-        usernames.add(service_username)
-    for policy in policies or []:
-        for key in [
-            "policyItems",
-            "denyPolicyItems",
-            "allowExceptions",
-            "denyExceptions",
-            "dataMaskPolicyItems",
-            "rowFilterPolicyItems",
-        ]:
-            usernames.update(usernames_from_policy_items(policy.get(key, [])))
-    return usernames
 
 
 def normalize_policy_resource(value):
@@ -688,11 +592,8 @@ def main():
     policies = []
     policies.extend(build_trino_baseline_policies(config))
     policies.extend(build_catalog_acl_policies(config))
-    for raw_policy in config["ranger"].get("bootstrapPolicies", []):
+    for raw_policy in config["ranger"].get("baselinePolicies", []):
         policies.append(normalize_policy(raw_policy, service_name))
-
-    desired_policy_usernames = policy_principal_usernames(config, policies)
-    ensure_users_exist(desired_policy_usernames)
 
     for policy in policies:
         upsert_policy(service_name, policy)

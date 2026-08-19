@@ -287,9 +287,10 @@ global:
         readiness:
           attempts: 120
           delaySeconds: 5
-      bootstrapPolicies: []
+      baselinePolicies: []
       bootstrap:
-        enabled: true
+        # bootstrap.py only uses the Python stdlib, so any Python 3 image
+        # works here (e.g. an internal mirror) -- no extra pip packages required.
         image:
           repository: python
           tag: 3.12-slim

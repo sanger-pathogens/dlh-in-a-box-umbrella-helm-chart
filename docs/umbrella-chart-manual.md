@@ -871,7 +871,7 @@ only carries the connection/type shape a catalog needs to render.
 | --- | --- |
 | `global.authorization.ranger.dataRoles` | Ranger role definitions the chart can reconcile |
 | `global.dataCatalogs.<name>.authorizedRoles` | catalog-wide read/write Ranger role grants; a catalog with any role listed gets a generated Ranger policy for the whole catalog |
-| `global.authorization.ranger.bootstrapPolicies` | explicit policy definitions the chart can reconcile into Ranger, including fine-grained (column-level, masking, row-filter) policies |
+| `global.authorization.ranger.baselinePolicies` | explicit policy definitions the chart can reconcile into Ranger, including fine-grained (column-level, masking, row-filter) policies |
 
 Catalog access can only be granted to Ranger roles. A catalog's `authorizedGroups`
 or `authorizedUsers` key is rejected outside `local` — there is no per-user or

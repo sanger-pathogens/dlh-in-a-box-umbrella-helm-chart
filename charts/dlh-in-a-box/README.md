@@ -319,7 +319,7 @@ Each key becomes a Keycloak realm role; `appAccess` accepts any of `superset`,
 `keycloak`, and `minio`. See the commented example in `values.yaml` for the
 shape of a custom role.
 
-### `global.authorization.ranger.bootstrapPolicies`
+### `global.authorization.ranger.baselinePolicies`
 
 These are the policies the chart can reconcile into Ranger.
 
