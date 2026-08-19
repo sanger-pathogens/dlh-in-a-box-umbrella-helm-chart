@@ -287,7 +287,21 @@ global:
         readiness:
           attempts: 120
           delaySeconds: 5
-      baselinePolicies: []
+      # Custom catalog access is expressed via
+      # dataCatalogs.{}.authorizedRoles instead. Disabling one removes it from Ranger.
+      baselinePolicies:
+        selfQueryExecution:
+          enabled: true
+          name: "trino - self query execution"
+          description: "Required Trino/Ranger baseline policy that lets each authenticated user execute their own queries."
+        selfImpersonation:
+          enabled: true
+          name: "trino - self impersonation"
+          description: "Required Trino/Ranger baseline policy that lets each authenticated user impersonate themselves."
+        systemCatalogMetadata:
+          enabled: true
+          name: "trino - catalog metadata"
+          description: "Baseline policy that provides access to system catalog metadata to each authenticated user."
       bootstrap:
         # bootstrap.py only uses the Python stdlib, so any Python 3 image
         # works here (e.g. an internal mirror) -- no extra pip packages required.

@@ -4,6 +4,15 @@
   "type": "object",
   "additionalProperties": true,
   "definitions": {
+    "baselinePolicyToggle": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "name": { "type": "string" },
+        "description": { "type": "string" }
+      }
+    },
     "catalogAcl": {
       "type": "object",
       "additionalProperties": true,
@@ -764,8 +773,13 @@
               }
             },
             "baselinePolicies": {
-              "type": "array",
-              "items": { "type": "object" }
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "selfQueryExecution": { "$ref": "#/definitions/baselinePolicyToggle" },
+                "selfImpersonation": { "$ref": "#/definitions/baselinePolicyToggle" },
+                "systemCatalogMetadata": { "$ref": "#/definitions/baselinePolicyToggle" }
+              }
             },
             "bootstrap": {
               "type": "object",

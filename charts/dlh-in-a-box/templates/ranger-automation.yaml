@@ -41,7 +41,7 @@
 {{- end -}}
 {{- $keycloakRangerSyncEnabled := and (default false $identity.enabled) (eq $providerMode "bundledKeycloak") $localUserSyncRequested -}}
 {{- $localUserSyncImage := get $localUserSync "image" | default $usersyncImage -}}
-{{- $baselinePolicies := get $ranger "baselinePolicies" | default (list) -}}
+{{- $baselinePolicies := get $ranger "baselinePolicies" | default dict -}}
 {{- if $ranger.enabled }}
 apiVersion: v1
 kind: ConfigMap
