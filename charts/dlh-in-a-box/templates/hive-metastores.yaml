@@ -10,6 +10,6 @@ inside that chart.
 {{- $hive := .Values.hive | default dict -}}
 {{- if and (default false (get $hive "enabled")) (gt (len (.Values.global.dataCatalogs | default dict)) 0) -}}
 {{- range $catalogName, $catalog := .Values.global.dataCatalogs }}
-{{ include "hive.metastoreInstance" (dict "context" $.Subcharts.hive "name" $catalogName) }}
+{{ include "hive.metastoreInstance" (dict "context" $.Subcharts.hive "name" $catalogName "warehouseDir" $catalog.warehouseDir) }}
 {{- end }}
 {{- end -}}

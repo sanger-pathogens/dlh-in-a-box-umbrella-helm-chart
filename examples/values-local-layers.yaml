@@ -15,21 +15,25 @@ global:
   dataCatalogs:
     bronze:
       type: deltaLake
+      warehouseDir: s3a://dlh-local/warehouse/bronze
       authorizedRoles:
         read: ["dlh_team", "surveillance_dashboard", "datahub"]
         write: ["admin"]
     silver:
       type: deltaLake
+      warehouseDir: s3a://dlh-local/warehouse/silver
       authorizedRoles:
         read: ["dlh_team", "surveillance_dashboard"]
         write: ["admin"]
     gold:
       type: deltaLake
+      warehouseDir: s3a://dlh-local/warehouse/gold
       authorizedRoles:
         read: ["dlh_team", "surveillance_dashboard"]
         write: ["admin"]
     geospatial:
       type: hive
+      warehouseDir: s3a://dlh-local/warehouse/geospatial
       authorizedRoles:
         read: ["dlh_team", "surveillance_dashboard"]
         write: ["admin"]
@@ -159,7 +163,6 @@ hive:
     accessKey: minioadmin
     secretKey: minioadmin123
     pathStyleAccess: true
-  warehouseDir: s3a://dlh-local/warehouse
   ingress:
     enabled: false
 

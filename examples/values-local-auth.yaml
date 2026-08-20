@@ -137,6 +137,7 @@ global:
   dataCatalogs:
     default:
       type: deltaLake
+      warehouseDir: s3a://dlh-local/warehouse
 
 trino:
   accessControl:
@@ -306,7 +307,6 @@ hive:
     accessKey: minioadmin
     secretKey: minioadmin123
     pathStyleAccess: true
-  warehouseDir: s3a://dlh-local/warehouse
   ingress:
     enabled: false
 

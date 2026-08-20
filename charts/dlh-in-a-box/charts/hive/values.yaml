@@ -57,7 +57,8 @@ s3:
   pathStyleAccess: true
   existingSecret: ""
 
-# Warehouse directory base
+# Complete warehouse location for this chart's own default metastore (e.g.
+# s3a://bucket/warehouse) -- used as-is for metastore.warehouse.dir.
 warehouseDir: ""
 
 # Name of the single metastore database this chart creates by default. Only

@@ -15,6 +15,7 @@ global:
   dataCatalogs:
     default:
       type: deltaLake
+      warehouseDir: s3a://dlh-local/warehouse
       authorizedRoles:
         read: ["local-reader"]
         write: ["local-admin"]
@@ -144,7 +145,6 @@ hive:
     accessKey: minioadmin
     secretKey: minioadmin123
     pathStyleAccess: true
-  warehouseDir: s3a://dlh-local/warehouse
   ingress:
     enabled: false
 

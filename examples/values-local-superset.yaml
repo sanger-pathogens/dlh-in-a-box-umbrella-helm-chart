@@ -15,6 +15,7 @@ global:
   dataCatalogs:
     default:
       type: deltaLake
+      warehouseDir: s3a://dlh-superset-local/warehouse
       authorizedRoles:
         read: ["superset"]
         write: ["local-admin"]

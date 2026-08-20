@@ -179,6 +179,7 @@ global:
   dataCatalogs:
     redcap:
       type: deltaLake
+      warehouseDir: s3a://dlh/warehouse
 
 trino:
   accessControl:

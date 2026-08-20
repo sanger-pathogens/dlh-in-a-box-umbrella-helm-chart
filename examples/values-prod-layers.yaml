@@ -28,12 +28,16 @@ global:
   dataCatalogs:
     bronze:
       type: deltaLake
+      warehouseDir: s3a://dlh/warehouse/bronze
     silver:
       type: deltaLake
+      warehouseDir: s3a://dlh/warehouse/silver
     gold:
       type: deltaLake
+      warehouseDir: s3a://dlh/warehouse/gold
     geospatial:
       type: hive
+      warehouseDir: s3a://dlh/warehouse/geospatial
 
 prefectWorker:
   worker:

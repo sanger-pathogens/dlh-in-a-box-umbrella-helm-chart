@@ -24,6 +24,21 @@ hive.postgresql.enabled or hiveMetastore, so nothing needs validating. */ -}}
   {{- fail "global.dataCatalogs is non-empty, which means templates/hive-metastores.yaml already creates one named metastore per catalog; leaving hive.metastore.enabled=true (the default) would also render Hive's own single default metastore alongside them. Set hive.metastore.enabled=false." -}}
 {{- end -}}
 
+{{- if and $hiveCatalogsActive (not (empty (get $hive "warehouseDir"))) -}}
+  {{- fail "global.dataCatalogs is non-empty, so each catalog carries its own required warehouseDir (passed to its own metastore instance) -- hive.warehouseDir is only used by this chart's own standalone default metastore, which is disabled in this mode, so leaving it set here is stale/misleading. Remove hive.warehouseDir." -}}
+{{- end -}}
+
+{{- $seenWarehouseDirs := dict -}}
+{{- range $catalogName, $catalog := $catalogs -}}
+  {{- $dir := get $catalog "warehouseDir" | default "" -}}
+  {{- if $dir -}}
+    {{- if hasKey $seenWarehouseDirs $dir -}}
+      {{- fail (printf "global.dataCatalogs.%s.warehouseDir and global.dataCatalogs.%s.warehouseDir are both %q: each catalog must have its own distinct warehouseDir." (get $seenWarehouseDirs $dir) $catalogName $dir) -}}
+    {{- end -}}
+    {{- $seenWarehouseDirs = set $seenWarehouseDirs $dir $catalogName -}}
+  {{- end -}}
+{{- end -}}
+
 {{- $sharedPostgresql := .Values.sharedPostgresql | default dict -}}
 {{- $provisioning := get $sharedPostgresql "provisioning" | default dict -}}
 {{- $provisioningDatabases := get $provisioning "databases" | default dict -}}

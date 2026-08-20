@@ -2,7 +2,7 @@
 Renders one complete metastore instance: Service, Deployment (+ optional
 Ingress), its metastore-site.xml config Secret, and its schema-init Job.
 
-Call with (dict "context" $ "name" "<optional>"):
+Call with (dict "context" $ "name" "<optional>" "warehouseDir" "<optional>"):
   - context: the root template context scoped to this chart's own Values
     (either this chart's own "$" when called from its own templates, or
     another chart's ".Subcharts.hive" when called from a parent composing
@@ -13,6 +13,11 @@ Call with (dict "context" $ "name" "<optional>"):
     catalog name reproduces existing resource names unchanged). Omitted, it
     renders a single, plainly-named metastore backed by .Values.database --
     this chart's own default, self-sufficient behavior.
+  - warehouseDir: optional override for this instance's own warehouse
+    location -- the complete path used as-is for metastore.warehouse.dir, no
+    suffix appended (a parent composing several instances that each need
+    their own bucket passes a different one per call). Omitted, falls back
+    to .Values.warehouseDir -- this chart's own default, also used verbatim.
 
 This chart has no notion of "catalogs" -- that's a concept owned by whoever
 composes multiple named instances of it, not by the instance itself.
@@ -21,6 +26,7 @@ composes multiple named instances of it, not by the instance itself.
 {{- $ctx := .context -}}
 {{- $name := .name | default "" -}}
 {{- $database := $name | default $ctx.Values.database -}}
+{{- $warehouseDir := .warehouseDir | default $ctx.Values.warehouseDir -}}
 {{- $suffix := "" -}}
 {{- $safeName := "" -}}
 {{- if $name -}}
@@ -126,7 +132,7 @@ stringData:
       </property>
       <property>
         <name>metastore.warehouse.dir</name>
-        <value>{{ include "hive.xmlEscape" (printf "%s/%s" $ctx.Values.warehouseDir $database) }}</value>
+        <value>{{ include "hive.xmlEscape" $warehouseDir }}</value>
       </property>
       <property>
         <name>metastore.thrift.port</name>
@@ -162,7 +168,7 @@ spec:
     metadata:
       annotations:
         checksum/init-config: {{ printf "%s|%s" $postgresHost $postgresPort | sha256sum }}
-        checksum/metastore-config: {{ printf "%s|%s|%s|%s" $postgresHost $postgresPort $database $ctx.Values.warehouseDir | sha256sum }}
+        checksum/metastore-config: {{ printf "%s|%s|%s|%s" $postgresHost $postgresPort $database $warehouseDir | sha256sum }}
         checksum/postgres-secret: {{ include "hive.postgresSecretChecksum" $ctx }}
         checksum/s3-secret: {{ include "hive.s3SecretChecksum" $ctx }}
       labels:

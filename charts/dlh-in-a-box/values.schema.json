@@ -905,6 +905,7 @@
             ".*": {
               "type": "object",
               "additionalProperties": true,
+              "required": ["warehouseDir"],
               "properties": {
                 "type": {
                   "type": "string",
@@ -914,6 +915,10 @@
                 "authorizedRoles": {
                   "description": "Catalog-level role access lists used by generated Trino access rules and Ranger catalog ACL import.",
                   "$ref": "#/definitions/catalogAcl"
+                },
+                "warehouseDir": {
+                  "type": "string",
+                  "description": "This catalog's own complete warehouse location (e.g. s3a://bucket/warehouse/catalog-name), passed to its Hive metastore instance and used as-is. Required on every catalog -- there is no shared fallback, so catalogs needing separate buckets and catalogs sharing one both say so explicitly. Must be unique across catalogs."
                 }
               }
             }
@@ -1619,7 +1624,7 @@
         },
         "warehouseDir": {
           "type": "string",
-          "description": "Base warehouse directory under which each metastore instance's own subfolder is created."
+          "description": "Complete warehouse location for this chart's own default single metastore."
         },
         "database": {
           "type": "string",
