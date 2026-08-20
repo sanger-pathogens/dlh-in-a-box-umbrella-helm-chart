@@ -43,7 +43,13 @@ hive.postgresql.enabled or hiveMetastore, so nothing needs validating. */ -}}
 {{- $provisioning := get $sharedPostgresql "provisioning" | default dict -}}
 {{- $provisioningDatabases := get $provisioning "databases" | default dict -}}
 {{- $hiveMetastoreProvisioning := get $provisioningDatabases "hiveMetastore" | default dict -}}
-{{- $hiveMetastoreEnabled := default false (get $hiveMetastoreProvisioning "enabled") -}}
+{{- $hiveMetastoreConfigured := default false (get $hiveMetastoreProvisioning "enabled") -}}
+{{- /* hiveMetastore only does anything once shared-postgresql-provisioning.yaml
+actually renders -- same gate that template itself uses -- so a stray
+hiveMetastore.enabled=true has no effect (and nothing to validate) unless
+sharedPostgresql itself is genuinely active. */ -}}
+{{- $sharedPostgresqlActive := and (default false $sharedPostgresql.enabled) (default true (get $provisioning "enabled")) -}}
+{{- $hiveMetastoreEnabled := and $hiveMetastoreConfigured $sharedPostgresqlActive -}}
 
 {{- if and $hiveCatalogsActive $hiveBundled $hiveMetastoreEnabled -}}
   {{- fail "hive.postgresql.enabled=true and sharedPostgresql.provisioning.databases.hiveMetastore.enabled=true are mutually exclusive: pick one system to own Hive's per-catalog databases -- Hive's own bundled instance (hive.postgresql), or the shared PostgreSQL provisioner (hiveMetastore)." -}}

@@ -58,3 +58,8 @@ datahub:
 
 hive:
   enabled: true
+  # global.dataCatalogs is non-empty, so the umbrella's own per-catalog loop
+  # (templates/hive-metastores.yaml) creates the named metastores instead of
+  # this chart's own single default one.
+  metastore:
+    enabled: false
