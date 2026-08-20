@@ -150,7 +150,6 @@ Important dependencies and what they are used for:
 | Hive | `hive` | local subchart for Hive Metastore generation |
 | Keycloak | `keycloak` | default bundled identity provider |
 | Ranger PostgreSQL | `rangerPostgresql` | backing database for Ranger Admin |
-| Hive PostgreSQL | `hivePostgresql` | backing database for the local Hive subchart |
 | Prefect server | `prefectServer` | self-hosted Prefect UI and API |
 | Prefect worker | `prefectWorker` | worker process for Prefect jobs |
 | oauth2-proxy | `prefect-auth-proxy`, `cloudbeaver-auth-proxy`, `ranger-auth-proxy` | browser auth boundary in front of selected apps |
@@ -218,7 +217,6 @@ These sections are mostly upstream chart values exposed at the umbrella level:
 - `superset`
 - `jupyterhub`
 - `vault`
-- `hivePostgresql`
 - `rangerPostgresql`
 
 ### Prefect Job Runner Pull Identity

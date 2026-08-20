@@ -126,7 +126,7 @@ Each catalog gets one Job that runs init containers in order:
 
 1. `wait-for-postgres` — polls `pg_isready` until PostgreSQL accepts connections
 2. `download-jdbc` — fetches the PostgreSQL JDBC driver
-3. `create-db` (optional, when `postgres.createDatabase=true`) — creates the
+3. `create-db` (optional, when `postgres.create=true`) — creates the
    per-catalog database if it does not already exist
 
 The Job's main container then runs `schematool -upgradeSchema`, falling back to

@@ -1,6 +1,10 @@
 enabled: true
 
 metastore:
+  # Whether this chart renders its own default, singularly-named metastore.
+  # Set false when something else (e.g. a parent chart composing several
+  # named instances) is calling hive.metastoreInstance itself instead.
+  enabled: true
   image:
     registry: docker.io
     repository: apache/hive
@@ -17,12 +21,29 @@ schemainit:
 jdbcDriver:
   url: "https://jdbc.postgresql.org/download/postgresql-42.7.4.jar"
 
-# PostgreSQL connection (external or deployed separately)
-postgres:
+# Bundled PostgreSQL instance owned entirely by this chart
+# (same convention as the Bitnami charts this project depends on: a
+# `postgresql.enabled` toggle for a self-contained instance). Hive's own
+# connecting role is that instance's superuser, so it self-creates its
+# per-catalog databases; that's only appropriate because it owns the whole
+# instance, not a scoped role on a Postgres instance shared with other
+# applications.
+postgresql:
+  enabled: true
+  nameOverride: hive-postgresql
+  auth:
+    enablePostgresUser: true
+    # Do not commit real database passwords in tracked values files.
+    postgresPassword: ""
+    existingSecret: ""
+
+# Connection details for an external PostgreSQL instance -- your own
+# externally managed cluster, or one this chart doesn't own (e.g. a shared
+# instance) -- used whenever postgresql.enabled=false.
+externalDatabase:
   host: ""
-  port: "5432"
-  username: ""
-  createDatabase: true
+  port: 5432
+  user: ""
   # Do not commit real database passwords in tracked values files.
   password: ""
   existingSecret: ""
@@ -39,16 +60,12 @@ s3:
 # Warehouse directory base
 warehouseDir: ""
 
+# Name of the single metastore database this chart creates by default. Only
+# used when nothing calls hive.metastoreInstance with an explicit name --
+# see templates/metastore.yaml and _metastore.tpl.
+database: hive
+
 ingress:
   enabled: false
   className: ""
   tlsSecretName: ""
-
-# Data catalogs configuration is sourced from global.dataCatalogs in the umbrella chart.
-# If using this chart stand-alone, you can uncomment and populate:
-# dataCatalogs:
-#   default:
-#     type: deltaLake  # deltaLake or hive
-#     authorizedRoles:
-#       read: []
-#       write: []

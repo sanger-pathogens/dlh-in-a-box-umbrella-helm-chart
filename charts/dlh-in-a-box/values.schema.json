@@ -1195,7 +1195,7 @@
                   ]
                 },
                 "hiveMetastore": {
-                  "description": "When enabled, provisions one database per global.dataCatalogs entry on the shared PostgreSQL instance, owned by hive.postgres.username/existingSecret (read directly -- no credentials are duplicated here). Requires hive.postgres.host to point at the shared PostgreSQL service.",
+                  "description": "When enabled, provisions one database per global.dataCatalogs entry on the shared PostgreSQL instance, owned by hive.externalDatabase.user/existingSecret (read directly -- no credentials are duplicated here). Requires hive.externalDatabase.host to point at the shared PostgreSQL service.",
                   "type": "object",
                   "additionalProperties": false,
                   "properties": {
@@ -1540,6 +1540,7 @@
           "type": "object",
           "additionalProperties": true,
           "properties": {
+            "enabled": { "type": "boolean" },
             "image": {
               "type": "object",
               "additionalProperties": true,
@@ -1574,15 +1575,32 @@
             }
           }
         },
-        "postgres": {
-          "description": "PostgreSQL connectivity for Hive metadata databases.",
+        "postgresql": {
+          "description": "Bundled PostgreSQL dependency owned by this chart (Hive's own dev-grade instance). enabled=true also makes Hive self-create its per-catalog databases, since it connects as that instance's superuser.",
+          "type": "object",
+          "additionalProperties": true,
+          "properties": {
+            "enabled": { "type": "boolean" },
+            "nameOverride": { "type": "string" },
+            "auth": {
+              "type": "object",
+              "additionalProperties": true,
+              "properties": {
+                "enablePostgresUser": { "type": "boolean" },
+                "postgresPassword": { "type": "string" },
+                "existingSecret": { "type": "string" }
+              }
+            }
+          }
+        },
+        "externalDatabase": {
+          "description": "Connection details for a PostgreSQL instance this chart doesn't own -- a genuinely external cluster, or a shared instance -- used whenever postgresql.enabled=false.",
           "type": "object",
           "additionalProperties": true,
           "properties": {
             "host": { "type": "string" },
             "port": { "type": ["string", "integer"] },
-            "username": { "type": "string" },
-            "createDatabase": { "type": "boolean" },
+            "user": { "type": "string" },
             "password": { "type": "string" },
             "existingSecret": { "type": "string" }
           }
@@ -1601,7 +1619,11 @@
         },
         "warehouseDir": {
           "type": "string",
-          "description": "Base warehouse directory under which per-catalog locations are created."
+          "description": "Base warehouse directory under which each metastore instance's own subfolder is created."
+        },
+        "database": {
+          "type": "string",
+          "description": "Database name for this chart's own default single metastore, used whenever nothing calls hive.metastoreInstance with an explicit name."
         },
         "ingress": {
           "description": "Optional ingress settings for exposing Hive metastore services.",
@@ -1620,15 +1642,6 @@
       "type": "object",
       "properties": {
         "enabled": { "type": "boolean" }
-      }
-    },
-    "hivePostgresql": {
-      "description": "Pass-through values for the PostgreSQL dependency used by the Hive subchart.",
-      "type": "object",
-      "additionalProperties": true,
-      "properties": {
-        "enabled": { "type": "boolean" },
-        "nameOverride": { "type": "string" }
       }
     }
   },

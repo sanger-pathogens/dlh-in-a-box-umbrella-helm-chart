@@ -128,7 +128,7 @@ dependencies:
     condition: sharedPostgresql.enabled
 
   - name: hive
-    version: "0.1.0"
+    version: "0.2.0"
     repository: file://charts/hive
     condition: hive.enabled
 
@@ -137,9 +137,3 @@ dependencies:
     version: "14.3.3"
     repository: https://charts.bitnami.com/bitnami
     condition: rangerPostgresql.enabled
-
-  - name: postgresql
-    alias: hivePostgresql
-    version: "14.3.3"
-    repository: https://charts.bitnami.com/bitnami
-    condition: hivePostgresql.enabled

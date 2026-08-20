@@ -217,7 +217,7 @@ institution-specific settings as needed.
 | `DLH-R-RANGER-DB` | Ranger Database | `Store` | PostgreSQL | Ranger PostgreSQL dependency/settings | Conditional | PostgreSQL store for Ranger policy definitions, users, roles, service metadata, and audit-related state. |
 | `DLH-R-MINIO` | In-Cluster Object Store | `Store` | MinIO / S3 API | `minio.enabled`; `global.storage.backend=minio` | Off | Optional S3-compatible object store deployed inside the cluster when a deployment does not use an external object-storage service. |
 | `DLH-R-HIVE` | Hive Metastore | `App` | Hive Metastore | `hive.enabled` | Off | Optional metastore service that records database, table, partition, and schema metadata used by Trino to interpret data in object storage. |
-| `DLH-R-HIVE-DB` | Hive Database | `Store` | PostgreSQL | `hivePostgresql` dependency/settings | Conditional | PostgreSQL persistence layer for Hive Metastore catalog metadata. |
+| `DLH-R-HIVE-DB` | Hive Database | `Store` | PostgreSQL | `hive.postgresql` dependency/settings | Conditional | PostgreSQL persistence layer for Hive Metastore catalog metadata. |
 | `DLH-R-SUPERSET` | Superset | `App` | Apache Superset | `superset.enabled` | Off | Optional web application for business intelligence, dashboard development, and visual exploration of governed datasets through Trino. |
 | `DLH-R-SUPERSET-DB` | Superset Database | `Store` | PostgreSQL | Superset chart settings | Conditional | Relational metadata store for Superset users, dashboards, charts, datasets, and application settings. |
 | `DLH-R-SUPERSET-REDIS` | Superset Queue | `Store` | Redis | Superset chart settings | Conditional | Cache and asynchronous task queue used by Superset for responsive dashboard execution and background work. |
