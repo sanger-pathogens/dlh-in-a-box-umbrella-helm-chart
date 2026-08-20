@@ -35,7 +35,6 @@ catalog governance, and app launch behavior.
 - `examples/values-shared-auth.yaml`
 - `test/render-contract.sh`
 - `test/render-contract/*.yaml`
-- `specs/ranger-keycloak-integration.md`
 
 ## Workflow
 
