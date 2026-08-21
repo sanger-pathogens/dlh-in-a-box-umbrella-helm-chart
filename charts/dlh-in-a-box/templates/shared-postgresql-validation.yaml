@@ -79,7 +79,8 @@
 {{- $prefectPostgresql := get $prefectServerValues "postgresql" | default dict -}}
 {{- $supersetPostgresql := get $supersetValues "postgresql" | default dict -}}
 {{- $rangerPostgresql := get .Values "rangerPostgresql" | default dict -}}
-{{- $hivePostgresql := get .Values "hivePostgresql" | default dict -}}
+{{- $hiveValues := get .Values "hive" | default dict -}}
+{{- $hivePostgresql := get $hiveValues "postgresql" | default dict -}}
 {{- $keycloakPostgresqlEnabled := true -}}
 {{- $prefectPostgresqlEnabled := true -}}
 {{- $supersetPostgresqlEnabled := true -}}
@@ -105,6 +106,6 @@
   {{- fail "a shared PostgreSQL instance is active, which requires rangerPostgresql.enabled=false." -}}
 {{- end -}}
 {{- if and (default false (get $hivePostgresql "enabled")) (not $allowBundledPostgresql) -}}
-  {{- fail "a shared PostgreSQL instance is active, which requires hivePostgresql.enabled=false." -}}
+  {{- fail "a shared PostgreSQL instance is active, which requires hive.postgresql.enabled=false." -}}
 {{- end -}}
 {{- end -}}

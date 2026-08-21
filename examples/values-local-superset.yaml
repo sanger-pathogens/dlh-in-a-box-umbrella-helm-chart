@@ -9,13 +9,13 @@ global:
     s3:
       endpoint: http://dlh-minio:9000
       region: us-east-1
-      bucket: dlh-superset-local
       pathStyleAccess: true
       accessKey: minioadmin
       secretKey: minioadmin123
   dataCatalogs:
     default:
       type: deltaLake
+      warehouseDir: s3a://dlh-superset-local/warehouse
       authorizedRoles:
         read: ["superset"]
         write: ["local-admin"]

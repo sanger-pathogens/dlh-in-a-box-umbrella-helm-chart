@@ -23,18 +23,21 @@ global:
     s3:
       endpoint: https://s3.example.com
       region: us-east-1
-      bucket: dlh-prod
       pathStyleAccess: true
       existingSecret: dlh-prod-object-store-credentials
   dataCatalogs:
     bronze:
       type: deltaLake
+      warehouseDir: s3a://dlh/warehouse/bronze
     silver:
       type: deltaLake
+      warehouseDir: s3a://dlh/warehouse/silver
     gold:
       type: deltaLake
+      warehouseDir: s3a://dlh/warehouse/gold
     geospatial:
       type: hive
+      warehouseDir: s3a://dlh/warehouse/geospatial
 
 prefectWorker:
   worker:
@@ -55,3 +58,8 @@ datahub:
 
 hive:
   enabled: true
+  # global.dataCatalogs is non-empty, so the umbrella's own per-catalog loop
+  # (templates/hive-metastores.yaml) creates the named metastores instead of
+  # this chart's own single default one.
+  metastore:
+    enabled: false

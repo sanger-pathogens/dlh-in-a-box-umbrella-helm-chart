@@ -144,7 +144,6 @@ global:
     s3:
       endpoint: https://s3.example.org
       region: eu-west-2
-      bucket: dlh-shared
       existingSecret: shared-object-store-credentials
       accessKeyKey: accessKey
       secretKeyKey: secretKey
@@ -152,6 +151,7 @@ global:
   dataCatalogs:
     default:
       type: deltaLake
+      warehouseDir: s3a://dlh/warehouse
 
 trino:
   ingress:

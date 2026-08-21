@@ -131,13 +131,13 @@ global:
     s3:
       endpoint: http://dlh-minio:9000
       region: us-east-1
-      bucket: dlh-local
       pathStyleAccess: true
       accessKey: minioadmin
       secretKey: minioadmin123
   dataCatalogs:
     default:
       type: deltaLake
+      warehouseDir: s3a://dlh-local/warehouse
 
 trino:
   accessControl:
@@ -276,40 +276,47 @@ minio:
 
 hive:
   enabled: true
-  postgres:
-    port: "5432"
-    username: postgres
-    password: localpostgres
+  # global.dataCatalogs is non-empty, so the umbrella's own per-catalog loop
+  # (templates/hive-metastores.yaml) creates the named metastores instead of
+  # this chart's own single default one.
+  metastore:
+    enabled: false
+  postgresql:
+    enabled: true
+    image:
+      registry: docker.io
+      repository: bitnamilegacy/postgresql
+      tag: 16.2.0-debian-12-r8
+    auth:
+      enablePostgresUser: true
+      postgresPassword: localpostgres
+    primary:
+      pgHbaConfiguration: |-
+        local   all             all                                     trust
+        host    all             all             127.0.0.1/32            trust
+        host    all             all             ::1/128                 trust
+        host    all             all             0.0.0.0/0               md5
+        host    all             all             ::/0                    md5
+      initdb:
+        scripts:
+          00-set-postgres-md5.sql: |
+            SET password_encryption = 'md5';
+            ALTER ROLE postgres WITH PASSWORD 'localpostgres';
   s3:
     endpoint: http://dlh-minio:9000
     accessKey: minioadmin
     secretKey: minioadmin123
     pathStyleAccess: true
-  warehouseDir: s3a://dlh-local/warehouse
   ingress:
     enabled: false
 
-hivePostgresql:
-  image:
-    registry: docker.io
-    repository: bitnamilegacy/postgresql
-    tag: 16.2.0-debian-12-r8
-  nameOverride: hive-postgresql
-  auth:
-    enablePostgresUser: true
-    postgresPassword: localpostgres
-  primary:
-    pgHbaConfiguration: |-
-      local   all             all                                     trust
-      host    all             all             127.0.0.1/32            trust
-      host    all             all             ::1/128                 trust
-      host    all             all             0.0.0.0/0               md5
-      host    all             all             ::/0                    md5
-    initdb:
-      scripts:
-        00-set-postgres-md5.sql: |
-          SET password_encryption = 'md5';
-          ALTER ROLE postgres WITH PASSWORD 'localpostgres';
+# Hive owns its own bundled instance above; the chart-wide default that has
+# the shared PostgreSQL provisioner own Hive's databases doesn't apply here.
+sharedPostgresql:
+  provisioning:
+    databases:
+      hiveMetastore:
+        enabled: false
 
 datahub:
   enabled: false

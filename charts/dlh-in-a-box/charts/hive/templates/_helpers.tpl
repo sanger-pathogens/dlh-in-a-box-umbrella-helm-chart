@@ -20,12 +20,34 @@ Full name for Hive resources
 {{- end -}}
 
 {{/*
-Default PostgreSQL service host for the bundled Hive metadata database.
-Allows the chart to remain release-name-safe while still permitting an
-explicit external host override.
+Fullname of the bundled PostgreSQL dependency (postgresql.enabled=true),
+following the same nameOverride convention that dependency's own templates
+use to name its Service/Secret -- not a guess, a read of the one field that
+actually controls both.
+*/}}
+{{- define "hive.bundledPostgresFullname" -}}
+{{- printf "%s-%s" .Release.Name (default "hive-postgresql" .Values.postgresql.nameOverride) -}}
+{{- end -}}
+
+{{/*
+PostgreSQL service host: the bundled dependency's computed fullname when
+postgresql.enabled=true, otherwise externalDatabase.host verbatim -- required
+in that case, with no implicit fallback/guessing.
 */}}
 {{- define "hive.postgresHost" -}}
-{{- default (printf "%s-hive-postgresql" .Release.Name) .Values.postgres.host -}}
+{{- if .Values.postgresql.enabled -}}
+{{- include "hive.bundledPostgresFullname" . -}}
+{{- else -}}
+{{- .Values.externalDatabase.host -}}
+{{- end -}}
+{{- end -}}
+
+{{- define "hive.postgresPort" -}}
+{{- if .Values.postgresql.enabled -}}
+5432
+{{- else -}}
+{{- .Values.externalDatabase.port -}}
+{{- end -}}
 {{- end -}}
 
 {{- define "hive.lookupSecretValue" -}}
@@ -36,10 +58,18 @@ explicit external host override.
 {{- end -}}
 
 {{- define "hive.postgresSecretName" -}}
-{{- if .Values.postgres.existingSecret -}}
-{{- .Values.postgres.existingSecret -}}
+{{- if .Values.postgresql.enabled -}}
+{{- default (include "hive.bundledPostgresFullname" .) .Values.postgresql.auth.existingSecret -}}
 {{- else -}}
-{{- printf "%s-postgres-secret" (include "hive.fullname" .) -}}
+{{- default (printf "%s-postgres-secret" (include "hive.fullname" .)) .Values.externalDatabase.existingSecret -}}
+{{- end -}}
+{{- end -}}
+
+{{- define "hive.postgresSecretKey" -}}
+{{- if .Values.postgresql.enabled -}}
+postgres-password
+{{- else -}}
+password
 {{- end -}}
 {{- end -}}
 
@@ -52,26 +82,30 @@ explicit external host override.
 {{- end -}}
 
 {{- define "hive.postgresUsername" -}}
-{{- $resolved := "" -}}
-{{- if .Values.postgres.existingSecret -}}
-  {{- $resolved = include "hive.lookupSecretValue" (dict "namespace" .Release.Namespace "secretName" (include "hive.postgresSecretName" .) "secretKey" "username") -}}
-{{- end -}}
-{{- if $resolved -}}
-{{- $resolved -}}
+{{- if .Values.postgresql.enabled -}}
+postgres
 {{- else -}}
-{{- .Values.postgres.username -}}
+{{- $resolved := "" -}}
+{{- if .Values.externalDatabase.existingSecret -}}
+  {{- $resolved = include "hive.lookupSecretValue" (dict "namespace" .Release.Namespace "secretName" .Values.externalDatabase.existingSecret "secretKey" "username") -}}
+{{- end -}}
+{{- default .Values.externalDatabase.user $resolved -}}
 {{- end -}}
 {{- end -}}
 
 {{- define "hive.postgresPassword" -}}
+{{- if .Values.postgresql.enabled -}}
 {{- $resolved := "" -}}
-{{- if .Values.postgres.existingSecret -}}
-  {{- $resolved = include "hive.lookupSecretValue" (dict "namespace" .Release.Namespace "secretName" (include "hive.postgresSecretName" .) "secretKey" "password") -}}
+{{- if .Values.postgresql.auth.existingSecret -}}
+  {{- $resolved = include "hive.lookupSecretValue" (dict "namespace" .Release.Namespace "secretName" .Values.postgresql.auth.existingSecret "secretKey" "postgres-password") -}}
 {{- end -}}
-{{- if $resolved -}}
-{{- $resolved -}}
+{{- default .Values.postgresql.auth.postgresPassword $resolved -}}
 {{- else -}}
-{{- .Values.postgres.password -}}
+{{- $resolved := "" -}}
+{{- if .Values.externalDatabase.existingSecret -}}
+  {{- $resolved = include "hive.lookupSecretValue" (dict "namespace" .Release.Namespace "secretName" .Values.externalDatabase.existingSecret "secretKey" "password") -}}
+{{- end -}}
+{{- default .Values.externalDatabase.password $resolved -}}
 {{- end -}}
 {{- end -}}
 
@@ -100,13 +134,16 @@ explicit external host override.
 {{- end -}}
 
 {{- define "hive.postgresSecretChecksum" -}}
-{{- if .Values.postgres.existingSecret -}}
-{{- $secret := lookup "v1" "Secret" .Release.Namespace (include "hive.postgresSecretName" .) -}}
+{{- $ownExistingSecret := ternary .Values.postgresql.auth.existingSecret .Values.externalDatabase.existingSecret .Values.postgresql.enabled -}}
+{{- if $ownExistingSecret -}}
+{{- $secret := lookup "v1" "Secret" .Release.Namespace $ownExistingSecret -}}
 {{- if $secret -}}
 {{- $secret | toYaml | sha256sum -}}
 {{- else -}}
 external-secret-missing
 {{- end -}}
+{{- else if .Values.postgresql.enabled -}}
+{{- .Values.postgresql.auth.postgresPassword | sha256sum -}}
 {{- else -}}
 {{- include (print .Template.BasePath "/postgres-secret.yaml") . | sha256sum -}}
 {{- end -}}
@@ -125,6 +162,37 @@ external-secret-missing
 {{- end -}}
 {{- end -}}
 
+{{/*
+Env-var entries for the Postgres role Hive connects as. POSTGRES_USER is a
+fixed literal ("postgres") for the bundled instance's superuser, or a
+runtime secretKeyRef/literal for externalDatabase -- resolved by Kubernetes
+at container start, not baked in at template time. POSTGRES_PASSWORD is
+always a real secretKeyRef, since hive.postgresSecretName/postgresSecretKey
+resolve to an actual Secret either way (the bundled dependency's own, or
+externalDatabase's existingSecret / this chart's own generated fallback).
+*/}}
+{{- define "hive.postgresUserEnvEntry" -}}
+- name: POSTGRES_USER
+  {{- if .Values.postgresql.enabled }}
+  value: "postgres"
+  {{- else if .Values.externalDatabase.existingSecret }}
+  valueFrom:
+    secretKeyRef:
+      name: {{ .Values.externalDatabase.existingSecret }}
+      key: username
+  {{- else }}
+  value: {{ .Values.externalDatabase.user | quote }}
+  {{- end }}
+{{- end -}}
+
+{{- define "hive.postgresPasswordEnvEntry" -}}
+- name: POSTGRES_PASSWORD
+  valueFrom:
+    secretKeyRef:
+      name: {{ include "hive.postgresSecretName" . }}
+      key: {{ include "hive.postgresSecretKey" . }}
+{{- end -}}
+
 {{- define "hive.waitForPostgresInitContainer" -}}
 - name: wait-for-postgres
   image: postgres:15
@@ -139,15 +207,11 @@ external-secret-missing
         sleep 2
       done
   env:
-    - name: POSTGRES_USER
-      valueFrom:
-        secretKeyRef:
-          name: {{ include "hive.postgresSecretName" . }}
-          key: username
+    {{- include "hive.postgresUserEnvEntry" . | nindent 4 }}
     - name: POSTGRES_HOST
       value: {{ include "hive.postgresHost" . }}
     - name: POSTGRES_PORT
-      value: {{ .Values.postgres.port | quote }}
+      value: {{ include "hive.postgresPort" . | quote }}
 {{- end -}}
 
 {{- define "hive.downloadJdbcInitContainer" -}}

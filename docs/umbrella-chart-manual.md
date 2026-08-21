@@ -564,7 +564,6 @@ These mostly expose upstream chart values at the umbrella level:
 - `superset`
 - `jupyterhub`
 - `vault`
-- `hivePostgresql`
 - `rangerPostgresql`
 - `sharedPostgresql`
 
@@ -572,7 +571,10 @@ These mostly expose upstream chart values at the umbrella level:
 
 By default every app that needs PostgreSQL runs its own bundled bitnami pod
 (`keycloak.postgresql`, `prefectServer.postgresql`, `superset.postgresql`,
-`rangerPostgresql`, `hivePostgresql`). `sharedPostgresql` is an optional consolidation: one PostgreSQL instance plus a
+`rangerPostgresql`, `hive.postgresql` -- a dependency owned by the `hive`
+subchart itself rather than a sibling at the umbrella level, since
+`hive.postgresql.enabled` also decides whether Hive self-creates its
+per-catalog databases). `sharedPostgresql` is an optional consolidation: one PostgreSQL instance plus a
 chart-owned provisioning Job (`templates/shared-postgresql-provisioning.yaml`)
 that creates a database, role, and password Secret for each app listed in
 `sharedPostgresql.provisioning.database-list` or the new map-based
@@ -613,7 +615,7 @@ neither is set, if either is set without `enabled=true`, or if
 instance is active either way, it also requires disabling the bundled pod
 for every app it provisions for (`keycloak.postgresql.enabled=false`,
 `prefectServer.postgresql.enabled=false`, `superset.postgresql.enabled=false`,
-`rangerPostgresql.enabled=false`, `hivePostgresql.enabled=false`) unless
+`rangerPostgresql.enabled=false`, `hive.postgresql.enabled=false`) unless
 `sharedPostgresql.migration.allowBundledPostgresql=true` — useful for
 migrating one app at a time instead of all at once.
 
@@ -1267,9 +1269,9 @@ This is important enough to state twice:
 
 | Workflow | What it does |
 | --- | --- |
-| `helm-lint.yaml` | refresh dependencies, run `lint`, render, and package |
+| `helm-ci.yaml` (`verify` job) | refresh dependencies, license/security/docs checks, test, run `lint`, render, and package |
 | `helm-smoke-install.yaml` | create a kind cluster and run the validated local-auth smoke path |
-| `helm-publish.yaml` | derive publish version, lint, package, and push to GHCR |
+| `helm-ci.yaml` (`publish` job, needs `verify`) | derive publish version, package, and push to GHCR |
 
 Release rules:
 

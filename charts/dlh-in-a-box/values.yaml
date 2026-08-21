@@ -317,7 +317,6 @@ global:
     s3:
       endpoint: ""
       region: ""
-      bucket: ""
       pathStyleAccess: true
       # Do not commit real credentials in tracked values files. Prefer CI-injected
       # values, environment-specific secrets, or external secret delivery.
@@ -386,11 +385,6 @@ sharedPostgresql:
         username: rangeradmin
         secretName: dlh-ranger-postgresql
         passwordKey: password
-      - name: hive-redcap
-        database: redcap
-        username: hive
-        secretName: dlh-hive-metastore-postgres
-        passwordKey: password
       - name: superset
         database: superset
         username: superset
@@ -415,6 +409,10 @@ sharedPostgresql:
         connectionSecret:
           create: true
           name: dlh-prefect-postgresql-connection
+      # Provisions one database per global.dataCatalogs entry, owned by
+      # hive.externalDatabase.user/existingSecret.
+      hiveMetastore:
+        enabled: true
   migration:
     allowBundledPostgresql: false
 
@@ -1842,11 +1840,17 @@ hive:
       enabled: true
   jdbcDriver:
     url: "https://jdbc.postgresql.org/download/postgresql-42.7.4.jar"
-  postgres:
+  # Default to the shared/external PostgreSQL path, where the database is
+  # provisioned externally (sharedPostgresql.provisioning.databases.hiveMetastore,
+  # or an external cluster's own admin) -- not Hive's own bundled dev
+  # instance (postgresql.enabled=true is this chart's own out-of-the-box
+  # default, overridden here). See dlh-integration-validation.yaml.
+  postgresql:
+    enabled: false
+  externalDatabase:
     host: ""
-    port: "5432"
-    username: ""
-    createDatabase: true
+    port: 5432
+    user: hive
     # Do not commit real database passwords in tracked values files.
     password: ""
     existingSecret: ""
@@ -1864,14 +1868,10 @@ hive:
     tlsSecretName: ""
 
 vault:
-  enabled: true
+  enabled: false
   server:
     readinessProbe:
       # The upstream exec probe can take slightly more than 3 seconds on local
       # kind clusters, which leads to readiness flapping even when Vault is
       # healthy. Use a less brittle timeout as the umbrella default.
       timeoutSeconds: 5
-
-hivePostgresql:
-  enabled: false
-  nameOverride: hive-postgresql

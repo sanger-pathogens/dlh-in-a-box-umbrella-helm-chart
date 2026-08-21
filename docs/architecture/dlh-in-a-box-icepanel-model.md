@@ -113,8 +113,8 @@ product. It should not include Sanger or icddr,b deployment-specific settings.
 | `DLH-C2-TRINO-VENDORED` | Vendored Trino Chart | `Store` | Helm chart source/archive | `charts/dlh-in-a-box/charts/trino/`; `charts/dlh-in-a-box/charts/trino-0.34.0.tgz` | Local copy of the upstream Trino chart adapted for DLH-in-a-box identity, storage, and access-control integration. |
 | `DLH-C2-HIVE-SUBCHART` | Hive Metastore Local Subchart | `Store` | Helm subchart | `charts/dlh-in-a-box/charts/hive/`; `charts/dlh-in-a-box/charts/hive-0.1.0.tgz` | First-party Helm subchart that renders the optional Hive Metastore service used for SQL catalog metadata. |
 | `DLH-C2-EXAMPLE-PROFILES` | Example Values Profiles | `Store` | YAML example configuration files | `examples/*.yaml` | Example configuration files that demonstrate and test supported installation modes, including local, development, production, shared identity, in-cluster MinIO, and external S3 configurations. |
-| `DLH-C2-VALIDATION` | Chart Validation Automation | `App` | GitHub Actions / shell | `.github/workflows/helm-lint.yaml`; `.github/workflows/helm-smoke-install.yaml`; `scripts/` | Automated checks that lint, render, smoke-install, and test the package against documented configuration rules before publication. |
-| `DLH-C2-PUBLISH` | Chart Publish Automation | `App` | GitHub Actions / Helm | `.github/workflows/helm-publish.yaml`; `../../scripts/helm/package.sh` | Release automation that builds versioned Helm artifacts and publishes them for deployment repositories. |
+| `DLH-C2-VALIDATION` | Chart Validation Automation | `App` | GitHub Actions / shell | `.github/workflows/helm-ci.yaml` (`verify` job); `.github/workflows/helm-smoke-install.yaml`; `scripts/` | Automated checks that lint, render, smoke-install, and test the package against documented configuration rules before publication. |
+| `DLH-C2-PUBLISH` | Chart Publish Automation | `App` | GitHub Actions / Helm | `.github/workflows/helm-ci.yaml` (`publish` job); `../../scripts/helm/package.sh` | Release automation that builds versioned Helm artifacts and publishes them for deployment repositories. |
 | `DLH-C2-OCI-PACKAGE` | Published OCI Chart Package | `Store` | GHCR OCI Helm artifact | `oci://ghcr.io/sanger-pathogens/charts/dlh-in-a-box` | Versioned Helm chart artifact stored in the GHCR OCI registry and consumed by deployment repositories. |
 
 ### External Systems
@@ -217,7 +217,7 @@ institution-specific settings as needed.
 | `DLH-R-RANGER-DB` | Ranger Database | `Store` | PostgreSQL | Ranger PostgreSQL dependency/settings | Conditional | PostgreSQL store for Ranger policy definitions, users, roles, service metadata, and audit-related state. |
 | `DLH-R-MINIO` | In-Cluster Object Store | `Store` | MinIO / S3 API | `minio.enabled`; `global.storage.backend=minio` | Off | Optional S3-compatible object store deployed inside the cluster when a deployment does not use an external object-storage service. |
 | `DLH-R-HIVE` | Hive Metastore | `App` | Hive Metastore | `hive.enabled` | Off | Optional metastore service that records database, table, partition, and schema metadata used by Trino to interpret data in object storage. |
-| `DLH-R-HIVE-DB` | Hive Database | `Store` | PostgreSQL | `hivePostgresql` dependency/settings | Conditional | PostgreSQL persistence layer for Hive Metastore catalog metadata. |
+| `DLH-R-HIVE-DB` | Hive Database | `Store` | PostgreSQL | `hive.postgresql` dependency/settings | Conditional | PostgreSQL persistence layer for Hive Metastore catalog metadata. |
 | `DLH-R-SUPERSET` | Superset | `App` | Apache Superset | `superset.enabled` | Off | Optional web application for business intelligence, dashboard development, and visual exploration of governed datasets through Trino. |
 | `DLH-R-SUPERSET-DB` | Superset Database | `Store` | PostgreSQL | Superset chart settings | Conditional | Relational metadata store for Superset users, dashboards, charts, datasets, and application settings. |
 | `DLH-R-SUPERSET-REDIS` | Superset Queue | `Store` | Redis | Superset chart settings | Conditional | Cache and asynchronous task queue used by Superset for responsive dashboard execution and background work. |
@@ -447,7 +447,7 @@ applications.
 
 | ID | Name | Parent | Path | Description |
 | --- | --- | --- | --- | --- |
-| `DLH-C3-VALIDATE-LINT` | Helm Lint Workflow | `DLH-C2-VALIDATION` | `.github/workflows/helm-lint.yaml`; `../../scripts/verify.sh` | Runs automated checks for licensing, documentation, security, rendering rules, shell scripts, JSON schema, and Helm syntax. |
+| `DLH-C3-VALIDATE-LINT` | Helm Lint Workflow | `DLH-C2-VALIDATION` | `.github/workflows/helm-ci.yaml` (`verify` job); `../../scripts/verify.sh` | Runs automated checks for licensing, documentation, security, rendering rules, shell scripts, JSON schema, and Helm syntax. |
 | `DLH-C3-VALIDATE-DEPS` | Dependency Refresh Check | `DLH-C2-VALIDATION` | `../../scripts/helm/helm-dependency-update.sh`; `Chart.lock` | Refreshes Helm dependency archives and updates lock metadata so packaged dependencies remain reproducible. |
 | `DLH-C3-VALIDATE-RENDER` | Example Render Checks | `DLH-C2-VALIDATION` | `../../scripts/helm/template.sh`; `examples/*.yaml` | Renders every maintained example configuration file to verify that supported installation profiles produce valid manifests. |
 | `DLH-C3-VALIDATE-CONTRACT` | Render Contract Checks | `DLH-C2-VALIDATION` | `test/render-contract.sh`; `test/render-contract/` | Verifies expected render outputs and expected failure modes for the chart's documented configuration rules. |
@@ -458,7 +458,7 @@ applications.
 | ID | Name | Parent | Path | Description |
 | --- | --- | --- | --- | --- |
 | `DLH-C3-PUBLISH-PACKAGE` | Helm Package Step | `DLH-C2-PUBLISH` | `../../scripts/helm/package.sh`; `dist/` | Builds the versioned Helm chart archive for release. |
-| `DLH-C3-PUBLISH-OCI` | OCI Push Step | `DLH-C2-PUBLISH` | `.github/workflows/helm-publish.yaml` | Publishes the release chart package to the GHCR OCI registry. |
+| `DLH-C3-PUBLISH-OCI` | OCI Push Step | `DLH-C2-PUBLISH` | `.github/workflows/helm-ci.yaml` (`publish` job) | Publishes the release chart package to the GHCR OCI registry. |
 | `DLH-C3-PUBLISH-METADATA` | Release Metadata Step | `DLH-C2-PUBLISH` | `.github/release.yml`; `Chart.yaml` annotations | Records chart version, labels, annotations, and release metadata used by deployment repositories. |
 
 ### Relationships

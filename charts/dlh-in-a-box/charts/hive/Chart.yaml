@@ -2,7 +2,7 @@ apiVersion: v2
 name: hive
 description: Hive Metastore subchart for data lakehouse
 type: application
-version: 0.1.0
+version: 0.2.0
 appVersion: "0.1.0"
 home: https://github.com/sanger-pathogens/dlh-in-a-box-umbrella-helm-chart
 annotations:
@@ -10,3 +10,9 @@ annotations:
   org.opencontainers.image.licenses: Apache-2.0
 sources:
   - https://github.com/sanger-pathogens/dlh-in-a-box-umbrella-helm-chart
+
+dependencies:
+  - name: postgresql
+    version: "14.3.3"
+    repository: https://charts.bitnami.com/bitnami
+    condition: postgresql.enabled
