@@ -345,7 +345,7 @@ flowchart TD
   subgraph Validation["Render-time checks"]
     Schema[values schema]
     IdentityValidation[identity validation]
-    GovernanceValidation[governance validation]
+    AuthorizationValidation[authorization validation]
   end
 
   subgraph ChartLogic["Chart logic"]
@@ -362,10 +362,10 @@ flowchart TD
 
   Values --> Schema
   Values --> IdentityValidation
-  Values --> GovernanceValidation
+  Values --> AuthorizationValidation
   Identity --> IdentityValidation
-  Authorization --> GovernanceValidation
-  Catalogs --> GovernanceValidation
+  Authorization --> AuthorizationValidation
+  Catalogs --> AuthorizationValidation
   Values --> UmbrellaTemplates
   Identity --> UmbrellaTemplates
   Authorization --> UmbrellaTemplates
@@ -378,7 +378,7 @@ flowchart TD
   Values --> DependencyCharts
   Schema --> Release
   IdentityValidation --> Release
-  GovernanceValidation --> Release
+  AuthorizationValidation --> Release
   UmbrellaTemplates --> Release
   LocalHive --> Release
   VendoredTrino --> Release
@@ -564,7 +564,6 @@ These mostly expose upstream chart values at the umbrella level:
 - `superset`
 - `jupyterhub`
 - `vault`
-- `hivePostgresql`
 - `rangerPostgresql`
 - `sharedPostgresql`
 
@@ -572,7 +571,10 @@ These mostly expose upstream chart values at the umbrella level:
 
 By default every app that needs PostgreSQL runs its own bundled bitnami pod
 (`keycloak.postgresql`, `prefectServer.postgresql`, `superset.postgresql`,
-`rangerPostgresql`, `hivePostgresql`). `sharedPostgresql` is an optional consolidation: one PostgreSQL instance plus a
+`rangerPostgresql`, `hive.postgresql` -- a dependency owned by the `hive`
+subchart itself rather than a sibling at the umbrella level, since
+`hive.postgresql.enabled` also decides whether Hive self-creates its
+per-catalog databases). `sharedPostgresql` is an optional consolidation: one PostgreSQL instance plus a
 chart-owned provisioning Job (`templates/shared-postgresql-provisioning.yaml`)
 that creates a database, role, and password Secret for each app listed in
 `sharedPostgresql.provisioning.database-list` or the new map-based
@@ -613,7 +615,7 @@ neither is set, if either is set without `enabled=true`, or if
 instance is active either way, it also requires disabling the bundled pod
 for every app it provisions for (`keycloak.postgresql.enabled=false`,
 `prefectServer.postgresql.enabled=false`, `superset.postgresql.enabled=false`,
-`rangerPostgresql.enabled=false`, `hivePostgresql.enabled=false`) unless
+`rangerPostgresql.enabled=false`, `hive.postgresql.enabled=false`) unless
 `sharedPostgresql.migration.allowBundledPostgresql=true` — useful for
 migrating one app at a time instead of all at once.
 
@@ -657,7 +659,7 @@ Two files are the main fail-fast safety rails:
 | File | What it blocks |
 | --- | --- |
 | `templates/identity-validation.yaml` | unsupported identity combinations, missing client wiring, invalid local Keycloak versus LDAP combinations, and inconsistent app-auth assumptions |
-| `templates/governance-validation.yaml` | broken platform roles, missing exception metadata, incomplete governed-catalog metadata, and unsafe authorization combinations |
+| `templates/authorization-validation.yaml` | a missing `global.environment` when `global.dataCatalogs` is set, deprecated catalog `authorizedGroups`/`authorizedUsers` ACL settings, and `authorizedRoles` entries that reference an undeclared Ranger data role |
 | `templates/shared-postgresql-validation.yaml` | conflicting or incomplete `sharedPostgresql`/`sharedPostgresql.external` settings, and bundled per-app postgres pods left enabled alongside a shared instance |
 
 `values.schema.json` also enforces input shape, but it is not the whole story.
@@ -861,37 +863,39 @@ Important restriction:
 
 ## Governance And Authorization
 
-This chart is opinionated about governed analytics environments. It is not just
-an infrastructure wrapper.
-
-That means the docs must say something explicit that the code already implies:
-
-- terms like PI, IRB, consent basis, and approval reference are part of the
-  chart's current governance model
-- those are not generic software terms
-- in `dev` and `prod`, the chart expects governed-catalog metadata rather than
-  treating every catalog as an ungoverned toy example
+Data access in this chart is expressed through Ranger, not through catalog
+metadata. Ranger roles and policies are the mechanism; `global.dataCatalogs`
+only carries the connection/type shape a catalog needs to render.
 
 ### Governance Concepts
 
 | Concept | What it means in this chart |
 | --- | --- |
-| `global.authorization.platformRoles` | durable named platform roles that carry app entitlements and map into Ranger roles |
-| `global.dataCatalogs.<name>.governance` | catalog-level metadata used to validate whether a catalog may be exposed |
-| `global.authorization.ranger.bootstrapPolicies` | policy definitions the chart can reconcile into Ranger |
+| `global.authorization.ranger.dataRoles` | Ranger role definitions the chart can reconcile |
+| `global.dataCatalogs.<name>.authorizedRoles` | catalog-wide read/write Ranger role grants; a catalog with any role listed gets a generated Ranger policy for the whole catalog |
+| `global.authorization.ranger.baselinePolicies` | explicit policy definitions the chart can reconcile into Ranger, including fine-grained (column-level, masking, row-filter) policies |
 
-### What The Governance Validation Layer Enforces
+Catalog access can only be granted to Ranger roles. A catalog's `authorizedGroups`
+or `authorizedUsers` key is rejected outside `local` — there is no per-user or
+per-group ACL path.
 
-Representative rules enforced by `governance-validation.yaml` include:
+Dataset sensitivity/classification metadata (data type, IRB status, consent
+basis, PHI identifiers, retention, and so on) is not part of this chart. If an
+institution needs to track and enforce that, it lives outside the chart, in
+whatever system owns the dataset's schema/classification decisions.
 
-- every platform role needs a description
-- app entitlements must use supported app names
-- nested platform roles must point at real platform roles
-- direct-user exceptions need approval reference, reason, grantor, and expiry
-- governed catalogs in `dev` and `prod` need the required governance metadata
-- restricted data cannot rely on unsafe wildcard access patterns
-- restricted identifiable data with identifiers needs fine-grained masking or
-  row-filter policy coverage
+### What The Authorization Validation Layer Enforces
+
+`authorization-validation.yaml` enforces three things:
+
+- `global.environment` must be set to `local`, `dev`, or `prod` whenever
+  `global.dataCatalogs` is non-empty
+- outside `local`, a catalog's `authorizedGroups` or `authorizedUsers` key is
+  rejected — catalog access must go through `authorizedRoles` or an explicit
+  Ranger bootstrap policy using Ranger role names
+- when Ranger is enabled, every role listed under a catalog's
+  `authorizedRoles.read`/`.write` must be declared (and not disabled) under
+  `global.authorization.ranger.dataRoles`
 
 ### Ranger Automation Flow
 
@@ -970,8 +974,9 @@ That one shared block becomes:
 
 - Hive Metastore resources
 - Trino catalog configuration
-- governance validation input
-- Ranger bootstrap policy input
+- catalog ACL validation input (the `authorizedGroups`/`authorizedUsers`
+  rejection check)
+- Ranger bootstrap and catalog-ACL policy input
 
 ### Data Path Diagram
 
@@ -980,7 +985,6 @@ flowchart TD
   subgraph Inputs["Shared chart inputs"]
     Catalogs[global dataCatalogs]
     Storage[global storage]
-    Governance[governance metadata]
   end
 
   subgraph HivePath["Local Hive subchart"]
@@ -1007,7 +1011,6 @@ flowchart TD
 
   Catalogs --> HiveConfig
   Catalogs --> CatalogSecret
-  Governance --> CatalogSecret
   Storage --> HiveConfig
   Storage --> CatalogSecret
   HiveConfig --> HiveRuntime
@@ -1155,7 +1158,7 @@ If you need to change one specific thing, start here.
 | shared defaults or values contract | `charts/dlh-in-a-box/values.yaml` | this defines the umbrella chart surface |
 | input shape validation | `charts/dlh-in-a-box/values.schema.json` | schema catches structural mistakes early |
 | supported auth combinations | `charts/dlh-in-a-box/templates/identity-validation.yaml` | this file rejects invalid identity modes |
-| governed-catalog and role rules | `charts/dlh-in-a-box/templates/governance-validation.yaml` | this file rejects invalid governance combinations |
+| catalog ACL and environment rules | `charts/dlh-in-a-box/templates/authorization-validation.yaml` | this file rejects deprecated catalog ACL settings, a missing `global.environment`, and `authorizedRoles` referencing an undeclared Ranger data role |
 | launchpad UI or helper API | `charts/dlh-in-a-box/templates/platform-home.yaml` | most launchpad logic is inline there |
 | CloudBeaver bootstrap or trust behavior | `charts/dlh-in-a-box/templates/cloudbeaver.yaml` | repo-owned wrapper logic lives there |
 | Ranger roles, policies, usersync, or exception audits | `charts/dlh-in-a-box/templates/ranger-automation.yaml` | this is the main reconciliation engine |
@@ -1266,9 +1269,9 @@ This is important enough to state twice:
 
 | Workflow | What it does |
 | --- | --- |
-| `helm-lint.yaml` | refresh dependencies, run `lint`, render, and package |
+| `helm-ci.yaml` (`verify` job) | refresh dependencies, license/security/docs checks, test, run `lint`, render, and package |
 | `helm-smoke-install.yaml` | create a kind cluster and run the validated local-auth smoke path |
-| `helm-publish.yaml` | derive publish version, lint, package, and push to GHCR |
+| `helm-ci.yaml` (`publish` job, needs `verify`) | derive publish version, package, and push to GHCR |
 
 Release rules:
 
@@ -1377,7 +1380,7 @@ renders.
 | oauth2-proxy | the browser-auth boundary used in front of some apps |
 | platform role | a durable named role in the chart's authorization model |
 | platform role exception | a controlled direct-user exception with metadata and expiry |
-| governed catalog | a catalog in `global.dataCatalogs` with governance metadata used for validation and policy decisions |
+| catalog ACL | the `authorizedRoles` read/write Ranger role lists on a catalog in `global.dataCatalogs`; any role listed generates a Ranger policy for the whole catalog |
 
 ## Secrets And Environment Appendix
 

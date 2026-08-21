@@ -4,6 +4,15 @@
   "type": "object",
   "additionalProperties": true,
   "definitions": {
+    "baselinePolicyToggle": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "name": { "type": "string" },
+        "description": { "type": "string" }
+      }
+    },
     "catalogAcl": {
       "type": "object",
       "additionalProperties": true,
@@ -17,50 +26,6 @@
           "items": { "type": "string" }
         }
       }
-    },
-    "catalogGovernance": {
-      "type": "object",
-      "additionalProperties": false,
-      "properties": {
-        "dataType": {
-          "type": "string",
-          "enum": ["research", "surveillance", "routineClinical", "derived", "public"]
-        },
-        "classification": {
-          "type": "string",
-          "enum": ["restricted-identifiable", "restricted-deidentified", "internal-deidentified", "public"]
-        },
-        "containsDirectIdentifiers": { "type": "boolean" },
-        "containsQuasiIdentifiers": { "type": "boolean" },
-        "consentBasis": { "type": "string", "minLength": 1 },
-        "irbStatus": {
-          "type": "string",
-          "enum": ["required-approved", "required-pending", "not-required"]
-        },
-        "sharingStatus": {
-          "type": "string",
-          "enum": ["pi-exclusive", "internal-only", "approved-secondary-use", "public"]
-        },
-        "ownerPi": { "type": "string", "minLength": 1 },
-        "dataSteward": { "type": "string", "minLength": 1 },
-        "sourceSystem": { "type": "string", "minLength": 1 },
-        "approvalReference": { "type": "string", "minLength": 1 },
-        "retentionNotes": { "type": "string", "minLength": 1 }
-      },
-      "required": [
-        "dataType",
-        "classification",
-        "containsDirectIdentifiers",
-        "containsQuasiIdentifiers",
-        "consentBasis",
-        "irbStatus",
-        "sharingStatus",
-        "ownerPi",
-        "dataSteward",
-        "sourceSystem",
-        "approvalReference",
-        "retentionNotes"
-      ]
     },
     "accessModelRole": {
       "type": "object",
@@ -807,20 +772,27 @@
                 }
               }
             },
-            "importCatalogAcls": { "type": "boolean" },
-            "bootstrapPolicies": {
-              "type": "array",
-              "items": { "type": "object" }
+            "baselinePolicies": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "selfQueryExecution": { "$ref": "#/definitions/baselinePolicyToggle" },
+                "selfImpersonation": { "$ref": "#/definitions/baselinePolicyToggle" },
+                "systemCatalogMetadata": { "$ref": "#/definitions/baselinePolicyToggle" }
+              }
             },
             "bootstrap": {
               "type": "object",
-              "additionalProperties": true,
+              "additionalProperties": false,
               "properties": {
-                "enabled": { "type": "boolean" },
-                "importCatalogAcls": { "type": "boolean" },
-                "policies": {
-                  "type": "array",
-                  "items": { "type": "object" }
+                "image": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "repository": { "type": "string" },
+                    "tag": { "type": "string" },
+                    "pullPolicy": { "type": "string" }
+                  }
                 }
               }
             },
@@ -888,7 +860,7 @@
             "s3": {
               "description": "Connection and credential settings for the S3-compatible object-store endpoint.",
               "type": "object",
-              "additionalProperties": true,
+              "additionalProperties": false,
               "properties": {
                 "endpoint": {
                   "type": "string",
@@ -897,10 +869,6 @@
                 "region": {
                   "type": "string",
                   "description": "Logical region for the configured object store."
-                },
-                "bucket": {
-                  "type": "string",
-                  "description": "Primary bucket used by local examples and generated catalog wiring."
                 },
                 "pathStyleAccess": {
                   "type": "boolean",
@@ -937,6 +905,7 @@
             ".*": {
               "type": "object",
               "additionalProperties": true,
+              "required": ["warehouseDir"],
               "properties": {
                 "type": {
                   "type": "string",
@@ -944,16 +913,12 @@
                   "enum": ["deltaLake", "hive"]
                 },
                 "authorizedRoles": {
-                  "description": "Preferred catalog-level role access lists used by generated Trino access rules and Ranger catalog ACL import.",
+                  "description": "Catalog-level role access lists used by generated Trino access rules and Ranger catalog ACL import.",
                   "$ref": "#/definitions/catalogAcl"
                 },
-                "authorizedUsers": {
-                  "description": "Simple catalog-level access-control lists used by generated Trino access rules.",
-                  "$ref": "#/definitions/catalogAcl"
-                },
-                "governance": {
-                  "description": "Mandatory governance metadata for shared, development, and production datasets.",
-                  "$ref": "#/definitions/catalogGovernance"
+                "warehouseDir": {
+                  "type": "string",
+                  "description": "This catalog's own complete warehouse location (e.g. s3a://bucket/warehouse/catalog-name), passed to its Hive metastore instance and used as-is. Required on every catalog -- there is no shared fallback, so catalogs needing separate buckets and catalogs sharing one both say so explicitly. Must be unique across catalogs."
                 }
               }
             }
@@ -1233,6 +1198,14 @@
                       }
                     }
                   ]
+                },
+                "hiveMetastore": {
+                  "description": "When enabled, provisions one database per global.dataCatalogs entry on the shared PostgreSQL instance, owned by hive.externalDatabase.user/existingSecret (read directly -- no credentials are duplicated here). Requires hive.externalDatabase.host to point at the shared PostgreSQL service.",
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "enabled": { "type": "boolean" }
+                  }
                 }
               }
             },
@@ -1572,6 +1545,7 @@
           "type": "object",
           "additionalProperties": true,
           "properties": {
+            "enabled": { "type": "boolean" },
             "image": {
               "type": "object",
               "additionalProperties": true,
@@ -1606,15 +1580,32 @@
             }
           }
         },
-        "postgres": {
-          "description": "PostgreSQL connectivity for Hive metadata databases.",
+        "postgresql": {
+          "description": "Bundled PostgreSQL dependency owned by this chart (Hive's own dev-grade instance). enabled=true also makes Hive self-create its per-catalog databases, since it connects as that instance's superuser.",
+          "type": "object",
+          "additionalProperties": true,
+          "properties": {
+            "enabled": { "type": "boolean" },
+            "nameOverride": { "type": "string" },
+            "auth": {
+              "type": "object",
+              "additionalProperties": true,
+              "properties": {
+                "enablePostgresUser": { "type": "boolean" },
+                "postgresPassword": { "type": "string" },
+                "existingSecret": { "type": "string" }
+              }
+            }
+          }
+        },
+        "externalDatabase": {
+          "description": "Connection details for a PostgreSQL instance this chart doesn't own -- a genuinely external cluster, or a shared instance -- used whenever postgresql.enabled=false.",
           "type": "object",
           "additionalProperties": true,
           "properties": {
             "host": { "type": "string" },
             "port": { "type": ["string", "integer"] },
-            "username": { "type": "string" },
-            "createDatabase": { "type": "boolean" },
+            "user": { "type": "string" },
             "password": { "type": "string" },
             "existingSecret": { "type": "string" }
           }
@@ -1633,7 +1624,11 @@
         },
         "warehouseDir": {
           "type": "string",
-          "description": "Base warehouse directory under which per-catalog locations are created."
+          "description": "Complete warehouse location for this chart's own default single metastore."
+        },
+        "database": {
+          "type": "string",
+          "description": "Database name for this chart's own default single metastore, used whenever nothing calls hive.metastoreInstance with an explicit name."
         },
         "ingress": {
           "description": "Optional ingress settings for exposing Hive metastore services.",
@@ -1652,15 +1647,6 @@
       "type": "object",
       "properties": {
         "enabled": { "type": "boolean" }
-      }
-    },
-    "hivePostgresql": {
-      "description": "Pass-through values for the PostgreSQL dependency used by the Hive subchart.",
-      "type": "object",
-      "additionalProperties": true,
-      "properties": {
-        "enabled": { "type": "boolean" },
-        "nameOverride": { "type": "string" }
       }
     }
   },

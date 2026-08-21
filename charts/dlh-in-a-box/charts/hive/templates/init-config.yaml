@@ -5,4 +5,4 @@ metadata:
   namespace: {{ .Release.Namespace }}
 data:
   POSTGRES_HOST: {{ include "hive.postgresHost" . | quote }}
-  POSTGRES_PORT: {{ .Values.postgres.port | quote }}
+  POSTGRES_PORT: {{ include "hive.postgresPort" . | quote }}

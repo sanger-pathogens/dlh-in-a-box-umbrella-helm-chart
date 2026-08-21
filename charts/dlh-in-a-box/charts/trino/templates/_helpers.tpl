@@ -276,11 +276,8 @@ s3.path-style-access={{ $s3.pathStyleAccess }}
 {{- $first := false }}
 {{- range $catalogName, $catalog := $catalogs }}
   {{- $authorizedRoles := get $catalog "authorizedRoles" | default (dict) }}
-  {{- $authorizedUsers := get $catalog "authorizedUsers" | default (dict) }}
   {{- $roleWrite := get $authorizedRoles "write" | default (list) }}
   {{- $roleRead := get $authorizedRoles "read" | default (list) }}
-  {{- $userWrite := get $authorizedUsers "write" | default (list) }}
-  {{- $userRead := get $authorizedUsers "read" | default (list) }}
   {{- range $role := $roleWrite }}
     {{- if not $first }},{{ end }}
     {"role":"{{ $role }}","catalog":"{{ $catalogName }}","allow":"all"}
@@ -290,18 +287,6 @@ s3.path-style-access={{ $s3.pathStyleAccess }}
     {{- if not (has $role $roleWrite) }}
       {{- if not $first }},{{ end }}
       {"role":"{{ $role }}","catalog":"{{ $catalogName }}","allow":"read-only"}
-      {{- $first = false }}
-    {{- end }}
-  {{- end }}
-  {{- range $user := $userWrite }}
-    {{- if not $first }},{{ end }}
-    {"user":"{{ $user }}","catalog":"{{ $catalogName }}","allow":"all"}
-    {{- $first = false }}
-  {{- end }}
-  {{- range $user := $userRead }}
-    {{- if not (has $user $userWrite) }}
-      {{- if not $first }},{{ end }}
-      {"user":"{{ $user }}","catalog":"{{ $catalogName }}","allow":"read-only"}
       {{- $first = false }}
     {{- end }}
   {{- end }}

@@ -22,7 +22,7 @@ catalog governance, and app launch behavior.
 - `charts/dlh-in-a-box/values.yaml`
 - `charts/dlh-in-a-box/values.schema.json`
 - `charts/dlh-in-a-box/templates/identity-validation.yaml`
-- `charts/dlh-in-a-box/templates/governance-validation.yaml`
+- `charts/dlh-in-a-box/templates/authorization-validation.yaml`
 - `charts/dlh-in-a-box/templates/ranger-automation.yaml`
 - `charts/dlh-in-a-box/templates/platform-home.yaml`
 - `charts/dlh-in-a-box/templates/cloudbeaver.yaml`
@@ -35,7 +35,6 @@ catalog governance, and app launch behavior.
 - `examples/values-shared-auth.yaml`
 - `test/render-contract.sh`
 - `test/render-contract/*.yaml`
-- `specs/ranger-keycloak-integration.md`
 
 ## Workflow
 

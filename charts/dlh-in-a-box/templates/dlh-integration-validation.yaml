@@ -1,0 +1,75 @@
+{{- /*
+Cross-subsystem invariants that don't belong to any single module's own
+validation file, because they require two independently-owned value trees
+(e.g. hive.* and sharedPostgresql.*) to agree with each other.
+*/ -}}
+{{- $hive := .Values.hive | default dict -}}
+{{- $hiveEnabled := default false (get $hive "enabled") -}}
+{{- $hivePostgresql := get $hive "postgresql" | default dict -}}
+{{- $hiveBundled := default false (get $hivePostgresql "enabled") -}}
+{{- $hiveExternalDatabase := get $hive "externalDatabase" | default dict -}}
+{{- $global := .Values.global | default dict -}}
+{{- $catalogs := get $global "dataCatalogs" | default dict -}}
+{{- /* Neither check below matters unless Hive is actually enabled and has at
+least one catalog to generate a metastore for -- with none, nothing reads
+hive.postgresql.enabled or hiveMetastore, so nothing needs validating. */ -}}
+{{- $hiveCatalogsActive := and $hiveEnabled (gt (len $catalogs) 0) -}}
+
+{{- $hiveMetastoreConfig := get $hive "metastore" | default dict -}}
+{{- $hiveOwnMetastoreEnabled := true -}}
+{{- if hasKey $hiveMetastoreConfig "enabled" -}}
+  {{- $hiveOwnMetastoreEnabled = $hiveMetastoreConfig.enabled -}}
+{{- end -}}
+{{- if and $hiveCatalogsActive $hiveOwnMetastoreEnabled -}}
+  {{- fail "global.dataCatalogs is non-empty, which means templates/hive-metastores.yaml already creates one named metastore per catalog; leaving hive.metastore.enabled=true (the default) would also render Hive's own single default metastore alongside them. Set hive.metastore.enabled=false." -}}
+{{- end -}}
+
+{{- if and $hiveCatalogsActive (not (empty (get $hive "warehouseDir"))) -}}
+  {{- fail "global.dataCatalogs is non-empty, so each catalog carries its own required warehouseDir (passed to its own metastore instance) -- hive.warehouseDir is only used by this chart's own standalone default metastore, which is disabled in this mode, so leaving it set here is stale/misleading. Remove hive.warehouseDir." -}}
+{{- end -}}
+
+{{- $seenWarehouseDirs := dict -}}
+{{- range $catalogName, $catalog := $catalogs -}}
+  {{- $dir := get $catalog "warehouseDir" | default "" -}}
+  {{- if $dir -}}
+    {{- if hasKey $seenWarehouseDirs $dir -}}
+      {{- fail (printf "global.dataCatalogs.%s.warehouseDir and global.dataCatalogs.%s.warehouseDir are both %q: each catalog must have its own distinct warehouseDir." (get $seenWarehouseDirs $dir) $catalogName $dir) -}}
+    {{- end -}}
+    {{- $seenWarehouseDirs = set $seenWarehouseDirs $dir $catalogName -}}
+  {{- end -}}
+{{- end -}}
+
+{{- $sharedPostgresql := .Values.sharedPostgresql | default dict -}}
+{{- $provisioning := get $sharedPostgresql "provisioning" | default dict -}}
+{{- $provisioningDatabases := get $provisioning "databases" | default dict -}}
+{{- $hiveMetastoreProvisioning := get $provisioningDatabases "hiveMetastore" | default dict -}}
+{{- $hiveMetastoreConfigured := default false (get $hiveMetastoreProvisioning "enabled") -}}
+{{- /* hiveMetastore only does anything once shared-postgresql-provisioning.yaml
+actually renders -- same gate that template itself uses -- so a stray
+hiveMetastore.enabled=true has no effect (and nothing to validate) unless
+sharedPostgresql itself is genuinely active. */ -}}
+{{- $sharedPostgresqlActive := and (default false $sharedPostgresql.enabled) (default true (get $provisioning "enabled")) -}}
+{{- $hiveMetastoreEnabled := and $hiveMetastoreConfigured $sharedPostgresqlActive -}}
+
+{{- if and $hiveCatalogsActive $hiveBundled $hiveMetastoreEnabled -}}
+  {{- fail "hive.postgresql.enabled=true and sharedPostgresql.provisioning.databases.hiveMetastore.enabled=true are mutually exclusive: pick one system to own Hive's per-catalog databases -- Hive's own bundled instance (hive.postgresql), or the shared PostgreSQL provisioner (hiveMetastore)." -}}
+{{- end -}}
+
+{{- if and $hiveCatalogsActive $hiveMetastoreEnabled (not $hiveBundled) -}}
+  {{- if empty (get $hiveExternalDatabase "user") -}}
+    {{- fail "sharedPostgresql.provisioning.databases.hiveMetastore.enabled=true requires hive.externalDatabase.user to be set: the shared-postgres provisioner creates Hive's per-catalog databases owned by that role." -}}
+  {{- end -}}
+  {{- if empty (get $hiveExternalDatabase "existingSecret") -}}
+    {{- fail "sharedPostgresql.provisioning.databases.hiveMetastore.enabled=true requires hive.externalDatabase.existingSecret to be set: the shared-postgres provisioner reads Hive's own secret to authenticate as that role." -}}
+  {{- end -}}
+  {{- $expectedHost := include "dlh-in-a-box.sharedPostgresql.serviceName" $ -}}
+  {{- $actualHost := get $hiveExternalDatabase "host" | default "" -}}
+  {{- if ne $actualHost $expectedHost -}}
+    {{- fail (printf "sharedPostgresql.provisioning.databases.hiveMetastore.enabled=true provisions Hive's databases on the shared PostgreSQL service (%q), so hive.externalDatabase.host must equal that value; got %q." $expectedHost $actualHost) -}}
+  {{- end -}}
+  {{- $expectedPort := include "dlh-in-a-box.sharedPostgresql.port" $ -}}
+  {{- $actualPort := get $hiveExternalDatabase "port" | default "" | toString -}}
+  {{- if ne $actualPort $expectedPort -}}
+    {{- fail (printf "sharedPostgresql.provisioning.databases.hiveMetastore.enabled=true provisions Hive's databases on the shared PostgreSQL service's port (%q), so hive.externalDatabase.port must equal that value; got %q." $expectedPort $actualPort) -}}
+  {{- end -}}
+{{- end -}}

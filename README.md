@@ -1,7 +1,6 @@
 # dlh-in-a-box: a research data lakehouse on Kubernetes
 
-[![Helm Lint](https://github.com/sanger-pathogens/dlh-in-a-box-umbrella-helm-chart/actions/workflows/helm-lint.yaml/badge.svg)](https://github.com/sanger-pathogens/dlh-in-a-box-umbrella-helm-chart/actions/workflows/helm-lint.yaml)
-[![Helm Publish](https://github.com/sanger-pathogens/dlh-in-a-box-umbrella-helm-chart/actions/workflows/helm-publish.yaml/badge.svg)](https://github.com/sanger-pathogens/dlh-in-a-box-umbrella-helm-chart/actions/workflows/helm-publish.yaml)
+[![Helm CI](https://github.com/sanger-pathogens/dlh-in-a-box-umbrella-helm-chart/actions/workflows/helm-ci.yaml/badge.svg)](https://github.com/sanger-pathogens/dlh-in-a-box-umbrella-helm-chart/actions/workflows/helm-ci.yaml)
 [![DOI](https://img.shields.io/badge/DOI-10.5281%2Fzenodo.20731685-blue.svg)](https://doi.org/10.5281/zenodo.20731685)
 
 <p align="center">
@@ -493,7 +492,7 @@ The detailed explanation of that distinction lives in
 | If you need to change... | Start here | Why |
 | --- | --- | --- |
 | chart metadata, dependencies, default values | `charts/dlh-in-a-box/` | this is the published chart |
-| shared validation rules | `charts/dlh-in-a-box/templates/identity-validation.yaml` or `governance-validation.yaml` | these files fail bad combinations before render |
+| shared validation rules | `charts/dlh-in-a-box/templates/identity-validation.yaml` or `authorization-validation.yaml` | these files fail bad combinations before render |
 | `platformHome` UI or admin API behavior | `charts/dlh-in-a-box/templates/platform-home.yaml` | most of the page and embedded API live inline there |
 | CloudBeaver bootstrap or proxy wiring | `charts/dlh-in-a-box/templates/cloudbeaver.yaml` | the repo owns the extra behavior here |
 | Ranger roles, policies, usersync, or audits | `charts/dlh-in-a-box/templates/ranger-automation.yaml` | that file contains the heavy reconciliation logic |

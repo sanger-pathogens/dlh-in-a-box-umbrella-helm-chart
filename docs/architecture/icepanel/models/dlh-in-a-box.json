@@ -597,9 +597,9 @@
       "parent": "DLH-L1-CHART",
       "status": "live",
       "external": false,
-      "description": "Automated checks that lint, render, smoke-install, and test the package against documented configuration rules before publication.\n\nModel metadata: source ID DLH-C2-VALIDATION; IcePanel type application or executable service; Child of DLH-in-a-box Umbrella Helm Chart (DLH-L1-CHART). IcePanel group membership: Automation. Lifecycle status: Live in the current IcePanel model. Ownership or stewardship: Sanger PaM Data Engineering and Integration. Location or hosting context: Wellcome Sanger Institute, Cloud. Reality links: GitHub: .github/workflows/helm-lint.yaml; GitHub: .github/workflows/helm-smoke-install.yaml; GitHub: hack. Source of truth: docs/architecture/icepanel/models/dlh-in-a-box.json in the DLH-in-a-box chart repository.",
+      "description": "Automated checks that lint, render, smoke-install, and test the package against documented configuration rules before publication.\n\nModel metadata: source ID DLH-C2-VALIDATION; IcePanel type application or executable service; Child of DLH-in-a-box Umbrella Helm Chart (DLH-L1-CHART). IcePanel group membership: Automation. Lifecycle status: Live in the current IcePanel model. Ownership or stewardship: Sanger PaM Data Engineering and Integration. Location or hosting context: Wellcome Sanger Institute, Cloud. Reality links: GitHub: .github/workflows/helm-ci.yaml (verify job); GitHub: .github/workflows/helm-smoke-install.yaml; GitHub: scripts. Source of truth: docs/architecture/icepanel/models/dlh-in-a-box.json in the DLH-in-a-box chart repository.",
       "labels": {
-        "dlhPath": ".github/workflows/helm-lint.yaml; .github/workflows/helm-smoke-install.yaml; hack/",
+        "dlhPath": ".github/workflows/helm-ci.yaml (verify job); .github/workflows/helm-smoke-install.yaml; scripts/",
         "dlhTechnology": "GitHub Actions / shell"
       },
       "layout": {
@@ -615,16 +615,16 @@
       ],
       "links": [
         {
-          "name": "GitHub: .github/workflows/helm-lint.yaml",
-          "url": "https://github.com/sanger-pathogens/dlh-in-a-box-umbrella-helm-chart/blob/main/.github/workflows/helm-lint.yaml"
+          "name": "GitHub: .github/workflows/helm-ci.yaml (verify job)",
+          "url": "https://github.com/sanger-pathogens/dlh-in-a-box-umbrella-helm-chart/blob/main/.github/workflows/helm-ci.yaml"
         },
         {
           "name": "GitHub: .github/workflows/helm-smoke-install.yaml",
           "url": "https://github.com/sanger-pathogens/dlh-in-a-box-umbrella-helm-chart/blob/main/.github/workflows/helm-smoke-install.yaml"
         },
         {
-          "name": "GitHub: hack",
-          "url": "https://github.com/sanger-pathogens/dlh-in-a-box-umbrella-helm-chart/tree/main/hack"
+          "name": "GitHub: scripts",
+          "url": "https://github.com/sanger-pathogens/dlh-in-a-box-umbrella-helm-chart/tree/main/scripts"
         }
       ],
       "caption": "Automated checks that lint, render, smoke-install, and test the package against documented configuration rules before publication.",
@@ -643,9 +643,9 @@
       "parent": "DLH-L1-CHART",
       "status": "live",
       "external": false,
-      "description": "Release automation that builds versioned Helm artifacts and publishes them for deployment repositories.\n\nModel metadata: source ID DLH-C2-PUBLISH; IcePanel type application or executable service; Child of DLH-in-a-box Umbrella Helm Chart (DLH-L1-CHART). IcePanel group membership: Automation. Lifecycle status: Live in the current IcePanel model. Ownership or stewardship: Sanger PaM Data Engineering and Integration. Location or hosting context: Wellcome Sanger Institute, Cloud. Reality links: GitHub: .github/workflows/helm-publish.yaml; GitHub: hack/package.sh. Source of truth: docs/architecture/icepanel/models/dlh-in-a-box.json in the DLH-in-a-box chart repository.",
+      "description": "Release automation that builds versioned Helm artifacts and publishes them for deployment repositories.\n\nModel metadata: source ID DLH-C2-PUBLISH; IcePanel type application or executable service; Child of DLH-in-a-box Umbrella Helm Chart (DLH-L1-CHART). IcePanel group membership: Automation. Lifecycle status: Live in the current IcePanel model. Ownership or stewardship: Sanger PaM Data Engineering and Integration. Location or hosting context: Wellcome Sanger Institute, Cloud. Reality links: GitHub: .github/workflows/helm-ci.yaml (publish job); GitHub: scripts/helm/package.sh. Source of truth: docs/architecture/icepanel/models/dlh-in-a-box.json in the DLH-in-a-box chart repository.",
       "labels": {
-        "dlhPath": ".github/workflows/helm-publish.yaml; hack/package.sh",
+        "dlhPath": ".github/workflows/helm-ci.yaml (publish job); scripts/helm/package.sh",
         "dlhTechnology": "GitHub Actions / Helm"
       },
       "layout": {
@@ -661,12 +661,12 @@
       ],
       "links": [
         {
-          "name": "GitHub: .github/workflows/helm-publish.yaml",
-          "url": "https://github.com/sanger-pathogens/dlh-in-a-box-umbrella-helm-chart/blob/main/.github/workflows/helm-publish.yaml"
+          "name": "GitHub: .github/workflows/helm-ci.yaml (publish job)",
+          "url": "https://github.com/sanger-pathogens/dlh-in-a-box-umbrella-helm-chart/blob/main/.github/workflows/helm-ci.yaml"
         },
         {
-          "name": "GitHub: hack/package.sh",
-          "url": "https://github.com/sanger-pathogens/dlh-in-a-box-umbrella-helm-chart/blob/main/hack/package.sh"
+          "name": "GitHub: scripts/helm/package.sh",
+          "url": "https://github.com/sanger-pathogens/dlh-in-a-box-umbrella-helm-chart/blob/main/scripts/helm/package.sh"
         }
       ],
       "caption": "Release automation that builds versioned Helm artifacts and publishes them for deployment repositories.",
@@ -716,7 +716,7 @@
         },
         {
           "name": "GitHub: chart publish workflow",
-          "url": "https://github.com/sanger-pathogens/dlh-in-a-box-umbrella-helm-chart/blob/main/.github/workflows/helm-publish.yaml"
+          "url": "https://github.com/sanger-pathogens/dlh-in-a-box-umbrella-helm-chart/blob/main/.github/workflows/helm-ci.yaml"
         }
       ]
     },
@@ -4334,9 +4334,9 @@
       "parent": "DLH-C2-VALIDATION",
       "status": "live",
       "external": false,
-      "description": "Runs automated checks for licensing, documentation, security, rendering rules, shell scripts, JSON schema, and Helm syntax.\n\nModel metadata: source ID DLH-C3-VALIDATE-LINT; IcePanel type component within a parent object; Child of Chart Validation Automation (DLH-C2-VALIDATION). No IcePanel group membership is assigned. Lifecycle status: Live in the current IcePanel model. Ownership or stewardship: Sanger PaM Data Engineering and Integration. Location or hosting context: Wellcome Sanger Institute, Cloud. Reality links: GitHub: .github/workflows/helm-lint.yaml; GitHub: hack/lint.sh. Source of truth: docs/architecture/icepanel/models/dlh-in-a-box.json in the DLH-in-a-box chart repository.",
+      "description": "Runs automated checks for licensing, documentation, security, rendering rules, shell scripts, JSON schema, and Helm syntax.\n\nModel metadata: source ID DLH-C3-VALIDATE-LINT; IcePanel type component within a parent object; Child of Chart Validation Automation (DLH-C2-VALIDATION). No IcePanel group membership is assigned. Lifecycle status: Live in the current IcePanel model. Ownership or stewardship: Sanger PaM Data Engineering and Integration. Location or hosting context: Wellcome Sanger Institute, Cloud. Reality links: GitHub: .github/workflows/helm-ci.yaml (verify job); GitHub: scripts/helm/helm-lint.sh. Source of truth: docs/architecture/icepanel/models/dlh-in-a-box.json in the DLH-in-a-box chart repository.",
       "labels": {
-        "dlhPath": ".github/workflows/helm-lint.yaml; hack/lint.sh"
+        "dlhPath": ".github/workflows/helm-ci.yaml (verify job); scripts/helm/helm-lint.sh"
       },
       "layout": {
         "validation": {
@@ -4348,12 +4348,12 @@
       },
       "links": [
         {
-          "name": "GitHub: .github/workflows/helm-lint.yaml",
-          "url": "https://github.com/sanger-pathogens/dlh-in-a-box-umbrella-helm-chart/blob/main/.github/workflows/helm-lint.yaml"
+          "name": "GitHub: .github/workflows/helm-ci.yaml (verify job)",
+          "url": "https://github.com/sanger-pathogens/dlh-in-a-box-umbrella-helm-chart/blob/main/.github/workflows/helm-ci.yaml"
         },
         {
-          "name": "GitHub: hack/lint.sh",
-          "url": "https://github.com/sanger-pathogens/dlh-in-a-box-umbrella-helm-chart/blob/main/hack/lint.sh"
+          "name": "GitHub: scripts/helm/helm-lint.sh",
+          "url": "https://github.com/sanger-pathogens/dlh-in-a-box-umbrella-helm-chart/blob/main/scripts/helm/helm-lint.sh"
         }
       ],
       "caption": "Runs automated checks for licensing, documentation, security, rendering rules, shell scripts, JSON schema, and Helm syntax.",
@@ -4524,9 +4524,9 @@
       "parent": "DLH-C2-PUBLISH",
       "status": "live",
       "external": false,
-      "description": "Builds the versioned Helm chart archive for release.\n\nModel metadata: source ID DLH-C3-PUBLISH-PACKAGE; IcePanel type component within a parent object; Child of Chart Publish Automation (DLH-C2-PUBLISH). No IcePanel group membership is assigned. Lifecycle status: Live in the current IcePanel model. Ownership or stewardship: Sanger PaM Data Engineering and Integration. Location or hosting context: Wellcome Sanger Institute, Cloud. Reality links: GitHub: hack/package.sh. Source of truth: docs/architecture/icepanel/models/dlh-in-a-box.json in the DLH-in-a-box chart repository.",
+      "description": "Builds the versioned Helm chart archive for release.\n\nModel metadata: source ID DLH-C3-PUBLISH-PACKAGE; IcePanel type component within a parent object; Child of Chart Publish Automation (DLH-C2-PUBLISH). No IcePanel group membership is assigned. Lifecycle status: Live in the current IcePanel model. Ownership or stewardship: Sanger PaM Data Engineering and Integration. Location or hosting context: Wellcome Sanger Institute, Cloud. Reality links: GitHub: scripts/helm/package.sh. Source of truth: docs/architecture/icepanel/models/dlh-in-a-box.json in the DLH-in-a-box chart repository.",
       "labels": {
-        "dlhPath": "hack/package.sh; dist/"
+        "dlhPath": "scripts/helm/package.sh; dist/"
       },
       "layout": {
         "publish": {
@@ -4538,8 +4538,8 @@
       },
       "links": [
         {
-          "name": "GitHub: hack/package.sh",
-          "url": "https://github.com/sanger-pathogens/dlh-in-a-box-umbrella-helm-chart/blob/main/hack/package.sh"
+          "name": "GitHub: scripts/helm/package.sh",
+          "url": "https://github.com/sanger-pathogens/dlh-in-a-box-umbrella-helm-chart/blob/main/scripts/helm/package.sh"
         }
       ],
       "caption": "Builds the versioned Helm chart archive for release.",
@@ -4558,9 +4558,9 @@
       "parent": "DLH-C2-PUBLISH",
       "status": "live",
       "external": false,
-      "description": "Publishes the release chart package to the GHCR OCI registry.\n\nModel metadata: source ID DLH-C3-PUBLISH-OCI; IcePanel type component within a parent object; Child of Chart Publish Automation (DLH-C2-PUBLISH). No IcePanel group membership is assigned. Lifecycle status: Live in the current IcePanel model. Ownership or stewardship: Sanger PaM Data Engineering and Integration. Location or hosting context: Wellcome Sanger Institute, Cloud. Reality links: GitHub: .github/workflows/helm-publish.yaml. Source of truth: docs/architecture/icepanel/models/dlh-in-a-box.json in the DLH-in-a-box chart repository.",
+      "description": "Publishes the release chart package to the GHCR OCI registry.\n\nModel metadata: source ID DLH-C3-PUBLISH-OCI; IcePanel type component within a parent object; Child of Chart Publish Automation (DLH-C2-PUBLISH). No IcePanel group membership is assigned. Lifecycle status: Live in the current IcePanel model. Ownership or stewardship: Sanger PaM Data Engineering and Integration. Location or hosting context: Wellcome Sanger Institute, Cloud. Reality links: GitHub: .github/workflows/helm-ci.yaml (publish job). Source of truth: docs/architecture/icepanel/models/dlh-in-a-box.json in the DLH-in-a-box chart repository.",
       "labels": {
-        "dlhPath": ".github/workflows/helm-publish.yaml"
+        "dlhPath": ".github/workflows/helm-ci.yaml (publish job)"
       },
       "layout": {
         "publish": {
@@ -4572,8 +4572,8 @@
       },
       "links": [
         {
-          "name": "GitHub: .github/workflows/helm-publish.yaml",
-          "url": "https://github.com/sanger-pathogens/dlh-in-a-box-umbrella-helm-chart/blob/main/.github/workflows/helm-publish.yaml"
+          "name": "GitHub: .github/workflows/helm-ci.yaml (publish job)",
+          "url": "https://github.com/sanger-pathogens/dlh-in-a-box-umbrella-helm-chart/blob/main/.github/workflows/helm-ci.yaml"
         }
       ],
       "caption": "Publishes the release chart package to the GHCR OCI registry.",

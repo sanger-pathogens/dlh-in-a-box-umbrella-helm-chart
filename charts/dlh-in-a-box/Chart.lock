@@ -46,12 +46,9 @@ dependencies:
   version: 0.1.0
 - name: hive
   repository: file://charts/hive
-  version: 0.1.0
+  version: 0.2.0
 - name: postgresql
   repository: https://charts.bitnami.com/bitnami
   version: 14.3.3
-- name: postgresql
-  repository: https://charts.bitnami.com/bitnami
-  version: 14.3.3
-digest: sha256:7b0fbf890c18e7b034372d64314bbf3b2d8524986a5f16c362dd2eb1c2c27163
-generated: "2026-07-09T13:56:11.361931+01:00"
+digest: sha256:bba860896040d1470a40aa6953c7bba9ae2676c16b3e208a260746d1129637c8
+generated: "2026-08-20T10:33:40.518854+01:00"

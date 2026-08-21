@@ -1,0 +1,15 @@
+{{- /*
+Integration-tier composition: global.dataCatalogs is an umbrella concept
+that Hive's own chart has no notion of. This is the one place that
+translates catalog names into named Hive metastore instances, calling the
+same reusable "hive.metastoreInstance" template Hive's own default
+rendering uses -- just once per catalog, via .Subcharts.hive so it's scoped
+to Hive's own resolved Values/Release/Chart exactly as if called from
+inside that chart.
+*/ -}}
+{{- $hive := .Values.hive | default dict -}}
+{{- if and (default false (get $hive "enabled")) (gt (len (.Values.global.dataCatalogs | default dict)) 0) -}}
+{{- range $catalogName, $catalog := .Values.global.dataCatalogs }}
+{{ include "hive.metastoreInstance" (dict "context" $.Subcharts.hive "name" $catalogName "warehouseDir" $catalog.warehouseDir) }}
+{{- end }}
+{{- end -}}
