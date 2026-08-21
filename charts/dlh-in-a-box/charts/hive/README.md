@@ -1,207 +1,214 @@
 # Hive Subchart
 
-This folder contains the local Hive subchart used by `dlh-in-a-box`.
-
-The repo keeps Hive as a local subchart because the platform needs
-catalog-aware metastore generation that is tightly coupled to the umbrella
-chart's shared catalog and storage model.
-
-## Who Should Read This
-
-| Reader | Why this guide matters |
-| --- | --- |
-| contributor | to understand where Hive Metastore resources are generated and why they are local |
-| operator | to see how catalog definitions, PostgreSQL, and object storage become working metastores |
-| maintainer | to understand the boundary between this local subchart and the rest of the umbrella chart |
+This folder contains a self-contained Hive Metastore chart. It has no notion
+of "catalogs," "data lakes," or anything else specific to the umbrella chart
+it happens to live inside — it knows how to run one Hive Metastore, backed by
+one PostgreSQL database and one object-store location, connected to whatever
+Postgres and S3-compatible endpoints its values point at.
 
 ## What This Subchart Does
 
-The Hive subchart turns shared catalog definitions into one Hive Metastore
-deployment per catalog.
+By default, installing this chart produces exactly one Hive Metastore:
+a Service, a Deployment, a metastore configuration Secret, a schema-init Job,
+and an optional Ingress — all plainly named off the release, with no suffix.
 
 It is responsible for:
 
-- creating the per-catalog metastore configuration files
-- wiring PostgreSQL and S3 credentials into Hive
-- creating the database if needed
-- initializing the metastore schema
-- creating the Service and optional Ingress for each metastore
+- deploying the metastore itself, and optionally a bundled PostgreSQL
+  instance to back it
+- wiring PostgreSQL and S3 credentials into Hive's `core-site.xml` /
+  `metastore-site.xml`
+- initializing (or upgrading) the metastore schema
+- creating the Service and optional Ingress
+
+A parent chart that needs *several* independently-named metastores (for
+example, one per data catalog) composes them itself by calling this chart's
+`hive.metastoreInstance` template once per name — see
+[Composing Multiple Instances](#composing-multiple-instances) below. This
+chart's own default rendering and a parent's composed rendering are mutually
+exclusive: set `metastore.enabled: false` when something else is doing the
+composing.
 
 ```mermaid
 flowchart TD
-  subgraph Inputs["Hive inputs"]
-    Catalogs[global dataCatalogs]
-    Storage[hive s3 settings]
-    Database[hive postgres settings]
+  subgraph Inputs["Values"]
+    Name[optional name + warehouseDir]
+    Storage[s3 settings]
+    Database["postgresql (bundled) or externalDatabase"]
   end
 
-  subgraph Render["Local Hive subchart"]
-    Config[metastore config secrets]
-    Init[init config and schema init]
-    Runtime[service deployment ingress]
+  subgraph Macro["hive.metastoreInstance"]
+    Config[metastore config secret]
+    Init[init-config + schema-init Job]
+    Runtime[Service + Deployment + optional Ingress]
   end
 
-  subgraph Outcome["Runtime shape"]
-    Metastores[one metastore per catalog]
-    Postgres[shared or external postgres]
-    ObjectStore[minio or external s3]
-    Trino[trino catalog clients]
+  subgraph Callers
+    Own[this chart's own metastore.yaml]
+    Parent[a parent chart, once per instance]
   end
 
-  Catalogs --> Config
+  Own -->|no name override| Macro
+  Parent -->|explicit name + warehouseDir per call| Macro
+
+  Name --> Config
   Storage --> Config
   Database --> Config
   Database --> Init
   Config --> Runtime
   Init --> Runtime
-  Runtime --> Metastores
-  Postgres --> Metastores
-  ObjectStore --> Metastores
-  Metastores --> Trino
 ```
 
-## What Lives In This Folder
+## Files In This Folder
 
-| Path | Ownership | What it is for |
-| --- | --- | --- |
-| `Chart.yaml` | repo-owned | local subchart metadata |
-| `values.yaml` | repo-owned | default Hive-specific settings used by the umbrella chart |
-| `templates/` | repo-owned | all Hive Metastore render logic |
-| `README.md` | repo-owned guide | this folder manual |
+| Path | What it is for |
+| --- | --- |
+| `Chart.yaml` | chart metadata, and its own PostgreSQL dependency (see below) |
+| `values.yaml` | default settings for this chart's own single metastore (see below) |
+| `templates/_metastore.tpl` | the `hive.metastoreInstance` template — all metastore render logic, see [How The Subchart Works](#how-the-subchart-works) |
+| `templates/metastore.yaml` | calls `hive.metastoreInstance` with no name, for this chart's own default rendering |
+| `templates/init-config.yaml`, `postgres-secret.yaml`, `s3-secret.yaml` | chart-wide (not per-instance) supporting resources |
+| `templates/_helpers.tpl` | naming, secret-resolution, and shared init-container helpers |
 
-There is no vendored Hive chart here. This entire subchart is locally owned.
+This chart declares its own dependency on the Bitnami `postgresql` chart
+(for the bundled-instance case below) — it is a fully independent chart, not
+one that relies on anything from its parent beyond ordinary Helm `global.*`
+values (currently just `global.domain`, for Ingress hosts).
+
+`values.yaml` is intentionally small. It defines:
+
+- `metastore.enabled` — whether this chart's own default single instance
+  renders (set `false` when a parent is composing instances itself)
+- image locations for the metastore and schema-init containers (default
+  `docker.io/apache/hive:4.2.0`)
+- the JDBC driver download URL (`jdbcDriver.url`), defaulting to the
+  PostgreSQL JDBC driver
+- `postgresql.*` (bundled instance) and `externalDatabase.*` (external
+  connection) — see [PostgreSQL wiring](#postgresql-wiring)
+- `s3.*` and `warehouseDir` — see [Storage wiring](#storage-wiring)
+- `database` — the database name used by this chart's own default instance
+- `ingress.*`
 
 ## How The Subchart Works
 
-### Catalog iteration is the core pattern
+### One template renders one metastore instance
 
-The subchart reads `global.dataCatalogs` from the umbrella values and loops
-over those catalogs.
+`templates/_metastore.tpl` defines `hive.metastoreInstance`, called as:
 
-For each catalog, it renders:
+```
+{{- include "hive.metastoreInstance" (dict "context" $ "name" "<optional>" "warehouseDir" "<optional>") -}}
+```
 
-- a Service
-- a Deployment
-- a metastore configuration secret
-- an optional Ingress
+- `context` — the root template context scoped to this chart's own
+  `Values`/`Release`/`Chart`. From this chart's own templates that's just
+  `$`. A parent chart composing several instances passes
+  `.Subcharts.hive` instead, so the macro sees this chart's own resolved
+  values exactly as if it were rendering from inside this chart.
+- `name` — optional. If given, it becomes the Postgres database name and is
+  woven into every resource name. If omitted, the database name falls back
+  to `.Values.database` and resources get no name suffix at all.
+- `warehouseDir` — optional. If given, it's used verbatim as
+  `metastore.warehouse.dir`. If omitted, falls back to `.Values.warehouseDir`.
 
-This is why a single values file can create several independent metastore
-endpoints.
+`templates/metastore.yaml` — the only template this chart renders on its
+own — calls this with no overrides, gated on `metastore.enabled` (default
+`true`). That's what makes `helm install myhive ./hive` work out of the box:
+one metastore, plainly named, backed by `.Values.database` and
+`.Values.warehouseDir`.
+
+### Composing multiple instances
+
+A parent chart that wants several named metastores loops over its own data
+and calls the same macro once per name, via `.Subcharts.hive`:
+
+```
+{{- range $name, $spec := .Values.something -}}
+{{ include "hive.metastoreInstance" (dict "context" $.Subcharts.hive "name" $name "warehouseDir" $spec.warehouseDir) }}
+{{- end -}}
+```
+
+When composing this way, set `hive.metastore.enabled: false` so this chart's
+own default single instance doesn't also render alongside the composed ones.
 
 ### Storage wiring
 
-Hive needs object-store credentials and endpoint information.
+Hive needs object-store credentials and endpoint information, from:
 
-The subchart uses:
+- `s3.endpoint`
+- `s3.accessKey` and `s3.secretKey`, unless `s3.existingSecret` is supplied
+- `warehouseDir` (or the per-call override, if a parent is composing)
 
-- `hive.s3.endpoint`
-- `hive.s3.accessKey` and `hive.s3.secretKey`, unless an existing secret is
-  supplied
-- `hive.warehouseDir`
-
-Those values become `core-site.xml` and `metastore-site.xml` entries so Hive
-can talk to MinIO or an external S3-compatible backend.
+These become `core-site.xml` and `metastore-site.xml` entries so Hive can
+talk to MinIO or any S3-compatible backend.
 
 ### PostgreSQL wiring
 
-Hive Metastore state is stored in PostgreSQL.
+Hive Metastore state is stored in PostgreSQL, in one of two ways:
 
-The subchart supports two patterns:
-
-- generate a small secret from inline values
-- reuse an existing PostgreSQL secret
-
-The rendered config points every catalog at the same PostgreSQL host and port,
-but uses a separate database name per catalog.
+- **`postgresql.enabled: true`** (default) — this chart deploys its own
+  bundled PostgreSQL instance (a declared dependency on the Bitnami
+  `postgresql` chart). Hive connects as that instance's superuser
+  (`postgres`), which is why it's also able to self-create its own database
+  in the schema-init Job — appropriate here because this chart owns the
+  entire instance, not a role scoped on a Postgres instance shared with
+  other applications.
+- **`postgresql.enabled: false`** — Hive connects to `externalDatabase.*`
+  instead: `host`, `port`, `user`, and either `password` or
+  `existingSecret`. Whoever manages that Postgres instance (an external
+  cluster's own admin, or another chart's provisioning job) is responsible
+  for the database existing; this chart never creates it in that case.
 
 ### Schema initialization lifecycle
 
-Schema initialization and upgrades are handled by a regular Kubernetes Job
-(`init-schema-job.yaml`). The metastore Deployment waits for the schema to be
-ready using an init container, but never creates or modifies the schema itself.
+Schema initialization and upgrades are handled by a regular Kubernetes Job,
+rendered by the same `hive.metastoreInstance` template. The metastore
+Deployment waits for the schema to be ready using an init container, but
+never creates or modifies the schema itself.
 
-**Schema Job** (`schemainit.job.enabled=true`, default):
-
-Each catalog gets one Job that runs init containers in order:
+**Schema Job** (`schemainit.job.enabled=true`, default) runs init containers
+in order:
 
 1. `wait-for-postgres` — polls `pg_isready` until PostgreSQL accepts connections
 2. `download-jdbc` — fetches the PostgreSQL JDBC driver
-3. `create-db` (optional, when `postgres.create=true`) — creates the
-   per-catalog database if it does not already exist
+3. `create-db` (only when `postgresql.enabled=true`) — creates this
+   instance's database if it does not already exist
 
-The Job's main container then runs `schematool -upgradeSchema`, falling back to
-`schematool -initSchema` if no schema exists yet.
+The Job's main container then runs `schematool -upgradeSchema`, falling back
+to `schematool -initSchema` if no schema exists yet.
 
-The Job name includes the Hive image tag. Bumping the image version creates a
-new Job on the next `helm upgrade`, which triggers a schema upgrade automatically.
+The Job name includes the Hive image tag, so bumping the image version
+creates a new Job on the next `helm upgrade`, which triggers a schema
+upgrade automatically.
 
 **Metastore Deployment** init containers:
 
 1. `wait-for-postgres` — polls `pg_isready`
 2. `download-jdbc` — fetches the PostgreSQL JDBC driver
-3. `wait-for-schema` — loops on `schematool -info` until the schema exists and
-   is at the expected version
+3. `wait-for-schema` — loops on `schematool -info` until the schema exists
+   and is at the expected version
 
-The metastore pod will not start until `schematool -info` succeeds. On restart,
-this check passes immediately because the schema already exists. There are no
-Helm hooks and no ordering concerns — Kubernetes retry handles the wait naturally.
+The metastore pod will not start until `schematool -info` succeeds. On
+restart, this check passes immediately because the schema already exists.
+There are no Helm hooks and no ordering concerns — Kubernetes retry handles
+the wait naturally.
 
-The JDBC init container and volume definitions are shared via named templates in
-`_helpers.tpl`. If the driver URL or mount path changes, update it there.
-
-### How Trino uses the result
-
-This subchart does not configure Trino directly.
-
-Instead:
-
-1. this subchart creates the Hive Metastore services
-2. the vendored Trino chart patches render Trino catalog properties from the
-   shared catalog contract
-3. those Trino catalogs point at the per-catalog Hive Metastore services
-
-That is the end-to-end bridge from `global.dataCatalogs` to queryable tables.
-
-## Important Files
-
-### `values.yaml`
-
-This file is intentionally small compared with the umbrella chart defaults.
-
-It defines:
-
-- image locations for the metastore and schema-init containers (default
-  `docker.io/apache/hive:4.2.0`)
-- the JDBC driver download URL (`jdbcDriver.url`), defaulting to the
-  PostgreSQL JDBC driver
-- PostgreSQL and S3 secret expectations
-- the warehouse directory base
-- ingress toggles
-
-The actual catalog list still comes from `global.dataCatalogs` at the umbrella
-layer.
-
-### `templates/`
-
-This is where the real behavior lives. Read
-[`templates/_README.txt`](templates/_README.txt) next if you are changing the
-subchart.
+The JDBC init container and volume definitions are shared via named
+templates in `_helpers.tpl`. If the driver URL or mount path changes, update
+it there — every call site (the schema Job and the metastore Deployment)
+uses the same helper.
 
 ## Common Tasks
 
 If you need to:
 
-- change how per-catalog metastore config is generated: edit
-  `templates/configmap.yaml`
-- change schema init or upgrade logic: edit `templates/init-schema-job.yaml`
-- change how long the metastore waits for the schema: edit
-  `templates/metastore.yaml`
-- change startup, mounts, or ingress for metastore pods: edit
-  `templates/metastore.yaml`
-- change the JDBC driver URL or postgres wait image: edit
+- change how metastore config is generated, schema-init behaves, or
+  Service/Deployment/Ingress shape: edit `templates/_metastore.tpl`
+- change the JDBC driver URL or postgres-wait image: edit
   `templates/_helpers.tpl`
-- change how generated secrets work: edit `templates/postgres-secret.yaml` or
-  `templates/s3-secret.yaml`
+- change how generated secrets work: edit `templates/postgres-secret.yaml`
+  or `templates/s3-secret.yaml`
+- change the bundled PostgreSQL dependency's version: edit `Chart.yaml`'s
+  `dependencies` entry
 
 ## Validation
 
@@ -211,26 +218,12 @@ After changing anything here, run:
 make verify
 ```
 
-Use `helm template` output to confirm the expected number of metastore Services
-and Deployments are rendered for your example catalogs.
+Use `helm template` output to confirm the expected metastore Service(s) and
+Deployment(s) are rendered — for this chart alone (one instance), and for
+any parent chart composing several.
 
 ## Common Mistakes
 
-- assuming Hive owns the catalog list locally instead of consuming
-  `global.dataCatalogs`
-- forgetting that one catalog means one metastore Deployment, Service, and
-  schema init Job
-- expecting the metastore to create or upgrade the schema; it only waits for
-  the schema to be ready via `schematool -info`
-- disabling the schema Job (`schemainit.job.enabled=false`) without an external
-  mechanism to create the schema; the metastore will hang indefinitely
-- editing the JDBC download or postgres wait init containers directly in
-  `metastore.yaml` or `init-schema-job.yaml` instead of updating the shared
-  helpers in `templates/_helpers.tpl`
-- changing secret generation without checking the existing-secret path
-- adding umbrella-only logic here when it belongs at the parent chart layer
-
-## When You Can Ignore This Folder
-
-You can ignore this folder unless you are changing Hive Metastore generation or
-debugging how a catalog reaches Trino.
+- leaving `metastore.enabled: true` (the default) while something else is
+  also composing instances via `hive.metastoreInstance` — this renders an
+  extra, unwanted default instance alongside the composed ones
