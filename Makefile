@@ -1,6 +1,7 @@
 CHART_PATH ?= charts/dlh-in-a-box
 DEST_DIR ?= dist
-LOCAL_VALUES ?= examples/values-local-auth.yaml
+LOCAL_VALUES ?= examples/values-local.yaml
+LOCAL_VALUES_AUTH ?= examples/values-local-auth.yaml
 RELEASE_NAME ?= dlh
 NAMESPACE ?= data-lakehouse-local
 
@@ -28,7 +29,7 @@ package: ## Package the chart into dist/.
 	./scripts/helm/package.sh $(CHART_PATH) $(DEST_DIR)
 
 smoke-install: ## Install the validated local overlay and wait for workloads to become ready.
-	./scripts/helm/smoke-install.sh $(CHART_PATH) $(LOCAL_VALUES)
+	./scripts/helm/smoke-install.sh $(CHART_PATH) $(LOCAL_VALUES_AUTH)
 
 local-install: ## Install the validated local overlay into the target namespace.
 	helm upgrade --install $(RELEASE_NAME) $(CHART_PATH) \
