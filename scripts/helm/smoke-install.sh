@@ -214,7 +214,7 @@ dump_diagnostics() {
 trap dump_diagnostics ERR
 
 if [[ "${SKIP_DEPENDENCY_UPDATE}" != "true" ]]; then
-  ./hack/helm-dependency-update.sh
+  ./scripts/helm/helm-dependency-update.sh
 fi
 
 if [[ "${RESET_RELEASE_STATE}" == "true" ]]; then
