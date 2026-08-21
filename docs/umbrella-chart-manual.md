@@ -1269,9 +1269,9 @@ This is important enough to state twice:
 
 | Workflow | What it does |
 | --- | --- |
-| `helm-lint.yaml` | refresh dependencies, run `lint`, render, and package |
+| `helm-ci.yaml` (`verify` job) | refresh dependencies, license/security/docs checks, test, run `lint`, render, and package |
 | `helm-smoke-install.yaml` | create a kind cluster and run the validated local-auth smoke path |
-| `helm-publish.yaml` | derive publish version, lint, package, and push to GHCR |
+| `helm-ci.yaml` (`publish` job, needs `verify`) | derive publish version, package, and push to GHCR |
 
 Release rules:
 
