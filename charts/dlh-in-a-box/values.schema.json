@@ -751,8 +751,7 @@
               "additionalProperties": true,
               "properties": {
                 "enabled": { "type": "boolean" },
-                "schedule": { "type": "string" },
-                "syncSource": { "type": "string" }
+                "schedule": { "type": "string" }
               }
             },
             "localUserSync": {

@@ -148,7 +148,7 @@ def build_synced_user(username, first_name="", last_name="", email_address=""):
         "userRoleList": ["ROLE_USER"],
         "isVisible": 1,
         "userSource": 1,
-        "syncSource": "KEYCLOAK_LOCAL",
+        "syncSource": "Keycloak",
     }
 
 
