@@ -11,6 +11,7 @@ CONFIG_PATH = "/opt/ranger-automation/bootstrap-config.json"
 RANGER_URL = os.environ["RANGER_URL"].rstrip("/")
 RANGER_PASSWORD = os.environ["RANGER_ADMIN_PASSWORD"]
 KEYCLOAK_ADMIN_PASSWORD = os.environ["KEYCLOAK_ADMIN_PASSWORD"]
+RANGER_SYNC_SOURCE = "Keycloak"
 
 
 def load_config():
@@ -78,7 +79,10 @@ def keycloak_token(config):
     )
     with urllib.request.urlopen(req, timeout=30) as response:
         payload = json.loads(response.read().decode("utf-8"))
-    return payload["access_token"]
+    token = payload.get("access_token") if isinstance(payload, dict) else None
+    if not token:
+        raise RuntimeError("Keycloak token response did not include an access_token; refusing to sync")
+    return token
 
 
 def keycloak_get(config, token, path, ok=(200,)):
@@ -109,12 +113,15 @@ def keycloak_get(config, token, path, ok=(200,)):
 
 def keycloak_get_page(config, token, path, first=0, max_results=200):
     delimiter = "&" if "?" in path else "?"
-    return keycloak_get(
-        config,
-        token,
-        f"{path}{delimiter}first={first}&max={max_results}",
-        ok=(200,),
-    ) or []
+    full_path = f"{path}{delimiter}first={first}&max={max_results}"
+    page = keycloak_get(config, token, full_path, ok=(200,))
+    if page is None:
+        return []
+    if not isinstance(page, list):
+        raise RuntimeError(
+            f"Unexpected Keycloak response for {full_path}: expected a list, got {type(page).__name__}"
+        )
+    return page
 
 
 def keycloak_list(config, token, path):
@@ -148,7 +155,7 @@ def build_synced_user(username, first_name="", last_name="", email_address=""):
         "userRoleList": ["ROLE_USER"],
         "isVisible": 1,
         "userSource": 1,
-        "syncSource": "Keycloak",
+        "syncSource": RANGER_SYNC_SOURCE,
     }
 
 
@@ -177,28 +184,45 @@ def list_ranger_users():
     return users
 
 
+def delete_ranger_user(user_id):
+    ranger_request(
+        "DELETE",
+        f"/service/xusers/secure/users/id/{user_id}?forceDelete=true",
+        ok=(200, 204, 404),
+        parse_json=False,
+    )
+
+
 def keycloak_users(config, token):
     realm = config["identity"]["keycloak"]["realm"]
     return keycloak_list(config, token, f"/admin/realms/{realm}/users")
 
 
-def sync_ranger_users(users):
-    if not users:
-        return 0
-    existing_names = {
-        str(user.get("name") or "").strip()
+def sync_ranger_users(desired_users):
+    existing_by_name = {
+        str(user.get("name") or "").strip(): user
         for user in list_ranger_users()
         if str(user.get("name") or "").strip()
     }
+
     missing = {
         username: user
-        for username, user in users.items()
-        if username not in existing_names
+        for username, user in desired_users.items()
+        if username not in existing_by_name
     }
-    if not missing:
-        return 0
-    ranger_request("POST", "/service/xusers/ugsync/users", {"vXUsers": list(missing.values())}, ok=(200, 201))
-    return len(missing)
+    if missing:
+        ranger_request("POST", "/service/xusers/ugsync/users", {"vXUsers": list(missing.values())}, ok=(200, 201))
+
+    removed = []
+    for username, user in existing_by_name.items():
+        if username in desired_users:
+            continue
+        if str(user.get("syncSource") or "").strip() != RANGER_SYNC_SOURCE:
+            continue
+        delete_ranger_user(user["id"])
+        removed.append(username)
+
+    return len(missing), len(removed)
 
 
 def sync_local_principals(config, token):
@@ -226,11 +250,11 @@ def sync():
     token = keycloak_token(config)
     local_mode = config["identity"].get("directoryMode") == "keycloakLocal"
 
-    synced_users = 0
+    added, removed = 0, 0
     if local_mode:
-        synced_users = sync_local_principals(config, token)
+        added, removed = sync_local_principals(config, token)
 
-    print(f"Synced Keycloak users to Ranger ({synced_users} users).")
+    print(f"Synced Keycloak users to Ranger ({added} added, {removed} removed).")
 
 
 if __name__ == "__main__":
