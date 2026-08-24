@@ -11,6 +11,7 @@ CONFIG_PATH = "/opt/ranger-automation/bootstrap-config.json"
 RANGER_URL = os.environ["RANGER_URL"].rstrip("/")
 RANGER_PASSWORD = os.environ["RANGER_ADMIN_PASSWORD"]
 KEYCLOAK_ADMIN_PASSWORD = os.environ["KEYCLOAK_ADMIN_PASSWORD"]
+RANGER_SYNC_SOURCE = "Keycloak"
 
 
 def load_config():
@@ -78,21 +79,21 @@ def keycloak_token(config):
     )
     with urllib.request.urlopen(req, timeout=30) as response:
         payload = json.loads(response.read().decode("utf-8"))
-    return payload["access_token"]
+    token = payload.get("access_token") if isinstance(payload, dict) else None
+    if not token:
+        raise RuntimeError("Keycloak token response did not include an access_token; refusing to sync")
+    return token
 
 
-def keycloak_request(config, token, method, path, payload=None, ok=(200, 201, 204)):
+def keycloak_get(config, token, path, ok=(200,)):
+    """Read-only GET against the Keycloak Admin API."""
     base_url = config["identity"]["keycloak"]["adminUrl"].rstrip("/")
     url = f"{base_url}{path}"
     headers = {
         "Authorization": f"Bearer {token}",
         "Accept": "application/json",
     }
-    body = None
-    if payload is not None:
-        body = json.dumps(payload).encode("utf-8")
-        headers["Content-Type"] = "application/json"
-    req = urllib.request.Request(url, data=body, headers=headers, method=method)
+    req = urllib.request.Request(url, headers=headers, method="GET")
     try:
         with urllib.request.urlopen(req, timeout=30) as response:
             data = response.read().decode("utf-8")
@@ -112,13 +113,15 @@ def keycloak_request(config, token, method, path, payload=None, ok=(200, 201, 20
 
 def keycloak_get_page(config, token, path, first=0, max_results=200):
     delimiter = "&" if "?" in path else "?"
-    return keycloak_request(
-        config,
-        token,
-        "GET",
-        f"{path}{delimiter}first={first}&max={max_results}",
-        ok=(200,),
-    ) or []
+    full_path = f"{path}{delimiter}first={first}&max={max_results}"
+    page = keycloak_get(config, token, full_path, ok=(200,))
+    if page is None:
+        return []
+    if not isinstance(page, list):
+        raise RuntimeError(
+            f"Unexpected Keycloak response for {full_path}: expected a list, got {type(page).__name__}"
+        )
+    return page
 
 
 def keycloak_list(config, token, path):
@@ -134,75 +137,8 @@ def keycloak_list(config, token, path):
     return results
 
 
-def should_sync_user(username, email, enabled):
-    if not enabled:
-        return False
-    if username in {
-        "admin",
-        "keyadmin",
-        "trino",
-        "trino-admin",
-        "cloudbeaver-service",
-        "superset-service",
-        "service-account-prefect-automation",
-        "{OWNER}",
-        "{USER}",
-    }:
-        return False
-    if (
-        username.startswith("codex-")
-        or username.startswith("service-account-")
-        or username.endswith("-service")
-        or username.endswith("-test-sync")
-    ):
-        return False
-    if email.endswith(".example.invalid"):
-        return False
-    return True
-
-
-def normalize_keycloak_user(config, token, user):
-    keycloak = config["identity"]["keycloak"]
-    if keycloak.get("requireEmailVerification", False):
-        return False, False
-
-    required_actions = [action for action in user.get("requiredActions") or [] if action != "VERIFY_EMAIL"]
-    email_verified = bool(user.get("emailVerified", False))
-    verify_email_required = "VERIFY_EMAIL" in (user.get("requiredActions") or [])
-
-    if email_verified and not verify_email_required and required_actions == (user.get("requiredActions") or []):
-        return False, False
-
-    updated = dict(user)
-    updated["emailVerified"] = True
-    updated["requiredActions"] = required_actions
-    realm = keycloak["realm"]
-    keycloak_request(
-        config,
-        token,
-        "PUT",
-        f"/admin/realms/{realm}/users/{user['id']}",
-        updated,
-    )
-
-    logged_out = False
-    try:
-        keycloak_request(
-            config,
-            token,
-            "POST",
-            f"/admin/realms/{realm}/users/{user['id']}/logout",
-            ok=(204,),
-        )
-        logged_out = True
-    except Exception as exc:
-        print(
-            f"WARNING: normalized Keycloak user {user.get('username') or user['id']} "
-            f"but failed to clear stale sessions: {exc}",
-            file=sys.stderr,
-        )
-
-    return True, logged_out
+def should_sync_user(enabled):
+    return bool(enabled)
 
 
 def build_synced_user(username, first_name="", last_name="", email_address=""):
@@ -210,17 +146,22 @@ def build_synced_user(username, first_name="", last_name="", email_address=""):
     first_name = str(first_name or "").strip() or username
     last_name = str(last_name or "").strip() or "User"
     email_address = str(email_address or "").strip()
-    return {
+    user = {
         "name": username,
         "firstName": first_name,
         "lastName": last_name,
-        "emailAddress": email_address,
         "status": 1,
         "userRoleList": ["ROLE_USER"],
         "isVisible": 1,
         "userSource": 1,
-        "syncSource": "KEYCLOAK_LOCAL",
+        "syncSource": RANGER_SYNC_SOURCE,
     }
+    if email_address:
+        # Ranger rejects the whole batch with a 400 if emailAddress is present but
+        # empty (e.g. a service-account user, which has no email in Keycloak);
+        # omitting the field entirely is accepted.
+        user["emailAddress"] = email_address
+    return user
 
 
 def normalize_names(items):
@@ -248,46 +189,91 @@ def list_ranger_users():
     return users
 
 
-def keycloak_users(config, token):
+def delete_ranger_user(user_id):
+    ranger_request(
+        "DELETE",
+        f"/service/xusers/secure/users/id/{user_id}?forceDelete=true",
+        ok=(200, 204, 404),
+        parse_json=False,
+    )
+
+
+def keycloak_clients(config, token):
     realm = config["identity"]["keycloak"]["realm"]
-    return keycloak_list(config, token, f"/admin/realms/{realm}/users")
+    return keycloak_list(config, token, f"/admin/realms/{realm}/clients")
 
 
-def sync_ranger_users(users):
-    if not users:
-        return 0
-    existing_names = {
-        str(user.get("name") or "").strip()
+def keycloak_service_account_user(config, token, client_uuid):
+    realm = config["identity"]["keycloak"]["realm"]
+    user = keycloak_get(
+        config,
+        token,
+        f"/admin/realms/{realm}/clients/{client_uuid}/service-account-user",
+        ok=(200, 404),
+    )
+    if user is not None and not isinstance(user, dict):
+        raise RuntimeError(
+            f"Unexpected Keycloak response for client {client_uuid} service-account-user: "
+            f"expected an object, got {type(user).__name__}"
+        )
+    return user
+
+
+def keycloak_service_account_users(config, token):
+    users = []
+    for client in keycloak_clients(config, token):
+        if not client.get("serviceAccountsEnabled"):
+            continue
+        user = keycloak_service_account_user(config, token, client["id"])
+        if user is not None:
+            users.append(user)
+    return users
+
+
+def keycloak_users(config, token):
+    # A plain GET /users listing silently omits service-account users (Keycloak
+    # hides them from the admin console's default Users page); they must be
+    # fetched individually via each service-account-enabled client instead.
+    realm = config["identity"]["keycloak"]["realm"]
+    human_users = keycloak_list(config, token, f"/admin/realms/{realm}/users")
+    return human_users + keycloak_service_account_users(config, token)
+
+
+def sync_ranger_users(desired_users):
+    existing_by_name = {
+        str(user.get("name") or "").strip(): user
         for user in list_ranger_users()
         if str(user.get("name") or "").strip()
     }
+
     missing = {
         username: user
-        for username, user in users.items()
-        if username not in existing_names
+        for username, user in desired_users.items()
+        if username not in existing_by_name
     }
-    if not missing:
-        return 0
-    ranger_request("POST", "/service/xusers/ugsync/users", {"vXUsers": list(missing.values())}, ok=(200, 201))
-    return len(missing)
+    if missing:
+        ranger_request("POST", "/service/xusers/ugsync/users", {"vXUsers": list(missing.values())}, ok=(200, 201))
+
+    removed = []
+    for username, user in existing_by_name.items():
+        if username in desired_users:
+            continue
+        if str(user.get("syncSource") or "").strip() != RANGER_SYNC_SOURCE:
+            continue
+        delete_ranger_user(user["id"])
+        removed.append(username)
+
+    return len(missing), len(removed)
 
 
 def sync_local_principals(config, token):
     users = {}
-    normalized_count = 0
-    logged_out_count = 0
     for user in keycloak_users(config, token):
         username = str(user.get("username") or "").strip()
         email = str(user.get("email") or "").strip()
         enabled = bool(user.get("enabled", True))
-        if not username or not should_sync_user(username, email, enabled):
+        if not username or not should_sync_user(enabled):
             continue
-
-        normalized, logged_out = normalize_keycloak_user(config, token, user)
-        if normalized:
-            normalized_count += 1
-        if logged_out:
-            logged_out_count += 1
 
         users[username] = build_synced_user(
             username,
@@ -296,8 +282,7 @@ def sync_local_principals(config, token):
             email,
         )
 
-    synced_users = sync_ranger_users(users)
-    return synced_users, normalized_count, logged_out_count
+    return sync_ranger_users(users)
 
 
 def sync():
@@ -306,22 +291,11 @@ def sync():
     token = keycloak_token(config)
     local_mode = config["identity"].get("directoryMode") == "keycloakLocal"
 
-    synced_users = 0
-    normalized_count = 0
-    logged_out_count = 0
+    added, removed = 0, 0
     if local_mode:
-        (
-            synced_users,
-            normalized_count,
-            logged_out_count,
-        ) = sync_local_principals(config, token)
+        added, removed = sync_local_principals(config, token)
 
-    print(
-        "Synced Keycloak users to Ranger "
-        f"({synced_users} users, "
-        f"{normalized_count} Keycloak accounts normalized, "
-        f"{logged_out_count} stale Keycloak sessions cleared)."
-    )
+    print(f"Synced Keycloak users to Ranger ({added} added, {removed} removed).")
 
 
 if __name__ == "__main__":

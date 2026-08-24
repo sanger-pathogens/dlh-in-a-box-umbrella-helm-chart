@@ -275,7 +275,6 @@ global:
           tag: 3.12-slim
           pullPolicy: IfNotPresent
         schedule: "*/15 * * * *"
-        syncSource: KEYCLOAK_LOCAL
       localUserSync:
         enabled: true
         image:
