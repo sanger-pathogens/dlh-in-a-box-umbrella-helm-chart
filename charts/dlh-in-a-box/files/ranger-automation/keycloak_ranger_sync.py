@@ -130,31 +130,8 @@ def keycloak_list(config, token, path):
     return results
 
 
-def should_sync_user(username, email, enabled):
-    if not enabled:
-        return False
-    if username in {
-        "admin",
-        "keyadmin",
-        "trino",
-        "trino-admin",
-        "cloudbeaver-service",
-        "superset-service",
-        "service-account-prefect-automation",
-        "{OWNER}",
-        "{USER}",
-    }:
-        return False
-    if (
-        username.startswith("codex-")
-        or username.startswith("service-account-")
-        or username.endswith("-service")
-        or username.endswith("-test-sync")
-    ):
-        return False
-    if email.endswith(".example.invalid"):
-        return False
-    return True
+def should_sync_user(enabled):
+    return bool(enabled)
 
 
 def build_synced_user(username, first_name="", last_name="", email_address=""):
@@ -230,7 +207,7 @@ def sync_local_principals(config, token):
         username = str(user.get("username") or "").strip()
         email = str(user.get("email") or "").strip()
         enabled = bool(user.get("enabled", True))
-        if not username or not should_sync_user(username, email, enabled):
+        if not username or not should_sync_user(enabled):
             continue
 
         users[username] = build_synced_user(
