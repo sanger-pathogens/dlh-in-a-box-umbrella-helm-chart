@@ -146,17 +146,22 @@ def build_synced_user(username, first_name="", last_name="", email_address=""):
     first_name = str(first_name or "").strip() or username
     last_name = str(last_name or "").strip() or "User"
     email_address = str(email_address or "").strip()
-    return {
+    user = {
         "name": username,
         "firstName": first_name,
         "lastName": last_name,
-        "emailAddress": email_address,
         "status": 1,
         "userRoleList": ["ROLE_USER"],
         "isVisible": 1,
         "userSource": 1,
         "syncSource": RANGER_SYNC_SOURCE,
     }
+    if email_address:
+        # Ranger rejects the whole batch with a 400 if emailAddress is present but
+        # empty (e.g. a service-account user, which has no email in Keycloak);
+        # omitting the field entirely is accepted.
+        user["emailAddress"] = email_address
+    return user
 
 
 def normalize_names(items):
@@ -193,9 +198,45 @@ def delete_ranger_user(user_id):
     )
 
 
-def keycloak_users(config, token):
+def keycloak_clients(config, token):
     realm = config["identity"]["keycloak"]["realm"]
-    return keycloak_list(config, token, f"/admin/realms/{realm}/users")
+    return keycloak_list(config, token, f"/admin/realms/{realm}/clients")
+
+
+def keycloak_service_account_user(config, token, client_uuid):
+    realm = config["identity"]["keycloak"]["realm"]
+    user = keycloak_get(
+        config,
+        token,
+        f"/admin/realms/{realm}/clients/{client_uuid}/service-account-user",
+        ok=(200, 404),
+    )
+    if user is not None and not isinstance(user, dict):
+        raise RuntimeError(
+            f"Unexpected Keycloak response for client {client_uuid} service-account-user: "
+            f"expected an object, got {type(user).__name__}"
+        )
+    return user
+
+
+def keycloak_service_account_users(config, token):
+    users = []
+    for client in keycloak_clients(config, token):
+        if not client.get("serviceAccountsEnabled"):
+            continue
+        user = keycloak_service_account_user(config, token, client["id"])
+        if user is not None:
+            users.append(user)
+    return users
+
+
+def keycloak_users(config, token):
+    # A plain GET /users listing silently omits service-account users (Keycloak
+    # hides them from the admin console's default Users page); they must be
+    # fetched individually via each service-account-enabled client instead.
+    realm = config["identity"]["keycloak"]["realm"]
+    human_users = keycloak_list(config, token, f"/admin/realms/{realm}/users")
+    return human_users + keycloak_service_account_users(config, token)
 
 
 def sync_ranger_users(desired_users):
