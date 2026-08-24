@@ -81,18 +81,15 @@ def keycloak_token(config):
     return payload["access_token"]
 
 
-def keycloak_request(config, token, method, path, payload=None, ok=(200, 201, 204)):
+def keycloak_get(config, token, path, ok=(200,)):
+    """Read-only GET against the Keycloak Admin API."""
     base_url = config["identity"]["keycloak"]["adminUrl"].rstrip("/")
     url = f"{base_url}{path}"
     headers = {
         "Authorization": f"Bearer {token}",
         "Accept": "application/json",
     }
-    body = None
-    if payload is not None:
-        body = json.dumps(payload).encode("utf-8")
-        headers["Content-Type"] = "application/json"
-    req = urllib.request.Request(url, data=body, headers=headers, method=method)
+    req = urllib.request.Request(url, headers=headers, method="GET")
     try:
         with urllib.request.urlopen(req, timeout=30) as response:
             data = response.read().decode("utf-8")
@@ -112,10 +109,9 @@ def keycloak_request(config, token, method, path, payload=None, ok=(200, 201, 20
 
 def keycloak_get_page(config, token, path, first=0, max_results=200):
     delimiter = "&" if "?" in path else "?"
-    return keycloak_request(
+    return keycloak_get(
         config,
         token,
-        "GET",
         f"{path}{delimiter}first={first}&max={max_results}",
         ok=(200,),
     ) or []
@@ -159,50 +155,6 @@ def should_sync_user(username, email, enabled):
     if email.endswith(".example.invalid"):
         return False
     return True
-
-
-def normalize_keycloak_user(config, token, user):
-    keycloak = config["identity"]["keycloak"]
-    if keycloak.get("requireEmailVerification", False):
-        return False, False
-
-    required_actions = [action for action in user.get("requiredActions") or [] if action != "VERIFY_EMAIL"]
-    email_verified = bool(user.get("emailVerified", False))
-    verify_email_required = "VERIFY_EMAIL" in (user.get("requiredActions") or [])
-
-    if email_verified and not verify_email_required and required_actions == (user.get("requiredActions") or []):
-        return False, False
-
-    updated = dict(user)
-    updated["emailVerified"] = True
-    updated["requiredActions"] = required_actions
-    realm = keycloak["realm"]
-    keycloak_request(
-        config,
-        token,
-        "PUT",
-        f"/admin/realms/{realm}/users/{user['id']}",
-        updated,
-    )
-
-    logged_out = False
-    try:
-        keycloak_request(
-            config,
-            token,
-            "POST",
-            f"/admin/realms/{realm}/users/{user['id']}/logout",
-            ok=(204,),
-        )
-        logged_out = True
-    except Exception as exc:
-        print(
-            f"WARNING: normalized Keycloak user {user.get('username') or user['id']} "
-            f"but failed to clear stale sessions: {exc}",
-            file=sys.stderr,
-        )
-
-    return True, logged_out
 
 
 def build_synced_user(username, first_name="", last_name="", email_address=""):
@@ -274,20 +226,12 @@ def sync_ranger_users(users):
 
 def sync_local_principals(config, token):
     users = {}
-    normalized_count = 0
-    logged_out_count = 0
     for user in keycloak_users(config, token):
         username = str(user.get("username") or "").strip()
         email = str(user.get("email") or "").strip()
         enabled = bool(user.get("enabled", True))
         if not username or not should_sync_user(username, email, enabled):
             continue
-
-        normalized, logged_out = normalize_keycloak_user(config, token, user)
-        if normalized:
-            normalized_count += 1
-        if logged_out:
-            logged_out_count += 1
 
         users[username] = build_synced_user(
             username,
@@ -296,8 +240,7 @@ def sync_local_principals(config, token):
             email,
         )
 
-    synced_users = sync_ranger_users(users)
-    return synced_users, normalized_count, logged_out_count
+    return sync_ranger_users(users)
 
 
 def sync():
@@ -307,21 +250,10 @@ def sync():
     local_mode = config["identity"].get("directoryMode") == "keycloakLocal"
 
     synced_users = 0
-    normalized_count = 0
-    logged_out_count = 0
     if local_mode:
-        (
-            synced_users,
-            normalized_count,
-            logged_out_count,
-        ) = sync_local_principals(config, token)
+        synced_users = sync_local_principals(config, token)
 
-    print(
-        "Synced Keycloak users to Ranger "
-        f"({synced_users} users, "
-        f"{normalized_count} Keycloak accounts normalized, "
-        f"{logged_out_count} stale Keycloak sessions cleared)."
-    )
+    print(f"Synced Keycloak users to Ranger ({synced_users} users).")
 
 
 if __name__ == "__main__":
