@@ -304,23 +304,8 @@ def detach_role_from_policies(service_name, role_name):
         if not removed:
             continue
 
-        has_principals = any(
-            updated_policy.get(key)
-            for key in [
-                "policyItems",
-                "denyPolicyItems",
-                "allowExceptions",
-                "denyExceptions",
-                "dataMaskPolicyItems",
-                "rowFilterPolicyItems",
-            ]
-        )
-        if has_principals:
-            request("PUT", policy_path(policy["id"]), updated_policy, ok=(200,))
-            print(f"Detached legacy role {role_name} from Ranger policy: {policy['name']}")
-        else:
-            request("DELETE", policy_path(policy["id"]), ok=(204, 404))
-            print(f"Deleted stale Ranger policy with no remaining principals: {policy['name']}")
+        request("PUT", policy_path(policy["id"]), updated_policy, ok=(200,))
+        print(f"Detached legacy role {role_name} from Ranger policy: {policy['name']}")
 
 
 def build_catalog_acl_policies(config):
