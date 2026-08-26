@@ -317,6 +317,17 @@ Each key becomes a Keycloak realm role; `appAccess` accepts any of `superset`,
 `keycloak`, and `minio`. See the commented example in `values.yaml` for the
 shape of a custom role.
 
+### `global.authorization.ranger.dataRoles`
+
+`dataRoles.roles` is a map of Ranger role name to description. `dataRoles.manage`
+controls whether the chart reconciles those roles into Ranger at all — it
+defaults to `false`. When `manage: true`, every role under `roles` is
+created/updated on each deploy, any Ranger role *not* listed there is
+detached from its policies and deleted, and `global.dataCatalogs.*.authorizedRoles`
+is validated against the declared role names. When `manage` is `false` (or
+unset), the chart does not create, update, or delete any Ranger role, and
+`authorizedRoles` is not validated against `roles` either.
+
 ### `global.authorization.ranger.baselinePolicies`
 
 These are the policies the chart can reconcile into Ranger.

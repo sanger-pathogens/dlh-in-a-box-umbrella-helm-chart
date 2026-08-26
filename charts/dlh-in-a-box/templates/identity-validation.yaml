@@ -102,7 +102,7 @@
       {{- $_ := set $accessModelRoleKeys $roleKey true -}}
     {{- end -}}
     {{- if hasKey $role "ranger" -}}
-      {{- fail (printf "global.identity.accessRoles.%s.ranger is not supported. Keycloak roles control app access only; define Ranger data roles under global.authorization.ranger.dataRoles." $roleKey) -}}
+      {{- fail (printf "global.identity.accessRoles.%s.ranger is not supported. Keycloak roles control app access only; define Ranger data roles under global.authorization.ranger.dataRoles.roles." $roleKey) -}}
     {{- end -}}
     {{- range $appName, $_ := get $role "appAccess" | default dict -}}
       {{- if not (has $appName $supportedAccessModelApps) -}}

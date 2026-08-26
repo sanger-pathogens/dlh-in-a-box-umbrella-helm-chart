@@ -490,7 +490,7 @@ expect_fail \
   -f "${FIXTURE_DIR}/access-model-group-role-mappings.yaml"
 
 expect_fail \
-  "global.identity.accessRoles.platform-viewer.ranger is not supported. Keycloak roles control app access only; define Ranger data roles under global.authorization.ranger.dataRoles." \
+  "global.identity.accessRoles.platform-viewer.ranger is not supported. Keycloak roles control app access only; define Ranger data roles under global.authorization.ranger.dataRoles.roles." \
   -f "${DEV_VALUES}" \
   -f "${FIXTURE_DIR}/access-model-ranger-override.yaml"
 
