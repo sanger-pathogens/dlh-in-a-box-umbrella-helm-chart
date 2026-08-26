@@ -871,7 +871,8 @@ only carries the connection/type shape a catalog needs to render.
 
 | Concept | What it means in this chart |
 | --- | --- |
-| `global.authorization.ranger.dataRoles` | Ranger role definitions the chart can reconcile |
+| `global.authorization.ranger.dataRoles.roles` | Ranger role name → description map |
+| `global.authorization.ranger.dataRoles.manage` | whether the chart reconciles `dataRoles.roles` into Ranger (create/update declared roles, delete undeclared ones) and validates `authorizedRoles` against them; defaults to `false` |
 | `global.dataCatalogs.<name>.authorizedRoles` | catalog-wide read/write Ranger role grants; a catalog with any role listed gets a generated Ranger policy for the whole catalog |
 | `global.authorization.ranger.baselinePolicies` | explicit policy definitions the chart can reconcile into Ranger, including fine-grained (column-level, masking, row-filter) policies |
 
@@ -893,9 +894,9 @@ whatever system owns the dataset's schema/classification decisions.
 - outside `local`, a catalog's `authorizedGroups` or `authorizedUsers` key is
   rejected — catalog access must go through `authorizedRoles` or an explicit
   Ranger bootstrap policy using Ranger role names
-- when Ranger is enabled, every role listed under a catalog's
-  `authorizedRoles.read`/`.write` must be declared (and not disabled) under
-  `global.authorization.ranger.dataRoles`
+- when Ranger is enabled and `global.authorization.ranger.dataRoles.manage` is
+  `true`, every role listed under a catalog's `authorizedRoles.read`/`.write`
+  must be declared under `global.authorization.ranger.dataRoles.roles`
 
 ### Ranger Automation Flow
 

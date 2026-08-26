@@ -11,8 +11,9 @@ catalog governance, and app launch behavior.
 ## Current Model
 
 - Keycloak realm roles control browser app access.
-- Ranger data access belongs under `global.authorization.ranger.dataRoles` and
-  explicit Ranger bootstrap policies.
+- Ranger data access belongs under `global.authorization.ranger.dataRoles.roles`
+  and explicit Ranger bootstrap policies. `dataRoles.manage` (default `false`)
+  gates whether the chart actually reconciles those roles into Ranger.
 - Deprecated group-based paths should fail with helpful migration messages.
 - Browser proxies enforce access through Keycloak client roles.
 - Local, dev, prod, and shared-auth overlays exercise different identity modes.

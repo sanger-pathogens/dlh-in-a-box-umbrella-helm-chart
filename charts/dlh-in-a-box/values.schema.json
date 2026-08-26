@@ -729,12 +729,12 @@
             },
             "dataRoles": {
               "type": "object",
-              "additionalProperties": {
-                "type": "object",
-                "additionalProperties": false,
-                "properties": {
-                  "enabled": { "type": "boolean" },
-                  "description": { "type": "string" }
+              "additionalProperties": false,
+              "properties": {
+                "manage": { "type": "boolean" },
+                "roles": {
+                  "type": "object",
+                  "additionalProperties": { "type": "string" }
                 }
               }
             },

@@ -243,7 +243,9 @@ global:
       superUsers:
         - admin
       superGroups: []
-      dataRoles: {}
+      dataRoles:
+        manage: false
+        roles: {}
       useRangerGroups: false
       postgresql:
         host: ""

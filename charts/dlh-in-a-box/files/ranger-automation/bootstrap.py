@@ -237,18 +237,20 @@ def upsert_role(role):
 
 def reconcile_data_roles(config, service_name):
     data_roles = (config.get("ranger") or {}).get("dataRoles") or {}
+    if not data_roles.get("manage", False):
+        print("Ranger data role management disabled (dataRoles.manage is not true); skipping role reconciliation.")
+        return
+
+    roles = data_roles.get("roles") or {}
     desired_role_names = set()
-    for role_name in sorted(data_roles):
-        role_config = data_roles.get(role_name) or {}
-        if not isinstance(role_config, dict) or role_config.get("enabled") is False:
-            continue
+    for role_name in sorted(roles):
+        description = str(roles.get(role_name) or "").strip()
         desired_role_names.add(role_name)
         existing = get_role(None, role_name)
         upsert_role(
             {
                 "name": role_name,
-                "description": role_config.get("description")
-                or f"Data access role managed by Ranger bootstrap: {role_name}.",
+                "description": description,
                 "isEnabled": True,
                 "users": (existing or {}).get("users", []),
                 "groups": (existing or {}).get("groups", []),
@@ -263,7 +265,7 @@ def reconcile_data_roles(config, service_name):
             continue
         detach_role_from_policies(service_name, role_name)
         delete_role(service_name, role_name)
-        print(f"Deleted Ranger role not declared in dataRoles: {role_name}")
+        print(f"Deleted Ranger role not declared in dataRoles.roles: {role_name}")
 
 
 def policy_path(policy_id):
