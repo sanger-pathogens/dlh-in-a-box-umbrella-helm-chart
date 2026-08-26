@@ -1,0 +1,87 @@
+enabled: false
+image:
+  repository: dbeaver/cloudbeaver
+  tag: 25.2.5
+  pullPolicy: IfNotPresent
+service:
+  port: 8978
+strategy:
+  type: Recreate
+workspace:
+  persistence:
+    enabled: false
+    size: 10Gi
+    storageClass: ""
+# auth.proxy is the SSO login path (Keycloak via oauth2-proxy) and stays
+# mandatory whenever cloudbeaver.enabled=true (enforced in the umbrella
+# chart's identity-validation.yaml) so CloudBeaver always sits behind the
+# central authentication boundary. auth.local is the local users login path.
+# Both providers can be registered at once. This chart also enforces its own
+# self-contained "at least one enabled" guard (templates/validation.yaml)
+# independent of the umbrella's stricter policy.
+auth:
+  admin:
+    # Native CloudBeaver admin identity. Always provisioned.
+    username: cbadmin
+    existingSecret: ""
+    passwordSecretKey: password
+  local:
+    enabled: false
+  proxy:
+    enabled: false
+    userHeader: X-Forwarded-Preferred-Username
+    # CloudBeaver treats this header as a list of existing team ids. The
+    # oauth2-proxy X-Forwarded-Groups header can contain broad Keycloak/OIDC
+    # roles such as offline_access, which breaks CloudBeaver login when those
+    # teams do not exist. Keep this dedicated header unless an upstream proxy
+    # explicitly emits CloudBeaver team ids such as platform-admin/platform-user-scientist.
+    groupHeader: X-CloudBeaver-Platform-Team
+    groupDelimiter: ","
+    firstNameHeader: ""
+    lastNameHeader: ""
+    logoutUrl: ""
+# seed provisions first-boot data -- teams/users/permissions (seed.teams),
+# and pre-loaded Trino/DB connections plus who can use them (seed.connections). Both are optional.
+seed:
+  teams:
+    existingSecret: ""
+    dataKey: initial-data.conf
+  connections:
+    existingSecret: ""
+    dataSourcesKey: data-sources.json
+    force: false
+    sharedAccess:
+      enabled: false
+      connectionIdKey: shared-connection-id
+      projectIdKey: shared-project-id
+      usernameKey: shared-connection-username
+      passwordKey: shared-connection-password
+      bootstrapUsernameKey: shared-bootstrap-username
+      bootstrapGroupsKey: shared-bootstrap-groups
+      expectedCatalog: redcap
+h2FreshSchemaPatch:
+  enabled: false
+  pluginJar: ""
+trustedCa:
+  existingSecret: ""
+  certKey: ca.crt
+  trustStorePath: /opt/cloudbeaver/trust/cloudbeaver-trino-truststore.p12
+  trustStorePassword: changeit
+  trustStoreType: PKCS12
+  initImage:
+    repository: eclipse-temurin
+    tag: 21-jdk
+    pullPolicy: IfNotPresent
+app:
+  defaultUserTeam: ""
+  adminTeam: ""
+  # Keep CloudBeaver's workspace runtime config aligned with Helm values.
+  # CloudBeaver gives workspace/.data/.cloudbeaver.runtime.conf precedence over
+  # cloudbeaver.conf, so auth must be enforced there as well for PVC-backed
+  # deployments.
+  enforceRuntimeConfig: true
+  supportsCustomConnections: true
+  showReadOnlyConnectionInfo: false
+  publicCredentialsSaveEnabled: false
+  adminCredentialsSaveEnabled: false
+  secretManagerEnabled: false

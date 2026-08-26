@@ -1,0 +1,85 @@
+# CloudBeaver Subchart
+
+This folder contains a self-contained CloudBeaver Community Edition chart. It
+knows how to run one CloudBeaver deployment (Service, Deployment, ConfigMap,
+optional workspace PersistentVolumeClaim) protected by an external oauth2-proxy
+auth boundary — it has no notion of "data lakehouse" or anything else specific
+to the umbrella chart it happens to live inside.
+
+## What This Subchart Does
+
+- deploys CloudBeaver with a ConfigMap-driven `cloudbeaver.conf` /
+  `cloudbeaver.runtime.conf`
+- registers CloudBeaver's own auth providers additively: `auth.proxy`
+  (`reverseProxy`, delegated to an external Keycloak-backed oauth2-proxy) and
+  `auth.local` (native `cbadmin` login) can both be enabled at once — see
+  [Auth model](#auth-model)
+- provisions the native admin identity (`auth.admin`) unconditionally, since
+  it's the break-glass path even when `auth.local.enabled=false` day-to-day
+- optionally seeds first-boot teams/permissions (`seed.teams`) and
+  connections (`seed.connections`), including a postStart hook that grants an
+  already-provisioned shared connection to a set of teams
+  (`seed.connections.sharedAccess`)
+- optionally trusts an extra CA (`trustedCa`), for talking to a Trino/DB TLS
+  endpoint signed by an internal CA
+
+## Files In This Folder
+
+| Path | What it is for |
+| --- | --- |
+| `Chart.yaml` | chart metadata; no dependencies of its own |
+| `values.yaml` | every CloudBeaver-owned setting (see below) |
+| `templates/_helpers.tpl` | naming/label helpers, and the Service name helper the umbrella's own oauth2-proxy config also calls |
+| `templates/validation.yaml` | this chart's own self-contained `fail()` guards |
+| `templates/configmap.yaml` | `cloudbeaver.conf` / `cloudbeaver.runtime.conf` |
+| `templates/pvc.yaml` | optional workspace PersistentVolumeClaim |
+| `templates/service.yaml` | the Service |
+| `templates/deployment.yaml` | the Deployment, including init containers and the shared-connection postStart hook |
+
+## Auth model
+
+`auth.proxy.enabled` is the SSO login path (Keycloak via an external
+oauth2-proxy in front of this Service) — the umbrella chart's own
+`identity-validation.yaml` makes this unconditionally mandatory whenever
+`cloudbeaver.enabled=true`, so CloudBeaver always sits behind the platform's
+central authentication boundary; that policy lives at the umbrella level
+because it needs cross-cutting `global.identity` context this chart doesn't
+have on its own.
+
+`auth.local.enabled` is CloudBeaver's native username/password login,
+additive on top of `auth.proxy` rather than a substitute for it:
+`enabledAuthProviders` is built as an additive list (see
+`templates/configmap.yaml`), not an exclusive choice. On the normal path
+(behind oauth2-proxy), the forwarded-username header is present on every
+request, so CloudBeaver auto-authenticates via `reverseProxy` and the local
+login screen never surfaces. `auth.local` only becomes reachable if
+something bypasses oauth2-proxy and hits this chart's Service directly with
+no forwarded-username header present — the deliberate break-glass path.
+
+This chart's own `templates/validation.yaml` additionally requires that at
+least one of `auth.local.enabled` / `auth.proxy.enabled` be true, and that
+`auth.admin.existingSecret` be set — both self-contained checks that don't
+need any context beyond this chart's own values, so they hold even if this
+chart is ever rendered standalone, independent of the umbrella's own
+(stricter) policy above.
+
+## Common Tasks
+
+If you need to:
+
+- change `cloudbeaver.conf`/`cloudbeaver.runtime.conf` generation: edit
+  `templates/configmap.yaml`
+- change container/init-container/volume behavior: edit
+  `templates/deployment.yaml`
+- change naming or the Service-name helper other charts call into: edit
+  `templates/_helpers.tpl`
+- add or change a self-contained validation rule: edit
+  `templates/validation.yaml`
+
+## Validation
+
+After changing anything here, render this chart as part of the umbrella
+(`helm template dlh charts/dlh-in-a-box -f examples/values-dev.yaml`, or any
+other example values file with `cloudbeaver.enabled: true`) and confirm the
+expected Service/Deployment/ConfigMap render, then run the umbrella's
+`test/render-contract.sh`.

@@ -267,9 +267,11 @@
 {{- if and (get $cloudbeaverIdentity "enabled") (not (get $cloudbeaverAuthProxy "enabled")) -}}
 {{- fail "global.identity.external.clients.cloudbeaverProxy.enabled requires cloudbeaver.auth.proxy.enabled=true." -}}
 {{- end -}}
-{{- if and .Values.cloudbeaver.enabled (not (dig "auth" "admin" "existingSecret" "" $cloudbeaverValues)) -}}
-{{- fail "cloudbeaver.auth.admin.existingSecret is required when CloudBeaver is enabled." -}}
-{{- end -}}
+{{- /*
+  cloudbeaver.auth.admin.existingSecret being required is now enforced by the
+  cloudbeaver subchart's own templates/_validation.yaml -- a self-contained
+  check that doesn't need any cross-chart/global context.
+*/ -}}
 {{- if and (get $cloudbeaverIdentity "enabled") (not (get $cloudbeaverAuthProxyConfig "existingSecret")) -}}
 {{- fail "cloudbeaver-auth-proxy.config.existingSecret must be set when global.identity.external.clients.cloudbeaverProxy.enabled=true." -}}
 {{- end -}}

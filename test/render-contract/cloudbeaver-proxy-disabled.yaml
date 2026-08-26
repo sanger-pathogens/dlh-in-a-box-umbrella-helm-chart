@@ -1,0 +1,6 @@
+cloudbeaver:
+  auth:
+    proxy:
+      enabled: false
+    local:
+      enabled: true

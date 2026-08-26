@@ -76,7 +76,7 @@ dependencies:
     alias: cloudbeaver-auth-proxy
     version: "10.1.4"
     repository: https://oauth2-proxy.github.io/manifests
-    condition: cloudbeaver.enabled,cloudbeaver.authProxy.enabled
+    condition: cloudbeaver.enabled,cloudbeaver.auth.proxy.enabled
 
   - name: oauth2-proxy
     alias: ranger-auth-proxy
@@ -131,6 +131,11 @@ dependencies:
     version: "0.2.0"
     repository: file://charts/hive
     condition: hive.enabled
+
+  - name: cloudbeaver
+    version: "0.1.0"
+    repository: file://charts/cloudbeaver
+    condition: cloudbeaver.enabled
 
   - name: postgresql
     alias: rangerPostgresql

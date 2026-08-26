@@ -489,6 +489,7 @@ The published chart mixes four kinds of material:
 | --- | --- | --- |
 | first-party umbrella chart logic | `charts/dlh-in-a-box/values.yaml` and `templates/` | repo-owned cross-component behavior |
 | first-party local subchart | `charts/dlh-in-a-box/charts/hive/` | repo-owned Hive Metastore generation |
+| first-party local subchart | `charts/dlh-in-a-box/charts/cloudbeaver/` | repo-owned CloudBeaver deployment |
 | first-party local wrapper subchart | `charts/dlh-in-a-box/charts/shared-postgresql/` | lets `sharedPostgresql.bundled.*` reach a nested Bitnami PostgreSQL dependency; see [Shared PostgreSQL](#shared-postgresql) |
 | vendored upstream source with local patch points | `charts/dlh-in-a-box/charts/trino/` | mostly upstream Trino chart code plus a small local patch set |
 | packaged dependency archives | `charts/dlh-in-a-box/charts/*.tgz` | reproducible dependency bundles used for packaging and release |
@@ -503,6 +504,7 @@ The most important dependencies are:
 | --- | --- |
 | Trino | main SQL engine |
 | Hive | local subchart for per-catalog metastore generation |
+| CloudBeaver | local subchart for the CloudBeaver SQL UI |
 | Keycloak | default bundled browser identity provider |
 | Prefect server and worker | self-hosted workflow UI and workers |
 | oauth2-proxy aliases | browser auth boundaries for Prefect, CloudBeaver, and Ranger |
@@ -544,7 +546,6 @@ When a dependency version changes, review these as one unit:
 | Values path | What it controls |
 | --- | --- |
 | `platformHome` | launchpad UI, helper API, health checks, and admin UI |
-| `cloudbeaver` | bootstrap, trust store, auth-proxy integration, and shared connection seeding |
 | `prefect` | high-level Prefect toggles and optional flow-run job-runner Kubernetes primitives |
 | `prefect-auth-proxy` | oauth2-proxy configuration in front of Prefect |
 | `cloudbeaver-auth-proxy` | oauth2-proxy configuration in front of CloudBeaver |
@@ -674,8 +675,8 @@ offline `helm template`.
 
 Important examples:
 
-- `templates/cloudbeaver.yaml` reads existing secrets to drive rollout
-  checksums
+- `charts/cloudbeaver/templates/deployment.yaml` reads existing secrets to
+  drive rollout checksums
 - `templates/datahub-auth-secrets.yaml` preserves previously generated signing
   material across upgrades
 - `templates/datahub-prerequisites-compat.yaml` can mirror an existing MySQL
@@ -1078,7 +1079,7 @@ identical service names and secret shapes on their own.
 | Keycloak | optional | upstream dependency plus umbrella values | bundled OIDC provider | default shared auth provider and local auth-heavy provider |
 | Ranger | optional | repo-owned templates plus upstream PostgreSQL dependency | governance UI, role store, policy administration | Trino may still be using file rules even when Ranger exists |
 | `platformHome` | optional | repo-owned `platform-home.yaml` | launchpad UI and helper API | most code is inline in the template, not in `files/` |
-| CloudBeaver | optional | repo-owned template plus oauth2-proxy dependency | browser SQL client | auth handled by the proxy, not by raw direct browser login |
+| CloudBeaver | optional | local CloudBeaver subchart plus oauth2-proxy dependency | browser SQL client | `auth.proxy` (SSO) is mandatory; `auth.local` is an additive break-glass login |
 | Prefect | optional | upstream server and worker dependencies plus auth proxy | workflow UI and workers | browser access goes through oauth2-proxy |
 | JupyterHub | optional | upstream dependency | notebook environment | direct OIDC client in the shared auth model |
 | Superset | optional | upstream dependency | BI application | direct OIDC client in shared environments |
@@ -1114,16 +1115,24 @@ the repo. It embeds:
 - local-user sync CronJobs in `keycloakLocal` mode
 - exception-role audit CronJobs
 
-#### CloudBeaver
+#### Local CloudBeaver Subchart
 
-`templates/cloudbeaver.yaml` owns the repo-specific behavior that makes
-CloudBeaver fit the platform:
+`charts/dlh-in-a-box/charts/cloudbeaver/` is entirely repo-owned (see its own
+README for the full picture).
 
+It handles:
+
+- registering CloudBeaver's `reverseProxy`/`local` auth providers additively,
+  and the admin identity that backs the `local` break-glass path
 - auth-proxy header mapping
-- bootstrap secrets
-- optional workspace seeding
+- optional first-boot teams and connections seeding
 - optional trust-store generation
 - optional shared Trino connection bootstrap
+
+The umbrella chart's own `templates/identity-validation.yaml` still owns the
+one cross-cutting rule that needs global context: `cloudbeaver.enabled`
+unconditionally requires `cloudbeaver.auth.proxy.enabled=true`, so CloudBeaver
+always sits behind the central authentication boundary.
 
 #### Local Hive Subchart
 
@@ -1161,10 +1170,10 @@ If you need to change one specific thing, start here.
 | supported auth combinations | `charts/dlh-in-a-box/templates/identity-validation.yaml` | this file rejects invalid identity modes |
 | catalog ACL and environment rules | `charts/dlh-in-a-box/templates/authorization-validation.yaml` | this file rejects deprecated catalog ACL settings, a missing `global.environment`, and `authorizedRoles` referencing an undeclared Ranger data role |
 | launchpad UI or helper API | `charts/dlh-in-a-box/templates/platform-home.yaml` | most launchpad logic is inline there |
-| CloudBeaver bootstrap or trust behavior | `charts/dlh-in-a-box/templates/cloudbeaver.yaml` | repo-owned wrapper logic lives there |
 | Ranger roles, policies, usersync, or exception audits | `charts/dlh-in-a-box/templates/ranger-automation.yaml` | this is the main reconciliation engine |
 | Ranger Admin bootstrap files | `charts/dlh-in-a-box/templates/_ranger-admin.tpl` and `ranger-admin.yaml` | one file owns the text templates, the other the runtime shell |
 | local Hive behavior | `charts/dlh-in-a-box/charts/hive/` | this subchart is fully repo-owned |
+| local CloudBeaver behavior, auth-provider registration, or trust behavior | `charts/dlh-in-a-box/charts/cloudbeaver/` | this subchart is fully repo-owned |
 | Trino catalog or access rule integration | vendored Trino patch points under `charts/dlh-in-a-box/charts/trino/templates/` | only a small patch set is locally owned |
 | example install shapes | `examples/*.yaml` | these files define supported install profiles |
 | local validation, smoke, or package behavior | `scripts/*.sh` and `scripts/repo/validate_mermaid.py` | workflows mirror these scripts |

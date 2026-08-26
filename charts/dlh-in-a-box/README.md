@@ -91,7 +91,7 @@ flowchart TD
 | `values.schema.json` | repo-owned | allowed values shape used during validation and linting |
 | `templates/` | repo-owned | umbrella-specific logic that upstream dependencies do not own |
 | `files/` | repo-owned | static payloads copied into rendered objects |
-| `charts/` | mixed | local Hive subchart, vendored Trino chart source, packaged dependency archives |
+| `charts/` | mixed | local Hive and CloudBeaver subcharts, vendored Trino chart source, packaged dependency archives |
 | `third_party/` | repo-owned provenance | bundled notice and license copies that must ship with the chart |
 | `THIRD_PARTY_NOTICES.md` | repo-owned notice document | chart-specific summary of bundled third-party material |
 | `LICENSE` | repo-owned license file | Apache-2.0 for the umbrella chart code |
@@ -148,6 +148,7 @@ Important dependencies and what they are used for:
 | --- | --- | --- |
 | Trino | `trino` | main SQL engine |
 | Hive | `hive` | local subchart for Hive Metastore generation |
+| CloudBeaver | `cloudbeaver` | local subchart for the CloudBeaver SQL UI |
 | Keycloak | `keycloak` | default bundled identity provider |
 | Ranger PostgreSQL | `rangerPostgresql` | backing database for Ranger Admin |
 | Prefect server | `prefectServer` | self-hosted Prefect UI and API |
@@ -197,7 +198,6 @@ These sections configure repo-owned or heavily wrapped features:
 | Values path | What it controls |
 | --- | --- |
 | `platformHome` | landing page, health checks, and admin UI |
-| `cloudbeaver` | CloudBeaver image, bootstrap secrets, auth-proxy headers, trust store wiring |
 | `prefect` | high-level Prefect toggles and optional flow-run job-runner Kubernetes primitives |
 | `prefect-auth-proxy` | oauth2-proxy in front of Prefect |
 | `cloudbeaver-auth-proxy` | oauth2-proxy in front of CloudBeaver |
@@ -398,8 +398,8 @@ render time, which means:
 
 Important places this happens:
 
-- `templates/cloudbeaver.yaml` reads existing bootstrap, workspace-seed, and
-  trust-store secrets for rollout checksums
+- `charts/cloudbeaver/templates/deployment.yaml` reads existing admin,
+  teams-seed, connections-seed, and trust-store secrets for rollout checksums
 - `templates/datahub-auth-secrets.yaml` preserves existing generated signing
   material
 - `templates/datahub-prerequisites-compat.yaml` can mirror an existing MySQL
@@ -423,7 +423,7 @@ rather than obvious small templates.
 | `templates/identity-validation.yaml` | blocks unsupported identity combinations before resources render |
 | `templates/authorization-validation.yaml` | blocks deprecated catalog ACL settings and `authorizedRoles` referencing an undeclared Ranger data role |
 | `templates/platform-home.yaml` | contains the landing page, embedded JavaScript, embedded Python helper API, launcher logic, and health checks |
-| `templates/cloudbeaver.yaml` | contains CloudBeaver bootstrap, proxy-header expectations, trust-store creation, and optional shared-connection seeding |
+| `charts/cloudbeaver/` | local subchart: CloudBeaver auth-provider registration, proxy-header expectations, trust-store creation, and optional shared-connection seeding (see its own README) |
 | `templates/ranger-admin.yaml` | builds the Ranger Admin deployment and bootstraps it against PostgreSQL |
 | `templates/ranger-automation.yaml` | embeds the large Python reconciliation logic for roles, policies, usersync, local-user sync, and exception audits |
 | `templates/ranger-browser-proxy.yaml` | adds the browser-facing reverse proxy layer in front of Ranger Admin |

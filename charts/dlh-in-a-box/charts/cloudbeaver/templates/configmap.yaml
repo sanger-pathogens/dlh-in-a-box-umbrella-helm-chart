@@ -1,0 +1,189 @@
+{{- if .Values.enabled }}
+{{- $serviceName := include "cloudbeaver.serviceName" . -}}
+{{- $port := default 8978 .Values.service.port -}}
+{{- $auth := .Values.auth | default dict -}}
+{{- $authLocal := get $auth "local" | default dict -}}
+{{- $authProxy := get $auth "proxy" | default dict -}}
+{{- $authLocalEnabled := default false $authLocal.enabled -}}
+{{- $appConfig := .Values.app | default dict -}}
+{{- $global := .Values.global | default dict -}}
+{{- $identity := get $global "identity" | default dict -}}
+{{- $accessModelRoles := fromJson (include "dlh-in-a-box.identity.accessModelRolesJson" .) -}}
+{{- $cloudbeaverRoles := list -}}
+{{- range $roleName := keys $accessModelRoles | sortAlpha -}}
+  {{- $role := get $accessModelRoles $roleName | default dict -}}
+  {{- if default false (get (get $role "appAccess" | default dict) "cloudbeaver") -}}
+    {{- $cloudbeaverRoles = uniq (append $cloudbeaverRoles (toString $roleName)) -}}
+  {{- end -}}
+{{- end -}}
+{{- $derivedDefaultUserTeam := default "" (first $cloudbeaverRoles) -}}
+{{- $defaultUserTeam := default $derivedDefaultUserTeam $appConfig.defaultUserTeam -}}
+{{- $reverseProxyAuthEnabled := default false $authProxy.enabled -}}
+{{- /*
+  enabledAuthProviders is additive, not exclusive: reverseProxy (Keycloak via
+  oauth2-proxy) and local (native cbadmin login) can both be registered at
+  once. oauth2-proxy sends userHeader on every proxied request, so CloudBeaver
+  auto-authenticates via reverseProxy and never surfaces the local login
+  screen on that path; local only becomes reachable by bypassing oauth2-proxy
+  and hitting the CloudBeaver Service directly with no forwarded-username
+  header present, which is the deliberate break-glass path for auth.local.
+*/ -}}
+{{- $enabledAuthProviders := list -}}
+{{- if $reverseProxyAuthEnabled -}}
+  {{- $enabledAuthProviders = append $enabledAuthProviders "reverseProxy" -}}
+{{- end -}}
+{{- if $authLocalEnabled -}}
+  {{- $enabledAuthProviders = append $enabledAuthProviders "local" -}}
+{{- end -}}
+{{- $external := get $identity "external" | default dict -}}
+{{- $clients := get $external "clients" | default dict -}}
+{{- $cloudbeaverIdentity := get $clients "cloudbeaverProxy" | default dict -}}
+{{- $cloudbeaverOrigin := first (default (list) (get $cloudbeaverIdentity "webOrigins")) -}}
+{{- $logoutUrl := default (printf "%s/oauth2/sign_out" $cloudbeaverOrigin) $authProxy.logoutUrl -}}
+{{- $cloudbeaverServerUrl := "" -}}
+{{- $supportsCustomConnections := true -}}
+{{- if hasKey $appConfig "supportsCustomConnections" -}}
+  {{- $supportsCustomConnections = get $appConfig "supportsCustomConnections" -}}
+{{- end -}}
+{{- $showReadOnlyConnectionInfo := true -}}
+{{- if hasKey $appConfig "showReadOnlyConnectionInfo" -}}
+  {{- $showReadOnlyConnectionInfo = get $appConfig "showReadOnlyConnectionInfo" -}}
+{{- end -}}
+{{- $cloudbeaverSecretManagerEnabled := or (default false $appConfig.secretManagerEnabled) (default false $appConfig.publicCredentialsSaveEnabled) (default false $appConfig.adminCredentialsSaveEnabled) -}}
+{{- if $cloudbeaverOrigin -}}
+  {{- $cloudbeaverServerUrl = printf "%s/" (trimSuffix "/" $cloudbeaverOrigin) -}}
+{{- end -}}
+{{- $cloudbeaverForceHttps := hasPrefix "https://" $cloudbeaverServerUrl -}}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ $serviceName }}-config
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "cloudbeaver.labels" . | nindent 4 }}
+    app.kubernetes.io/component: cloudbeaver
+data:
+  cloudbeaver.conf: |
+    {
+      server: {
+        serverPort: {{ $port }},
+        forceHttps: {{ ternary "true" "false" (or $cloudbeaverForceHttps (default false $appConfig.forceHttps)) }},
+        contentRoot: "web",
+        driversLocation: "drivers",
+        sslConfigurationPath: "${CLOUDBEAVER_SSL_CONF_PATH:workspace/.data/ssl-config.xml}",
+        rootURI: "/",
+        serviceURI: "/api/",
+        supportedHosts: [],
+        expireSessionAfterPeriod: "${CLOUDBEAVER_EXPIRE_SESSION_AFTER_PERIOD:1800000}",
+        bindSessionToIp: "${CLOUDBEAVER_BIND_SESSION_TO_IP:disable}",
+        develMode: "${CLOUDBEAVER_DEVEL_MODE:false}",
+        enableSecurityManager: false,
+        sm: {
+          enableBruteForceProtection: "${CLOUDBEAVER_BRUTE_FORCE_PROTECTION_ENABLED:true}",
+          maxFailedLogin: "${CLOUDBEAVER_MAX_FAILED_LOGINS:10}",
+          minimumLoginTimeout: "${CLOUDBEAVER_MINIMUM_LOGIN_TIMEOUT:1}",
+          blockLoginPeriod: "${CLOUDBEAVER_BLOCK_PERIOD:300}",
+          passwordPolicy: {
+            minLength: "${CLOUDBEAVER_POLICY_MIN_LENGTH:8}",
+            requireMixedCase: "${CLOUDBEAVER_POLICY_REQUIRE_MIXED_CASE:true}",
+            minNumberCount: "${CLOUDBEAVER_POLICY_MIN_NUMBER_COUNT:1}",
+            minSymbolCount: "${CLOUDBEAVER_POLICY_MIN_SYMBOL_COUNT:0}"
+          }
+        },
+        database: {
+          driver: "${CLOUDBEAVER_DB_DRIVER:h2_embedded_v2}",
+          url: "${CLOUDBEAVER_DB_URL:jdbc:h2:${workspace}/.data/cb.h2v2.dat}",
+          schema: "${CLOUDBEAVER_DB_SCHEMA:''}",
+          user: "${CLOUDBEAVER_DB_USER:''}",
+          password: "${CLOUDBEAVER_DB_PASSWORD:''}",
+          initialDataConfiguration: "${CLOUDBEAVER_DB_INITIAL_DATA:conf/initial-data.conf}",
+          pool: {
+            minIdleConnections: "${CLOUDBEAVER_DB_MIN_IDLE_CONNECTIONS:4}",
+            maxIdleConnections: "${CLOUDBEAVER_DB_MAX_IDLE_CONNECTIONS:10}",
+            maxConnections: "${CLOUDBEAVER_DB_MAX_CONNECTIONS:100}",
+            validationQuery: "${CLOUDBEAVER_DB_VALIDATION_QUERY:SELECT 1}"
+          },
+          backupEnabled: "${CLOUDBEAVER_DB_BACKUP_ENABLED:true}"
+        }
+      },
+      app: {
+        anonymousAccessEnabled: false,
+        defaultUserTeam: {{ $defaultUserTeam | quote }},
+        supportsCustomConnections: {{ ternary "true" "false" $supportsCustomConnections }},
+        showReadOnlyConnectionInfo: {{ ternary "true" "false" $showReadOnlyConnectionInfo }},
+        publicCredentialsSaveEnabled: {{ ternary "true" "false" (default false $appConfig.publicCredentialsSaveEnabled) }},
+        adminCredentialsSaveEnabled: {{ ternary "true" "false" (default false $appConfig.adminCredentialsSaveEnabled) }},
+        secretManagerEnabled: {{ ternary "true" "false" $cloudbeaverSecretManagerEnabled }},
+        enableReverseProxyAuth: {{ ternary "true" "false" $reverseProxyAuthEnabled }},
+        forwardProxy: true,
+        linkExternalCredentialsWithUser: true,
+        enabledAuthProviders: [
+          {{- range $index, $provider := $enabledAuthProviders }}
+          {{- if $index }},{{ end }}
+          {{ $provider | quote }}
+          {{- end }}
+        ],
+        authConfigurations: [
+          {{- if $reverseProxyAuthEnabled }}
+          {
+            id: "keycloak-proxy",
+            provider: "reverseProxy",
+            displayName: "Keycloak",
+            disabled: false,
+            iconURL: "",
+            description: "CloudBeaver browser login is delegated to the Keycloak-backed reverse proxy.",
+            parameters: {
+              "logout-url": {{ $logoutUrl | quote }},
+              "user-header": {{ default "X-Forwarded-Preferred-Username" $authProxy.userHeader | quote }},
+              "team-header": {{ default "X-Forwarded-Groups" $authProxy.groupHeader | quote }},
+              "team-delimiter": {{ default "," $authProxy.groupDelimiter | quote }},
+              "first-name-header": {{ default "" $authProxy.firstNameHeader | quote }},
+              "last-name-header": {{ default "" $authProxy.lastNameHeader | quote }}
+            }
+          }
+          {{- end }}
+        ]
+      }
+    }
+  cloudbeaver.runtime.conf: |
+    {
+      app: {
+        anonymousAccessEnabled: false,
+        defaultUserTeam: {{ $defaultUserTeam | quote }},
+        supportsCustomConnections: {{ ternary "true" "false" $supportsCustomConnections }},
+        showReadOnlyConnectionInfo: {{ ternary "true" "false" $showReadOnlyConnectionInfo }},
+        publicCredentialsSaveEnabled: {{ ternary "true" "false" (default false $appConfig.publicCredentialsSaveEnabled) }},
+        adminCredentialsSaveEnabled: {{ ternary "true" "false" (default false $appConfig.adminCredentialsSaveEnabled) }},
+        secretManagerEnabled: {{ ternary "true" "false" $cloudbeaverSecretManagerEnabled }},
+        enableReverseProxyAuth: {{ ternary "true" "false" $reverseProxyAuthEnabled }},
+        forwardProxy: true,
+        linkExternalCredentialsWithUser: true,
+        enabledAuthProviders: [
+          {{- range $index, $provider := $enabledAuthProviders }}
+          {{- if $index }},{{ end }}
+          {{ $provider | quote }}
+          {{- end }}
+        ],
+        authConfigurations: [
+          {{- if $reverseProxyAuthEnabled }}
+          {
+            id: "keycloak-proxy",
+            provider: "reverseProxy",
+            displayName: "Keycloak",
+            disabled: false,
+            iconURL: "",
+            description: "CloudBeaver browser login is delegated to the Keycloak-backed reverse proxy.",
+            parameters: {
+              "logout-url": {{ $logoutUrl | quote }},
+              "user-header": {{ default "X-Forwarded-Preferred-Username" $authProxy.userHeader | quote }},
+              "team-header": {{ default "X-Forwarded-Groups" $authProxy.groupHeader | quote }},
+              "team-delimiter": {{ default "," $authProxy.groupDelimiter | quote }},
+              "first-name-header": {{ default "" $authProxy.firstNameHeader | quote }},
+              "last-name-header": {{ default "" $authProxy.lastNameHeader | quote }}
+            }
+          }
+          {{- end }}
+        ]
+      }
+    }
+{{- end }}

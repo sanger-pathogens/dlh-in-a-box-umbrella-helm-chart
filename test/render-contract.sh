@@ -419,6 +419,16 @@ expect_fail \
   -f "${FIXTURE_DIR}/cloudbeaver-missing-secret.yaml"
 
 expect_fail \
+  "cloudbeaver.enabled requires cloudbeaver.auth.proxy.enabled=true so CloudBeaver stays behind the central authentication boundary." \
+  -f "${DEV_VALUES}" \
+  -f "${FIXTURE_DIR}/cloudbeaver-proxy-disabled.yaml"
+
+expect_fail \
+  "cloudbeaver.auth.admin.existingSecret is required when CloudBeaver is enabled." \
+  -f "${DEV_VALUES}" \
+  -f "${FIXTURE_DIR}/cloudbeaver-admin-secret-missing.yaml"
+
+expect_fail \
   "global.identity.external.clients.trino.redirectUris must not use wildcard values outside local environments." \
   -f "${PROD_VALUES}" \
   -f "${FIXTURE_DIR}/wildcard-redirect.yaml"

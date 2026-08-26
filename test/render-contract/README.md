@@ -118,6 +118,8 @@ configuration:
 | `prefect-direct-grant-prefectproxy-disabled.yaml` | Prefect direct-grant enabled while the shared Prefect browser client is disabled |
 | `prefect-token-audience-mismatch.yaml` | Prefect machine and developer bearer-token clients disagree on token audience |
 | `cloudbeaver-missing-secret.yaml` | CloudBeaver auth-proxy config secret missing |
+| `cloudbeaver-proxy-disabled.yaml` | CloudBeaver enabled with `auth.proxy.enabled=false` -- the umbrella's mandatory central-auth-boundary rule |
+| `cloudbeaver-admin-secret-missing.yaml` | CloudBeaver enabled with `auth.admin.existingSecret=""` -- the cloudbeaver subchart's own self-contained check |
 
 ### `keycloakLocal` edge cases
 

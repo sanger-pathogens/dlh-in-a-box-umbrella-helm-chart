@@ -26,7 +26,7 @@ catalog governance, and app launch behavior.
 - `charts/dlh-in-a-box/templates/authorization-validation.yaml`
 - `charts/dlh-in-a-box/templates/ranger-automation.yaml`
 - `charts/dlh-in-a-box/templates/platform-home.yaml`
-- `charts/dlh-in-a-box/templates/cloudbeaver.yaml`
+- `charts/dlh-in-a-box/charts/cloudbeaver/`
 - `charts/dlh-in-a-box/templates/ranger-admin.yaml`
 - `charts/dlh-in-a-box/files/ranger-automation/*.py`
 - `charts/dlh-in-a-box/files/platform-home/*`
