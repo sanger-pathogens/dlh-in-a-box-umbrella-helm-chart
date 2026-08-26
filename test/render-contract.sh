@@ -357,7 +357,7 @@ assert_contains "${cloudbeaver_h2_patch_manifest}" "Skipped by dlh-in-a-box for 
 
 echo "--- Negative contract renders"
 expect_fail \
-  "cloudbeaver.h2FreshSchemaPatch.enabled requires cloudbeaver.bootstrap.forceWorkspaceSeed=true because it is only safe for intentionally fresh CloudBeaver workspaces." \
+  "cloudbeaver.h2FreshSchemaPatch.enabled requires cloudbeaver.seed.connections.force=true because it is only safe for intentionally fresh CloudBeaver workspaces." \
   -f "${DEV_VALUES}" \
   -f "${FIXTURE_DIR}/cloudbeaver-h2-fresh-schema-patch-without-fresh-workspace.yaml"
 

@@ -34,7 +34,8 @@
 {{- $platformHomeValues := .Values.platformHome | default dict -}}
 {{- $platformHomeIngress := get $platformHomeValues "ingress" | default dict -}}
 {{- $cloudbeaverValues := .Values.cloudbeaver | default dict -}}
-{{- $cloudbeaverAuthProxy := get $cloudbeaverValues "authProxy" | default dict -}}
+{{- $cloudbeaverAuth := get $cloudbeaverValues "auth" | default dict -}}
+{{- $cloudbeaverAuthProxy := get $cloudbeaverAuth "proxy" | default dict -}}
 {{- $cloudbeaverAuthProxyValues := index .Values "cloudbeaver-auth-proxy" | default dict -}}
 {{- $cloudbeaverAuthProxyConfig := get $cloudbeaverAuthProxyValues "config" | default dict -}}
 {{- $cloudbeaverAuthProxyIngress := get $cloudbeaverAuthProxyValues "ingress" | default dict -}}
@@ -261,13 +262,13 @@
 {{- fail "global.identity.external.clients.cloudbeaverProxy.enabled requires cloudbeaver.enabled=true." -}}
 {{- end -}}
 {{- if and .Values.cloudbeaver.enabled (not (get $cloudbeaverAuthProxy "enabled")) -}}
-{{- fail "cloudbeaver.enabled requires cloudbeaver.authProxy.enabled=true so CloudBeaver stays behind the central authentication boundary." -}}
+{{- fail "cloudbeaver.enabled requires cloudbeaver.auth.proxy.enabled=true so CloudBeaver stays behind the central authentication boundary." -}}
 {{- end -}}
 {{- if and (get $cloudbeaverIdentity "enabled") (not (get $cloudbeaverAuthProxy "enabled")) -}}
-{{- fail "global.identity.external.clients.cloudbeaverProxy.enabled requires cloudbeaver.authProxy.enabled=true." -}}
+{{- fail "global.identity.external.clients.cloudbeaverProxy.enabled requires cloudbeaver.auth.proxy.enabled=true." -}}
 {{- end -}}
-{{- if and .Values.cloudbeaver.enabled (not (dig "bootstrap" "existingSecret" "" $cloudbeaverValues)) -}}
-{{- fail "cloudbeaver.bootstrap.existingSecret is required when CloudBeaver is enabled." -}}
+{{- if and .Values.cloudbeaver.enabled (not (dig "auth" "admin" "existingSecret" "" $cloudbeaverValues)) -}}
+{{- fail "cloudbeaver.auth.admin.existingSecret is required when CloudBeaver is enabled." -}}
 {{- end -}}
 {{- if and (get $cloudbeaverIdentity "enabled") (not (get $cloudbeaverAuthProxyConfig "existingSecret")) -}}
 {{- fail "cloudbeaver-auth-proxy.config.existingSecret must be set when global.identity.external.clients.cloudbeaverProxy.enabled=true." -}}

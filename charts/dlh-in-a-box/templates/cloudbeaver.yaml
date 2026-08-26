@@ -1,36 +1,44 @@
 {{- if .Values.cloudbeaver.enabled }}
 {{- $serviceName := include "dlh-in-a-box.cloudbeaver.serviceName" . -}}
 {{- $port := default 8978 .Values.cloudbeaver.service.port -}}
-{{- $bootstrap := .Values.cloudbeaver.bootstrap | default dict -}}
-{{- $authProxy := .Values.cloudbeaver.authProxy | default dict -}}
+{{- $auth := .Values.cloudbeaver.auth | default dict -}}
+{{- $authAdmin := get $auth "admin" | default dict -}}
+{{- $authLocal := get $auth "local" | default dict -}}
+{{- $authProxy := get $auth "proxy" | default dict -}}
+{{- $seed := .Values.cloudbeaver.seed | default dict -}}
+{{- $seedTeams := get $seed "teams" | default dict -}}
+{{- $seedConnections := get $seed "connections" | default dict -}}
 {{- $appConfig := .Values.cloudbeaver.app | default dict -}}
 {{- $workspace := .Values.cloudbeaver.workspace | default dict -}}
 {{- $workspacePersistence := get $workspace "persistence" | default dict -}}
 {{- $trustedCa := .Values.cloudbeaver.trustedCa | default dict -}}
-{{- $workspaceSeedSecret := default "" $bootstrap.workspaceSeedExistingSecret -}}
-{{- $workspaceDataSourcesKey := default "data-sources.json" $bootstrap.workspaceDataSourcesKey -}}
-{{- $forceWorkspaceSeed := default false $bootstrap.forceWorkspaceSeed -}}
+{{- $authAdminExistingSecret := default "" $authAdmin.existingSecret -}}
+{{- $authAdminUsername := default "cbadmin" $authAdmin.username -}}
+{{- $authAdminPasswordSecretKey := default "admin-password" $authAdmin.passwordSecretKey -}}
+{{- $authLocalEnabled := default false $authLocal.enabled -}}
+{{- $seedTeamsExistingSecret := default "" $seedTeams.existingSecret -}}
+{{- $seedTeamsDataKey := default "initial-data.conf" $seedTeams.dataKey -}}
+{{- $seedConnectionsExistingSecret := default "" $seedConnections.existingSecret -}}
+{{- $seedConnectionsDataSourcesKey := default "data-sources.json" $seedConnections.dataSourcesKey -}}
+{{- $seedConnectionsForce := default false $seedConnections.force -}}
 {{- $h2FreshSchemaPatch := get .Values.cloudbeaver "h2FreshSchemaPatch" | default dict -}}
 {{- $h2FreshSchemaPatchEnabled := default false $h2FreshSchemaPatch.enabled -}}
 {{- $h2FreshSchemaPatchPluginJar := default "" $h2FreshSchemaPatch.pluginJar -}}
-{{- if and $h2FreshSchemaPatchEnabled (not $forceWorkspaceSeed) -}}
-  {{- fail "cloudbeaver.h2FreshSchemaPatch.enabled requires cloudbeaver.bootstrap.forceWorkspaceSeed=true because it is only safe for intentionally fresh CloudBeaver workspaces." -}}
+{{- if and $h2FreshSchemaPatchEnabled (not $seedConnectionsForce) -}}
+  {{- fail "cloudbeaver.h2FreshSchemaPatch.enabled requires cloudbeaver.seed.connections.force=true because it is only safe for intentionally fresh CloudBeaver workspaces." -}}
 {{- end -}}
 {{- if and $h2FreshSchemaPatchEnabled (not $h2FreshSchemaPatchPluginJar) -}}
   {{- fail "cloudbeaver.h2FreshSchemaPatch.pluginJar is required when cloudbeaver.h2FreshSchemaPatch.enabled=true." -}}
 {{- end -}}
-{{- $bootstrapInitialDataKey := default "initial-data.conf" $bootstrap.initialDataKey -}}
-{{- $bootstrapAdminNameKey := default "admin-name" $bootstrap.adminNameKey -}}
-{{- $bootstrapAdminPasswordKey := default "admin-password" $bootstrap.adminPasswordKey -}}
-{{- $sharedConnectionSeed := get $bootstrap "sharedConnectionSeed" | default dict -}}
-{{- $sharedConnectionSeedEnabled := default false $sharedConnectionSeed.enabled -}}
-{{- $sharedConnectionConnectionIdKey := default "shared-connection-id" $sharedConnectionSeed.connectionIdKey -}}
-{{- $sharedConnectionProjectIdKey := default "shared-project-id" $sharedConnectionSeed.projectIdKey -}}
-{{- $sharedConnectionUsernameKey := default "shared-connection-username" $sharedConnectionSeed.usernameKey -}}
-{{- $sharedConnectionPasswordKey := default "shared-connection-password" $sharedConnectionSeed.passwordKey -}}
-{{- $sharedConnectionBootstrapUsernameKey := default "shared-bootstrap-username" $sharedConnectionSeed.bootstrapUsernameKey -}}
-{{- $sharedConnectionBootstrapGroupsKey := default "shared-bootstrap-groups" $sharedConnectionSeed.bootstrapGroupsKey -}}
-{{- $sharedConnectionExpectedCatalog := default "redcap" $sharedConnectionSeed.expectedCatalog -}}
+{{- $sharedAccess := get $seedConnections "sharedAccess" | default dict -}}
+{{- $sharedAccessEnabled := default false $sharedAccess.enabled -}}
+{{- $sharedAccessConnectionIdKey := default "shared-connection-id" $sharedAccess.connectionIdKey -}}
+{{- $sharedAccessProjectIdKey := default "shared-project-id" $sharedAccess.projectIdKey -}}
+{{- $sharedAccessUsernameKey := default "shared-connection-username" $sharedAccess.usernameKey -}}
+{{- $sharedAccessPasswordKey := default "shared-connection-password" $sharedAccess.passwordKey -}}
+{{- $sharedAccessBootstrapUsernameKey := default "shared-bootstrap-username" $sharedAccess.bootstrapUsernameKey -}}
+{{- $sharedAccessBootstrapGroupsKey := default "shared-bootstrap-groups" $sharedAccess.bootstrapGroupsKey -}}
+{{- $sharedAccessExpectedCatalog := default "redcap" $sharedAccess.expectedCatalog -}}
 {{- $trustedCaSecret := default "" $trustedCa.existingSecret -}}
 {{- $trustedCaCertKey := default "ca.crt" $trustedCa.certKey -}}
 {{- $trustStorePath := default "/opt/cloudbeaver/trust/cloudbeaver-trino-truststore.p12" $trustedCa.trustStorePath -}}
@@ -57,16 +65,25 @@
 {{- $defaultUserTeam := default $derivedDefaultUserTeam $appConfig.defaultUserTeam -}}
 {{- $adminTeam := default $derivedAdminTeam $appConfig.adminTeam -}}
 {{- $reverseProxyAuthEnabled := default false $authProxy.enabled -}}
-{{- if hasKey $appConfig "enableReverseProxyAuth" -}}
-  {{- $reverseProxyAuthEnabled = get $appConfig "enableReverseProxyAuth" -}}
-{{- end -}}
 {{- $enforceRuntimeConfig := $reverseProxyAuthEnabled -}}
 {{- if hasKey $appConfig "enforceRuntimeConfig" -}}
   {{- $enforceRuntimeConfig = get $appConfig "enforceRuntimeConfig" -}}
 {{- end -}}
-{{- $enabledAuthProviders := list "local" -}}
+{{- /*
+  enabledAuthProviders is additive, not exclusive: reverseProxy (Keycloak via
+  oauth2-proxy) and local (native cbadmin login) can both be registered at
+  once. oauth2-proxy sends userHeader on every proxied request, so CloudBeaver
+  auto-authenticates via reverseProxy and never surfaces the local login
+  screen on that path; local only becomes reachable by bypassing oauth2-proxy
+  and hitting the CloudBeaver Service directly with no forwarded-username
+  header present, which is the deliberate break-glass path for auth.local.
+*/ -}}
+{{- $enabledAuthProviders := list -}}
 {{- if $reverseProxyAuthEnabled -}}
-  {{- $enabledAuthProviders = list "reverseProxy" -}}
+  {{- $enabledAuthProviders = append $enabledAuthProviders "reverseProxy" -}}
+{{- end -}}
+{{- if $authLocalEnabled -}}
+  {{- $enabledAuthProviders = append $enabledAuthProviders "local" -}}
 {{- end -}}
 {{- $external := get $identity "external" | default dict -}}
 {{- $clients := get $external "clients" | default dict -}}
@@ -90,16 +107,22 @@
 {{- $cloudbeaverForceHttps := hasPrefix "https://" $cloudbeaverServerUrl -}}
 {{- $checksums := dict
   "config" ((printf "%s\n%s\n%s\n%s\n%s" (toPrettyJson $authProxy) (toPrettyJson $appConfig) (toPrettyJson $cloudbeaverIdentity) (toPrettyJson $h2FreshSchemaPatch) $logoutUrl) | sha256sum)
-  "bootstrap" $bootstrap.existingSecret
-  "workspaceSeed" $workspaceSeedSecret
+  "admin" $authAdminExistingSecret
+  "teamsSeed" $seedTeamsExistingSecret
+  "connectionsSeed" $seedConnectionsExistingSecret
   "trustedCa" $trustedCaSecret
 -}}
-{{- with (lookup "v1" "Secret" .Release.Namespace $bootstrap.existingSecret) }}
-  {{- $_ := set $checksums "bootstrap" (toJson (default dict .data) | sha256sum) -}}
+{{- with (lookup "v1" "Secret" .Release.Namespace $authAdminExistingSecret) }}
+  {{- $_ := set $checksums "admin" (toJson (default dict .data) | sha256sum) -}}
 {{- end }}
-{{- if $workspaceSeedSecret }}
-  {{- with (lookup "v1" "Secret" .Release.Namespace $workspaceSeedSecret) }}
-    {{- $_ := set $checksums "workspaceSeed" (toJson (default dict .data) | sha256sum) -}}
+{{- if $seedTeamsExistingSecret }}
+  {{- with (lookup "v1" "Secret" .Release.Namespace $seedTeamsExistingSecret) }}
+    {{- $_ := set $checksums "teamsSeed" (toJson (default dict .data) | sha256sum) -}}
+  {{- end }}
+{{- end }}
+{{- if $seedConnectionsExistingSecret }}
+  {{- with (lookup "v1" "Secret" .Release.Namespace $seedConnectionsExistingSecret) }}
+    {{- $_ := set $checksums "connectionsSeed" (toJson (default dict .data) | sha256sum) -}}
   {{- end }}
 {{- end }}
 {{- if $trustedCaSecret }}
@@ -300,8 +323,9 @@ spec:
     metadata:
       annotations:
         checksum/cloudbeaver-config: {{ get $checksums "config" | quote }}
-        checksum/cloudbeaver-bootstrap: {{ get $checksums "bootstrap" | quote }}
-        checksum/cloudbeaver-workspace-seed: {{ get $checksums "workspaceSeed" | quote }}
+        checksum/cloudbeaver-admin: {{ get $checksums "admin" | quote }}
+        checksum/cloudbeaver-teams-seed: {{ get $checksums "teamsSeed" | quote }}
+        checksum/cloudbeaver-connections-seed: {{ get $checksums "connectionsSeed" | quote }}
         checksum/cloudbeaver-trusted-ca: {{ get $checksums "trustedCa" | quote }}
       labels:
         app.kubernetes.io/instance: {{ .Release.Name }}
@@ -312,7 +336,7 @@ spec:
       imagePullSecrets:
         {{- toYaml . | nindent 8 }}
       {{- end }}
-      {{- if or $trustedCaSecret $workspaceSeedSecret $enforceRuntimeConfig $h2FreshSchemaPatchEnabled }}
+      {{- if or $trustedCaSecret $seedConnectionsExistingSecret $enforceRuntimeConfig $h2FreshSchemaPatchEnabled }}
       initContainers:
         {{- if $h2FreshSchemaPatchEnabled }}
         - name: cloudbeaver-h2-fresh-schema-patch
@@ -369,7 +393,7 @@ spec:
               mountPath: /ca
               readOnly: true
         {{- end }}
-        {{- if $workspaceSeedSecret }}
+        {{- if $seedConnectionsExistingSecret }}
         - name: cloudbeaver-workspace-seed
           image: docker.io/busybox:1.36
           imagePullPolicy: IfNotPresent
@@ -380,12 +404,12 @@ spec:
               target_dir="/workspace/GlobalConfiguration/.dbeaver"
               target_file="${target_dir}/data-sources.json"
               permissions_file="${target_dir}/data-sources-permissions.json"
-              if [ "{{ ternary "true" "false" $forceWorkspaceSeed }}" = "true" ]; then
+              if [ "{{ ternary "true" "false" $seedConnectionsForce }}" = "true" ]; then
                 find /workspace -mindepth 1 -maxdepth 1 -exec rm -rf {} +
               fi
               mkdir -p "${target_dir}"
-              if [ "{{ ternary "true" "false" $forceWorkspaceSeed }}" = "true" ] || [ ! -f "${target_file}" ]; then
-                cp "/seed/{{ $workspaceDataSourcesKey }}" "${target_file}"
+              if [ "{{ ternary "true" "false" $seedConnectionsForce }}" = "true" ] || [ ! -f "${target_file}" ]; then
+                cp "/seed/{{ $seedConnectionsDataSourcesKey }}" "${target_file}"
               fi
               if [ -f "/seed/data-sources-permissions.json" ]; then
                 cp "/seed/data-sources-permissions.json" "${permissions_file}"
@@ -429,40 +453,37 @@ spec:
               value: {{ $cloudbeaverServerUrl | quote }}
             {{- end }}
             - name: CB_ADMIN_NAME
-              valueFrom:
-                secretKeyRef:
-                  name: {{ $bootstrap.existingSecret }}
-                  key: {{ $bootstrapAdminNameKey }}
+              value: {{ $authAdminUsername | quote }}
             - name: CB_ADMIN_PASSWORD
               valueFrom:
                 secretKeyRef:
-                  name: {{ $bootstrap.existingSecret }}
-                  key: {{ $bootstrapAdminPasswordKey }}
-            {{- if $sharedConnectionSeedEnabled }}
+                  name: {{ $authAdminExistingSecret }}
+                  key: {{ $authAdminPasswordSecretKey }}
+            {{- if $sharedAccessEnabled }}
             - name: CB_SHARED_CONNECTION_ID
               valueFrom:
                 secretKeyRef:
-                  name: {{ $bootstrap.existingSecret }}
-                  key: {{ $sharedConnectionConnectionIdKey }}
+                  name: {{ $authAdminExistingSecret }}
+                  key: {{ $sharedAccessConnectionIdKey }}
             - name: CB_SHARED_CONNECTION_PROJECT_ID
               valueFrom:
                 secretKeyRef:
-                  name: {{ $bootstrap.existingSecret }}
-                  key: {{ $sharedConnectionProjectIdKey }}
+                  name: {{ $authAdminExistingSecret }}
+                  key: {{ $sharedAccessProjectIdKey }}
                   optional: true
             - name: CB_SHARED_BOOTSTRAP_USERNAME
               valueFrom:
                 secretKeyRef:
-                  name: {{ $bootstrap.existingSecret }}
-                  key: {{ $sharedConnectionBootstrapUsernameKey }}
+                  name: {{ $authAdminExistingSecret }}
+                  key: {{ $sharedAccessBootstrapUsernameKey }}
             - name: CB_SHARED_BOOTSTRAP_GROUPS
               valueFrom:
                 secretKeyRef:
-                  name: {{ $bootstrap.existingSecret }}
-                  key: {{ $sharedConnectionBootstrapGroupsKey }}
+                  name: {{ $authAdminExistingSecret }}
+                  key: {{ $sharedAccessBootstrapGroupsKey }}
                   optional: true
             {{- end }}
-          {{- if $sharedConnectionSeedEnabled }}
+          {{- if $sharedAccessEnabled }}
           lifecycle:
             postStart:
               exec:
@@ -477,7 +498,7 @@ spec:
                     fi
                     project_id="${CB_SHARED_CONNECTION_PROJECT_ID:-g_GlobalConfiguration}"
                     bootstrap_groups="${CB_SHARED_BOOTSTRAP_GROUPS:-{{ $adminTeam }},{{ $defaultUserTeam }}}"
-                    expected_catalog={{ $sharedConnectionExpectedCatalog | quote }}
+                    expected_catalog={{ $sharedAccessExpectedCatalog | quote }}
                     for _ in $(seq 1 90); do
                       if curl -fsS "http://127.0.0.1:{{ $port }}/status" >/dev/null 2>&1; then
                         break
@@ -617,10 +638,12 @@ spec:
               mountPath: /opt/cloudbeaver/conf/cloudbeaver.conf
               subPath: cloudbeaver.conf
               readOnly: true
-            - name: cloudbeaver-bootstrap
+            {{- if $seedTeamsExistingSecret }}
+            - name: cloudbeaver-teams-seed
               mountPath: /opt/cloudbeaver/conf/initial-data.conf
-              subPath: {{ $bootstrapInitialDataKey }}
+              subPath: {{ $seedTeamsDataKey }}
               readOnly: true
+            {{- end }}
             - name: workspace
               mountPath: /opt/cloudbeaver/workspace
             {{- if $h2FreshSchemaPatchEnabled }}
@@ -638,9 +661,11 @@ spec:
         - name: cloudbeaver-config
           configMap:
             name: {{ $serviceName }}-config
-        - name: cloudbeaver-bootstrap
+        {{- if $seedTeamsExistingSecret }}
+        - name: cloudbeaver-teams-seed
           secret:
-            secretName: {{ $bootstrap.existingSecret }}
+            secretName: {{ $seedTeamsExistingSecret }}
+        {{- end }}
         {{- if $trustedCaSecret }}
         - name: cloudbeaver-trusted-ca
           secret:
@@ -651,10 +676,10 @@ spec:
         - name: cloudbeaver-truststore
           emptyDir: {}
         {{- end }}
-        {{- if $workspaceSeedSecret }}
+        {{- if $seedConnectionsExistingSecret }}
         - name: workspace-seed
           secret:
-            secretName: {{ $workspaceSeedSecret }}
+            secretName: {{ $seedConnectionsExistingSecret }}
         {{- end }}
         {{- if $h2FreshSchemaPatchEnabled }}
         - name: cloudbeaver-security-plugin-patch

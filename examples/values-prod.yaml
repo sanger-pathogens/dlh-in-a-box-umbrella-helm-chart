@@ -273,10 +273,11 @@ jupyterhub:
 
 cloudbeaver:
   enabled: true
-  bootstrap:
-    existingSecret: dlh-cloudbeaver-bootstrap
-  authProxy:
-    enabled: true
+  auth:
+    admin:
+      existingSecret: dlh-cloudbeaver-bootstrap
+    proxy:
+      enabled: true
 
 cloudbeaver-auth-proxy:
   config:

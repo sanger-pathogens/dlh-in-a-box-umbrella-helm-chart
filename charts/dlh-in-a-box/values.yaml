@@ -813,21 +813,51 @@ cloudbeaver:
       enabled: false
       size: 10Gi
       storageClass: ""
-  bootstrap:
-    existingSecret: dlh-cloudbeaver-bootstrap
-    initialDataKey: initial-data.conf
-    workspaceSeedExistingSecret: ""
-    workspaceDataSourcesKey: data-sources.json
-    forceWorkspaceSeed: false
-    sharedConnectionSeed:
+  # auth.proxy is the SSO login path (Keycloak via oauth2-proxy) and stays
+  # mandatory whenever cloudbeaver.enabled=true (enforced in
+  # identity-validation.yaml) so CloudBeaver always sits behind the central
+  # authentication boundary. auth.local is the local users login path.
+  # Both providers can be registered at once
+  auth:
+    admin:
+      # Native CloudBeaver admin identity. Always provisioned.
+      username: cbadmin
+      existingSecret: ""
+      passwordSecretKey: password
+    local:
       enabled: false
-      connectionIdKey: shared-connection-id
-      projectIdKey: shared-project-id
-      usernameKey: shared-connection-username
-      passwordKey: shared-connection-password
-      bootstrapUsernameKey: shared-bootstrap-username
-      bootstrapGroupsKey: shared-bootstrap-groups
-      expectedCatalog: redcap
+    proxy:
+      enabled: false
+      userHeader: X-Forwarded-Preferred-Username
+      # CloudBeaver treats this header as a list of existing team ids. The
+      # oauth2-proxy X-Forwarded-Groups header can contain broad Keycloak/OIDC
+      # roles such as offline_access, which breaks CloudBeaver login when those
+      # teams do not exist. Keep this dedicated header unless an upstream proxy
+      # explicitly emits CloudBeaver team ids such as platform-admin/platform-user-scientist.
+      groupHeader: X-CloudBeaver-Platform-Team
+      groupDelimiter: ","
+      firstNameHeader: ""
+      lastNameHeader: ""
+      logoutUrl: ""
+  # seed provisions first-boot data -- teams/users/permissions (seed.teams),
+  # and pre-loaded Trino/DB connections plus who can use them (seed.connections). Both are optional.
+  seed:
+    teams:
+      existingSecret: ""
+      dataKey: initial-data.conf
+    connections:
+      existingSecret: ""
+      dataSourcesKey: data-sources.json
+      force: false
+      sharedAccess:
+        enabled: false
+        connectionIdKey: shared-connection-id
+        projectIdKey: shared-project-id
+        usernameKey: shared-connection-username
+        passwordKey: shared-connection-password
+        bootstrapUsernameKey: shared-bootstrap-username
+        bootstrapGroupsKey: shared-bootstrap-groups
+        expectedCatalog: redcap
   h2FreshSchemaPatch:
     enabled: false
     pluginJar: ""
@@ -841,19 +871,6 @@ cloudbeaver:
       repository: eclipse-temurin
       tag: 21-jdk
       pullPolicy: IfNotPresent
-  authProxy:
-    enabled: false
-    userHeader: X-Forwarded-Preferred-Username
-    # CloudBeaver treats this header as a list of existing team ids. The
-    # oauth2-proxy X-Forwarded-Groups header can contain broad Keycloak/OIDC
-    # roles such as offline_access, which breaks CloudBeaver login when those
-    # teams do not exist. Keep this dedicated header unless an upstream proxy
-    # explicitly emits CloudBeaver team ids such as platform-admin/platform-user-scientist.
-    groupHeader: X-CloudBeaver-Platform-Team
-    groupDelimiter: ","
-    firstNameHeader: ""
-    lastNameHeader: ""
-    logoutUrl: ""
   app:
     defaultUserTeam: ""
     adminTeam: ""
