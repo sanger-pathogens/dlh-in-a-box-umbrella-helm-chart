@@ -1,0 +1,172 @@
+{
+  "$schema": "https://json-schema.org/draft-07/schema#",
+  "title": "cloudbeaver",
+  "description": "Chart-owned CloudBeaver Community Edition deployment, protected by an external oauth2-proxy auth boundary. This is the authoritative schema for this subchart's own values.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["enabled"],
+  "properties": {
+    "global": {
+      "type": "object",
+      "description": "Auto-propagated by Helm from the umbrella chart's own global values (e.g. global.identity, global.imagePullSecrets). Not owned or validated by this subchart.",
+      "additionalProperties": true
+    },
+    "enabled": { "type": "boolean" },
+    "image": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "repository": { "type": "string" },
+        "tag": { "type": "string" },
+        "pullPolicy": { "type": "string", "enum": ["Always", "IfNotPresent", "Never"] }
+      }
+    },
+    "service": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "port": { "type": "integer", "minimum": 1, "maximum": 65535 }
+      }
+    },
+    "strategy": {
+      "type": "object",
+      "description": "Passed through verbatim as the Deployment's own strategy field -- matches the Kubernetes DeploymentStrategy shape, not validated further here.",
+      "additionalProperties": true
+    },
+    "workspace": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "persistence": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "enabled": { "type": "boolean" },
+            "existingClaim": { "type": "string" },
+            "size": { "type": "string" },
+            "storageClass": { "type": "string" }
+          }
+        }
+      }
+    },
+    "auth": {
+      "type": "object",
+      "description": "auth.proxy is the SSO login path (Keycloak via oauth2-proxy) and stays mandatory whenever cloudbeaver.enabled=true (enforced in the umbrella chart's identity-validation.yaml). auth.local is the local/break-glass login path. Both can be registered at once.",
+      "additionalProperties": false,
+      "properties": {
+        "admin": {
+          "type": "object",
+          "description": "Native CloudBeaver admin identity. Always provisioned.",
+          "additionalProperties": false,
+          "properties": {
+            "username": { "type": "string" },
+            "existingSecret": { "type": "string" },
+            "passwordSecretKey": { "type": "string" }
+          }
+        },
+        "local": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "enabled": { "type": "boolean" }
+          }
+        },
+        "proxy": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "enabled": { "type": "boolean" },
+            "userHeader": { "type": "string" },
+            "groupHeader": { "type": "string" },
+            "groupDelimiter": { "type": "string" },
+            "firstNameHeader": { "type": "string" },
+            "lastNameHeader": { "type": "string" },
+            "logoutUrl": { "type": "string" }
+          }
+        }
+      }
+    },
+    "seed": {
+      "type": "object",
+      "description": "First-boot data seeding: seed.teams provisions teams/users/permissions; seed.connections provisions Trino/DB connections and who can use them. Both optional.",
+      "additionalProperties": false,
+      "properties": {
+        "teams": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "existingSecret": { "type": "string" },
+            "dataKey": { "type": "string" }
+          }
+        },
+        "connections": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "existingSecret": { "type": "string" },
+            "dataSourcesKey": { "type": "string" },
+            "force": { "type": "boolean" },
+            "sharedAccess": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "enabled": { "type": "boolean" },
+                "connectionIdKey": { "type": "string" },
+                "projectIdKey": { "type": "string" },
+                "usernameKey": { "type": "string" },
+                "passwordKey": { "type": "string" },
+                "bootstrapUsernameKey": { "type": "string" },
+                "bootstrapGroupsKey": { "type": "string" },
+                "expectedCatalog": { "type": "string" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "h2FreshSchemaPatch": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "pluginJar": { "type": "string" }
+      }
+    },
+    "trustedCa": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "existingSecret": { "type": "string" },
+        "certKey": { "type": "string" },
+        "trustStorePath": { "type": "string" },
+        "trustStorePassword": { "type": "string" },
+        "trustStoreType": { "type": "string" },
+        "initImage": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "repository": { "type": "string" },
+            "tag": { "type": "string" },
+            "pullPolicy": { "type": "string", "enum": ["Always", "IfNotPresent", "Never"] }
+          }
+        }
+      }
+    },
+    "app": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "defaultUserTeam": { "type": "string" },
+        "adminTeam": { "type": "string" },
+        "serverName": { "type": "string" },
+        "forceHttps": { "type": "boolean" },
+        "enforceRuntimeConfig": { "type": "boolean" },
+        "supportsCustomConnections": { "type": "boolean" },
+        "showReadOnlyConnectionInfo": { "type": "boolean" },
+        "publicCredentialsSaveEnabled": { "type": "boolean" },
+        "adminCredentialsSaveEnabled": { "type": "boolean" },
+        "secretManagerEnabled": { "type": "boolean" }
+      }
+    }
+  }
+}
