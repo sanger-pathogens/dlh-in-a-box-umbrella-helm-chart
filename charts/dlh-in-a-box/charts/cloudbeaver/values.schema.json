@@ -12,6 +12,10 @@
       "additionalProperties": true
     },
     "enabled": { "type": "boolean" },
+    "serverName": {
+      "type": "string",
+      "description": "Sent as CB_SERVER_NAME on every boot. Must not be empty -- required alongside seed.admin for CloudBeaver's env-var-driven auto-configuration to run at all."
+    },
     "image": {
       "type": "object",
       "additionalProperties": false,
@@ -51,19 +55,9 @@
     },
     "auth": {
       "type": "object",
-      "description": "auth.proxy is the SSO login path (Keycloak via oauth2-proxy) and stays mandatory whenever cloudbeaver.enabled=true (enforced in the umbrella chart's identity-validation.yaml). auth.local is the local/break-glass login path. Both can be registered at once.",
+      "description": "Live, continuously-reconciled auth provider configuration -- re-applied on every pod start. auth.proxy is the SSO login path (Keycloak via oauth2-proxy) and stays mandatory whenever cloudbeaver.enabled=true (enforced in the umbrella chart's identity-validation.yaml). auth.local is the local/break-glass login path. Both can be registered at once.",
       "additionalProperties": false,
       "properties": {
-        "admin": {
-          "type": "object",
-          "description": "Native CloudBeaver admin identity. Always provisioned.",
-          "additionalProperties": false,
-          "properties": {
-            "username": { "type": "string" },
-            "existingSecret": { "type": "string" },
-            "passwordSecretKey": { "type": "string" }
-          }
-        },
         "local": {
           "type": "object",
           "additionalProperties": false,
@@ -88,15 +82,39 @@
     },
     "seed": {
       "type": "object",
-      "description": "First-boot data seeding: seed.teams provisions teams/users/permissions; seed.connections provisions Trino/DB connections and who can use them. Both optional.",
+      "description": "One-time, first-boot-only provisioning (or after seed.force resets the workspace): seed.admin provisions the native admin identity, seed.teams provisions initial teams/permissions, seed.connections provisions Trino/DB connections and who can use them.",
       "additionalProperties": false,
       "properties": {
-        "teams": {
+        "force": {
+          "type": "boolean",
+          "description": "Wipes the entire workspace on pod start, making every seed below (and h2FreshSchemaPatch) apply as if this were a brand-new install."
+        },
+        "admin": {
           "type": "object",
+          "description": "Native CloudBeaver admin identity. Always provisioned; only actually applied on first boot of a fresh workspace.",
           "additionalProperties": false,
           "properties": {
+            "username": { "type": "string" },
             "existingSecret": { "type": "string" },
-            "dataKey": { "type": "string" }
+            "passwordSecretKey": { "type": "string" }
+          }
+        },
+        "teams": {
+          "type": "array",
+          "description": "Seeds CloudBeaver's initial-data.conf teams list. Only applied on first-ever schema creation.",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["subjectId", "teamName"],
+            "properties": {
+              "subjectId": { "type": "string" },
+              "teamName": { "type": "string" },
+              "description": { "type": "string" },
+              "permissions": {
+                "type": "array",
+                "items": { "type": "string" }
+              }
+            }
           }
         },
         "connections": {
@@ -105,7 +123,6 @@
           "properties": {
             "existingSecret": { "type": "string" },
             "dataSourcesKey": { "type": "string" },
-            "force": { "type": "boolean" },
             "sharedAccess": {
               "type": "object",
               "additionalProperties": false,

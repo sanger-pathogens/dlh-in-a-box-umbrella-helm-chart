@@ -20,13 +20,17 @@ to the umbrella chart it happens to live inside.
 - registers CloudBeaver's own auth providers additively: `auth.proxy`
   (`reverseProxy`, delegated to an external Keycloak-backed oauth2-proxy) and
   `auth.local` (native `cbadmin` login) can both be enabled at once — see
-  [Auth model](#auth-model)
-- provisions the native admin identity (`auth.admin`) unconditionally, since
-  it's the break-glass path even when `auth.local.enabled=false` day-to-day
-- optionally seeds first-boot teams/permissions (`seed.teams`) and
-  connections (`seed.connections`), including a postStart hook that grants an
-  already-provisioned shared connection to a set of teams
-  (`seed.connections.sharedAccess`)
+  [Auth model](#auth-model). Both are live/continuously reconciled, unlike
+  everything under `seed.*` below.
+- `seed.*` is one-time, first-boot-only provisioning (or after
+  `seed.force=true` resets the workspace back to fresh):
+  `seed.admin` unconditionally provisions the native admin identity (it's
+  the break-glass path even when `auth.local.enabled=false` day-to-day),
+  `seed.teams` seeds CloudBeaver's initial teams/permissions from a plain
+  structured list (no Secret needed — nothing in it is sensitive), and
+  `seed.connections` seeds Trino/DB connections and who can use them,
+  including a postStart hook that grants an already-provisioned shared
+  connection to a set of teams (`seed.connections.sharedAccess`)
 - optionally trusts extra CAs (`trustedCerts`), for talking to a Trino/DB
   TLS endpoint signed by an internal CA -- every key in the referenced
   secret is imported by CloudBeaver at startup and trusted for all
@@ -66,11 +70,14 @@ something bypasses oauth2-proxy and hits this chart's Service directly with
 no forwarded-username header present — the deliberate break-glass path.
 
 This chart's own `templates/validation.yaml` additionally requires that at
-least one of `auth.local.enabled` / `auth.proxy.enabled` be true, and that
-`auth.admin.existingSecret` be set — both self-contained checks that don't
-need any context beyond this chart's own values, so they hold even if this
-chart is ever rendered standalone, independent of the umbrella's own
-(stricter) policy above.
+least one of `auth.local.enabled` / `auth.proxy.enabled` be true, that
+`seed.admin.existingSecret` be set, and that `serverName` is never empty
+(CloudBeaver's env-var-driven auto-configuration -- which is what applies
+`seed.admin`'s credentials -- only runs when `CB_SERVER_NAME` is present
+alongside `CB_ADMIN_NAME`/`CB_ADMIN_PASSWORD`) — all self-contained checks
+that don't need any context beyond this chart's own values, so they hold
+even if this chart is ever rendered standalone, independent of the
+umbrella's own (stricter) policy above.
 
 ## Common Tasks
 

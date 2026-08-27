@@ -7,6 +7,8 @@
 {{- $authLocalEnabled := default false $authLocal.enabled -}}
 {{- $appConfig := .Values.app | default dict -}}
 {{- $appPassthrough := get $appConfig "config" | default dict -}}
+{{- $seed := .Values.seed | default dict -}}
+{{- $seedTeams := get $seed "teams" | default list -}}
 {{- $global := .Values.global | default dict -}}
 {{- $identity := get $global "identity" | default dict -}}
 {{- $reverseProxyAuthEnabled := default false $authProxy.enabled -}}
@@ -138,4 +140,11 @@ data:
   # above.
   cloudbeaver.runtime.conf: |
     {{- dict "app" $renderedApp | toPrettyJson | nindent 4 }}
+  {{- if gt (len $seedTeams) 0 }}
+  # Read once, only during genuine first-ever schema creation (CloudBeaver
+  # ignores this file entirely on every later boot). Structural, not
+  # secret -- rendered straight from seed.teams.
+  initial-data.conf: |
+    {{- dict "teams" $seedTeams | toPrettyJson | nindent 4 }}
+  {{- end }}
 {{- end }}
