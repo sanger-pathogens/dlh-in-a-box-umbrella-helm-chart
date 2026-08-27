@@ -8,16 +8,7 @@
 {{- $appConfig := .Values.app | default dict -}}
 {{- $global := .Values.global | default dict -}}
 {{- $identity := get $global "identity" | default dict -}}
-{{- $accessModelRoles := fromJson (include "dlh-in-a-box.identity.accessModelRolesJson" .) -}}
-{{- $cloudbeaverRoles := list -}}
-{{- range $roleName := keys $accessModelRoles | sortAlpha -}}
-  {{- $role := get $accessModelRoles $roleName | default dict -}}
-  {{- if default false (get (get $role "appAccess" | default dict) "cloudbeaver") -}}
-    {{- $cloudbeaverRoles = uniq (append $cloudbeaverRoles (toString $roleName)) -}}
-  {{- end -}}
-{{- end -}}
-{{- $derivedDefaultUserTeam := default "" (first $cloudbeaverRoles) -}}
-{{- $defaultUserTeam := default $derivedDefaultUserTeam $appConfig.defaultUserTeam -}}
+{{- $defaultUserTeam := default "" $appConfig.defaultUserTeam -}}
 {{- $reverseProxyAuthEnabled := default false $authProxy.enabled -}}
 {{- /*
   enabledAuthProviders is additive, not exclusive: reverseProxy (Keycloak via

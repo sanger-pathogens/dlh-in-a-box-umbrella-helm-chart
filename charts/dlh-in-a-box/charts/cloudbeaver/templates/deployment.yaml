@@ -40,17 +40,8 @@
 {{- $customCertsPath := "/opt/cloudbeaver/workspace/.data/custom-certs" -}}
 {{- $global := .Values.global | default dict -}}
 {{- $identity := get $global "identity" | default dict -}}
-{{- $accessModelRoles := fromJson (include "dlh-in-a-box.identity.accessModelRolesJson" .) -}}
-{{- $cloudbeaverRoles := list -}}
-{{- range $roleName := keys $accessModelRoles | sortAlpha -}}
-  {{- $role := get $accessModelRoles $roleName | default dict -}}
-  {{- if default false (get (get $role "appAccess" | default dict) "cloudbeaver") -}}
-    {{- $cloudbeaverRoles = uniq (append $cloudbeaverRoles (toString $roleName)) -}}
-  {{- end -}}
-{{- end -}}
-{{- $derivedDefaultUserTeam := default "" (first $cloudbeaverRoles) -}}
 {{- $derivedAdminTeam := "platform-admin" -}}
-{{- $defaultUserTeam := default $derivedDefaultUserTeam $appConfig.defaultUserTeam -}}
+{{- $defaultUserTeam := default "" $appConfig.defaultUserTeam -}}
 {{- $adminTeam := default $derivedAdminTeam $appConfig.adminTeam -}}
 {{- $reverseProxyAuthEnabled := default false $authProxy.enabled -}}
 {{- $enforceRuntimeConfig := $reverseProxyAuthEnabled -}}

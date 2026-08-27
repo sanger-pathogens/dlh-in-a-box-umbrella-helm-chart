@@ -12,8 +12,12 @@ Self-contained CloudBeaver sanity checks.
 {{- $h2FreshSchemaPatch := get .Values "h2FreshSchemaPatch" | default dict -}}
 {{- $h2FreshSchemaPatchEnabled := default false $h2FreshSchemaPatch.enabled -}}
 {{- $h2FreshSchemaPatchPluginJar := default "" $h2FreshSchemaPatch.pluginJar -}}
+{{- $appConfig := .Values.app | default dict -}}
 {{- if not (or (default false $authLocal.enabled) (default false $authProxy.enabled)) -}}
 {{- fail "cloudbeaver: at least one of auth.local.enabled or auth.proxy.enabled must be true when cloudbeaver.enabled=true." -}}
+{{- end -}}
+{{- if and (default false $authProxy.enabled) (not (default "" $appConfig.defaultUserTeam)) -}}
+{{- fail "cloudbeaver.app.defaultUserTeam is required when auth.proxy.enabled=true: reverse-proxy-authenticated users are auto-provisioned into this team on first login, and have no other way to be granted connection access." -}}
 {{- end -}}
 {{- if not (default "" $authAdmin.existingSecret) -}}
 {{- fail "cloudbeaver.auth.admin.existingSecret is required when CloudBeaver is enabled." -}}
