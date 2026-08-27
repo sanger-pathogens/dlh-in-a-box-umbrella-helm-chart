@@ -10,7 +10,7 @@
 {{- $appConfig := .Values.app | default dict -}}
 {{- $workspace := .Values.workspace | default dict -}}
 {{- $workspacePersistence := get $workspace "persistence" | default dict -}}
-{{- $trustedCa := .Values.trustedCa | default dict -}}
+{{- $trustedCerts := .Values.trustedCerts | default dict -}}
 {{- $authAdminExistingSecret := default "" $authAdmin.existingSecret -}}
 {{- $authAdminUsername := default "cbadmin" $authAdmin.username -}}
 {{- $authAdminPasswordSecretKey := default "admin-password" $authAdmin.passwordSecretKey -}}
@@ -31,17 +31,13 @@
 {{- $sharedAccessBootstrapUsernameKey := default "shared-bootstrap-username" $sharedAccess.bootstrapUsernameKey -}}
 {{- $sharedAccessBootstrapGroupsKey := default "shared-bootstrap-groups" $sharedAccess.bootstrapGroupsKey -}}
 {{- $sharedAccessExpectedCatalog := default "redcap" $sharedAccess.expectedCatalog -}}
-{{- $trustedCaSecret := default "" $trustedCa.existingSecret -}}
-{{- $trustedCaCertKey := default "ca.crt" $trustedCa.certKey -}}
-{{- $trustStorePath := default "/opt/cloudbeaver/trust/cloudbeaver-trino-truststore.p12" $trustedCa.trustStorePath -}}
-{{- $trustStorePassword := default "changeit" $trustedCa.trustStorePassword -}}
-{{- $trustStoreType := default "PKCS12" $trustedCa.trustStoreType -}}
-{{- $trustStoreMountPath := dir $trustStorePath -}}
-{{- $trustStoreFileName := base $trustStorePath -}}
-{{- $trustedCaInitImage := get $trustedCa "initImage" | default dict -}}
-{{- $trustedCaInitImageRepository := default "eclipse-temurin" $trustedCaInitImage.repository -}}
-{{- $trustedCaInitImageTag := default "21-jdk" $trustedCaInitImage.tag -}}
-{{- $trustedCaInitImagePullPolicy := default "IfNotPresent" $trustedCaInitImage.pullPolicy -}}
+{{- $trustedCertsSecret := default "" $trustedCerts.existingSecret -}}
+{{- /* CloudBeaver auto-imports every cert found here at startup into its own
+   trust store, so all JDBC/DB connections inherit it -- no per-connection
+   truststore config needed. Every key in $trustedCertsSecret becomes one
+   file here, so trusting an extra CA is a Secret-content change only. See
+   https://github.com/dbeaver/cloudbeaver/wiki/SSL-Configuration */ -}}
+{{- $customCertsPath := "/opt/cloudbeaver/workspace/.data/custom-certs" -}}
 {{- $global := .Values.global | default dict -}}
 {{- $identity := get $global "identity" | default dict -}}
 {{- $accessModelRoles := fromJson (include "dlh-in-a-box.identity.accessModelRolesJson" .) -}}
@@ -76,7 +72,7 @@
   "admin" $authAdminExistingSecret
   "teamsSeed" $seedTeamsExistingSecret
   "connectionsSeed" $seedConnectionsExistingSecret
-  "trustedCa" $trustedCaSecret
+  "trustedCerts" $trustedCertsSecret
 -}}
 {{- with (lookup "v1" "Secret" .Release.Namespace $authAdminExistingSecret) }}
   {{- $_ := set $checksums "admin" (toJson (default dict .data) | sha256sum) -}}
@@ -91,9 +87,9 @@
     {{- $_ := set $checksums "connectionsSeed" (toJson (default dict .data) | sha256sum) -}}
   {{- end }}
 {{- end }}
-{{- if $trustedCaSecret }}
-  {{- with (lookup "v1" "Secret" .Release.Namespace $trustedCaSecret) }}
-    {{- $_ := set $checksums "trustedCa" (toJson (default dict .data) | sha256sum) -}}
+{{- if $trustedCertsSecret }}
+  {{- with (lookup "v1" "Secret" .Release.Namespace $trustedCertsSecret) }}
+    {{- $_ := set $checksums "trustedCerts" (toJson (default dict .data) | sha256sum) -}}
   {{- end }}
 {{- end }}
 apiVersion: apps/v1
@@ -120,7 +116,7 @@ spec:
         checksum/cloudbeaver-admin: {{ get $checksums "admin" | quote }}
         checksum/cloudbeaver-teams-seed: {{ get $checksums "teamsSeed" | quote }}
         checksum/cloudbeaver-connections-seed: {{ get $checksums "connectionsSeed" | quote }}
-        checksum/cloudbeaver-trusted-ca: {{ get $checksums "trustedCa" | quote }}
+        checksum/cloudbeaver-trusted-certs: {{ get $checksums "trustedCerts" | quote }}
       labels:
         app.kubernetes.io/instance: {{ .Release.Name }}
         app.kubernetes.io/name: {{ include "cloudbeaver.name" . }}
@@ -130,7 +126,7 @@ spec:
       imagePullSecrets:
         {{- toYaml . | nindent 8 }}
       {{- end }}
-      {{- if or $trustedCaSecret $seedConnectionsExistingSecret $enforceRuntimeConfig $h2FreshSchemaPatchEnabled }}
+      {{- if or $seedConnectionsExistingSecret $enforceRuntimeConfig $h2FreshSchemaPatchEnabled }}
       initContainers:
         {{- if $h2FreshSchemaPatchEnabled }}
         - name: cloudbeaver-h2-fresh-schema-patch
@@ -161,31 +157,6 @@ spec:
           volumeMounts:
             - name: cloudbeaver-security-plugin-patch
               mountPath: /patched
-        {{- end }}
-        {{- if $trustedCaSecret }}
-        - name: cloudbeaver-truststore
-          image: "{{ $trustedCaInitImageRepository }}:{{ $trustedCaInitImageTag }}"
-          imagePullPolicy: {{ $trustedCaInitImagePullPolicy }}
-          command:
-            - /bin/sh
-            - -ec
-            - |
-              mkdir -p /trust
-              rm -f "/trust/{{ $trustStoreFileName }}"
-              keytool \
-                -importcert \
-                -noprompt \
-                -alias cloudbeaver-trusted-ca \
-                -file "/ca/{{ $trustedCaCertKey }}" \
-                -keystore "/trust/{{ $trustStoreFileName }}" \
-                -storepass "{{ $trustStorePassword }}" \
-                -storetype "{{ $trustStoreType }}"
-          volumeMounts:
-            - name: cloudbeaver-truststore
-              mountPath: /trust
-            - name: cloudbeaver-trusted-ca
-              mountPath: /ca
-              readOnly: true
         {{- end }}
         {{- if $seedConnectionsExistingSecret }}
         - name: cloudbeaver-workspace-seed
@@ -446,9 +417,9 @@ spec:
               subPath: {{ $h2FreshSchemaPatchPluginJar }}
               readOnly: true
             {{- end }}
-            {{- if $trustedCaSecret }}
-            - name: cloudbeaver-truststore
-              mountPath: {{ $trustStoreMountPath }}
+            {{- if $trustedCertsSecret }}
+            - name: cloudbeaver-trusted-certs
+              mountPath: {{ $customCertsPath }}
               readOnly: true
             {{- end }}
       volumes:
@@ -460,15 +431,10 @@ spec:
           secret:
             secretName: {{ $seedTeamsExistingSecret }}
         {{- end }}
-        {{- if $trustedCaSecret }}
-        - name: cloudbeaver-trusted-ca
+        {{- if $trustedCertsSecret }}
+        - name: cloudbeaver-trusted-certs
           secret:
-            secretName: {{ $trustedCaSecret }}
-            items:
-              - key: {{ $trustedCaCertKey }}
-                path: {{ $trustedCaCertKey }}
-        - name: cloudbeaver-truststore
-          emptyDir: {}
+            secretName: {{ $trustedCertsSecret }}
         {{- end }}
         {{- if $seedConnectionsExistingSecret }}
         - name: workspace-seed

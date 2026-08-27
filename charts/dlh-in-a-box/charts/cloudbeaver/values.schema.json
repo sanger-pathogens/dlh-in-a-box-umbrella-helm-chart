@@ -132,24 +132,11 @@
         "pluginJar": { "type": "string" }
       }
     },
-    "trustedCa": {
+    "trustedCerts": {
       "type": "object",
       "additionalProperties": false,
       "properties": {
-        "existingSecret": { "type": "string" },
-        "certKey": { "type": "string" },
-        "trustStorePath": { "type": "string" },
-        "trustStorePassword": { "type": "string" },
-        "trustStoreType": { "type": "string" },
-        "initImage": {
-          "type": "object",
-          "additionalProperties": false,
-          "properties": {
-            "repository": { "type": "string" },
-            "tag": { "type": "string" },
-            "pullPolicy": { "type": "string", "enum": ["Always", "IfNotPresent", "Never"] }
-          }
-        }
+        "existingSecret": { "type": "string" }
       }
     },
     "app": {

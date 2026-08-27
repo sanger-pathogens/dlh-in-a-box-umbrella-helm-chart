@@ -20,8 +20,10 @@ to the umbrella chart it happens to live inside.
   connections (`seed.connections`), including a postStart hook that grants an
   already-provisioned shared connection to a set of teams
   (`seed.connections.sharedAccess`)
-- optionally trusts an extra CA (`trustedCa`), for talking to a Trino/DB TLS
-  endpoint signed by an internal CA
+- optionally trusts extra CAs (`trustedCerts`), for talking to a Trino/DB
+  TLS endpoint signed by an internal CA -- every key in the referenced
+  secret is imported by CloudBeaver at startup and trusted for all
+  connections, so no per-connection SSL setup is needed
 
 ## Files In This Folder
 

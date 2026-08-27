@@ -62,16 +62,14 @@ seed:
 h2FreshSchemaPatch:
   enabled: false
   pluginJar: ""
-trustedCa:
+
+# Every key in this secret is imported by CloudBeaver at startup
+# into its own trust store, and every
+# JDBC/DB connection inherits it automatically.
+# https://github.com/dbeaver/cloudbeaver/wiki/SSL-Configuration
+trustedCerts:
   existingSecret: ""
-  certKey: ca.crt
-  trustStorePath: /opt/cloudbeaver/trust/cloudbeaver-trino-truststore.p12
-  trustStorePassword: changeit
-  trustStoreType: PKCS12
-  initImage:
-    repository: eclipse-temurin
-    tag: 21-jdk
-    pullPolicy: IfNotPresent
+
 app:
   defaultUserTeam: ""
   adminTeam: ""
