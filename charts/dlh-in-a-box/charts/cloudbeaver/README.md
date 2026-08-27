@@ -28,9 +28,11 @@ to the umbrella chart it happens to live inside.
   the break-glass path even when `auth.local.enabled=false` day-to-day),
   `seed.teams` seeds CloudBeaver's initial teams/permissions from a plain
   structured list (no Secret needed — nothing in it is sensitive), and
-  `seed.connections` seeds Trino/DB connections and who can use them,
-  including a postStart hook that grants an already-provisioned shared
-  connection to a set of teams (`seed.connections.sharedAccess`)
+  `seed.connections` seeds Trino/DB connections. The one exception is
+  `seed.connections.permissions` (team → connection access grants,
+  CloudBeaver's own `data-sources-permissions.json`): also a plain
+  structured map, but re-read and fully reconciled by CloudBeaver's own
+  boot sequence on every pod start, not one-time like its siblings.
 - optionally trusts extra CAs (`trustedCerts`), for talking to a Trino/DB
   TLS endpoint signed by an internal CA -- every key in the referenced
   secret is imported by CloudBeaver at startup and trusted for all
@@ -47,7 +49,7 @@ to the umbrella chart it happens to live inside.
 | `templates/configmap.yaml` | `cloudbeaver.conf` / `cloudbeaver.runtime.conf` |
 | `templates/pvc.yaml` | optional workspace PersistentVolumeClaim |
 | `templates/service.yaml` | the Service |
-| `templates/deployment.yaml` | the Deployment, including init containers and the shared-connection postStart hook |
+| `templates/deployment.yaml` | the Deployment, including init containers |
 
 ## Auth model
 

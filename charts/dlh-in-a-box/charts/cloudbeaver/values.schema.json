@@ -123,19 +123,12 @@
           "properties": {
             "existingSecret": { "type": "string" },
             "dataSourcesKey": { "type": "string" },
-            "sharedAccess": {
+            "permissions": {
               "type": "object",
-              "additionalProperties": false,
-              "properties": {
-                "enabled": { "type": "boolean" },
-                "connectionIdKey": { "type": "string" },
-                "projectIdKey": { "type": "string" },
-                "usernameKey": { "type": "string" },
-                "passwordKey": { "type": "string" },
-                "bootstrapUsernameKey": { "type": "string" },
-                "bootstrapGroupsKey": { "type": "string" },
-                "expectedCatalog": { "type": "string" },
-                "adminTeam": { "type": "string" }
+              "description": "Grants team access to seeded connections -- CloudBeaver's own data-sources-permissions.json. Unlike the rest of seed.*, re-read and fully reconciled on every pod start, not one-time.",
+              "additionalProperties": {
+                "type": "array",
+                "items": { "type": "string" }
               }
             }
           }

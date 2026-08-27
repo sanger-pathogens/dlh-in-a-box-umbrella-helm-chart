@@ -9,6 +9,8 @@
 {{- $appPassthrough := get $appConfig "config" | default dict -}}
 {{- $seed := .Values.seed | default dict -}}
 {{- $seedTeams := get $seed "teams" | default list -}}
+{{- $seedConnections := get $seed "connections" | default dict -}}
+{{- $seedConnectionsPermissions := get $seedConnections "permissions" | default dict -}}
 {{- $global := .Values.global | default dict -}}
 {{- $identity := get $global "identity" | default dict -}}
 {{- $reverseProxyAuthEnabled := default false $authProxy.enabled -}}
@@ -146,5 +148,14 @@ data:
   # secret -- rendered straight from seed.teams.
   initial-data.conf: |
     {{- dict "teams" $seedTeams | toPrettyJson | nindent 4 }}
+  {{- end }}
+  {{- if gt (len $seedConnectionsPermissions) 0 }}
+  # Re-read and fully reconciled by CloudBeaver's own boot sequence on
+  # every pod start (unlike initial-data.conf above) -- stale grants for
+  # any connection id listed here are deleted, not just added to.
+  # Structural, not secret -- rendered straight from
+  # seed.connections.permissions.
+  data-sources-permissions.json: |
+    {{- toPrettyJson $seedConnectionsPermissions | nindent 4 }}
   {{- end }}
 {{- end }}

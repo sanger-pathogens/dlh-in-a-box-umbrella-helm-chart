@@ -65,18 +65,13 @@ seed:
   connections:
     existingSecret: ""
     dataSourcesKey: data-sources.json
-    sharedAccess:
-      enabled: false
-      connectionIdKey: shared-connection-id
-      projectIdKey: shared-project-id
-      usernameKey: shared-connection-username
-      passwordKey: shared-connection-password
-      bootstrapUsernameKey: shared-bootstrap-username
-      bootstrapGroupsKey: shared-bootstrap-groups
-      expectedCatalog: redcap
-      # Fallback default group for the bootstrap script's
-      # CB_SHARED_BOOTSTRAP_GROUPS, when sharedAccess.enabled=true.
-      adminTeam: ""
+    # Grants team access to seeded connections.
+    # Unlike everything else under seed.*, this one is NOT one-time: it's
+    # re-read and fully reconciled (stale grants deleted, not just
+    # additive) by CloudBeaver's own boot sequence on every pod start. Referenced team
+    # ids must already exist (e.g. via seed.teams).
+    permissions: {}
+    # db1: ["platform-user", "platform-admin"]
 
 h2FreshSchemaPatch:
   enabled: false
