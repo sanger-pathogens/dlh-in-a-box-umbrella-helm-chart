@@ -40,6 +40,7 @@ auth:
     firstNameHeader: ""
     lastNameHeader: ""
     logoutUrl: ""
+
 # seed provisions first-boot data -- teams/users/permissions (seed.teams),
 # and pre-loaded Trino/DB connections plus who can use them (seed.connections). Both are optional.
 seed:
@@ -59,6 +60,10 @@ seed:
       bootstrapUsernameKey: shared-bootstrap-username
       bootstrapGroupsKey: shared-bootstrap-groups
       expectedCatalog: redcap
+      # Fallback default group for the bootstrap script's
+      # CB_SHARED_BOOTSTRAP_GROUPS, when sharedAccess.enabled=true.
+      adminTeam: ""
+
 h2FreshSchemaPatch:
   enabled: false
   pluginJar: ""
@@ -71,15 +76,21 @@ trustedCerts:
   existingSecret: ""
 
 app:
-  defaultUserTeam: ""
-  adminTeam: ""
-  # Keep CloudBeaver's workspace runtime config aligned with Helm values.
-  # CloudBeaver gives workspace/.data/.cloudbeaver.runtime.conf precedence over
-  # cloudbeaver.conf, so auth must be enforced there as well for PVC-backed
-  # deployments.
-  enforceRuntimeConfig: true
-  supportsCustomConnections: true
-  showReadOnlyConnectionInfo: false
-  publicCredentialsSaveEnabled: false
-  adminCredentialsSaveEnabled: false
-  secretManagerEnabled: false
+  # Passed through verbatim into CloudBeaver's own app: {} config, written
+  # to cloudbeaver.runtime.conf and force-reapplied to the workspace on
+  # every pod start -- Helm values always win over persisted or
+  # admin-UI-edited state (see templates/configmap.yaml). Any key from
+  # CloudBeaver's Server-configuration docs is valid here; anything unset
+  # falls back to CloudBeaver's own built-in default. A few auth-wiring
+  # keys are always chart-derived from auth.* and override anything set
+  # here (see templates/configmap.yaml).
+  config: {}
+
+# Raw Kubernetes EnvVar entries appended to the cloudbeaver container, e.g.
+# to reach the CLOUDBEAVER_* placeholders already baked into
+# cloudbeaver.conf's server block (session/password policy, devMode), or to
+# set CB_SERVER_NAME:
+# extraEnv:
+#   - name: CB_SERVER_NAME
+#     value: "My CloudBeaver"
+extraEnv: []

@@ -8,8 +8,15 @@ to the umbrella chart it happens to live inside.
 
 ## What This Subchart Does
 
-- deploys CloudBeaver with a ConfigMap-driven `cloudbeaver.conf` /
-  `cloudbeaver.runtime.conf`
+- deploys CloudBeaver with a ConfigMap-driven `cloudbeaver.conf` (`server`
+  block, read once at cold start) / `cloudbeaver.runtime.conf` (`app` block,
+  built from `app.config` -- an open passthrough for any CloudBeaver `app:`
+  setting, merged under a handful of chart-derived auth-wiring keys --
+  force-reapplied to the workspace on every pod start so Helm values always
+  win over persisted/admin-UI-edited state)
+- accepts arbitrary extra container env vars via `extraEnv`, e.g. to reach
+  the `CLOUDBEAVER_*` placeholders already baked into `cloudbeaver.conf`'s
+  `server` block, or to set `CB_SERVER_NAME`
 - registers CloudBeaver's own auth providers additively: `auth.proxy`
   (`reverseProxy`, delegated to an external Keycloak-backed oauth2-proxy) and
   `auth.local` (native `cbadmin` login) can both be enabled at once — see

@@ -13,11 +13,15 @@ Self-contained CloudBeaver sanity checks.
 {{- $h2FreshSchemaPatchEnabled := default false $h2FreshSchemaPatch.enabled -}}
 {{- $h2FreshSchemaPatchPluginJar := default "" $h2FreshSchemaPatch.pluginJar -}}
 {{- $appConfig := .Values.app | default dict -}}
+{{- $appPassthrough := get $appConfig "config" | default dict -}}
 {{- if not (or (default false $authLocal.enabled) (default false $authProxy.enabled)) -}}
 {{- fail "cloudbeaver: at least one of auth.local.enabled or auth.proxy.enabled must be true when cloudbeaver.enabled=true." -}}
 {{- end -}}
-{{- if and (default false $authProxy.enabled) (not (default "" $appConfig.defaultUserTeam)) -}}
-{{- fail "cloudbeaver.app.defaultUserTeam is required when auth.proxy.enabled=true: reverse-proxy-authenticated users are auto-provisioned into this team on first login, and have no other way to be granted connection access." -}}
+{{- if and (default false $authProxy.enabled) (not (default "" $appPassthrough.defaultUserTeam)) -}}
+{{- fail "cloudbeaver.app.config.defaultUserTeam is required when auth.proxy.enabled=true: reverse-proxy-authenticated users are auto-provisioned into this team on first login, and have no other way to be granted connection access." -}}
+{{- end -}}
+{{- if and (or (default false $appPassthrough.publicCredentialsSaveEnabled) (default false $appPassthrough.adminCredentialsSaveEnabled)) (ne true $appPassthrough.secretManagerEnabled) -}}
+{{- fail "cloudbeaver.app.config.secretManagerEnabled must be true when publicCredentialsSaveEnabled or adminCredentialsSaveEnabled is true: CloudBeaver's secret manager is a prerequisite for saving connection credentials." -}}
 {{- end -}}
 {{- if not (default "" $authAdmin.existingSecret) -}}
 {{- fail "cloudbeaver.auth.admin.existingSecret is required when CloudBeaver is enabled." -}}

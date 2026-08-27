@@ -798,7 +798,7 @@ jupyterhub:
             "nbformat_minor": 5
           }
 
-# CloudBeaver is a real nested subchart (charts/dlh-in-a-box/charts/cloudbeaver/,
+# CloudBeaver is a nested subchart (charts/dlh-in-a-box/charts/cloudbeaver/,
 # see its own values.yaml for the full settings list). This umbrella-level
 # block only needs to restate `enabled` -- Helm's dependency `condition:` in
 # Chart.yaml reads it before the subchart's own defaults are merged in.

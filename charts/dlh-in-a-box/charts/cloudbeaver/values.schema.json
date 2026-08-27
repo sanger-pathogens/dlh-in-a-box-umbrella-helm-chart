@@ -117,7 +117,8 @@
                 "passwordKey": { "type": "string" },
                 "bootstrapUsernameKey": { "type": "string" },
                 "bootstrapGroupsKey": { "type": "string" },
-                "expectedCatalog": { "type": "string" }
+                "expectedCatalog": { "type": "string" },
+                "adminTeam": { "type": "string" }
               }
             }
           }
@@ -143,16 +144,20 @@
       "type": "object",
       "additionalProperties": false,
       "properties": {
-        "defaultUserTeam": { "type": "string" },
-        "adminTeam": { "type": "string" },
-        "serverName": { "type": "string" },
-        "forceHttps": { "type": "boolean" },
-        "enforceRuntimeConfig": { "type": "boolean" },
-        "supportsCustomConnections": { "type": "boolean" },
-        "showReadOnlyConnectionInfo": { "type": "boolean" },
-        "publicCredentialsSaveEnabled": { "type": "boolean" },
-        "adminCredentialsSaveEnabled": { "type": "boolean" },
-        "secretManagerEnabled": { "type": "boolean" }
+        "config": {
+          "type": "object",
+          "description": "Passed through verbatim into CloudBeaver's own app: {} config (cloudbeaver.runtime.conf). Any key CloudBeaver supports is valid here -- not enumerated/validated by this schema.",
+          "additionalProperties": true
+        }
+      }
+    },
+    "extraEnv": {
+      "type": "array",
+      "description": "Raw Kubernetes EnvVar entries appended to the cloudbeaver container.",
+      "items": {
+        "type": "object",
+        "additionalProperties": true,
+        "required": ["name"]
       }
     }
   }

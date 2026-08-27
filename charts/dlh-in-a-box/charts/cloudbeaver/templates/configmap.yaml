@@ -6,9 +6,9 @@
 {{- $authProxy := get $auth "proxy" | default dict -}}
 {{- $authLocalEnabled := default false $authLocal.enabled -}}
 {{- $appConfig := .Values.app | default dict -}}
+{{- $appPassthrough := get $appConfig "config" | default dict -}}
 {{- $global := .Values.global | default dict -}}
 {{- $identity := get $global "identity" | default dict -}}
-{{- $defaultUserTeam := default "" $appConfig.defaultUserTeam -}}
 {{- $reverseProxyAuthEnabled := default false $authProxy.enabled -}}
 {{- /*
   enabledAuthProviders is additive, not exclusive: reverseProxy (Keycloak via
@@ -32,19 +32,46 @@
 {{- $cloudbeaverOrigin := first (default (list) (get $cloudbeaverIdentity "webOrigins")) -}}
 {{- $logoutUrl := default (printf "%s/oauth2/sign_out" $cloudbeaverOrigin) $authProxy.logoutUrl -}}
 {{- $cloudbeaverServerUrl := "" -}}
-{{- $supportsCustomConnections := true -}}
-{{- if hasKey $appConfig "supportsCustomConnections" -}}
-  {{- $supportsCustomConnections = get $appConfig "supportsCustomConnections" -}}
-{{- end -}}
-{{- $showReadOnlyConnectionInfo := true -}}
-{{- if hasKey $appConfig "showReadOnlyConnectionInfo" -}}
-  {{- $showReadOnlyConnectionInfo = get $appConfig "showReadOnlyConnectionInfo" -}}
-{{- end -}}
-{{- $cloudbeaverSecretManagerEnabled := or (default false $appConfig.secretManagerEnabled) (default false $appConfig.publicCredentialsSaveEnabled) (default false $appConfig.adminCredentialsSaveEnabled) -}}
 {{- if $cloudbeaverOrigin -}}
   {{- $cloudbeaverServerUrl = printf "%s/" (trimSuffix "/" $cloudbeaverOrigin) -}}
 {{- end -}}
 {{- $cloudbeaverForceHttps := hasPrefix "https://" $cloudbeaverServerUrl -}}
+{{- $authConfigurations := list -}}
+{{- if $reverseProxyAuthEnabled -}}
+  {{- $authConfigurations = list (dict
+    "id" "keycloak-proxy"
+    "provider" "reverseProxy"
+    "displayName" "Keycloak"
+    "disabled" false
+    "iconURL" ""
+    "description" "CloudBeaver browser login is delegated to the Keycloak-backed reverse proxy."
+    "parameters" (dict
+      "logout-url" $logoutUrl
+      "user-header" (default "X-Forwarded-Preferred-Username" $authProxy.userHeader)
+      "team-header" (default "X-Forwarded-Groups" $authProxy.groupHeader)
+      "team-delimiter" (default "," $authProxy.groupDelimiter)
+      "first-name-header" (default "" $authProxy.firstNameHeader)
+      "last-name-header" (default "" $authProxy.lastNameHeader)
+    )
+  ) -}}
+{{- end -}}
+{{- /*
+  These keys are how this chart's auth architecture actually works --
+  derived from auth.*, not arbitrary CloudBeaver settings -- so they always
+  win over anything set in app.config. anonymousAccessEnabled is forced off
+  as a defense-in-depth invariant: this chart's own validation.yaml already
+  requires at least one real auth provider, and CloudBeaver must never fall
+  back to anonymous access behind that.
+*/ -}}
+{{- $forcedApp := dict
+  "anonymousAccessEnabled" false
+  "forwardProxy" true
+  "linkExternalCredentialsWithUser" true
+  "enableReverseProxyAuth" $reverseProxyAuthEnabled
+  "enabledAuthProviders" $enabledAuthProviders
+  "authConfigurations" $authConfigurations
+-}}
+{{- $renderedApp := merge $forcedApp $appPassthrough -}}
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -54,11 +81,14 @@ metadata:
     {{- include "cloudbeaver.labels" . | nindent 4 }}
     app.kubernetes.io/component: cloudbeaver
 data:
+  # Read once at cold start. Nothing here is admin-UI-hot-editable in
+  # CloudBeaver, so there's no drift to guard against -- unlike
+  # cloudbeaver.runtime.conf below, this file is never force-reapplied.
   cloudbeaver.conf: |
     {
       server: {
         serverPort: {{ $port }},
-        forceHttps: {{ ternary "true" "false" (or $cloudbeaverForceHttps (default false $appConfig.forceHttps)) }},
+        forceHttps: {{ ternary "true" "false" $cloudbeaverForceHttps }},
         contentRoot: "web",
         driversLocation: "drivers",
         sslConfigurationPath: "${CLOUDBEAVER_SSL_CONF_PATH:workspace/.data/ssl-config.xml}",
@@ -96,85 +126,16 @@ data:
           },
           backupEnabled: "${CLOUDBEAVER_DB_BACKUP_ENABLED:true}"
         }
-      },
-      app: {
-        anonymousAccessEnabled: false,
-        defaultUserTeam: {{ $defaultUserTeam | quote }},
-        supportsCustomConnections: {{ ternary "true" "false" $supportsCustomConnections }},
-        showReadOnlyConnectionInfo: {{ ternary "true" "false" $showReadOnlyConnectionInfo }},
-        publicCredentialsSaveEnabled: {{ ternary "true" "false" (default false $appConfig.publicCredentialsSaveEnabled) }},
-        adminCredentialsSaveEnabled: {{ ternary "true" "false" (default false $appConfig.adminCredentialsSaveEnabled) }},
-        secretManagerEnabled: {{ ternary "true" "false" $cloudbeaverSecretManagerEnabled }},
-        enableReverseProxyAuth: {{ ternary "true" "false" $reverseProxyAuthEnabled }},
-        forwardProxy: true,
-        linkExternalCredentialsWithUser: true,
-        enabledAuthProviders: [
-          {{- range $index, $provider := $enabledAuthProviders }}
-          {{- if $index }},{{ end }}
-          {{ $provider | quote }}
-          {{- end }}
-        ],
-        authConfigurations: [
-          {{- if $reverseProxyAuthEnabled }}
-          {
-            id: "keycloak-proxy",
-            provider: "reverseProxy",
-            displayName: "Keycloak",
-            disabled: false,
-            iconURL: "",
-            description: "CloudBeaver browser login is delegated to the Keycloak-backed reverse proxy.",
-            parameters: {
-              "logout-url": {{ $logoutUrl | quote }},
-              "user-header": {{ default "X-Forwarded-Preferred-Username" $authProxy.userHeader | quote }},
-              "team-header": {{ default "X-Forwarded-Groups" $authProxy.groupHeader | quote }},
-              "team-delimiter": {{ default "," $authProxy.groupDelimiter | quote }},
-              "first-name-header": {{ default "" $authProxy.firstNameHeader | quote }},
-              "last-name-header": {{ default "" $authProxy.lastNameHeader | quote }}
-            }
-          }
-          {{- end }}
-        ]
       }
     }
+  # Force-reapplied over workspace/.data/.cloudbeaver.runtime.conf on every
+  # pod start (see the cloudbeaver-runtime-config init container in
+  # deployment.yaml). CloudBeaver gives that persisted file priority over
+  # cloudbeaver.conf, including for settings changed live via its own Admin
+  # UI, so this unconditional overwrite is what keeps Helm values
+  # authoritative across redeploys instead of just on first boot. `app` is
+  # app.config (see values.yaml) merged under the chart-derived auth keys
+  # above.
   cloudbeaver.runtime.conf: |
-    {
-      app: {
-        anonymousAccessEnabled: false,
-        defaultUserTeam: {{ $defaultUserTeam | quote }},
-        supportsCustomConnections: {{ ternary "true" "false" $supportsCustomConnections }},
-        showReadOnlyConnectionInfo: {{ ternary "true" "false" $showReadOnlyConnectionInfo }},
-        publicCredentialsSaveEnabled: {{ ternary "true" "false" (default false $appConfig.publicCredentialsSaveEnabled) }},
-        adminCredentialsSaveEnabled: {{ ternary "true" "false" (default false $appConfig.adminCredentialsSaveEnabled) }},
-        secretManagerEnabled: {{ ternary "true" "false" $cloudbeaverSecretManagerEnabled }},
-        enableReverseProxyAuth: {{ ternary "true" "false" $reverseProxyAuthEnabled }},
-        forwardProxy: true,
-        linkExternalCredentialsWithUser: true,
-        enabledAuthProviders: [
-          {{- range $index, $provider := $enabledAuthProviders }}
-          {{- if $index }},{{ end }}
-          {{ $provider | quote }}
-          {{- end }}
-        ],
-        authConfigurations: [
-          {{- if $reverseProxyAuthEnabled }}
-          {
-            id: "keycloak-proxy",
-            provider: "reverseProxy",
-            displayName: "Keycloak",
-            disabled: false,
-            iconURL: "",
-            description: "CloudBeaver browser login is delegated to the Keycloak-backed reverse proxy.",
-            parameters: {
-              "logout-url": {{ $logoutUrl | quote }},
-              "user-header": {{ default "X-Forwarded-Preferred-Username" $authProxy.userHeader | quote }},
-              "team-header": {{ default "X-Forwarded-Groups" $authProxy.groupHeader | quote }},
-              "team-delimiter": {{ default "," $authProxy.groupDelimiter | quote }},
-              "first-name-header": {{ default "" $authProxy.firstNameHeader | quote }},
-              "last-name-header": {{ default "" $authProxy.lastNameHeader | quote }}
-            }
-          }
-          {{- end }}
-        ]
-      }
-    }
+    {{- dict "app" $renderedApp | toPrettyJson | nindent 4 }}
 {{- end }}
