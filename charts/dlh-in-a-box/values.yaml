@@ -805,6 +805,7 @@ cloudbeaver:
   auth:
     proxy:
       userHeader: X-Forwarded-Preferred-Username
+      groupHeader: X-Forwarded-Groups
       groupDelimiter: ","
 
 rangerPostgresql:
@@ -943,7 +944,12 @@ cloudbeaver-auth-proxy:
       scope = "{{ join " " .Values.global.identity.external.oidc.scopes }}"
       email_domains = [{{- range $index, $domain := .Values.global.identity.external.clients.cloudbeaverProxy.emailDomains }}{{ if $index }}, {{ end }}{{ $domain | quote }}{{- end }}]
       allowed_roles = [{{ printf "%s:access" .Values.global.identity.external.clients.cloudbeaverProxy.clientId | quote }}]
-      oidc_groups_claim = "{{ .Values.global.identity.external.oidc.groupsClaim }}"
+      # Not .oidc.groupsClaim: no Keycloak Groups exist anywhere in this
+      # realm, and that claim isn't even attached to this client's token at
+      # all. platform_roles (the realm-role claim, same one Superset reads)
+      # is what actually carries platform-admin/platform-user for this user
+      # -- see cloudbeaver.auth.proxy.groupHeader below for where it lands.
+      oidc_groups_claim = "{{ default "platform_roles" .Values.global.identity.external.oidc.rolesClaim }}"
       redirect_url = "{{ .Values.global.identity.external.clients.cloudbeaverProxy.redirectUrl }}"
       approval_prompt = "auto"
       skip_provider_button = true
