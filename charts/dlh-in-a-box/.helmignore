@@ -1,2 +1,9 @@
 # Documentation files in special Helm directories.
 charts/README.md
+
+# Python bytecode caches
+__pycache__/
+*.pyc
+
+# Orphaned staging directories from an interrupted `helm dependency update`
+tmpcharts-*/

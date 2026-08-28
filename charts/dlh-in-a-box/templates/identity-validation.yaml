@@ -8,6 +8,7 @@
 {{- $keycloakLocalMode := eq $directoryMode "keycloakLocal" -}}
 {{- $ldap := get $directory "ldap" | default dict -}}
 {{- $external := get $identity "external" | default dict -}}
+{{- $oidc := get $external "oidc" | default dict -}}
 {{- $accessRoles := get $identity "accessRoles" | default dict -}}
 {{- $clients := get $external "clients" | default dict -}}
 {{- $trinoIdentity := get $clients "trino" | default dict -}}
@@ -122,6 +123,9 @@
   {{- end -}}
 {{- if and (default false $identity.enabled) (or (not $hasEnvironment) (not (has $environment (list "local" "dev" "prod")))) -}}
 {{- fail "global.environment must be set to local, dev, or prod when shared identity is enabled." -}}
+{{- end -}}
+{{- if and (default false $identity.enabled) (not (default "" $oidc.rolesClaim)) -}}
+{{- fail "global.identity.external.oidc.rolesClaim must not be empty when shared identity is enabled." -}}
 {{- end -}}
 {{- range $env := $supersetExtraEnvRaw -}}
   {{- if eq (get $env "name") "OAUTH_CLIENT_ID" -}}
