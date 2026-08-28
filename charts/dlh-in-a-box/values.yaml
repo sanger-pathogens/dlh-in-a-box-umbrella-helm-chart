@@ -799,11 +799,13 @@ jupyterhub:
           }
 
 # CloudBeaver is a nested subchart (charts/dlh-in-a-box/charts/cloudbeaver/,
-# see its own values.yaml for the full settings list). This umbrella-level
-# block only needs to restate `enabled` -- Helm's dependency `condition:` in
-# Chart.yaml reads it before the subchart's own defaults are merged in.
+# see its own values.yaml for the full settings list).
 cloudbeaver:
   enabled: false
+  auth:
+    proxy:
+      userHeader: X-Forwarded-Preferred-Username
+      groupDelimiter: ","
 
 rangerPostgresql:
   enabled: false

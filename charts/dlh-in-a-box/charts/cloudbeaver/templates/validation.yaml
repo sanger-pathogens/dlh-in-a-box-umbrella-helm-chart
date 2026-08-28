@@ -24,6 +24,9 @@ Self-contained CloudBeaver sanity checks.
 {{- if and (default false $authProxy.enabled) (not $defaultUserTeam) -}}
 {{- fail "cloudbeaver.app.config.defaultUserTeam is required when auth.proxy.enabled=true: reverse-proxy-authenticated users are auto-provisioned into this team on first login, and have no other way to be granted connection access." -}}
 {{- end -}}
+{{- if and (default false $authProxy.enabled) (not (default "" $authProxy.logoutUrl)) -}}
+{{- fail "cloudbeaver.auth.proxy.logoutUrl is required when auth.proxy.enabled=true: this chart has no default reverse-proxy technology to assume a sign-out path from. Without it, CloudBeaver's own Sign Out clears only its local session and silently leaves the upstream proxy's SSO session intact, so the user is transparently re-authenticated on next visit." -}}
+{{- end -}}
 {{- if and (or (default false $appPassthrough.publicCredentialsSaveEnabled) (default false $appPassthrough.adminCredentialsSaveEnabled)) (ne true $appPassthrough.secretManagerEnabled) -}}
 {{- fail "cloudbeaver.app.config.secretManagerEnabled must be true when publicCredentialsSaveEnabled or adminCredentialsSaveEnabled is true: CloudBeaver's secret manager is a prerequisite for saving connection credentials." -}}
 {{- end -}}

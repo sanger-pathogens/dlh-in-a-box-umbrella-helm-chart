@@ -15,24 +15,28 @@ workspace:
 
 serverName: CloudBeaver
 
-# auth.proxy is the SSO login path.
 # auth.local is the local users login path.
+# auth.proxy is the SSO login path.
 # Both providers can be registered at the same time.
 auth:
   local:
-    enabled: false
+    enabled: true
   proxy:
     enabled: false
     userHeader: X-Forwarded-Preferred-Username
     # CloudBeaver treats this header as a list of existing team ids. The
-    # oauth2-proxy X-Forwarded-Groups header can contain broad Keycloak/OIDC
+    # oauth2-proxy X-Forwarded-Groups header can contain broad OIDC
     # roles such as offline_access, which breaks CloudBeaver login when those
     # teams do not exist. Keep this dedicated header unless an upstream proxy
-    # explicitly emits CloudBeaver team ids such as platform-admin/platform-user-scientist.
-    groupHeader: X-CloudBeaver-Platform-Team
-    groupDelimiter: ","
+    # explicitly emits CloudBeaver team ids.
+    groupHeader: X-CloudBeaver-Groups
+    groupDelimiter: "|"
     firstNameHeader: ""
     lastNameHeader: ""
+    fullNameHeader: ""
+    # Full sign-out URL. Required when proxy.enabled=true. Without it, CloudBeaver's own Sign
+    # Out only clears its local session, silently leaving the upstream
+    # proxy's SSO session intact.
     logoutUrl: ""
 
 # Everything under seed.* only takes effect on a genuinely fresh workspace

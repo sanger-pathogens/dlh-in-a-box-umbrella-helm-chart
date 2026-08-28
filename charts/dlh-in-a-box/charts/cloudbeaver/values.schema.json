@@ -75,6 +75,7 @@
             "groupDelimiter": { "type": "string" },
             "firstNameHeader": { "type": "string" },
             "lastNameHeader": { "type": "string" },
+            "fullNameHeader": { "type": "string" },
             "logoutUrl": { "type": "string" }
           }
         }

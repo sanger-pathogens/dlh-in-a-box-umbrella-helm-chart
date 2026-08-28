@@ -34,7 +34,11 @@
 {{- $clients := get $external "clients" | default dict -}}
 {{- $cloudbeaverIdentity := get $clients "cloudbeaverProxy" | default dict -}}
 {{- $cloudbeaverOrigin := first (default (list) (get $cloudbeaverIdentity "webOrigins")) -}}
-{{- $logoutUrl := default (printf "%s/oauth2/sign_out" $cloudbeaverOrigin) $authProxy.logoutUrl -}}
+{{- /* No fallback derivation here: this chart doesn't assume any specific
+   reverse proxy technology, so it can't guess a sign-out path (e.g.
+   oauth2-proxy's /oauth2/sign_out). Whoever fronts CloudBeaver with
+   auth.proxy must supply the full logout URL explicitly. */ -}}
+{{- $logoutUrl := default "" $authProxy.logoutUrl -}}
 {{- $cloudbeaverServerUrl := "" -}}
 {{- if $cloudbeaverOrigin -}}
   {{- $cloudbeaverServerUrl = printf "%s/" (trimSuffix "/" $cloudbeaverOrigin) -}}
@@ -56,6 +60,7 @@
       "team-delimiter" (default "," $authProxy.groupDelimiter)
       "first-name-header" (default "" $authProxy.firstNameHeader)
       "last-name-header" (default "" $authProxy.lastNameHeader)
+      "full-name-header" (default "" $authProxy.fullNameHeader)
     )
   ) -}}
 {{- end -}}
