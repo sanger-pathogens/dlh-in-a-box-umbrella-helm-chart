@@ -145,9 +145,10 @@ auth-heavy local stack:
 Why:
 
 - `make local-install` uses `LOCAL_VALUES`, which defaults to
-  `examples/values-local-auth.yaml` in the current `Makefile`
+  `examples/values-local.yaml` in the current `Makefile`
 - `make smoke-install` is intentionally the stronger auth and access test path,
-  not the easiest newcomer install
+  not the easiest newcomer install. This target uses `LOCAL_VALUES_AUTH`, which defaults
+  to `examples/values-local-auth.yaml`
 
 ### Optional Disposable Cluster Setup With kind
 
@@ -1303,7 +1304,7 @@ Important facts about the manual build:
 
 ### I Ran The Wrong Local Path
 
-If you used `make local-install` or `values-local-auth.yaml` and hit auth
+If you used `make smoke-install` and hit auth
 failures immediately, check whether you meant to use the simpler
 `values-local.yaml` first.
 
@@ -1353,18 +1354,6 @@ Re-check these together:
 - packaged dependency archives
 - `THIRD_PARTY_NOTICES.md`
 - provenance files under `third_party/`
-
-### PDF Build Fails On A New Machine
-
-Check the docs-local toolchain first:
-
-- `npm --prefix docs install`
-- Playwright Chromium installed successfully
-- `docs/build-manual.mjs` can launch Chromium
-
-If the build fails before PDF export, it is usually a missing Node dependency,
-a missing Playwright browser install, or a Mermaid block that no longer
-renders.
 
 ## Glossary
 

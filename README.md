@@ -213,8 +213,8 @@ make local-install
 ```
 
 That target is a thin wrapper around `helm upgrade --install` with
-`examples/values-local-auth.yaml` as its default values file from `Makefile`.
-It is useful for quick iteration, but it does not create demo secrets, reset
+`examples/values-local.yaml` as its default values file from `Makefile`.
+It is useful for quick iteration, but it does not set up or test authentication, create demo secrets, reset
 the namespace, or wait through the full smoke lifecycle the way
 `make smoke-install` does.
 
