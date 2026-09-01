@@ -23,12 +23,14 @@
 {{- $h2FreshSchemaPatchEnabled := default false $h2FreshSchemaPatch.enabled -}}
 {{- $h2FreshSchemaPatchPluginJar := default "" $h2FreshSchemaPatch.pluginJar -}}
 {{- $trustedCertsSecret := default "" $trustedCerts.existingSecret -}}
-{{- /* CloudBeaver auto-imports every cert found here at startup into its own
-   trust store, so all JDBC/DB connections inherit it -- no per-connection
-   truststore config needed. Every key in $trustedCertsSecret becomes one
-   file here, so trusting an extra CA is a Secret-content change only. See
-   https://github.com/dbeaver/cloudbeaver/wiki/SSL-Configuration */ -}}
-{{- $customCertsPath := "/opt/cloudbeaver/workspace/.data/custom-certs" -}}
+{{- /* CloudBeaver CE has no cert auto-import feature despite the docs
+   describing one. Instead,
+   an initContainer builds a merged JVM truststore (base cacerts + every
+   cert in $trustedCertsSecret) and JAVA_OPTS points the main container's
+   JVM at it. */ -}}
+{{- $trustStorePassword := "notasecret" -}}
+{{- $trustStoreSourcePath := "/opt/cloudbeaver-trust-source" -}}
+{{- $trustStorePath := "/opt/cloudbeaver-trust/cacerts" -}}
 {{- $global := .Values.global | default dict -}}
 {{- $identity := get $global "identity" | default dict -}}
 {{- $reverseProxyAuthEnabled := default false $authProxy.enabled -}}
@@ -173,6 +175,31 @@ spec:
             - name: cloudbeaver-config
               mountPath: /config
               readOnly: true
+        {{- if $trustedCertsSecret }}
+        - name: cloudbeaver-trust-store
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          command:
+            - /bin/sh
+            - -ec
+            - |
+              mkdir -p "$(dirname {{ $trustStorePath }})"
+              cp "$JAVA_HOME/lib/security/cacerts" {{ $trustStorePath }}
+              for cert in {{ $trustStoreSourcePath }}/*; do
+                [ -f "${cert}" ] || continue
+                keytool -importcert -noprompt -trustcacerts \
+                  -alias "$(basename "${cert}")" \
+                  -file "${cert}" \
+                  -keystore {{ $trustStorePath }} \
+                  -storepass {{ $trustStorePassword }}
+              done
+          volumeMounts:
+            - name: cloudbeaver-trusted-certs
+              mountPath: {{ $trustStoreSourcePath }}
+              readOnly: true
+            - name: cloudbeaver-truststore
+              mountPath: {{ dir $trustStorePath }}
+        {{- end }}
       containers:
         - name: cloudbeaver
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
@@ -193,6 +220,10 @@ spec:
                 secretKeyRef:
                   name: {{ $seedAdminExistingSecret }}
                   key: {{ $seedAdminPasswordSecretKey }}
+            {{- if $trustedCertsSecret }}
+            - name: JAVA_OPTS
+              value: {{ printf "-Djavax.net.ssl.trustStore=%s -Djavax.net.ssl.trustStorePassword=%s" $trustStorePath $trustStorePassword | quote }}
+            {{- end }}
             {{- with .Values.extraEnv }}
             {{- toYaml . | nindent 12 }}
             {{- end }}
@@ -238,8 +269,8 @@ spec:
               readOnly: true
             {{- end }}
             {{- if $trustedCertsSecret }}
-            - name: cloudbeaver-trusted-certs
-              mountPath: {{ $customCertsPath }}
+            - name: cloudbeaver-truststore
+              mountPath: {{ dir $trustStorePath }}
               readOnly: true
             {{- end }}
       volumes:
@@ -250,6 +281,8 @@ spec:
         - name: cloudbeaver-trusted-certs
           secret:
             secretName: {{ $trustedCertsSecret }}
+        - name: cloudbeaver-truststore
+          emptyDir: {}
         {{- end }}
         {{- if $seedConnectionsExistingSecret }}
         - name: workspace-seed
