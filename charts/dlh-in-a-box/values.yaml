@@ -51,7 +51,7 @@ global:
     external:
       oidc:
         issuer: ""
-        usernameClaim: email
+        usernameClaim: preferred_username
         groupsClaim: groups
         rolesClaim: platform_roles
         userMappingPattern: "([^@]+)"
