@@ -26,13 +26,21 @@ to the umbrella chart it happens to live inside.
   `seed.force=true` resets the workspace back to fresh):
   `seed.admin` unconditionally provisions the native admin identity (it's
   the break-glass path even when `auth.local.enabled=false` day-to-day),
-  `seed.teams` seeds CloudBeaver's initial teams/permissions from a plain
-  structured list (no Secret needed — nothing in it is sensitive), and
-  `seed.connections` seeds Trino/DB connections. The one exception is
-  `seed.connections.permissions` (team → connection access grants,
-  CloudBeaver's own `data-sources-permissions.json`): also a plain
-  structured map, but re-read and fully reconciled by CloudBeaver's own
-  boot sequence on every pod start, not one-time like its siblings.
+  and `seed.teams` seeds CloudBeaver's initial teams/permissions from a
+  plain structured list (no Secret needed — nothing in it is sensitive).
+- `connections` governs CloudBeaver's global (shared) connections list,
+  separately from `seed.*` — this file is CloudBeaver's own live
+  write-back store, so any connection a user creates or edits through the
+  UI is persisted into the same `data-sources.json` the chart would seed.
+  `connections.manage=false` (default) means Helm never touches the file
+  at all; `manage=true` fully overwrites it from `existingSecret` on every
+  pod start, discarding anything created/changed through the UI since the
+  last deploy — the same force-reapply tradeoff as `app.config` above.
+  `connections.permissions` (team → connection access grants, CloudBeaver's
+  own `data-sources-permissions.json`) is only meaningful when
+  `manage=true`, since connection ids are otherwise unpredictable; when
+  active it's re-read and fully reconciled by CloudBeaver's own boot
+  sequence on every pod start, not one-time.
 - optionally trusts extra CAs (`trustedCerts`), for talking to a Trino/DB
   TLS endpoint signed by an internal CA -- every key in the referenced
   secret is imported by CloudBeaver at startup and trusted for all

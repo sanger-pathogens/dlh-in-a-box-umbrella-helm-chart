@@ -83,7 +83,7 @@
     },
     "seed": {
       "type": "object",
-      "description": "One-time, first-boot-only provisioning (or after seed.force resets the workspace): seed.admin provisions the native admin identity, seed.teams provisions initial teams/permissions, seed.connections provisions Trino/DB connections and who can use them.",
+      "description": "One-time, first-boot-only provisioning (or after seed.force resets the workspace): seed.admin provisions the native admin identity, seed.teams provisions initial teams/permissions.",
       "additionalProperties": false,
       "properties": {
         "force": {
@@ -117,21 +117,23 @@
               }
             }
           }
-        },
-        "connections": {
+        }
+      }
+    },
+    "connections": {
+      "type": "object",
+      "description": "CloudBeaver's global (shared) connections. manage=false (default): Helm never touches data-sources.json. manage=true: fully overwritten from existingSecret on every pod start, discarding any UI changes.",
+      "additionalProperties": false,
+      "properties": {
+        "manage": { "type": "boolean" },
+        "existingSecret": { "type": "string" },
+        "dataSourcesKey": { "type": "string" },
+        "permissions": {
           "type": "object",
-          "additionalProperties": false,
-          "properties": {
-            "existingSecret": { "type": "string" },
-            "dataSourcesKey": { "type": "string" },
-            "permissions": {
-              "type": "object",
-              "description": "Grants team access to seeded connections -- CloudBeaver's own data-sources-permissions.json. Unlike the rest of seed.*, re-read and fully reconciled on every pod start, not one-time.",
-              "additionalProperties": {
-                "type": "array",
-                "items": { "type": "string" }
-              }
-            }
+          "description": "Grants team access to connections, keyed by connection id. Ignored unless manage=true. Re-read and fully reconciled on every pod start.",
+          "additionalProperties": {
+            "type": "array",
+            "items": { "type": "string" }
           }
         }
       }

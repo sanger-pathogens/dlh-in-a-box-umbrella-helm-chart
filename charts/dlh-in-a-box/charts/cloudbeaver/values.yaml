@@ -66,16 +66,20 @@ seed:
   #   teamName: Platform User
   #   description: "Standard user."
   #   permissions: []
-  connections:
-    existingSecret: ""
-    dataSourcesKey: data-sources.json
-    # Grants team access to seeded connections.
-    # Unlike everything else under seed.*, this one is NOT one-time: it's
-    # re-read and fully reconciled (stale grants deleted, not just
-    # additive) by CloudBeaver's own boot sequence on every pod start. Referenced team
-    # ids must already exist (e.g. via seed.teams).
-    permissions: {}
-    # db1: ["platform-user", "platform-admin"]
+
+connections:
+  # false (default): Helm never touches data-sources.json. Users manage global
+  # connections entirely through the UI from an empty starting point.
+  # true: data-sources.json is fully overwritten from existingSecret on
+  # every pod start. Helm always wins; any connection created or changed through the
+  # UI since the last deploy is discarded, not merged.
+  manage: false
+  existingSecret: ""
+  dataSourcesKey: data-sources.json
+  # Grants team access to connections, keyed by connection id.
+  # Referenced team ids must already exist (e.g. via seed.teams).
+  permissions: {}
+  # db1: ["platform-user", "platform-admin"]
 
 h2FreshSchemaPatch:
   enabled: false
