@@ -2,6 +2,14 @@
 Modified for dlh-in-a-box from the upstream Trino chart.
 Local changes render catalog definitions from global lakehouse catalog values
 and shared S3 settings.
+
+Rendered into `data` (base64) rather than `stringData` on purpose. `stringData`
+is a write-only input field that the API server merges into `data` and never
+returns on read, so a key dropped from it has nothing to diff against in the
+live object: helm/helm#10010, and `helm upgrade` leaves the orphan behind
+forever (removing a catalog from global.dataCatalogs used to leave its
+`<name>.properties` mounted, so Trino kept serving a catalog whose metastore
+Helm had already pruned). `data` keys are diffed normally and get deleted.
 */}}
 {{- $catalogs := (include "trino.dataCatalogs" . | fromYaml) | default (dict) -}}
 {{- $global := get .Values "global" | default (dict) -}}
@@ -17,9 +25,9 @@ metadata:
     {{- include "trino.labels" . | nindent 4 }}
     app.kubernetes.io/component: catalogs
 type: Opaque
-stringData:
+data:
 {{- range $catalogName, $catalog := $catalogs }}
-  {{ $catalogName }}.properties: |
-{{ include "trino.catalogProperties" (dict "root" $ "catalogName" $catalogName "catalog" $catalog "s3" $s3) | indent 4 }}
+  {{- $properties := include "trino.catalogProperties" (dict "root" $ "catalogName" $catalogName "catalog" $catalog "s3" $s3) | trim }}
+  {{ $catalogName }}.properties: {{ printf "%s\n" $properties | b64enc | quote }}
 {{- end }}
 {{- end }}

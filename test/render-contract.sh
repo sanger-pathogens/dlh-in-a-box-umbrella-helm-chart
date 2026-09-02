@@ -64,6 +64,27 @@ assert_contains_decoded_secret() {
   fi
 }
 
+# Catalog entries must be rendered into a Secret's base64 `data` field rather
+# than `stringData`. `stringData` is a write-only input the API server merges
+# into `data` and never returns on read, so a key dropped from the template has
+# nothing to diff against in the live object and `helm upgrade` leaves the
+# orphan behind (helm/helm#10010) -- a catalog removed from
+# global.dataCatalogs would stay mounted and loaded by Trino forever.
+assert_secret_has_no_string_data() {
+  local file="$1" secret_name="$2"
+  local string_data
+  string_data="$(
+    yq eval-all "select(.kind == \"Secret\" and .metadata.name == \"${secret_name}\") | .stringData" "${file}"
+  )"
+
+  if [[ "${string_data}" != "null" ]]; then
+    echo "Secret ${secret_name} must render its entries into .data (base64), not .stringData," >&2
+    echo "because keys removed from .stringData are never deleted by helm upgrade." >&2
+    echo "Rendered file: ${file}" >&2
+    exit 1
+  fi
+}
+
 assert_not_contains() {
   local file="$1"
   local needle="$2"
@@ -366,6 +387,11 @@ assert_contains "${dev_manifest}" "\"roles\": ["
 assert_contains "${prod_manifest}" "\"roles\": ["
 assert_contains "${dev_manifest}" "\"user\":\"cloudbeaver-service\",\"catalog\":\"system\",\"allow\":\"all\""
 assert_contains "${dev_manifest}" "\"user\":\"superset-service\",\"catalog\":\"system\",\"allow\":\"all\""
+assert_contains_decoded_secret "${dev_manifest}" "dlh-trino-catalog" "redcap.properties" "connector.name=delta_lake"
+assert_contains_decoded_secret "${dev_manifest}" "dlh-trino-catalog" "redcap.properties" "hive.metastore.uri=thrift://dlh-hive-redcap-metastore:9083"
+assert_contains_decoded_secret "${prod_manifest}" "dlh-trino-catalog" "redcap.properties" "connector.name=delta_lake"
+assert_secret_has_no_string_data "${dev_manifest}" "dlh-trino-catalog"
+assert_secret_has_no_string_data "${prod_manifest}" "dlh-trino-catalog"
 assert_contains "${dev_manifest}" 'driver: "${CLOUDBEAVER_DB_DRIVER:h2_embedded_v2}"'
 assert_contains "${dev_manifest}" 'url: "${CLOUDBEAVER_DB_URL:jdbc:h2:${workspace}/.data/cb.h2v2.dat}"'
 assert_contains "${cloudbeaver_h2_patch_manifest}" "name: cloudbeaver-h2-fresh-schema-patch"
