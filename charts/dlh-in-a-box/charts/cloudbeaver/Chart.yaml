@@ -1,0 +1,13 @@
+apiVersion: v2
+name: cloudbeaver
+description: Chart-owned CloudBeaver Community Edition deployment, protected by an external oauth2-proxy auth boundary.
+type: application
+version: 0.1.0
+appVersion: "25.2.5"
+home: https://github.com/sanger-pathogens/dlh-in-a-box-umbrella-helm-chart
+annotations:
+  org.opencontainers.image.source: https://github.com/sanger-pathogens/dlh-in-a-box-umbrella-helm-chart
+  org.opencontainers.image.licenses: Apache-2.0
+sources:
+  - https://github.com/sanger-pathogens/dlh-in-a-box-umbrella-helm-chart
+  - https://github.com/dbeaver/cloudbeaver

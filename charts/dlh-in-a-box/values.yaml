@@ -51,7 +51,7 @@ global:
     external:
       oidc:
         issuer: ""
-        usernameClaim: email
+        usernameClaim: preferred_username
         groupsClaim: groups
         rolesClaim: platform_roles
         userMappingPattern: "([^@]+)"
@@ -798,75 +798,20 @@ jupyterhub:
             "nbformat_minor": 5
           }
 
+# CloudBeaver is a nested subchart (charts/dlh-in-a-box/charts/cloudbeaver/,
+# see its own values.yaml for the full settings list).
 cloudbeaver:
   enabled: false
-  image:
-    repository: dbeaver/cloudbeaver
-    tag: 25.2.5
-    pullPolicy: IfNotPresent
-  service:
-    port: 8978
-  strategy:
-    type: Recreate
-  workspace:
-    persistence:
-      enabled: false
-      size: 10Gi
-      storageClass: ""
-  bootstrap:
-    existingSecret: dlh-cloudbeaver-bootstrap
-    initialDataKey: initial-data.conf
-    workspaceSeedExistingSecret: ""
-    workspaceDataSourcesKey: data-sources.json
-    forceWorkspaceSeed: false
-    sharedConnectionSeed:
-      enabled: false
-      connectionIdKey: shared-connection-id
-      projectIdKey: shared-project-id
-      usernameKey: shared-connection-username
-      passwordKey: shared-connection-password
-      bootstrapUsernameKey: shared-bootstrap-username
-      bootstrapGroupsKey: shared-bootstrap-groups
-      expectedCatalog: redcap
-  h2FreshSchemaPatch:
-    enabled: false
-    pluginJar: ""
-  trustedCa:
-    existingSecret: ""
-    certKey: ca.crt
-    trustStorePath: /opt/cloudbeaver/trust/cloudbeaver-trino-truststore.p12
-    trustStorePassword: changeit
-    trustStoreType: PKCS12
-    initImage:
-      repository: eclipse-temurin
-      tag: 21-jdk
-      pullPolicy: IfNotPresent
-  authProxy:
-    enabled: false
-    userHeader: X-Forwarded-Preferred-Username
-    # CloudBeaver treats this header as a list of existing team ids. The
-    # oauth2-proxy X-Forwarded-Groups header can contain broad Keycloak/OIDC
-    # roles such as offline_access, which breaks CloudBeaver login when those
-    # teams do not exist. Keep this dedicated header unless an upstream proxy
-    # explicitly emits CloudBeaver team ids such as platform-admin/platform-user-scientist.
-    groupHeader: X-CloudBeaver-Platform-Team
-    groupDelimiter: ","
-    firstNameHeader: ""
-    lastNameHeader: ""
-    logoutUrl: ""
-  app:
-    defaultUserTeam: ""
-    adminTeam: ""
-    # Keep CloudBeaver's workspace runtime config aligned with Helm values.
-    # CloudBeaver gives workspace/.data/.cloudbeaver.runtime.conf precedence over
-    # cloudbeaver.conf, so auth must be enforced there as well for PVC-backed
-    # deployments.
-    enforceRuntimeConfig: true
-    supportsCustomConnections: true
-    showReadOnlyConnectionInfo: false
-    publicCredentialsSaveEnabled: false
-    adminCredentialsSaveEnabled: false
-    secretManagerEnabled: false
+  auth:
+    proxy:
+      userHeader: X-Forwarded-Preferred-Username
+      # Custom header names, only possible because cloudbeaver-auth-proxy uses
+      # oauth2-proxy's alpha configuration (injectRequestHeaders) below.
+      groupHeader: X-CloudBeaver-Groups
+      groupDelimiter: ","
+      firstNameHeader: X-Forwarded-First-Name
+      lastNameHeader: X-Forwarded-Last-Name
+      fullNameHeader: X-Forwarded-Full-Name
 
 rangerPostgresql:
   enabled: false
@@ -993,32 +938,88 @@ cloudbeaver-auth-proxy:
     # When using an externally managed Secret, it must contain the oauth2-proxy
     # keys `client-id`, `client-secret`, and `cookie-secret`.
     existingSecret: ""
+    # Only the settings alpha config doesn't cover (provider/OIDC endpoints,
+    # scope, allowed_roles, upstreams and header injection all moved to
+    # alphaConfig below -- oauth2-proxy rejects those options outright once
+    # --alpha-config is in use).
     configFile: |-
-      provider = "keycloak-oidc"
-      oidc_issuer_url = "{{ include "dlh-in-a-box.identity.issuer" $ }}"
-      skip_oidc_discovery = true
-      login_url = "{{ include "dlh-in-a-box.identity.authorizeUrl" $ }}"
-      redeem_url = "{{ include "dlh-in-a-box.identity.internalAccessTokenUrl" $ }}"
-      oidc_jwks_url = "{{ include "dlh-in-a-box.identity.internalJwksUri" $ }}"
-      profile_url = "{{ include "dlh-in-a-box.identity.internalUserInfoUrl" $ }}"
-      scope = "{{ join " " .Values.global.identity.external.oidc.scopes }}"
       email_domains = [{{- range $index, $domain := .Values.global.identity.external.clients.cloudbeaverProxy.emailDomains }}{{ if $index }}, {{ end }}{{ $domain | quote }}{{- end }}]
-      allowed_roles = [{{ printf "%s:access" .Values.global.identity.external.clients.cloudbeaverProxy.clientId | quote }}]
-      oidc_groups_claim = "{{ .Values.global.identity.external.oidc.groupsClaim }}"
       redirect_url = "{{ .Values.global.identity.external.clients.cloudbeaverProxy.redirectUrl }}"
-      approval_prompt = "auto"
       skip_provider_button = true
       cookie_secure = {{ hasPrefix "https://" .Values.global.identity.external.clients.cloudbeaverProxy.redirectUrl }}
       # Use a distinct oauth2-proxy cookie per app so localhost tunnel access
       # does not mix CloudBeaver and Prefect sessions on 127.0.0.1.
       cookie_name = "_oauth2_proxy_cloudbeaver"
       session_cookie_minimal = true
-      upstreams = [ "http://{{ include "dlh-in-a-box.cloudbeaver.serviceName" $ }}:8978" ]
-      pass_access_token = false
-      pass_authorization_header = false
-      pass_user_headers = true
-      set_xauthrequest = true
       reverse_proxy = true
+  # additionalClaims (used below) requires oauth2-proxy >= v7.15.0; the
+  # chart's pinned appVersion (v7.14.2) predates it. Scoped to this proxy
+  # only -- other oauth2-proxy instances in this chart are unaffected.
+  image:
+    tag: v7.15.4
+  alphaConfig:
+    enabled: true
+    # KeycloakOIDCProvider (provider: keycloak-oidc) always flattens realm_access.roles *and* every
+    # resource_access.<client>.roles entry (i.e. every other Keycloak client's roles, not just this one) into the
+    # session's Groups field. That pollutes CloudBeaver's team header if exposed directly, which is why `allowed_roles`
+    # and the team header are deliberately kept independent of each other: the allowed_roles gate still checks the
+    # (harmlessly polluted) Groups field internally, but no header here is ever sourced from it.
+    configFile: |-
+      providers:
+        - id: keycloak
+          provider: keycloak-oidc
+          clientID: "${OAUTH2_PROXY_CLIENT_ID}"
+          clientSecret: "${OAUTH2_PROXY_CLIENT_SECRET}"
+          loginURL: "{{ include "dlh-in-a-box.identity.authorizeUrl" $ }}"
+          redeemURL: "{{ include "dlh-in-a-box.identity.internalAccessTokenUrl" $ }}"
+          profileURL: "{{ include "dlh-in-a-box.identity.internalUserInfoUrl" $ }}"
+          scope: "{{ join " " .Values.global.identity.external.oidc.scopes }}"
+          additionalClaims:
+            - {{ .Values.global.identity.external.oidc.rolesClaim | quote }}
+            - given_name
+            - family_name
+            - name
+          oidcConfig:
+            issuerURL: "{{ include "dlh-in-a-box.identity.issuer" $ }}"
+            skipDiscovery: true
+            jwksURL: "{{ include "dlh-in-a-box.identity.internalJwksUri" $ }}"
+          keycloakConfig:
+            roles:
+              - {{ printf "%s:access" .Values.global.identity.external.clients.cloudbeaverProxy.clientId | quote }}
+      upstreamConfig:
+        upstreams:
+          - id: cloudbeaver
+            path: /
+            uri: "http://{{ include "cloudbeaver.serviceName" $ }}:8978"
+      injectRequestHeaders:
+        - name: X-Forwarded-User
+          values:
+            - claimSource:
+                claim: user
+        - name: X-Forwarded-Email
+          values:
+            - claimSource:
+                claim: email
+        - name: X-Forwarded-Preferred-Username
+          values:
+            - claimSource:
+                claim: preferred_username
+        - name: X-CloudBeaver-Groups
+          values:
+            - claimSource:
+                claim: {{ .Values.global.identity.external.oidc.rolesClaim | quote }}
+        - name: X-Forwarded-First-Name
+          values:
+            - claimSource:
+                claim: given_name
+        - name: X-Forwarded-Last-Name
+          values:
+            - claimSource:
+                claim: family_name
+        - name: X-Forwarded-Full-Name
+          values:
+            - claimSource:
+                claim: name
   service:
     type: ClusterIP
   ingress:
@@ -1152,7 +1153,7 @@ superset:
       AUTH_ROLES_SYNC_AT_LOGIN = True
       AUTH_USER_REGISTRATION = True
       AUTH_USER_REGISTRATION_ROLE = "Gamma"
-      ROLES_CLAIM = {{ default "platform_roles" .Values.global.identity.external.oidc.rolesClaim | quote }}
+      ROLES_CLAIM = {{ .Values.global.identity.external.oidc.rolesClaim | quote }}
       AUTH_ROLES_MAPPING = {
       {{- range $supersetRole, $platformRoles := .Values.auth.roleMappings }}
         {{- range $platformRole := $platformRoles }}

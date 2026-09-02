@@ -186,10 +186,6 @@ app.kubernetes.io/managed-by: {{ .Release.Service }}
 {{- printf "%s-platform-home" .Release.Name -}}
 {{- end -}}
 
-{{- define "dlh-in-a-box.cloudbeaver.serviceName" -}}
-{{- printf "%s-cloudbeaver" .Release.Name -}}
-{{- end -}}
-
 {{- define "dlh-in-a-box.minio.serviceName" -}}
 {{- $minio := .Values.minio | default dict -}}
 {{- if $minio.fullnameOverride -}}

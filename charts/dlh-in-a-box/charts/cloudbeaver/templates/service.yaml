@@ -1,0 +1,22 @@
+{{- if .Values.enabled }}
+{{- $serviceName := include "cloudbeaver.serviceName" . -}}
+{{- $port := default 8978 .Values.service.port -}}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ $serviceName }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "cloudbeaver.labels" . | nindent 4 }}
+    app.kubernetes.io/component: cloudbeaver
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/name: {{ include "cloudbeaver.name" . }}
+    app.kubernetes.io/component: cloudbeaver
+  ports:
+    - name: http
+      port: {{ $port }}
+      targetPort: http
+{{- end }}

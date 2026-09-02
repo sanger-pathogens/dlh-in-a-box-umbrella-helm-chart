@@ -1,0 +1,304 @@
+{{- if .Values.enabled }}
+{{- $serviceName := include "cloudbeaver.serviceName" . -}}
+{{- $port := default 8978 .Values.service.port -}}
+{{- $serverName := default "CloudBeaver" .Values.serverName -}}
+{{- $auth := .Values.auth | default dict -}}
+{{- $authProxy := get $auth "proxy" | default dict -}}
+{{- $seed := .Values.seed | default dict -}}
+{{- $seedAdmin := get $seed "admin" | default dict -}}
+{{- $seedTeams := get $seed "teams" | default list -}}
+{{- $seedForce := default false $seed.force -}}
+{{- $connections := .Values.connections | default dict -}}
+{{- $connectionsManage := default false $connections.manage -}}
+{{- $connectionsPermissions := get $connections "permissions" | default dict -}}
+{{- if not $connectionsManage -}}
+  {{- $connectionsPermissions = dict -}}
+{{- end -}}
+{{- $appConfig := .Values.app | default dict -}}
+{{- $workspace := .Values.workspace | default dict -}}
+{{- $workspacePersistence := get $workspace "persistence" | default dict -}}
+{{- $trustedCerts := .Values.trustedCerts | default dict -}}
+{{- $seedAdminExistingSecret := default "" $seedAdmin.existingSecret -}}
+{{- $seedAdminUsername := default "cbadmin" $seedAdmin.username -}}
+{{- $seedAdminPasswordSecretKey := default "admin-password" $seedAdmin.passwordSecretKey -}}
+{{- $connectionsExistingSecret := default "" $connections.existingSecret -}}
+{{- $connectionsDataSourcesKey := default "data-sources.json" $connections.dataSourcesKey -}}
+{{- $h2FreshSchemaPatch := get .Values "h2FreshSchemaPatch" | default dict -}}
+{{- $h2FreshSchemaPatchEnabled := default false $h2FreshSchemaPatch.enabled -}}
+{{- $h2FreshSchemaPatchPluginJar := default "" $h2FreshSchemaPatch.pluginJar -}}
+{{- $trustedCertsSecret := default "" $trustedCerts.existingSecret -}}
+{{- /* CloudBeaver CE has no cert auto-import feature despite the docs
+   describing one. Instead,
+   an initContainer builds a merged JVM truststore (base cacerts + every
+   cert in $trustedCertsSecret) and JAVA_OPTS points the main container's
+   JVM at it. */ -}}
+{{- $trustStorePassword := "notasecret" -}}
+{{- $trustStoreSourcePath := "/opt/cloudbeaver-trust-source" -}}
+{{- $trustStorePath := "/opt/cloudbeaver-trust/cacerts" -}}
+{{- $global := .Values.global | default dict -}}
+{{- $identity := get $global "identity" | default dict -}}
+{{- $reverseProxyAuthEnabled := default false $authProxy.enabled -}}
+{{- $external := get $identity "external" | default dict -}}
+{{- $clients := get $external "clients" | default dict -}}
+{{- $cloudbeaverIdentity := get $clients "cloudbeaverProxy" | default dict -}}
+{{- $cloudbeaverOrigin := first (default (list) (get $cloudbeaverIdentity "webOrigins")) -}}
+{{- $cloudbeaverServerUrl := "" -}}
+{{- if $cloudbeaverOrigin -}}
+  {{- $cloudbeaverServerUrl = printf "%s/" (trimSuffix "/" $cloudbeaverOrigin) -}}
+{{- end -}}
+{{- $authProxyForChecksum := $authProxy -}}
+{{- $checksums := dict
+  "config" ((printf "%s\n%s\n%s\n%s\n%s\n%s" (toPrettyJson $authProxyForChecksum) (toPrettyJson $appConfig) (toPrettyJson $cloudbeaverIdentity) (toPrettyJson $h2FreshSchemaPatch) (toPrettyJson $seedTeams) (toPrettyJson $connectionsPermissions)) | sha256sum)
+  "admin" $seedAdminExistingSecret
+  "connectionsManaged" $connectionsExistingSecret
+  "trustedCerts" $trustedCertsSecret
+-}}
+{{- with (lookup "v1" "Secret" .Release.Namespace $seedAdminExistingSecret) }}
+  {{- $_ := set $checksums "admin" (toJson (default dict .data) | sha256sum) -}}
+{{- end }}
+{{- if and $connectionsManage $connectionsExistingSecret }}
+  {{- with (lookup "v1" "Secret" .Release.Namespace $connectionsExistingSecret) }}
+    {{- $_ := set $checksums "connectionsManaged" (toJson (default dict .data) | sha256sum) -}}
+  {{- end }}
+{{- end }}
+{{- if $trustedCertsSecret }}
+  {{- with (lookup "v1" "Secret" .Release.Namespace $trustedCertsSecret) }}
+    {{- $_ := set $checksums "trustedCerts" (toJson (default dict .data) | sha256sum) -}}
+  {{- end }}
+{{- end }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ $serviceName }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "cloudbeaver.labels" . | nindent 4 }}
+    app.kubernetes.io/component: cloudbeaver
+spec:
+  replicas: 1
+  strategy:
+    {{- toYaml (default (dict "type" "Recreate") .Values.strategy) | nindent 4 }}
+  selector:
+    matchLabels:
+      app.kubernetes.io/instance: {{ .Release.Name }}
+      app.kubernetes.io/name: {{ include "cloudbeaver.name" . }}
+      app.kubernetes.io/component: cloudbeaver
+  template:
+    metadata:
+      annotations:
+        checksum/cloudbeaver-config: {{ get $checksums "config" | quote }}
+        checksum/cloudbeaver-admin: {{ get $checksums "admin" | quote }}
+        checksum/cloudbeaver-connections-managed: {{ get $checksums "connectionsManaged" | quote }}
+        checksum/cloudbeaver-trusted-certs: {{ get $checksums "trustedCerts" | quote }}
+      labels:
+        app.kubernetes.io/instance: {{ .Release.Name }}
+        app.kubernetes.io/name: {{ include "cloudbeaver.name" . }}
+        app.kubernetes.io/component: cloudbeaver
+    spec:
+      {{- with .Values.global.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      initContainers:
+        {{- if $seedForce }}
+        - name: cloudbeaver-workspace-reset
+          image: docker.io/busybox:1.36
+          imagePullPolicy: IfNotPresent
+          command:
+            - /bin/sh
+            - -ec
+            - |
+              find /workspace -mindepth 1 -maxdepth 1 -exec rm -rf {} +
+          volumeMounts:
+            - name: workspace
+              mountPath: /workspace
+        {{- end }}
+        {{- if $h2FreshSchemaPatchEnabled }}
+        - name: cloudbeaver-h2-fresh-schema-patch
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          command:
+            - /bin/sh
+            - -ec
+            - |
+              plugin_jar={{ $h2FreshSchemaPatchPluginJar | quote }}
+              source_path="/opt/cloudbeaver/server/plugins/${plugin_jar}"
+              patched_path="/patched/${plugin_jar}"
+
+              test -f "${source_path}"
+              cp "${source_path}" "${patched_path}"
+
+              tmp_dir="$(mktemp -d)"
+              trap 'rm -rf "${tmp_dir}"' EXIT
+              cd "${tmp_dir}"
+              jar xf "${patched_path}" db
+              find db -type f -name 'cb_schema_update_*.sql' | while read -r script; do
+                printf '%s\n' \
+                  "-- Skipped by dlh-in-a-box for forced fresh CloudBeaver workspaces." \
+                  "-- The bundled cb_schema_create.sql already contains the current schema." \
+                  >"${script}"
+              done
+              jar uf "${patched_path}" db
+          volumeMounts:
+            - name: cloudbeaver-security-plugin-patch
+              mountPath: /patched
+        {{- end }}
+        {{- if and $connectionsManage $connectionsExistingSecret }}
+        - name: cloudbeaver-workspace-seed
+          image: docker.io/busybox:1.36
+          imagePullPolicy: IfNotPresent
+          command:
+            - /bin/sh
+            - -ec
+            - |
+              target_dir="/workspace/GlobalConfiguration/.dbeaver"
+              mkdir -p "${target_dir}"
+              cp "/seed/{{ $connectionsDataSourcesKey }}" "${target_dir}/data-sources.json"
+          volumeMounts:
+            - name: workspace
+              mountPath: /workspace
+            - name: workspace-seed
+              mountPath: /seed
+              readOnly: true
+        {{- end }}
+        - name: cloudbeaver-runtime-config
+          image: docker.io/busybox:1.36
+          imagePullPolicy: IfNotPresent
+          command:
+            - /bin/sh
+            - -ec
+            - |
+              mkdir -p /workspace/.data
+              cp /config/cloudbeaver.runtime.conf /workspace/.data/.cloudbeaver.runtime.conf
+          volumeMounts:
+            - name: workspace
+              mountPath: /workspace
+            - name: cloudbeaver-config
+              mountPath: /config
+              readOnly: true
+        {{- if $trustedCertsSecret }}
+        - name: cloudbeaver-trust-store
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          command:
+            - /bin/sh
+            - -ec
+            - |
+              mkdir -p "$(dirname {{ $trustStorePath }})"
+              cp "$JAVA_HOME/lib/security/cacerts" {{ $trustStorePath }}
+              for cert in {{ $trustStoreSourcePath }}/*; do
+                [ -f "${cert}" ] || continue
+                keytool -importcert -noprompt -trustcacerts \
+                  -alias "$(basename "${cert}")" \
+                  -file "${cert}" \
+                  -keystore {{ $trustStorePath }} \
+                  -storepass {{ $trustStorePassword }}
+              done
+          volumeMounts:
+            - name: cloudbeaver-trusted-certs
+              mountPath: {{ $trustStoreSourcePath }}
+              readOnly: true
+            - name: cloudbeaver-truststore
+              mountPath: {{ dir $trustStorePath }}
+        {{- end }}
+      containers:
+        - name: cloudbeaver
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          env:
+            - name: CLOUDBEAVER_WEB_SERVER_PORT
+              value: {{ printf "%v" $port | quote }}
+            - name: CB_SERVER_NAME
+              value: {{ $serverName | quote }}
+            {{- if $cloudbeaverServerUrl }}
+            - name: CB_SERVER_URL
+              value: {{ $cloudbeaverServerUrl | quote }}
+            {{- end }}
+            - name: CB_ADMIN_NAME
+              value: {{ $seedAdminUsername | quote }}
+            - name: CB_ADMIN_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $seedAdminExistingSecret }}
+                  key: {{ $seedAdminPasswordSecretKey }}
+            {{- if $trustedCertsSecret }}
+            - name: JAVA_OPTS
+              value: {{ printf "-Djavax.net.ssl.trustStore=%s -Djavax.net.ssl.trustStorePassword=%s" $trustStorePath $trustStorePassword | quote }}
+            {{- end }}
+            {{- with .Values.extraEnv }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+          ports:
+            - name: http
+              containerPort: {{ $port }}
+              protocol: TCP
+          readinessProbe:
+            httpGet:
+              path: /status
+              port: http
+            initialDelaySeconds: 20
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /status
+              port: http
+            initialDelaySeconds: 45
+            periodSeconds: 20
+          volumeMounts:
+            - name: cloudbeaver-config
+              mountPath: /opt/cloudbeaver/conf/cloudbeaver.conf
+              subPath: cloudbeaver.conf
+              readOnly: true
+            {{- if gt (len $seedTeams) 0 }}
+            - name: cloudbeaver-config
+              mountPath: /opt/cloudbeaver/conf/initial-data.conf
+              subPath: initial-data.conf
+              readOnly: true
+            {{- end }}
+            - name: workspace
+              mountPath: /opt/cloudbeaver/workspace
+            {{- if gt (len $connectionsPermissions) 0 }}
+            - name: cloudbeaver-config
+              mountPath: /opt/cloudbeaver/workspace/GlobalConfiguration/.dbeaver/data-sources-permissions.json
+              subPath: data-sources-permissions.json
+              readOnly: true
+            {{- end }}
+            {{- if $h2FreshSchemaPatchEnabled }}
+            - name: cloudbeaver-security-plugin-patch
+              mountPath: /opt/cloudbeaver/server/plugins/{{ $h2FreshSchemaPatchPluginJar }}
+              subPath: {{ $h2FreshSchemaPatchPluginJar }}
+              readOnly: true
+            {{- end }}
+            {{- if $trustedCertsSecret }}
+            - name: cloudbeaver-truststore
+              mountPath: {{ dir $trustStorePath }}
+              readOnly: true
+            {{- end }}
+      volumes:
+        - name: cloudbeaver-config
+          configMap:
+            name: {{ $serviceName }}-config
+        {{- if $trustedCertsSecret }}
+        - name: cloudbeaver-trusted-certs
+          secret:
+            secretName: {{ $trustedCertsSecret }}
+        - name: cloudbeaver-truststore
+          emptyDir: {}
+        {{- end }}
+        {{- if and $connectionsManage $connectionsExistingSecret }}
+        - name: workspace-seed
+          secret:
+            secretName: {{ $connectionsExistingSecret }}
+        {{- end }}
+        {{- if $h2FreshSchemaPatchEnabled }}
+        - name: cloudbeaver-security-plugin-patch
+          emptyDir: {}
+        {{- end }}
+        - name: workspace
+          {{- if default false $workspacePersistence.enabled }}
+          persistentVolumeClaim:
+            claimName: {{ default (printf "%s-workspace" $serviceName) $workspacePersistence.existingClaim }}
+          {{- else }}
+          emptyDir: {}
+          {{- end }}
+{{- end }}

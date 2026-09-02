@@ -198,10 +198,16 @@ prefect-auth-proxy:
 
 cloudbeaver:
   enabled: true
-  bootstrap:
-    existingSecret: cloudbeaver-bootstrap
-  authProxy:
-    enabled: true
+  auth:
+    proxy:
+      enabled: true
+      logoutUrl: https://cloudbeaver.shared.example.org/oauth2/sign_out
+  seed:
+    admin:
+      existingSecret: cloudbeaver-bootstrap
+  app:
+    config:
+      defaultUserTeam: platform-user
 
 cloudbeaver-auth-proxy:
   config:

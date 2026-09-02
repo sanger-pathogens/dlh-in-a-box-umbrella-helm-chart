@@ -1,0 +1,170 @@
+{{- if .Values.enabled }}
+{{- $serviceName := include "cloudbeaver.serviceName" . -}}
+{{- $port := default 8978 .Values.service.port -}}
+{{- $auth := .Values.auth | default dict -}}
+{{- $authLocal := get $auth "local" | default dict -}}
+{{- $authProxy := get $auth "proxy" | default dict -}}
+{{- $authLocalEnabled := default false $authLocal.enabled -}}
+{{- $appConfig := .Values.app | default dict -}}
+{{- $appPassthrough := get $appConfig "config" | default dict -}}
+{{- $seed := .Values.seed | default dict -}}
+{{- $seedTeams := get $seed "teams" | default list -}}
+{{- $connections := .Values.connections | default dict -}}
+{{- $connectionsManage := default false $connections.manage -}}
+{{- $connectionsPermissions := get $connections "permissions" | default dict -}}
+{{- if not $connectionsManage -}}
+  {{- $connectionsPermissions = dict -}}
+{{- end -}}
+{{- $global := .Values.global | default dict -}}
+{{- $identity := get $global "identity" | default dict -}}
+{{- $reverseProxyAuthEnabled := default false $authProxy.enabled -}}
+{{- /*
+  enabledAuthProviders is additive, not exclusive: reverseProxy (Keycloak via
+  oauth2-proxy) and local (native cbadmin login) can both be registered at
+  once. oauth2-proxy sends userHeader on every proxied request, so CloudBeaver
+  auto-authenticates via reverseProxy and never surfaces the local login
+  screen on that path; local only becomes reachable by bypassing oauth2-proxy
+  and hitting the CloudBeaver Service directly with no forwarded-username
+  header present, which is the deliberate break-glass path for auth.local.
+*/ -}}
+{{- $enabledAuthProviders := list -}}
+{{- if $reverseProxyAuthEnabled -}}
+  {{- $enabledAuthProviders = append $enabledAuthProviders "reverseProxy" -}}
+{{- end -}}
+{{- if $authLocalEnabled -}}
+  {{- $enabledAuthProviders = append $enabledAuthProviders "local" -}}
+{{- end -}}
+{{- $external := get $identity "external" | default dict -}}
+{{- $clients := get $external "clients" | default dict -}}
+{{- $cloudbeaverIdentity := get $clients "cloudbeaverProxy" | default dict -}}
+{{- $cloudbeaverOrigin := first (default (list) (get $cloudbeaverIdentity "webOrigins")) -}}
+{{- /* No fallback derivation here: this chart doesn't assume any specific
+   reverse proxy technology, so it can't guess a sign-out path (e.g.
+   oauth2-proxy's /oauth2/sign_out). Whoever fronts CloudBeaver with
+   auth.proxy must supply the full logout URL explicitly. */ -}}
+{{- $logoutUrl := default "" $authProxy.logoutUrl -}}
+{{- $cloudbeaverServerUrl := "" -}}
+{{- if $cloudbeaverOrigin -}}
+  {{- $cloudbeaverServerUrl = printf "%s/" (trimSuffix "/" $cloudbeaverOrigin) -}}
+{{- end -}}
+{{- $cloudbeaverForceHttps := hasPrefix "https://" $cloudbeaverServerUrl -}}
+{{- $authConfigurations := list -}}
+{{- if $reverseProxyAuthEnabled -}}
+  {{- $authConfigurations = list (dict
+    "id" "keycloak-proxy"
+    "provider" "reverseProxy"
+    "displayName" "Keycloak"
+    "disabled" false
+    "iconURL" ""
+    "description" "CloudBeaver browser login is delegated to the Keycloak-backed reverse proxy."
+    "parameters" (dict
+      "logout-url" $logoutUrl
+      "user-header" (default "X-Forwarded-Preferred-Username" $authProxy.userHeader)
+      "team-header" (default "X-Forwarded-Groups" $authProxy.groupHeader)
+      "team-delimiter" (default "," $authProxy.groupDelimiter)
+      "first-name-header" (default "" $authProxy.firstNameHeader)
+      "last-name-header" (default "" $authProxy.lastNameHeader)
+      "full-name-header" (default "" $authProxy.fullNameHeader)
+    )
+  ) -}}
+{{- end -}}
+{{- /*
+  These keys are how this chart's auth architecture actually works --
+  derived from auth.*, not arbitrary CloudBeaver settings -- so they always
+  win over anything set in app.config. anonymousAccessEnabled is forced off
+  as a defense-in-depth invariant: this chart's own validation.yaml already
+  requires at least one real auth provider, and CloudBeaver must never fall
+  back to anonymous access behind that.
+*/ -}}
+{{- $forcedApp := dict
+  "anonymousAccessEnabled" false
+  "forwardProxy" true
+  "linkExternalCredentialsWithUser" true
+  "enableReverseProxyAuth" $reverseProxyAuthEnabled
+  "enabledAuthProviders" $enabledAuthProviders
+  "authConfigurations" $authConfigurations
+-}}
+{{- $renderedApp := merge $forcedApp $appPassthrough -}}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ $serviceName }}-config
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "cloudbeaver.labels" . | nindent 4 }}
+    app.kubernetes.io/component: cloudbeaver
+data:
+  # Read once at cold start. Nothing here is admin-UI-hot-editable in
+  # CloudBeaver, so there's no drift to guard against -- unlike
+  # cloudbeaver.runtime.conf below, this file is never force-reapplied.
+  cloudbeaver.conf: |
+    {
+      server: {
+        serverPort: {{ $port }},
+        forceHttps: {{ ternary "true" "false" $cloudbeaverForceHttps }},
+        contentRoot: "web",
+        driversLocation: "drivers",
+        sslConfigurationPath: "${CLOUDBEAVER_SSL_CONF_PATH:workspace/.data/ssl-config.xml}",
+        rootURI: "/",
+        serviceURI: "/api/",
+        supportedHosts: [],
+        expireSessionAfterPeriod: "${CLOUDBEAVER_EXPIRE_SESSION_AFTER_PERIOD:1800000}",
+        bindSessionToIp: "${CLOUDBEAVER_BIND_SESSION_TO_IP:disable}",
+        develMode: "${CLOUDBEAVER_DEVEL_MODE:false}",
+        enableSecurityManager: false,
+        sm: {
+          enableBruteForceProtection: "${CLOUDBEAVER_BRUTE_FORCE_PROTECTION_ENABLED:true}",
+          maxFailedLogin: "${CLOUDBEAVER_MAX_FAILED_LOGINS:10}",
+          minimumLoginTimeout: "${CLOUDBEAVER_MINIMUM_LOGIN_TIMEOUT:1}",
+          blockLoginPeriod: "${CLOUDBEAVER_BLOCK_PERIOD:300}",
+          passwordPolicy: {
+            minLength: "${CLOUDBEAVER_POLICY_MIN_LENGTH:8}",
+            requireMixedCase: "${CLOUDBEAVER_POLICY_REQUIRE_MIXED_CASE:true}",
+            minNumberCount: "${CLOUDBEAVER_POLICY_MIN_NUMBER_COUNT:1}",
+            minSymbolCount: "${CLOUDBEAVER_POLICY_MIN_SYMBOL_COUNT:0}"
+          }
+        },
+        database: {
+          driver: "${CLOUDBEAVER_DB_DRIVER:h2_embedded_v2}",
+          url: "${CLOUDBEAVER_DB_URL:jdbc:h2:${workspace}/.data/cb.h2v2.dat}",
+          schema: "${CLOUDBEAVER_DB_SCHEMA:''}",
+          user: "${CLOUDBEAVER_DB_USER:''}",
+          password: "${CLOUDBEAVER_DB_PASSWORD:''}",
+          initialDataConfiguration: "${CLOUDBEAVER_DB_INITIAL_DATA:conf/initial-data.conf}",
+          pool: {
+            minIdleConnections: "${CLOUDBEAVER_DB_MIN_IDLE_CONNECTIONS:4}",
+            maxIdleConnections: "${CLOUDBEAVER_DB_MAX_IDLE_CONNECTIONS:10}",
+            maxConnections: "${CLOUDBEAVER_DB_MAX_CONNECTIONS:100}",
+            validationQuery: "${CLOUDBEAVER_DB_VALIDATION_QUERY:SELECT 1}"
+          },
+          backupEnabled: "${CLOUDBEAVER_DB_BACKUP_ENABLED:true}"
+        }
+      }
+    }
+  # Force-reapplied over workspace/.data/.cloudbeaver.runtime.conf on every
+  # pod start (see the cloudbeaver-runtime-config init container in
+  # deployment.yaml). CloudBeaver gives that persisted file priority over
+  # cloudbeaver.conf, including for settings changed live via its own Admin
+  # UI, so this unconditional overwrite is what keeps Helm values
+  # authoritative across redeploys instead of just on first boot. `app` is
+  # app.config (see values.yaml) merged under the chart-derived auth keys
+  # above.
+  cloudbeaver.runtime.conf: |
+    {{- dict "app" $renderedApp | toPrettyJson | nindent 4 }}
+  {{- if gt (len $seedTeams) 0 }}
+  # Read once, only during genuine first-ever schema creation (CloudBeaver
+  # ignores this file entirely on every later boot). Structural, not
+  # secret -- rendered straight from seed.teams.
+  initial-data.conf: |
+    {{- dict "teams" $seedTeams | toPrettyJson | nindent 4 }}
+  {{- end }}
+  {{- if gt (len $connectionsPermissions) 0 }}
+  # Re-read and fully reconciled by CloudBeaver's own boot sequence on
+  # every pod start (unlike initial-data.conf above) -- stale grants for
+  # any connection id listed here are deleted, not just added to.
+  # Structural, not secret -- rendered straight from
+  # connections.permissions.
+  data-sources-permissions.json: |
+    {{- toPrettyJson $connectionsPermissions | nindent 4 }}
+  {{- end }}
+{{- end }}

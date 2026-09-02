@@ -8,6 +8,7 @@
 {{- $keycloakLocalMode := eq $directoryMode "keycloakLocal" -}}
 {{- $ldap := get $directory "ldap" | default dict -}}
 {{- $external := get $identity "external" | default dict -}}
+{{- $oidc := get $external "oidc" | default dict -}}
 {{- $accessRoles := get $identity "accessRoles" | default dict -}}
 {{- $clients := get $external "clients" | default dict -}}
 {{- $trinoIdentity := get $clients "trino" | default dict -}}
@@ -34,7 +35,8 @@
 {{- $platformHomeValues := .Values.platformHome | default dict -}}
 {{- $platformHomeIngress := get $platformHomeValues "ingress" | default dict -}}
 {{- $cloudbeaverValues := .Values.cloudbeaver | default dict -}}
-{{- $cloudbeaverAuthProxy := get $cloudbeaverValues "authProxy" | default dict -}}
+{{- $cloudbeaverAuth := get $cloudbeaverValues "auth" | default dict -}}
+{{- $cloudbeaverAuthProxy := get $cloudbeaverAuth "proxy" | default dict -}}
 {{- $cloudbeaverAuthProxyValues := index .Values "cloudbeaver-auth-proxy" | default dict -}}
 {{- $cloudbeaverAuthProxyConfig := get $cloudbeaverAuthProxyValues "config" | default dict -}}
 {{- $cloudbeaverAuthProxyIngress := get $cloudbeaverAuthProxyValues "ingress" | default dict -}}
@@ -121,6 +123,9 @@
   {{- end -}}
 {{- if and (default false $identity.enabled) (or (not $hasEnvironment) (not (has $environment (list "local" "dev" "prod")))) -}}
 {{- fail "global.environment must be set to local, dev, or prod when shared identity is enabled." -}}
+{{- end -}}
+{{- if and (default false $identity.enabled) (not (default "" $oidc.rolesClaim)) -}}
+{{- fail "global.identity.external.oidc.rolesClaim must not be empty when shared identity is enabled." -}}
 {{- end -}}
 {{- range $env := $supersetExtraEnvRaw -}}
   {{- if eq (get $env "name") "OAUTH_CLIENT_ID" -}}
@@ -261,14 +266,16 @@
 {{- fail "global.identity.external.clients.cloudbeaverProxy.enabled requires cloudbeaver.enabled=true." -}}
 {{- end -}}
 {{- if and .Values.cloudbeaver.enabled (not (get $cloudbeaverAuthProxy "enabled")) -}}
-{{- fail "cloudbeaver.enabled requires cloudbeaver.authProxy.enabled=true so CloudBeaver stays behind the central authentication boundary." -}}
+{{- fail "cloudbeaver.enabled requires cloudbeaver.auth.proxy.enabled=true so CloudBeaver stays behind the central authentication boundary." -}}
 {{- end -}}
 {{- if and (get $cloudbeaverIdentity "enabled") (not (get $cloudbeaverAuthProxy "enabled")) -}}
-{{- fail "global.identity.external.clients.cloudbeaverProxy.enabled requires cloudbeaver.authProxy.enabled=true." -}}
+{{- fail "global.identity.external.clients.cloudbeaverProxy.enabled requires cloudbeaver.auth.proxy.enabled=true." -}}
 {{- end -}}
-{{- if and .Values.cloudbeaver.enabled (not (dig "bootstrap" "existingSecret" "" $cloudbeaverValues)) -}}
-{{- fail "cloudbeaver.bootstrap.existingSecret is required when CloudBeaver is enabled." -}}
-{{- end -}}
+{{- /*
+  cloudbeaver.auth.admin.existingSecret being required is now enforced by the
+  cloudbeaver subchart's own templates/_validation.yaml -- a self-contained
+  check that doesn't need any cross-chart/global context.
+*/ -}}
 {{- if and (get $cloudbeaverIdentity "enabled") (not (get $cloudbeaverAuthProxyConfig "existingSecret")) -}}
 {{- fail "cloudbeaver-auth-proxy.config.existingSecret must be set when global.identity.external.clients.cloudbeaverProxy.enabled=true." -}}
 {{- end -}}

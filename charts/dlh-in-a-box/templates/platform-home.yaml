@@ -295,7 +295,7 @@
     "refreshIntervalSeconds" (default 90 (get $portalHealth "refreshIntervalSeconds"))
   )
   "identity" (dict
-    "rolesClaim" (default "platform_roles" $oidc.rolesClaim)
+    "rolesClaim" $oidc.rolesClaim
     "keycloak" (dict
       "baseUrl" (default (include "dlh-in-a-box.keycloak.browserBaseUrl" .) .Values.platformHome.keycloakBrowserBaseUrl)
       "realm" (include "dlh-in-a-box.keycloak.realm" .)
@@ -618,7 +618,7 @@ spec:
             - name: IDENTITY_EXPECTED_ISSUER
               value: {{ include "dlh-in-a-box.identity.issuer" . | quote }}
             - name: OIDC_ROLES_CLAIM
-              value: {{ default "platform_roles" $oidc.rolesClaim | quote }}
+              value: {{ $oidc.rolesClaim | quote }}
             - name: PLATFORM_ADMIN_ROLES
               value: {{ join "," $adminRequiredRoles | quote }}
           ports:

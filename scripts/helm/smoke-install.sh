@@ -124,7 +124,6 @@ seed_local_auth_demo_secrets() {
     --from-literal=cookie-secret=0123456789abcdef0123456789abcdef
 
   seed_secret dlh-cloudbeaver-bootstrap \
-    --from-literal=admin-name=cbadmin \
     --from-literal=admin-password=cloudbeaver-admin-password \
     --from-literal=initial-data.conf='{
       adminName: "cbadmin",

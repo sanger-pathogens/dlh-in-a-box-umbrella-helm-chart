@@ -233,10 +233,19 @@ platformHome:
 
 cloudbeaver:
   enabled: true
-  bootstrap:
-    existingSecret: dlh-cloudbeaver-bootstrap
-  authProxy:
-    enabled: true
+  auth:
+    proxy:
+      enabled: true
+      logoutUrl: http://dlh-cloudbeaver-auth-proxy.data-lakehouse-local.svc.cluster.local/oauth2/sign_out
+  seed:
+    admin:
+      existingSecret: dlh-cloudbeaver-bootstrap
+    teams:
+      - subjectId: platform-user
+        teamName: Platform User
+  app:
+    config:
+      defaultUserTeam: platform-user
 
 cloudbeaver-auth-proxy:
   config:

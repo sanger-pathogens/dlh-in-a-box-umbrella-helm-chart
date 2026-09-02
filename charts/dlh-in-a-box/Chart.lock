@@ -47,8 +47,11 @@ dependencies:
 - name: hive
   repository: file://charts/hive
   version: 0.2.0
+- name: cloudbeaver
+  repository: file://charts/cloudbeaver
+  version: 0.1.0
 - name: postgresql
   repository: https://charts.bitnami.com/bitnami
   version: 14.3.3
-digest: sha256:bba860896040d1470a40aa6953c7bba9ae2676c16b3e208a260746d1129637c8
-generated: "2026-08-20T10:33:40.518854+01:00"
+digest: sha256:0fcb23e350ed3359e769149c73f9ed0004e188fe1c710518bbe2d17b76bfb5ef
+generated: "2026-08-26T17:06:31.090163+01:00"
