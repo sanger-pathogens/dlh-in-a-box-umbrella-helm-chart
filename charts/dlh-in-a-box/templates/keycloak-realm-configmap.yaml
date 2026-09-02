@@ -361,6 +361,13 @@ data:
         protocol: openid-connect
         publicClient: false
         standardFlowEnabled: true
+        # Without this, every realm role the user has -- including
+        # Keycloak's own implicit offline_access/uma_authorization/
+        # default-roles-dlh -- lands in this client's tokens. Paired with
+        # the scopeMappings block below, which makes accessModelRoles the
+        # authoritative list of realm roles this client's tokens can ever
+        # contain.
+        fullScopeAllowed: false
         directAccessGrantsEnabled: false
         serviceAccountsEnabled: false
         secret: "$(env:KC_CLOUDBEAVER_CLIENT_SECRET)"
@@ -478,6 +485,17 @@ data:
               included.client.audience: {{ .Values.global.identity.external.clients.prefectDirectGrant.tokenAudience | quote }}
               access.token.claim: "true"
               id.token.claim: "false"
+    {{- end }}
+    {{- if .Values.global.identity.external.clients.cloudbeaverProxy.enabled }}
+    # Makes accessModelRoles the authoritative list of realm roles the
+    # cloudbeaver client's tokens can ever contain, pairing with
+    # fullScopeAllowed=false on that client above.
+    scopeMappings:
+      - client: {{ .Values.global.identity.external.clients.cloudbeaverProxy.clientId | quote }}
+        roles:
+        {{- range $roleKey := keys $accessModelRoles | sortAlpha }}
+          - {{ $roleKey | quote }}
+        {{- end }}
     {{- end }}
     {{- if .Values.global.identity.directory.ldap.enabled }}
     components:
