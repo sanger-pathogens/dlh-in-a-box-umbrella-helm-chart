@@ -46,6 +46,24 @@ assert_contains() {
   fi
 }
 
+# oauth2-proxy's alpha configuration (used by cloudbeaver-auth-proxy) ships as
+# a base64-encoded Secret value, not plain ConfigMap text -- assert_contains
+# can't see inside it, so decode the named key first.
+assert_contains_decoded_secret() {
+  local file="$1" secret_name="$2" data_key="$3" needle="$4"
+  local decoded
+  decoded="$(
+    yq eval-all "select(.kind == \"Secret\" and .metadata.name == \"${secret_name}\") | .data[\"${data_key}\"]" "${file}" \
+      | base64 -d 2>/dev/null || true
+  )"
+
+  if ! grep -Fq -- "${needle}" <<<"${decoded}"; then
+    echo "Expected decoded secret ${secret_name}[${data_key}] to contain: ${needle}" >&2
+    echo "Rendered file: ${file}" >&2
+    exit 1
+  fi
+}
+
 assert_not_contains() {
   local file="$1"
   local needle="$2"
@@ -297,8 +315,8 @@ assert_contains "${dev_manifest}" 'provider = \"keycloak-oidc\"'
 assert_contains "${prod_manifest}" 'provider = \"keycloak-oidc\"'
 assert_contains "${dev_manifest}" 'allowed_roles = [\"prefect:access\"]'
 assert_contains "${prod_manifest}" 'allowed_roles = [\"prefect:access\"]'
-assert_contains "${dev_manifest}" 'allowed_roles = [\"cloudbeaver:access\"]'
-assert_contains "${prod_manifest}" 'allowed_roles = [\"cloudbeaver:access\"]'
+assert_contains_decoded_secret "${dev_manifest}" "dlh-cloudbeaver-auth-proxy-alpha" "oauth2_proxy.yml" "cloudbeaver:access"
+assert_contains_decoded_secret "${prod_manifest}" "dlh-cloudbeaver-auth-proxy-alpha" "oauth2_proxy.yml" "cloudbeaver:access"
 assert_not_contains "${dev_manifest}" 'allowed_groups = [\"platform-app-prefect\", \"platform-role-platform-admin\"]'
 assert_not_contains "${prod_manifest}" 'allowed_groups = [\"platform-app-prefect\", \"platform-role-platform-admin\"]'
 assert_not_contains "${dev_manifest}" 'allowed_groups = [\"platform-app-cloudbeaver\", \"platform-role-platform-admin\"]'
@@ -357,7 +375,7 @@ assert_contains "${cloudbeaver_h2_patch_manifest}" "Skipped by dlh-in-a-box for 
 
 echo "--- Negative contract renders"
 expect_fail \
-  "cloudbeaver.h2FreshSchemaPatch.enabled requires cloudbeaver.seed.connections.force=true because it is only safe for intentionally fresh CloudBeaver workspaces." \
+  "cloudbeaver.h2FreshSchemaPatch.enabled requires cloudbeaver.seed.force=true because it is only safe for intentionally fresh CloudBeaver workspaces." \
   -f "${DEV_VALUES}" \
   -f "${FIXTURE_DIR}/cloudbeaver-h2-fresh-schema-patch-without-fresh-workspace.yaml"
 
@@ -424,7 +442,7 @@ expect_fail \
   -f "${FIXTURE_DIR}/cloudbeaver-proxy-disabled.yaml"
 
 expect_fail \
-  "cloudbeaver.auth.admin.existingSecret is required when CloudBeaver is enabled." \
+  "cloudbeaver.seed.admin.existingSecret is required when CloudBeaver is enabled." \
   -f "${DEV_VALUES}" \
   -f "${FIXTURE_DIR}/cloudbeaver-admin-secret-missing.yaml"
 

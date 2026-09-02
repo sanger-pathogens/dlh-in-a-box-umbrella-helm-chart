@@ -1,6 +1,5 @@
 cloudbeaver:
   seed:
-    connections:
-      force: true
+    force: true
   h2FreshSchemaPatch:
     enabled: true

@@ -274,10 +274,16 @@ jupyterhub:
 cloudbeaver:
   enabled: true
   auth:
-    admin:
-      existingSecret: dlh-cloudbeaver-bootstrap
     proxy:
       enabled: true
+      logoutUrl: https://cloudbeaver.data-platform.example.org/oauth2/sign_out
+
+  seed:
+    admin:
+      existingSecret: dlh-cloudbeaver-bootstrap
+  app:
+    config:
+      defaultUserTeam: platform-user
 
 cloudbeaver-auth-proxy:
   config:

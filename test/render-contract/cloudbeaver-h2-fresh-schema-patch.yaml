@@ -1,8 +1,6 @@
 cloudbeaver:
   seed:
-    connections:
-      existingSecret: dlh-cloudbeaver-workspace-seed
-      force: true
+    force: true
   h2FreshSchemaPatch:
     enabled: true
     pluginJar: io.cloudbeaver.service.security_1.0.89.202511171057.jar
