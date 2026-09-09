@@ -1145,7 +1145,6 @@ superset:
     enable_oauth: |
       {{- if .Values.global.identity.external.clients.superset.enabled }}
       import os
-      import jwt
       from flask_appbuilder.security.manager import AUTH_OAUTH
       from superset.security.manager import SupersetSecurityManager
 
@@ -1155,6 +1154,7 @@ superset:
       AUTH_USER_REGISTRATION_ROLE = "Gamma"
       ROLES_CLAIM = {{ .Values.global.identity.external.oidc.rolesClaim | quote }}
       PROVIDER_NAME = {{ .Values.global.identity.external.clients.superset.providerName | quote }}
+      USERINFO_URL = {{ include "dlh-in-a-box.identity.internalUserInfoUrl" $ | quote }}
       AUTH_ROLES_MAPPING = {
       {{- range $supersetRole, $platformRoles := .Values.auth.roleMappings }}
         {{- range $platformRole := $platformRoles }}
@@ -1174,35 +1174,39 @@ superset:
                   "api_base_url": {{ include "dlh-in-a-box.identity.internalApiBaseUrl" $ | quote }},
                   "client_kwargs": {
                       "scope": "openid profile email",
-                      "verify_signature": False,
                   },
                   "access_token_url": {{ include "dlh-in-a-box.identity.internalAccessTokenUrl" $ | quote }},
                   "authorize_url": {{ include "dlh-in-a-box.identity.authorizeUrl" $ | quote }},
                   "jwks_uri": {{ include "dlh-in-a-box.identity.internalJwksUri" $ | quote }},
-                  "userinfo_endpoint": {{ include "dlh-in-a-box.identity.internalUserInfoUrl" $ | quote }},
+                  "userinfo_endpoint": USERINFO_URL,
               },
           }
       ]
 
+      # Resolve identity by calling Keycloak's userinfo endpoint with the access
+      # token from the code exchange. Keycloak validates that token itself, so
+      # Superset needs no signature handling of its own -- which suits a
+      # deployment where the browser-facing issuer and the in-cluster endpoints
+      # are different URLs. The roles claim reaches userinfo via the realm's
+      # protocol mapper (userinfo.token.claim), see keycloak-realm-configmap.yaml.
       class DlhKeycloakSecurityManager(SupersetSecurityManager):
           def oauth_user_info(self, provider, response=None):
               if provider == PROVIDER_NAME and response:
-                  token = response.get("id_token") or response.get("access_token")
-                  if token:
-                      claims = jwt.decode(
-                          token,
-                          options={
-                              "verify_signature": False,
-                              "verify_aud": False,
-                          },
-                      )
-                      return {
-                          "username": claims.get("preferred_username", claims.get("email", "")),
-                          "first_name": claims.get("given_name", ""),
-                          "last_name": claims.get("family_name", ""),
-                          "email": claims.get("email", ""),
-                          "role_keys": claims.get(ROLES_CLAIM) or [],
-                      }
+                  userinfo = self.appbuilder.sm.oauth_remotes[provider].get(
+                      USERINFO_URL,
+                      token=response,
+                  )
+                  # Fail loudly: a silent fall-through would hand the user the
+                  # AUTH_USER_REGISTRATION_ROLE default instead of their roles.
+                  userinfo.raise_for_status()
+                  claims = userinfo.json()
+                  return {
+                      "username": claims.get("preferred_username", claims.get("email", "")),
+                      "first_name": claims.get("given_name", ""),
+                      "last_name": claims.get("family_name", ""),
+                      "email": claims.get("email", ""),
+                      "role_keys": claims.get(ROLES_CLAIM) or [],
+                  }
               return super().oauth_user_info(provider, response)
 
       CUSTOM_SECURITY_MANAGER = DlhKeycloakSecurityManager
