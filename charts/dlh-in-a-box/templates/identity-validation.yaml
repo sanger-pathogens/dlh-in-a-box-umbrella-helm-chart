@@ -230,6 +230,34 @@
 {{- if and (get $supersetIdentity "enabled") (not $hasSupersetOauthClientSecret) -}}
 {{- fail "superset.extraEnvRaw must project OAUTH_CLIENT_SECRET when global.identity.external.clients.superset.enabled=true." -}}
 {{- end -}}
+{{- if and (get $supersetIdentity "enabled") (not (default "" (get $supersetIdentity "providerName"))) -}}
+{{- fail "global.identity.external.clients.superset.providerName must not be empty; Flask-AppBuilder builds the Superset OAuth callback path from it." -}}
+{{- end -}}
+{{- /*
+  Flask-AppBuilder serves the Superset OAuth callback at
+  /oauth-authorized/<providerName>, so the registered Keycloak redirect URI has
+  to carry that exact suffix. Nothing links the two values at runtime: a drifted
+  providerName fails on the outbound leg with Keycloak's "Invalid parameter:
+  redirect_uri" and leaves no trace in Superset's logs, so catch it at render
+  time instead. This applies in every provider mode -- bundledKeycloak consumes
+  redirectUris directly, and under externalOidc they are still the contract an
+  external Keycloak admin registers by hand. Only non-empty lists are checked,
+  because externalOidc deployments may legitimately leave them unset. Wildcard
+  entries are accepted because Keycloak expands them -- the loop above already
+  confines those to local environments.
+*/ -}}
+{{- if and (get $supersetIdentity "enabled") (get $supersetIdentity "providerName") (gt (len (get $supersetIdentity "redirectUris" | default list)) 0) -}}
+  {{- $supersetCallbackPath := printf "/oauth-authorized/%s" (get $supersetIdentity "providerName") -}}
+  {{- $hasSupersetCallback := false -}}
+  {{- range $uri := (get $supersetIdentity "redirectUris" | default list) -}}
+    {{- if or (hasSuffix $supersetCallbackPath (toString $uri)) (contains "*" (toString $uri)) -}}
+      {{- $hasSupersetCallback = true -}}
+    {{- end -}}
+  {{- end -}}
+  {{- if not $hasSupersetCallback -}}
+    {{- fail (printf "global.identity.external.clients.superset.redirectUris must include the Superset OAuth callback URL ending in %s, which Flask-AppBuilder derives from global.identity.external.clients.superset.providerName." $supersetCallbackPath) -}}
+  {{- end -}}
+{{- end -}}
 {{- if and (get $datahubIdentity "enabled") (not .Values.datahub.enabled) -}}
 {{- fail "global.identity.external.clients.datahub.enabled requires datahub.enabled=true." -}}
 {{- end -}}

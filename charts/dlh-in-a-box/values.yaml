@@ -1154,6 +1154,7 @@ superset:
       AUTH_USER_REGISTRATION = True
       AUTH_USER_REGISTRATION_ROLE = "Gamma"
       ROLES_CLAIM = {{ .Values.global.identity.external.oidc.rolesClaim | quote }}
+      PROVIDER_NAME = {{ .Values.global.identity.external.clients.superset.providerName | quote }}
       AUTH_ROLES_MAPPING = {
       {{- range $supersetRole, $platformRoles := .Values.auth.roleMappings }}
         {{- range $platformRole := $platformRoles }}
@@ -1164,7 +1165,7 @@ superset:
 
       OAUTH_PROVIDERS = [
           {
-              "name": {{ .Values.global.identity.external.clients.superset.providerName | quote }},
+              "name": PROVIDER_NAME,
               "icon": {{ .Values.global.identity.external.clients.superset.icon | quote }},
               "token_key": "access_token",
               "remote_app": {
@@ -1185,7 +1186,7 @@ superset:
 
       class DlhKeycloakSecurityManager(SupersetSecurityManager):
           def oauth_user_info(self, provider, response=None):
-              if provider == "keycloak" and response:
+              if provider == PROVIDER_NAME and response:
                   token = response.get("id_token") or response.get("access_token")
                   if token:
                       claims = jwt.decode(
