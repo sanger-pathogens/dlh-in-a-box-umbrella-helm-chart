@@ -46,6 +46,45 @@ assert_contains() {
   fi
 }
 
+# oauth2-proxy's alpha configuration (used by cloudbeaver-auth-proxy) ships as
+# a base64-encoded Secret value, not plain ConfigMap text -- assert_contains
+# can't see inside it, so decode the named key first.
+assert_contains_decoded_secret() {
+  local file="$1" secret_name="$2" data_key="$3" needle="$4"
+  local decoded
+  decoded="$(
+    yq eval-all "select(.kind == \"Secret\" and .metadata.name == \"${secret_name}\") | .data[\"${data_key}\"]" "${file}" \
+      | base64 -d 2>/dev/null || true
+  )"
+
+  if ! grep -Fq -- "${needle}" <<<"${decoded}"; then
+    echo "Expected decoded secret ${secret_name}[${data_key}] to contain: ${needle}" >&2
+    echo "Rendered file: ${file}" >&2
+    exit 1
+  fi
+}
+
+# Catalog entries must be rendered into a Secret's base64 `data` field rather
+# than `stringData`. `stringData` is a write-only input the API server merges
+# into `data` and never returns on read, so a key dropped from the template has
+# nothing to diff against in the live object and `helm upgrade` leaves the
+# orphan behind (helm/helm#10010) -- a catalog removed from
+# global.dataCatalogs would stay mounted and loaded by Trino forever.
+assert_secret_has_no_string_data() {
+  local file="$1" secret_name="$2"
+  local string_data
+  string_data="$(
+    yq eval-all "select(.kind == \"Secret\" and .metadata.name == \"${secret_name}\") | .stringData" "${file}"
+  )"
+
+  if [[ "${string_data}" != "null" ]]; then
+    echo "Secret ${secret_name} must render its entries into .data (base64), not .stringData," >&2
+    echo "because keys removed from .stringData are never deleted by helm upgrade." >&2
+    echo "Rendered file: ${file}" >&2
+    exit 1
+  fi
+}
+
 assert_not_contains() {
   local file="$1"
   local needle="$2"
@@ -297,8 +336,8 @@ assert_contains "${dev_manifest}" 'provider = \"keycloak-oidc\"'
 assert_contains "${prod_manifest}" 'provider = \"keycloak-oidc\"'
 assert_contains "${dev_manifest}" 'allowed_roles = [\"prefect:access\"]'
 assert_contains "${prod_manifest}" 'allowed_roles = [\"prefect:access\"]'
-assert_contains "${dev_manifest}" 'allowed_roles = [\"cloudbeaver:access\"]'
-assert_contains "${prod_manifest}" 'allowed_roles = [\"cloudbeaver:access\"]'
+assert_contains_decoded_secret "${dev_manifest}" "dlh-cloudbeaver-auth-proxy-alpha" "oauth2_proxy.yml" "cloudbeaver:access"
+assert_contains_decoded_secret "${prod_manifest}" "dlh-cloudbeaver-auth-proxy-alpha" "oauth2_proxy.yml" "cloudbeaver:access"
 assert_not_contains "${dev_manifest}" 'allowed_groups = [\"platform-app-prefect\", \"platform-role-platform-admin\"]'
 assert_not_contains "${prod_manifest}" 'allowed_groups = [\"platform-app-prefect\", \"platform-role-platform-admin\"]'
 assert_not_contains "${dev_manifest}" 'allowed_groups = [\"platform-app-cloudbeaver\", \"platform-role-platform-admin\"]'
@@ -348,6 +387,11 @@ assert_contains "${dev_manifest}" "\"roles\": ["
 assert_contains "${prod_manifest}" "\"roles\": ["
 assert_contains "${dev_manifest}" "\"user\":\"cloudbeaver-service\",\"catalog\":\"system\",\"allow\":\"all\""
 assert_contains "${dev_manifest}" "\"user\":\"superset-service\",\"catalog\":\"system\",\"allow\":\"all\""
+assert_contains_decoded_secret "${dev_manifest}" "dlh-trino-catalog" "redcap.properties" "connector.name=delta_lake"
+assert_contains_decoded_secret "${dev_manifest}" "dlh-trino-catalog" "redcap.properties" "hive.metastore.uri=thrift://dlh-hive-redcap-metastore:9083"
+assert_contains_decoded_secret "${prod_manifest}" "dlh-trino-catalog" "redcap.properties" "connector.name=delta_lake"
+assert_secret_has_no_string_data "${dev_manifest}" "dlh-trino-catalog"
+assert_secret_has_no_string_data "${prod_manifest}" "dlh-trino-catalog"
 assert_contains "${dev_manifest}" 'driver: "${CLOUDBEAVER_DB_DRIVER:h2_embedded_v2}"'
 assert_contains "${dev_manifest}" 'url: "${CLOUDBEAVER_DB_URL:jdbc:h2:${workspace}/.data/cb.h2v2.dat}"'
 assert_contains "${cloudbeaver_h2_patch_manifest}" "name: cloudbeaver-h2-fresh-schema-patch"
@@ -357,7 +401,7 @@ assert_contains "${cloudbeaver_h2_patch_manifest}" "Skipped by dlh-in-a-box for 
 
 echo "--- Negative contract renders"
 expect_fail \
-  "cloudbeaver.h2FreshSchemaPatch.enabled requires cloudbeaver.bootstrap.forceWorkspaceSeed=true because it is only safe for intentionally fresh CloudBeaver workspaces." \
+  "cloudbeaver.h2FreshSchemaPatch.enabled requires cloudbeaver.seed.force=true because it is only safe for intentionally fresh CloudBeaver workspaces." \
   -f "${DEV_VALUES}" \
   -f "${FIXTURE_DIR}/cloudbeaver-h2-fresh-schema-patch-without-fresh-workspace.yaml"
 
@@ -417,6 +461,16 @@ expect_fail \
   "cloudbeaver-auth-proxy.config.existingSecret must be set when global.identity.external.clients.cloudbeaverProxy.enabled=true." \
   -f "${DEV_VALUES}" \
   -f "${FIXTURE_DIR}/cloudbeaver-missing-secret.yaml"
+
+expect_fail \
+  "cloudbeaver.enabled requires cloudbeaver.auth.proxy.enabled=true so CloudBeaver stays behind the central authentication boundary." \
+  -f "${DEV_VALUES}" \
+  -f "${FIXTURE_DIR}/cloudbeaver-proxy-disabled.yaml"
+
+expect_fail \
+  "cloudbeaver.seed.admin.existingSecret is required when CloudBeaver is enabled." \
+  -f "${DEV_VALUES}" \
+  -f "${FIXTURE_DIR}/cloudbeaver-admin-secret-missing.yaml"
 
 expect_fail \
   "global.identity.external.clients.trino.redirectUris must not use wildcard values outside local environments." \
@@ -490,7 +544,7 @@ expect_fail \
   -f "${FIXTURE_DIR}/access-model-group-role-mappings.yaml"
 
 expect_fail \
-  "global.identity.accessRoles.platform-viewer.ranger is not supported. Keycloak roles control app access only; define Ranger data roles under global.authorization.ranger.dataRoles." \
+  "global.identity.accessRoles.platform-viewer.ranger is not supported. Keycloak roles control app access only; define Ranger data roles under global.authorization.ranger.dataRoles.roles." \
   -f "${DEV_VALUES}" \
   -f "${FIXTURE_DIR}/access-model-ranger-override.yaml"
 

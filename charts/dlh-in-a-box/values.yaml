@@ -51,7 +51,7 @@ global:
     external:
       oidc:
         issuer: ""
-        usernameClaim: email
+        usernameClaim: preferred_username
         groupsClaim: groups
         rolesClaim: platform_roles
         userMappingPattern: "([^@]+)"
@@ -243,7 +243,9 @@ global:
       superUsers:
         - admin
       superGroups: []
-      dataRoles: {}
+      dataRoles:
+        manage: false
+        roles: {}
       useRangerGroups: false
       postgresql:
         host: ""
@@ -275,7 +277,6 @@ global:
           tag: 3.12-slim
           pullPolicy: IfNotPresent
         schedule: "*/15 * * * *"
-        syncSource: KEYCLOAK_LOCAL
       localUserSync:
         enabled: true
         image:
@@ -442,621 +443,7 @@ keycloak:
         value: "true"
       - name: IMPORT_VARSUBSTITUTION_UNDEFINEDISERROR
         value: "false"
-    configuration:
-      dlh-realm.yaml: |
-        realm: {{ include "dlh-in-a-box.keycloak.realm" $ }}
-        enabled: true
-        {{- $keycloakRegistration := default (dict) .Values.global.identity.provider.keycloak.registration }}
-        {{- $registrationEnabled := default false (get $keycloakRegistration "enabled") }}
-        {{- $requireEmailVerification := true }}
-        {{- if hasKey $keycloakRegistration "requireEmailVerification" }}
-        {{- $requireEmailVerification = get $keycloakRegistration "requireEmailVerification" }}
-        {{- end }}
-        registrationAllowed: {{ ternary "true" "false" $registrationEnabled }}
-        loginWithEmailAllowed: true
-        duplicateEmailsAllowed: false
-        verifyEmail: {{ ternary "true" "false" (and $registrationEnabled $requireEmailVerification) }}
-        resetPasswordAllowed: true
-        rememberMe: true
-        {{- $keycloakDisplayName := default "" .Values.global.identity.provider.keycloak.displayName }}
-        {{- if $keycloakDisplayName }}
-        displayName: {{ $keycloakDisplayName | quote }}
-        {{- end }}
-        {{- $keycloakLoginTheme := default "" .Values.global.identity.provider.keycloak.loginTheme }}
-        {{- if $keycloakLoginTheme }}
-        loginTheme: {{ $keycloakLoginTheme | quote }}
-        {{- end }}
-        defaultDefaultClientScopes:
-          - profile
-          - email
-          - roles
-          - platform-access
-        clientScopes:
-          - name: groups
-            protocol: openid-connect
-            attributes:
-              include.in.token.scope: "true"
-              display.on.consent.screen: "false"
-            protocolMappers:
-              - name: groups
-                protocol: openid-connect
-                protocolMapper: oidc-group-membership-mapper
-                consentRequired: false
-                config:
-                  full.path: "false"
-                  id.token.claim: "true"
-                  access.token.claim: "true"
-                  userinfo.token.claim: "true"
-                  introspection.token.claim: "true"
-                  claim.name: {{ .Values.global.identity.external.oidc.groupsClaim | quote }}
-                  jsonType.label: String
-          - name: platform-access
-            protocol: openid-connect
-            attributes:
-              include.in.token.scope: "true"
-              display.on.consent.screen: "false"
-            protocolMappers:
-              - name: platform-realm-roles
-                protocol: openid-connect
-                protocolMapper: oidc-usermodel-realm-role-mapper
-                consentRequired: false
-                config:
-                  multivalued: "true"
-                  id.token.claim: "true"
-                  access.token.claim: "true"
-                  userinfo.token.claim: "true"
-                  introspection.token.claim: "true"
-                  claim.name: {{ default "platform_roles" .Values.global.identity.external.oidc.rolesClaim | quote }}
-                  jsonType.label: String
-        {{- $accessModelRoles := fromJson (include "dlh-in-a-box.identity.accessModelRolesJson" $) }}
-        {{- $accessModelAppClients := fromJson (include "dlh-in-a-box.identity.accessModelAppClientsJson" $) }}
-        {{- $accessModelClientRoleApps := dict }}
-        {{- range $roleKey, $role := $accessModelRoles }}
-          {{- range $appName, $enabled := get $role "appAccess" | default dict }}
-            {{- if and $enabled (hasKey $accessModelAppClients $appName) }}
-              {{- $_ := set $accessModelClientRoleApps $appName true }}
-            {{- end }}
-          {{- end }}
-        {{- end }}
-        {{- if gt (len $accessModelRoles) 0 }}
-        roles:
-          realm:
-          {{- range $roleKey := keys $accessModelRoles | sortAlpha }}
-            {{- $role := get $accessModelRoles $roleKey | default dict }}
-            {{- $roleClientComposites := dict }}
-            {{- range $appName, $enabled := get $role "appAccess" | default dict }}
-              {{- if and $enabled (hasKey $accessModelAppClients $appName) }}
-                {{- $_ := set $roleClientComposites (get $accessModelAppClients $appName) (list "access") }}
-              {{- end }}
-            {{- end }}
-            {{- if eq $roleKey "platform-admin" }}
-              {{- $_ := set $roleClientComposites "realm-management" (list "realm-admin") }}
-            {{- end }}
-            - name: {{ $roleKey | quote }}
-              {{- if get $role "description" }}
-              description: {{ get $role "description" | quote }}
-              {{- else }}
-              description: {{ printf "Built-in platform role %s" $roleKey | quote }}
-              {{- end }}
-              {{- if gt (len $roleClientComposites) 0 }}
-              composite: true
-              composites:
-                client:
-                  {{- range $clientId := keys $roleClientComposites | sortAlpha }}
-                  {{ $clientId | quote }}:
-                    {{- range $clientRole := get $roleClientComposites $clientId }}
-                    - {{ $clientRole | quote }}
-                    {{- end }}
-                  {{- end }}
-              {{- end }}
-          {{- end }}
-          {{- if gt (len $accessModelClientRoleApps) 0 }}
-          client:
-          {{- range $appName := keys $accessModelClientRoleApps | sortAlpha }}
-            {{- $clientId := get $accessModelAppClients $appName }}
-            {{ $clientId | quote }}:
-              - name: access
-                description: {{ printf "Browser access entitlement for %s" $appName | quote }}
-          {{- end }}
-        {{- end }}
-        {{- end }}
-        clients:
-        {{- if .Values.global.identity.external.clients.trino.enabled }}
-          - clientId: {{ .Values.global.identity.external.clients.trino.clientId | quote }}
-            name: Trino
-            description: OIDC client for Trino browser login
-            enabled: true
-            protocol: openid-connect
-            publicClient: false
-            standardFlowEnabled: true
-            directAccessGrantsEnabled: false
-            serviceAccountsEnabled: false
-            secret: "$(env:KC_TRINO_CLIENT_SECRET)"
-            redirectUris:
-            {{- range .Values.global.identity.external.clients.trino.redirectUris }}
-              - {{ . | quote }}
-            {{- end }}
-            webOrigins:
-            {{- range .Values.global.identity.external.clients.trino.webOrigins }}
-              - {{ . | quote }}
-            {{- end }}
-            defaultClientScopes:
-              - profile
-              - email
-              - roles
-              - platform-access
-        {{- end }}
-        {{- if .Values.global.identity.external.clients.trinoDirectGrant.enabled }}
-          - clientId: {{ .Values.global.identity.external.clients.trinoDirectGrant.clientId | quote }}
-            name: Trino Direct Grant
-            description: Public OIDC client for non-browser Trino workstation token grants
-            enabled: true
-            protocol: openid-connect
-            publicClient: true
-            standardFlowEnabled: false
-            directAccessGrantsEnabled: true
-            serviceAccountsEnabled: false
-            defaultClientScopes:
-              - profile
-              - email
-              - roles
-              - platform-access
-            protocolMappers:
-              - name: trino-audience
-                protocol: openid-connect
-                protocolMapper: oidc-audience-mapper
-                consentRequired: false
-                config:
-                  access.token.claim: "true"
-                  id.token.claim: "false"
-                  introspection.token.claim: "true"
-                  included.client.audience: {{ .Values.global.identity.external.clients.trino.clientId | quote }}
-        {{- end }}
-        {{- if .Values.global.identity.external.clients.superset.enabled }}
-          - clientId: {{ .Values.global.identity.external.clients.superset.clientId | quote }}
-            name: Superset
-            description: OIDC client for Apache Superset
-            enabled: true
-            protocol: openid-connect
-            publicClient: false
-            standardFlowEnabled: true
-            directAccessGrantsEnabled: false
-            serviceAccountsEnabled: false
-            secret: "$(env:KC_SUPERSET_CLIENT_SECRET)"
-            redirectUris:
-            {{- range .Values.global.identity.external.clients.superset.redirectUris }}
-              - {{ . | quote }}
-            {{- end }}
-            webOrigins:
-            {{- range .Values.global.identity.external.clients.superset.webOrigins }}
-              - {{ . | quote }}
-            {{- end }}
-            defaultClientScopes:
-              - profile
-              - email
-              - roles
-              - platform-access
-        {{- end }}
-        {{- if .Values.global.identity.external.clients.datahub.enabled }}
-          - clientId: {{ .Values.global.identity.external.clients.datahub.clientId | quote }}
-            name: DataHub
-            description: OIDC client for DataHub frontend
-            enabled: true
-            protocol: openid-connect
-            publicClient: false
-            standardFlowEnabled: true
-            directAccessGrantsEnabled: false
-            serviceAccountsEnabled: false
-            secret: "$(env:KC_DATAHUB_CLIENT_SECRET)"
-            redirectUris:
-            {{- range .Values.global.identity.external.clients.datahub.redirectUris }}
-              - {{ . | quote }}
-            {{- end }}
-            webOrigins:
-            {{- range .Values.global.identity.external.clients.datahub.webOrigins }}
-              - {{ . | quote }}
-            {{- end }}
-            defaultClientScopes:
-              - profile
-              - email
-              - roles
-              - platform-access
-        {{- end }}
-        {{- if .Values.global.identity.external.clients.platformHome.enabled }}
-          - clientId: {{ .Values.global.identity.external.clients.platformHome.clientId | quote }}
-            name: Platform Home
-            description: Public browser client for the data-platform launchpad
-            enabled: true
-            protocol: openid-connect
-            publicClient: true
-            standardFlowEnabled: true
-            directAccessGrantsEnabled: false
-            serviceAccountsEnabled: false
-            redirectUris:
-            {{- range .Values.global.identity.external.clients.platformHome.redirectUris }}
-              - {{ . | quote }}
-            {{- end }}
-            webOrigins:
-            {{- range .Values.global.identity.external.clients.platformHome.webOrigins }}
-              - {{ . | quote }}
-            {{- end }}
-            defaultClientScopes:
-              - profile
-              - email
-              - roles
-              - platform-access
-        {{- end }}
-        {{- if .Values.global.identity.external.clients.minio.enabled }}
-          - clientId: {{ .Values.global.identity.external.clients.minio.clientId | quote }}
-            name: MinIO Console
-            description: OIDC client for MinIO Console browser login
-            enabled: true
-            protocol: openid-connect
-            publicClient: false
-            standardFlowEnabled: true
-            directAccessGrantsEnabled: false
-            serviceAccountsEnabled: false
-            secret: "$(env:KC_MINIO_CLIENT_SECRET)"
-            redirectUris:
-            {{- range .Values.global.identity.external.clients.minio.redirectUris }}
-              - {{ . | quote }}
-            {{- end }}
-            webOrigins:
-            {{- range .Values.global.identity.external.clients.minio.webOrigins }}
-              - {{ . | quote }}
-            {{- end }}
-            defaultClientScopes:
-              - profile
-              - email
-              - roles
-              - platform-access
-            protocolMappers:
-              - name: minio-policy
-                protocol: openid-connect
-                protocolMapper: oidc-hardcoded-claim-mapper
-                consentRequired: false
-                config:
-                  access.token.claim: "true"
-                  id.token.claim: "true"
-                  userinfo.token.claim: "true"
-                  introspection.token.claim: "true"
-                  claim.name: "policy"
-                  claim.value: "consoleAdmin"
-                  jsonType.label: String
-        {{- end }}
-        {{- if .Values.global.identity.external.clients.vault.enabled }}
-          - clientId: {{ .Values.global.identity.external.clients.vault.clientId | quote }}
-            name: Vault
-            description: OIDC client for Vault UI browser login
-            enabled: true
-            protocol: openid-connect
-            publicClient: false
-            standardFlowEnabled: true
-            directAccessGrantsEnabled: false
-            serviceAccountsEnabled: false
-            secret: "$(env:KC_VAULT_CLIENT_SECRET)"
-            redirectUris:
-            {{- range .Values.global.identity.external.clients.vault.redirectUris }}
-              - {{ . | quote }}
-            {{- end }}
-            webOrigins:
-            {{- range .Values.global.identity.external.clients.vault.webOrigins }}
-              - {{ . | quote }}
-            {{- end }}
-            defaultClientScopes:
-              - profile
-              - email
-              - roles
-              - platform-access
-        {{- end }}
-        {{- if .Values.global.identity.external.clients.jupyterhub.enabled }}
-          - clientId: {{ .Values.global.identity.external.clients.jupyterhub.clientId | quote }}
-            name: JupyterHub
-            description: OIDC client for JupyterHub browser login and notebook token forwarding
-            enabled: true
-            protocol: openid-connect
-            publicClient: false
-            standardFlowEnabled: true
-            directAccessGrantsEnabled: false
-            serviceAccountsEnabled: false
-            secret: "$(env:KC_JUPYTERHUB_CLIENT_SECRET)"
-            attributes:
-              access.token.lifespan: {{ printf "%d" (int (default 28800 .Values.global.identity.external.clients.jupyterhub.accessTokenLifespanSeconds)) | quote }}
-            redirectUris:
-            {{- range .Values.global.identity.external.clients.jupyterhub.redirectUris }}
-              - {{ . | quote }}
-            {{- end }}
-            webOrigins:
-            {{- range .Values.global.identity.external.clients.jupyterhub.webOrigins }}
-              - {{ . | quote }}
-            {{- end }}
-            defaultClientScopes:
-              - profile
-              - email
-              - roles
-              - platform-access
-            {{- if .Values.global.identity.external.clients.trino.enabled }}
-            protocolMappers:
-              - name: trino-audience
-                protocol: openid-connect
-                protocolMapper: oidc-audience-mapper
-                consentRequired: false
-                config:
-                  access.token.claim: "true"
-                  id.token.claim: "false"
-                  introspection.token.claim: "true"
-                  included.client.audience: {{ .Values.global.identity.external.clients.trino.clientId | quote }}
-            {{- end }}
-        {{- end }}
-        {{- if .Values.global.identity.external.clients.cloudbeaverProxy.enabled }}
-          - clientId: {{ .Values.global.identity.external.clients.cloudbeaverProxy.clientId | quote }}
-            name: CloudBeaver Proxy
-            description: OIDC client for oauth2-proxy in front of CloudBeaver
-            enabled: true
-            protocol: openid-connect
-            publicClient: false
-            standardFlowEnabled: true
-            directAccessGrantsEnabled: false
-            serviceAccountsEnabled: false
-            secret: "$(env:KC_CLOUDBEAVER_CLIENT_SECRET)"
-            redirectUris:
-            {{- range .Values.global.identity.external.clients.cloudbeaverProxy.redirectUris }}
-              - {{ . | quote }}
-            {{- end }}
-            webOrigins:
-            {{- range .Values.global.identity.external.clients.cloudbeaverProxy.webOrigins }}
-              - {{ . | quote }}
-            {{- end }}
-            defaultClientScopes:
-              - profile
-              - email
-              - roles
-              - platform-access
-        {{- end }}
-        {{- if .Values.global.identity.external.clients.rangerProxy.enabled }}
-          - clientId: {{ .Values.global.identity.external.clients.rangerProxy.clientId | quote }}
-            name: Ranger Proxy
-            description: OIDC client for oauth2-proxy in front of Ranger Admin
-            enabled: true
-            protocol: openid-connect
-            publicClient: false
-            standardFlowEnabled: true
-            directAccessGrantsEnabled: false
-            serviceAccountsEnabled: false
-            secret: "$(env:KC_RANGER_CLIENT_SECRET)"
-            redirectUris:
-            {{- range .Values.global.identity.external.clients.rangerProxy.redirectUris }}
-              - {{ . | quote }}
-            {{- end }}
-            webOrigins:
-            {{- range .Values.global.identity.external.clients.rangerProxy.webOrigins }}
-              - {{ . | quote }}
-            {{- end }}
-            defaultClientScopes:
-              - profile
-              - email
-              - roles
-              - platform-access
-        {{- end }}
-        {{- if .Values.global.identity.external.clients.prefectProxy.enabled }}
-          - clientId: {{ .Values.global.identity.external.clients.prefectProxy.clientId | quote }}
-            name: Prefect Proxy
-            description: OIDC client for oauth2-proxy in front of Prefect
-            enabled: true
-            protocol: openid-connect
-            publicClient: false
-            standardFlowEnabled: true
-            directAccessGrantsEnabled: false
-            serviceAccountsEnabled: false
-            secret: "$(env:KC_PREFECT_CLIENT_SECRET)"
-            redirectUris:
-            {{- range .Values.global.identity.external.clients.prefectProxy.redirectUris }}
-              - {{ . | quote }}
-            {{- end }}
-            webOrigins:
-            {{- range .Values.global.identity.external.clients.prefectProxy.webOrigins }}
-              - {{ . | quote }}
-            {{- end }}
-            defaultClientScopes:
-              - profile
-              - email
-              - roles
-              - platform-access
-        {{- end }}
-        {{- if .Values.global.identity.external.clients.prefectAutomation.enabled }}
-          - clientId: {{ .Values.global.identity.external.clients.prefectAutomation.clientId | quote }}
-            name: Prefect Automation
-            description: OIDC machine client for programmatic Prefect API access through oauth2-proxy
-            enabled: true
-            protocol: openid-connect
-            publicClient: false
-            standardFlowEnabled: {{ .Values.global.identity.external.clients.prefectAutomation.standardFlowEnabled }}
-            directAccessGrantsEnabled: {{ .Values.global.identity.external.clients.prefectAutomation.directAccessGrantsEnabled }}
-            serviceAccountsEnabled: {{ .Values.global.identity.external.clients.prefectAutomation.serviceAccountsEnabled }}
-            secret: "$(env:{{ .Values.global.identity.external.clients.prefectAutomation.configCliSecretKey }})"
-            defaultClientScopes:
-              - profile
-              - email
-              - roles
-              - platform-access
-            protocolMappers:
-              - name: prefect-automation-audience
-                protocol: openid-connect
-                protocolMapper: oidc-audience-mapper
-                consentRequired: false
-                config:
-                  included.client.audience: {{ .Values.global.identity.external.clients.prefectAutomation.tokenAudience | quote }}
-                  access.token.claim: "true"
-                  id.token.claim: "false"
-        {{- end }}
-        {{- if .Values.global.identity.external.clients.prefectDirectGrant.enabled }}
-          - clientId: {{ .Values.global.identity.external.clients.prefectDirectGrant.clientId | quote }}
-            name: Prefect Direct Grant
-            description: Public OIDC client for developer Prefect API access without a browser popup
-            enabled: true
-            protocol: openid-connect
-            publicClient: true
-            standardFlowEnabled: false
-            directAccessGrantsEnabled: true
-            serviceAccountsEnabled: false
-            defaultClientScopes:
-              - profile
-              - email
-              - roles
-              - platform-access
-            protocolMappers:
-              - name: prefect-direct-grant-audience
-                protocol: openid-connect
-                protocolMapper: oidc-audience-mapper
-                consentRequired: false
-                config:
-                  included.client.audience: {{ .Values.global.identity.external.clients.prefectDirectGrant.tokenAudience | quote }}
-                  access.token.claim: "true"
-                  id.token.claim: "false"
-        {{- end }}
-        {{- if .Values.global.identity.directory.ldap.enabled }}
-        components:
-          org.keycloak.storage.UserStorageProvider:
-            - name: ldap-directory
-              providerId: ldap
-              config:
-                enabled:
-                  - "true"
-                priority:
-                  - "0"
-                fullSyncPeriod:
-                  - "-1"
-                changedSyncPeriod:
-                  - "-1"
-                cachePolicy:
-                  - DEFAULT
-                importEnabled:
-                  - "true"
-                editMode:
-                  - READ_ONLY
-                syncRegistrations:
-                  - "false"
-                usersDn:
-                  - {{ include "dlh-in-a-box.identity.directory.userBaseDn" $ | quote }}
-                usernameLDAPAttribute:
-                  - {{ .Values.global.identity.directory.ldap.usernameAttribute | quote }}
-                rdnLDAPAttribute:
-                  - {{ .Values.global.identity.directory.ldap.usernameAttribute | quote }}
-                uuidLDAPAttribute:
-                  - {{ .Values.global.identity.directory.ldap.uuidAttribute | quote }}
-                userObjectClasses:
-                  - {{ .Values.global.identity.directory.ldap.userObjectClasses | quote }}
-                connectionUrl:
-                  - {{ include "dlh-in-a-box.identity.directory.url" $ | quote }}
-                searchScope:
-                  - "1"
-                vendor:
-                  - other
-                {{- if .Values.global.identity.directory.ldap.allowAnonymousRead }}
-                bindDn:
-                  - ""
-                bindCredential:
-                  - ""
-                authType:
-                  - none
-                {{- else }}
-                bindDn:
-                  - {{ include "dlh-in-a-box.identity.directory.bindDn" $ | quote }}
-                bindCredential:
-                  - "$(env:LDAP_BIND_PASSWORD)"
-                authType:
-                  - simple
-                {{- end }}
-                useTruststoreSpi:
-                  - {{ ternary "never" "ldapsOnly" .Values.global.identity.directory.ldap.allowInsecure | quote }}
-                trustEmail:
-                  - "true"
-              subComponents:
-                org.keycloak.storage.ldap.mappers.LDAPStorageMapper:
-                  - name: username
-                    providerId: user-attribute-ldap-mapper
-                    config:
-                      ldap.attribute:
-                        - {{ .Values.global.identity.directory.ldap.usernameAttribute | quote }}
-                      user.model.attribute:
-                        - username
-                      is.mandatory.in.ldap:
-                        - "true"
-                      read.only:
-                        - "true"
-                      always.read.value.from.ldap:
-                        - "true"
-                  - name: first name
-                    providerId: user-attribute-ldap-mapper
-                    config:
-                      ldap.attribute:
-                        - {{ .Values.global.identity.directory.ldap.firstNameAttribute | quote }}
-                      user.model.attribute:
-                        - firstName
-                      is.mandatory.in.ldap:
-                        - "false"
-                      read.only:
-                        - "true"
-                      always.read.value.from.ldap:
-                        - "true"
-                  - name: last name
-                    providerId: user-attribute-ldap-mapper
-                    config:
-                      ldap.attribute:
-                        - {{ .Values.global.identity.directory.ldap.lastNameAttribute | quote }}
-                      user.model.attribute:
-                        - lastName
-                      is.mandatory.in.ldap:
-                        - "false"
-                      read.only:
-                        - "true"
-                      always.read.value.from.ldap:
-                        - "true"
-                  - name: email
-                    providerId: user-attribute-ldap-mapper
-                    config:
-                      ldap.attribute:
-                        - {{ .Values.global.identity.directory.ldap.emailAttribute | quote }}
-                      user.model.attribute:
-                        - email
-                      is.mandatory.in.ldap:
-                        - "false"
-                      read.only:
-                        - "true"
-                      always.read.value.from.ldap:
-                        - "true"
-                  {{- if .Values.global.identity.directory.ldap.syncGroupsToKeycloak }}
-                  - name: groups
-                    providerId: group-ldap-mapper
-                    config:
-                      membership.attribute.type:
-                        - DN
-                      group.name.ldap.attribute:
-                        - {{ .Values.global.identity.directory.ldap.groupNameAttribute | quote }}
-                      membership.user.ldap.attribute:
-                        - {{ .Values.global.identity.directory.ldap.membershipUserAttribute | quote }}
-                      preserve.group.inheritance:
-                        - "true"
-                      groups.dn:
-                        - {{ include "dlh-in-a-box.identity.directory.groupBaseDn" $ | quote }}
-                      mode:
-                        - READ_ONLY
-                      user.roles.retrieve.strategy:
-                        - LOAD_GROUPS_BY_MEMBER_ATTRIBUTE
-                      membership.ldap.attribute:
-                        - {{ .Values.global.identity.directory.ldap.groupSearchMemberAttribute | quote }}
-                      ignore.missing.groups:
-                        - "false"
-                      group.object.classes:
-                        - {{ .Values.global.identity.directory.ldap.groupObjectClasses | quote }}
-                      memberof.ldap.attribute:
-                        - {{ .Values.global.identity.directory.ldap.userMemberOfAttribute | quote }}
-                      groups.path:
-                        - /
-                      drop.non.existing.groups.during.sync:
-                        - "false"
-                  {{- end }}
-        {{- end }}
+    existingConfigmap: keycloak-realm-config
   postgresql:
     enabled: true
     nameOverride: keycloak-postgresql
@@ -1411,75 +798,20 @@ jupyterhub:
             "nbformat_minor": 5
           }
 
+# CloudBeaver is a nested subchart (charts/dlh-in-a-box/charts/cloudbeaver/,
+# see its own values.yaml for the full settings list).
 cloudbeaver:
   enabled: false
-  image:
-    repository: dbeaver/cloudbeaver
-    tag: 25.2.5
-    pullPolicy: IfNotPresent
-  service:
-    port: 8978
-  strategy:
-    type: Recreate
-  workspace:
-    persistence:
-      enabled: false
-      size: 10Gi
-      storageClass: ""
-  bootstrap:
-    existingSecret: dlh-cloudbeaver-bootstrap
-    initialDataKey: initial-data.conf
-    workspaceSeedExistingSecret: ""
-    workspaceDataSourcesKey: data-sources.json
-    forceWorkspaceSeed: false
-    sharedConnectionSeed:
-      enabled: false
-      connectionIdKey: shared-connection-id
-      projectIdKey: shared-project-id
-      usernameKey: shared-connection-username
-      passwordKey: shared-connection-password
-      bootstrapUsernameKey: shared-bootstrap-username
-      bootstrapGroupsKey: shared-bootstrap-groups
-      expectedCatalog: redcap
-  h2FreshSchemaPatch:
-    enabled: false
-    pluginJar: ""
-  trustedCa:
-    existingSecret: ""
-    certKey: ca.crt
-    trustStorePath: /opt/cloudbeaver/trust/cloudbeaver-trino-truststore.p12
-    trustStorePassword: changeit
-    trustStoreType: PKCS12
-    initImage:
-      repository: eclipse-temurin
-      tag: 21-jdk
-      pullPolicy: IfNotPresent
-  authProxy:
-    enabled: false
-    userHeader: X-Forwarded-Preferred-Username
-    # CloudBeaver treats this header as a list of existing team ids. The
-    # oauth2-proxy X-Forwarded-Groups header can contain broad Keycloak/OIDC
-    # roles such as offline_access, which breaks CloudBeaver login when those
-    # teams do not exist. Keep this dedicated header unless an upstream proxy
-    # explicitly emits CloudBeaver team ids such as platform-admin/platform-user-scientist.
-    groupHeader: X-CloudBeaver-Platform-Team
-    groupDelimiter: ","
-    firstNameHeader: ""
-    lastNameHeader: ""
-    logoutUrl: ""
-  app:
-    defaultUserTeam: ""
-    adminTeam: ""
-    # Keep CloudBeaver's workspace runtime config aligned with Helm values.
-    # CloudBeaver gives workspace/.data/.cloudbeaver.runtime.conf precedence over
-    # cloudbeaver.conf, so auth must be enforced there as well for PVC-backed
-    # deployments.
-    enforceRuntimeConfig: true
-    supportsCustomConnections: true
-    showReadOnlyConnectionInfo: false
-    publicCredentialsSaveEnabled: false
-    adminCredentialsSaveEnabled: false
-    secretManagerEnabled: false
+  auth:
+    proxy:
+      userHeader: X-Forwarded-Preferred-Username
+      # Custom header names, only possible because cloudbeaver-auth-proxy uses
+      # oauth2-proxy's alpha configuration (injectRequestHeaders) below.
+      groupHeader: X-CloudBeaver-Groups
+      groupDelimiter: ","
+      firstNameHeader: X-Forwarded-First-Name
+      lastNameHeader: X-Forwarded-Last-Name
+      fullNameHeader: X-Forwarded-Full-Name
 
 rangerPostgresql:
   enabled: false
@@ -1606,32 +938,88 @@ cloudbeaver-auth-proxy:
     # When using an externally managed Secret, it must contain the oauth2-proxy
     # keys `client-id`, `client-secret`, and `cookie-secret`.
     existingSecret: ""
+    # Only the settings alpha config doesn't cover (provider/OIDC endpoints,
+    # scope, allowed_roles, upstreams and header injection all moved to
+    # alphaConfig below -- oauth2-proxy rejects those options outright once
+    # --alpha-config is in use).
     configFile: |-
-      provider = "keycloak-oidc"
-      oidc_issuer_url = "{{ include "dlh-in-a-box.identity.issuer" $ }}"
-      skip_oidc_discovery = true
-      login_url = "{{ include "dlh-in-a-box.identity.authorizeUrl" $ }}"
-      redeem_url = "{{ include "dlh-in-a-box.identity.internalAccessTokenUrl" $ }}"
-      oidc_jwks_url = "{{ include "dlh-in-a-box.identity.internalJwksUri" $ }}"
-      profile_url = "{{ include "dlh-in-a-box.identity.internalUserInfoUrl" $ }}"
-      scope = "{{ join " " .Values.global.identity.external.oidc.scopes }}"
       email_domains = [{{- range $index, $domain := .Values.global.identity.external.clients.cloudbeaverProxy.emailDomains }}{{ if $index }}, {{ end }}{{ $domain | quote }}{{- end }}]
-      allowed_roles = [{{ printf "%s:access" .Values.global.identity.external.clients.cloudbeaverProxy.clientId | quote }}]
-      oidc_groups_claim = "{{ .Values.global.identity.external.oidc.groupsClaim }}"
       redirect_url = "{{ .Values.global.identity.external.clients.cloudbeaverProxy.redirectUrl }}"
-      approval_prompt = "auto"
       skip_provider_button = true
       cookie_secure = {{ hasPrefix "https://" .Values.global.identity.external.clients.cloudbeaverProxy.redirectUrl }}
       # Use a distinct oauth2-proxy cookie per app so localhost tunnel access
       # does not mix CloudBeaver and Prefect sessions on 127.0.0.1.
       cookie_name = "_oauth2_proxy_cloudbeaver"
       session_cookie_minimal = true
-      upstreams = [ "http://{{ include "dlh-in-a-box.cloudbeaver.serviceName" $ }}:8978" ]
-      pass_access_token = false
-      pass_authorization_header = false
-      pass_user_headers = true
-      set_xauthrequest = true
       reverse_proxy = true
+  # additionalClaims (used below) requires oauth2-proxy >= v7.15.0; the
+  # chart's pinned appVersion (v7.14.2) predates it. Scoped to this proxy
+  # only -- other oauth2-proxy instances in this chart are unaffected.
+  image:
+    tag: v7.15.4
+  alphaConfig:
+    enabled: true
+    # KeycloakOIDCProvider (provider: keycloak-oidc) always flattens realm_access.roles *and* every
+    # resource_access.<client>.roles entry (i.e. every other Keycloak client's roles, not just this one) into the
+    # session's Groups field. That pollutes CloudBeaver's team header if exposed directly, which is why `allowed_roles`
+    # and the team header are deliberately kept independent of each other: the allowed_roles gate still checks the
+    # (harmlessly polluted) Groups field internally, but no header here is ever sourced from it.
+    configFile: |-
+      providers:
+        - id: keycloak
+          provider: keycloak-oidc
+          clientID: "${OAUTH2_PROXY_CLIENT_ID}"
+          clientSecret: "${OAUTH2_PROXY_CLIENT_SECRET}"
+          loginURL: "{{ include "dlh-in-a-box.identity.authorizeUrl" $ }}"
+          redeemURL: "{{ include "dlh-in-a-box.identity.internalAccessTokenUrl" $ }}"
+          profileURL: "{{ include "dlh-in-a-box.identity.internalUserInfoUrl" $ }}"
+          scope: "{{ join " " .Values.global.identity.external.oidc.scopes }}"
+          additionalClaims:
+            - {{ .Values.global.identity.external.oidc.rolesClaim | quote }}
+            - given_name
+            - family_name
+            - name
+          oidcConfig:
+            issuerURL: "{{ include "dlh-in-a-box.identity.issuer" $ }}"
+            skipDiscovery: true
+            jwksURL: "{{ include "dlh-in-a-box.identity.internalJwksUri" $ }}"
+          keycloakConfig:
+            roles:
+              - {{ printf "%s:access" .Values.global.identity.external.clients.cloudbeaverProxy.clientId | quote }}
+      upstreamConfig:
+        upstreams:
+          - id: cloudbeaver
+            path: /
+            uri: "http://{{ include "cloudbeaver.serviceName" $ }}:8978"
+      injectRequestHeaders:
+        - name: X-Forwarded-User
+          values:
+            - claimSource:
+                claim: user
+        - name: X-Forwarded-Email
+          values:
+            - claimSource:
+                claim: email
+        - name: X-Forwarded-Preferred-Username
+          values:
+            - claimSource:
+                claim: preferred_username
+        - name: X-CloudBeaver-Groups
+          values:
+            - claimSource:
+                claim: {{ .Values.global.identity.external.oidc.rolesClaim | quote }}
+        - name: X-Forwarded-First-Name
+          values:
+            - claimSource:
+                claim: given_name
+        - name: X-Forwarded-Last-Name
+          values:
+            - claimSource:
+                claim: family_name
+        - name: X-Forwarded-Full-Name
+          values:
+            - claimSource:
+                claim: name
   service:
     type: ClusterIP
   ingress:
@@ -1765,7 +1153,7 @@ superset:
       AUTH_ROLES_SYNC_AT_LOGIN = True
       AUTH_USER_REGISTRATION = True
       AUTH_USER_REGISTRATION_ROLE = "Gamma"
-      ROLES_CLAIM = {{ default "platform_roles" .Values.global.identity.external.oidc.rolesClaim | quote }}
+      ROLES_CLAIM = {{ .Values.global.identity.external.oidc.rolesClaim | quote }}
       AUTH_ROLES_MAPPING = {
       {{- range $supersetRole, $platformRoles := .Values.auth.roleMappings }}
         {{- range $platformRole := $platformRoles }}

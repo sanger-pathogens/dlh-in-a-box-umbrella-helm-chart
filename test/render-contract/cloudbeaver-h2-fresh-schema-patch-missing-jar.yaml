@@ -1,5 +1,5 @@
 cloudbeaver:
-  bootstrap:
-    forceWorkspaceSeed: true
+  seed:
+    force: true
   h2FreshSchemaPatch:
     enabled: true

@@ -1,0 +1,51 @@
+{{- /*
+Self-contained CloudBeaver sanity checks.
+*/ -}}
+{{- if .Values.enabled -}}
+{{- $auth := .Values.auth | default dict -}}
+{{- $authLocal := get $auth "local" | default dict -}}
+{{- $authProxy := get $auth "proxy" | default dict -}}
+{{- $seed := .Values.seed | default dict -}}
+{{- $seedAdmin := get $seed "admin" | default dict -}}
+{{- $seedTeams := get $seed "teams" | default list -}}
+{{- $seedForce := default false $seed.force -}}
+{{- $h2FreshSchemaPatch := get .Values "h2FreshSchemaPatch" | default dict -}}
+{{- $h2FreshSchemaPatchEnabled := default false $h2FreshSchemaPatch.enabled -}}
+{{- $h2FreshSchemaPatchPluginJar := default "" $h2FreshSchemaPatch.pluginJar -}}
+{{- $appConfig := .Values.app | default dict -}}
+{{- $appPassthrough := get $appConfig "config" | default dict -}}
+{{- $defaultUserTeam := default "" $appPassthrough.defaultUserTeam -}}
+{{- if not (default "" .Values.serverName) -}}
+{{- fail "cloudbeaver.serverName must not be empty: CloudBeaver only runs its env-var-driven auto-configuration (which applies seed.admin's credentials) when CB_SERVER_NAME, CB_ADMIN_NAME and CB_ADMIN_PASSWORD are all present." -}}
+{{- end -}}
+{{- if not (or (default false $authLocal.enabled) (default false $authProxy.enabled)) -}}
+{{- fail "cloudbeaver: at least one of auth.local.enabled or auth.proxy.enabled must be true when cloudbeaver.enabled=true." -}}
+{{- end -}}
+{{- if and (default false $authProxy.enabled) (not $defaultUserTeam) -}}
+{{- fail "cloudbeaver.app.config.defaultUserTeam is required when auth.proxy.enabled=true: reverse-proxy-authenticated users are auto-provisioned into this team on first login, and have no other way to be granted connection access." -}}
+{{- end -}}
+{{- if and (default false $authProxy.enabled) (not (default "" $authProxy.logoutUrl)) -}}
+{{- fail "cloudbeaver.auth.proxy.logoutUrl is required when auth.proxy.enabled=true: this chart has no default reverse-proxy technology to assume a sign-out path from. Without it, CloudBeaver's own Sign Out clears only its local session and silently leaves the upstream proxy's SSO session intact, so the user is transparently re-authenticated on next visit." -}}
+{{- end -}}
+{{- if and (or (default false $appPassthrough.publicCredentialsSaveEnabled) (default false $appPassthrough.adminCredentialsSaveEnabled)) (ne true $appPassthrough.secretManagerEnabled) -}}
+{{- fail "cloudbeaver.app.config.secretManagerEnabled must be true when publicCredentialsSaveEnabled or adminCredentialsSaveEnabled is true: CloudBeaver's secret manager is a prerequisite for saving connection credentials." -}}
+{{- end -}}
+{{- if not (default "" $seedAdmin.existingSecret) -}}
+{{- fail "cloudbeaver.seed.admin.existingSecret is required when CloudBeaver is enabled." -}}
+{{- end -}}
+{{- if and $defaultUserTeam $seedTeams -}}
+  {{- $seedTeamIds := list -}}
+  {{- range $seedTeams -}}
+    {{- $seedTeamIds = append $seedTeamIds .subjectId -}}
+  {{- end -}}
+  {{- if not (has $defaultUserTeam $seedTeamIds) -}}
+  {{- fail (printf "cloudbeaver.app.config.defaultUserTeam=%s must be one of seed.teams[].subjectId when seed.teams is set: CloudBeaver refuses to create a fresh workspace whose initial teams don't contain the default team." $defaultUserTeam) -}}
+  {{- end -}}
+{{- end -}}
+{{- if and $h2FreshSchemaPatchEnabled (not $seedForce) -}}
+{{- fail "cloudbeaver.h2FreshSchemaPatch.enabled requires cloudbeaver.seed.force=true because it is only safe for intentionally fresh CloudBeaver workspaces." -}}
+{{- end -}}
+{{- if and $h2FreshSchemaPatchEnabled (not $h2FreshSchemaPatchPluginJar) -}}
+{{- fail "cloudbeaver.h2FreshSchemaPatch.pluginJar is required when cloudbeaver.h2FreshSchemaPatch.enabled=true." -}}
+{{- end -}}
+{{- end -}}

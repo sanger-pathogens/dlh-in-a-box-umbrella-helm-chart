@@ -494,9 +494,9 @@ The detailed explanation of that distinction lives in
 | chart metadata, dependencies, default values | `charts/dlh-in-a-box/` | this is the published chart |
 | shared validation rules | `charts/dlh-in-a-box/templates/identity-validation.yaml` or `authorization-validation.yaml` | these files fail bad combinations before render |
 | `platformHome` UI or admin API behavior | `charts/dlh-in-a-box/templates/platform-home.yaml` | most of the page and embedded API live inline there |
-| CloudBeaver bootstrap or proxy wiring | `charts/dlh-in-a-box/templates/cloudbeaver.yaml` | the repo owns the extra behavior here |
 | Ranger roles, policies, usersync, or audits | `charts/dlh-in-a-box/templates/ranger-automation.yaml` | that file contains the heavy reconciliation logic |
 | Hive-specific render logic | `charts/dlh-in-a-box/charts/hive/` | local subchart owned by this repo |
+| CloudBeaver-specific render logic | `charts/dlh-in-a-box/charts/cloudbeaver/` | local subchart owned by this repo |
 | Trino patch points | `charts/dlh-in-a-box/charts/trino/OVERVIEW.md` then `templates/_README.txt` | most Trino code is upstream, only a few files are locally patched |
 | example install profiles | `examples/` | each overlay is documented there |
 | local validation or smoke scripts | `scripts/` | scripts and their test fixtures live there |

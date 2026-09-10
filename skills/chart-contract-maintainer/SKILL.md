@@ -14,6 +14,7 @@ chart values.
 - `charts/dlh-in-a-box/values.schema.json`
 - `charts/dlh-in-a-box/templates/*-validation.yaml`
 - `charts/dlh-in-a-box/templates/*.yaml`
+- `charts/dlh-in-a-box/charts/cloudbeaver/` (local subchart: its own `values.yaml` and `templates/validation.yaml`)
 - `examples/*.yaml`
 - `test/render-contract.sh`
 - `test/render-contract/*.yaml`

@@ -1,0 +1,24 @@
+{{- if .Values.enabled }}
+{{- $serviceName := include "cloudbeaver.serviceName" . -}}
+{{- $workspace := .Values.workspace | default dict -}}
+{{- $workspacePersistence := get $workspace "persistence" | default dict -}}
+{{- if and (default false $workspacePersistence.enabled) (not (get $workspacePersistence "existingClaim")) }}
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ $serviceName }}-workspace
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "cloudbeaver.labels" . | nindent 4 }}
+    app.kubernetes.io/component: cloudbeaver
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: {{ default "10Gi" $workspacePersistence.size }}
+  {{- if $workspacePersistence.storageClass }}
+  storageClassName: {{ $workspacePersistence.storageClass }}
+  {{- end }}
+{{- end }}
+{{- end }}

@@ -89,7 +89,6 @@ data:
           "realm" (include "dlh-in-a-box.keycloak.realm" .)
           "adminUrl" (include "dlh-in-a-box.keycloak.internalBaseUrl" .)
           "adminUsername" (default "admin" .Values.keycloak.auth.adminUser)
-          "requireEmailVerification" (default false (dig "provider" "keycloak" "registration" "requireEmailVerification" false $identity))
         )
       )
     | toPrettyJson | nindent 4 }}

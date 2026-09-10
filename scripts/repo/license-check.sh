@@ -21,8 +21,23 @@ for file in "${required_files[@]}"; do
   fi
 done
 
+# A dependency's own Chart.yaml `home` field tells apart chart-owned
+# (first-party) subcharts, which point back at this repo, from genuinely
+# third-party ones, which point at their own upstream project -- vendoring
+# a chart locally (file:// repository) doesn't by itself mean it's ours
+# (e.g. trino is vendored too). Only genuinely third-party dependencies
+# need a THIRD_PARTY_NOTICES.md entry.
+own_home="$(yq eval '.home' charts/dlh-in-a-box/Chart.yaml)"
 deps="$(
-  ruby -e 'require "yaml"; content = File.read("charts/dlh-in-a-box/Chart.lock"); lock = begin; YAML.safe_load(content, aliases: true); rescue ArgumentError; YAML.load(content); end; lock.fetch("dependencies").each { |dep| puts dep.fetch("name") }'
+  yq eval '.dependencies[] | [.name, .repository] | @tsv' charts/dlh-in-a-box/Chart.lock |
+  while IFS=$'\t' read -r name repository; do
+    subchart_dir="${repository#file://}"
+    subchart_home="$(yq eval '.home' "charts/dlh-in-a-box/${subchart_dir}/Chart.yaml" 2>/dev/null)"
+    if [[ "${subchart_home}" == "${own_home}" ]]; then
+      continue
+    fi
+    echo "${name}"
+  done
 )"
 
 for doc in "THIRD_PARTY_NOTICES.md" "charts/dlh-in-a-box/THIRD_PARTY_NOTICES.md"; do

@@ -79,7 +79,6 @@ flowchart TD
 | `identity-validation.yaml` | repo-owned | fail-fast contract checks for shared identity modes and app wiring |
 | `authorization-validation.yaml` | repo-owned | fail-fast contract checks for catalog and Ranger authorization settings |
 | `platform-home.yaml` | repo-owned | inline launchpad UI plus helper API and access-control admin behavior |
-| `cloudbeaver.yaml` | repo-owned | CloudBeaver service, config, storage, bootstrap, trust-store, and optional ingress wiring |
 | `ranger-admin.yaml` | repo-owned | Ranger Admin bootstrap ConfigMap, Service, and Deployment |
 | `ranger-automation.yaml` | repo-owned | role and policy reconciliation, LDAP or local user sync, and exception audits |
 | `ranger-browser-proxy.yaml` | repo-owned | small nginx proxy that makes Ranger Admin usable behind browser auth |
@@ -97,8 +96,9 @@ The easiest way to think about this folder is by responsibility:
 - `_helpers.tpl` and `_ranger-admin.tpl` define reusable building blocks
 - `identity-validation.yaml` and `authorization-validation.yaml` reject invalid
   values combinations before resources render
-- `platform-home.yaml`, `cloudbeaver.yaml`, and `ranger-browser-proxy.yaml`
-  own browser-facing repo-specific apps and wrappers
+- `platform-home.yaml` and `ranger-browser-proxy.yaml` own browser-facing
+  repo-specific apps and wrappers (CloudBeaver's own equivalent now lives in
+  `charts/dlh-in-a-box/charts/cloudbeaver/`)
 - `ranger-admin.yaml` and `ranger-automation.yaml` own governance control-plane
   services that are specific to this platform model
 - `datahub-auth-secrets.yaml` and `datahub-prerequisites-compat.yaml` bridge
@@ -199,25 +199,6 @@ Most of the runtime logic for `platformHome` lives inline here rather than in
 If you are changing layout, launch behavior, access-control editing, or helper
 API logic, this is the file you need to read.
 
-### `cloudbeaver.yaml`
-
-This template renders the repo-managed CloudBeaver deployment shape.
-
-It owns behavior that the upstream CloudBeaver image does not know about:
-
-- generation of the main `cloudbeaver.conf`
-- auth-proxy header mapping so browser identity arrives from oauth2-proxy
-- optional workspace PVC creation
-- bootstrap secret handling for initial admin and workspace data
-- optional workspace seed secret injection
-- optional trust-store generation from a provided CA certificate
-- optional shared Trino connection seeding so users arrive with a prebuilt
-  platform connection
-- checksum annotations that force rollout when bootstrap or trust inputs change
-
-Edit this file when you are changing how CloudBeaver is configured or seeded,
-not when you are changing the standalone oauth2-proxy chart behavior.
-
 ### `ranger-admin.yaml`
 
 This template is the runtime shell for Ranger Admin itself.
@@ -308,8 +289,6 @@ Several templates in this folder use Helm `lookup`.
 
 That is deliberate, but it creates an important documentation nuance:
 
-- `cloudbeaver.yaml` inspects existing secrets so checksum annotations reflect
-  the real current secret payload
 - `datahub-auth-secrets.yaml` preserves generated secret material across
   upgrades
 - `datahub-prerequisites-compat.yaml` can copy values out of an existing MySQL
@@ -343,8 +322,8 @@ If you need to:
 - change catalog or Ranger authorization rules: edit
   `authorization-validation.yaml`
 - change the launchpad UI or helper API: edit `platform-home.yaml`
-- change CloudBeaver seeding, trust, or auth-proxy integration: edit
-  `cloudbeaver.yaml`
+- change CloudBeaver seeding, trust, or auth-provider registration: edit
+  `charts/dlh-in-a-box/charts/cloudbeaver/`
 - change Ranger bootstrap scripts: edit `_ranger-admin.tpl`
 - change Ranger runtime shell: edit `ranger-admin.yaml`
 - change role or policy reconciliation: edit `ranger-automation.yaml`

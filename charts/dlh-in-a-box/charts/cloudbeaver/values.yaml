@@ -1,0 +1,112 @@
+enabled: true
+image:
+  repository: dbeaver/cloudbeaver
+  tag: 25.2.5
+  pullPolicy: IfNotPresent
+service:
+  port: 8978
+strategy:
+  type: Recreate
+workspace:
+  persistence:
+    enabled: false
+    size: 10Gi
+    storageClass: ""
+
+serverName: CloudBeaver
+
+# auth.local is the local users login path.
+# auth.proxy is the SSO login path.
+# Both providers can be registered at the same time.
+auth:
+  local:
+    enabled: true
+  proxy:
+    enabled: false
+    userHeader: X-Forwarded-Preferred-Username
+    # CloudBeaver treats this header as a list of existing team ids. The
+    # oauth2-proxy X-Forwarded-Groups header can contain broad OIDC
+    # roles such as offline_access, which breaks CloudBeaver login when those
+    # teams do not exist. Keep this dedicated header unless an upstream proxy
+    # explicitly emits CloudBeaver team ids.
+    groupHeader: X-CloudBeaver-Groups
+    groupDelimiter: "|"
+    firstNameHeader: ""
+    lastNameHeader: ""
+    fullNameHeader: ""
+    # Full sign-out URL. Required when proxy.enabled=true. Without it, CloudBeaver's own Sign
+    # Out only clears its local session, silently leaving the upstream
+    # proxy's SSO session intact.
+    logoutUrl: ""
+
+# Everything under seed.* only takes effect on a genuinely fresh workspace
+# (or after seed.force resets one back to fresh) -- unlike auth.*/app.*,
+# none of this is re-applied by a plain Helm value change + redeploy.
+seed:
+  # Wipes the entire workspace on pod start -- the H2 database,
+  # .cloudbeaver.runtime.conf, everything -- so every seed below (and
+  # h2FreshSchemaPatch) applies as if this were a brand-new install.
+  force: false
+  admin:
+    # Native CloudBeaver admin identity. Always provisioned. Only actually
+    # applied on first boot of a fresh workspace; changing this after
+    # that point has no effect until the workspace is reset via
+    # seed.force=true.
+    username: cbadmin
+    existingSecret: ""
+    passwordSecretKey: password
+  # Seeds CloudBeaver's initial-data.conf teams list. Only applied on first-ever schema creation, same
+  # one-time caveat as seed.admin. Empty list means no file is mounted at all.
+  teams: []
+  # - subjectId: admin
+  #   teamName: Platform Admin
+  #   description: "Administrative access. Has total and full authority."
+  #   permissions: ["admin"]
+  # - subjectId: user
+  #   teamName: Platform User
+  #   description: "Standard user."
+  #   permissions: []
+
+connections:
+  # false (default): Helm never touches data-sources.json. Users manage global
+  # connections entirely through the UI from an empty starting point.
+  # true: data-sources.json is fully overwritten from existingSecret on
+  # every pod start. Helm always wins; any connection created or changed through the
+  # UI since the last deploy is discarded, not merged.
+  manage: false
+  existingSecret: ""
+  dataSourcesKey: data-sources.json
+  # Grants team access to connections, keyed by connection id.
+  # Referenced team ids must already exist (e.g. via seed.teams).
+  permissions: {}
+  # db1: ["platform-user", "platform-admin"]
+
+h2FreshSchemaPatch:
+  enabled: false
+  pluginJar: ""
+
+# Every key in this secret is imported by CloudBeaver at startup
+# into its own trust store, and every
+# JDBC/DB connection inherits it automatically.
+# https://github.com/dbeaver/cloudbeaver/wiki/SSL-Configuration
+trustedCerts:
+  existingSecret: ""
+
+app:
+  # Passed through verbatim into CloudBeaver's own app: {} config, written
+  # to cloudbeaver.runtime.conf and force-reapplied to the workspace on
+  # every pod start -- Helm values always win over persisted or
+  # admin-UI-edited state (see templates/configmap.yaml). Any key from
+  # CloudBeaver's Server-configuration docs is valid here; anything unset
+  # falls back to CloudBeaver's own built-in default. A few auth-wiring
+  # keys are always chart-derived from auth.* and override anything set
+  # here (see templates/configmap.yaml).
+  config: {}
+
+# Raw Kubernetes EnvVar entries appended to the cloudbeaver container, e.g.
+# to reach the CLOUDBEAVER_* placeholders already baked into
+# cloudbeaver.conf's server block (session/password policy, devMode):
+# extraEnv:
+#   - name: CLOUDBEAVER_EXPIRE_SESSION_AFTER_PERIOD
+#     value: "3600000"
+extraEnv: []
