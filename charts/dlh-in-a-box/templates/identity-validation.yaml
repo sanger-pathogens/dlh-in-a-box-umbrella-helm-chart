@@ -14,6 +14,7 @@
 {{- $trinoIdentity := get $clients "trino" | default dict -}}
 {{- $trinoDirectGrantIdentity := get $clients "trinoDirectGrant" | default dict -}}
 {{- $supersetIdentity := get $clients "superset" | default dict -}}
+{{- $supersetTrinoUsersIdentity := get $clients "supersetTrinoUsers" | default dict -}}
 {{- $datahubIdentity := get $clients "datahub" | default dict -}}
 {{- $platformHomeIdentity := get $clients "platformHome" | default dict -}}
 {{- $jupyterhubIdentity := get $clients "jupyterhub" | default dict -}}
@@ -58,8 +59,8 @@
 {{- $keycloakProvider := get $provider "keycloak" | default dict -}}
 {{- $keycloakRegistration := get $keycloakProvider "registration" | default dict -}}
 {{- $configCliEnvSecretName := default "" $keycloakProvider.configCliEnvExistingSecret -}}
-{{- $hasSupersetOauthClientId := false -}}
 {{- $hasSupersetOauthClientSecret := false -}}
+{{- $hasTrinoUserOauthClientSecret := false -}}
 {{- $supportedAccessModelApps := list "superset" "datahub" "trinoUi" "jupyterhub" "cloudbeaver" "prefect" "ranger" "keycloak" "minio" -}}
 {{- $accessModelRoleKeys := dict -}}
 {{- $accessModelAppAccess := dict -}}
@@ -128,14 +129,11 @@
 {{- fail "global.identity.external.oidc.rolesClaim must not be empty when shared identity is enabled." -}}
 {{- end -}}
 {{- range $env := $supersetExtraEnvRaw -}}
-  {{- if eq (get $env "name") "OAUTH_CLIENT_ID" -}}
-    {{- $hasSupersetOauthClientId = true -}}
-    {{- if and (get $supersetIdentity "clientId") (get $env "value") (ne (get $env "value") (get $supersetIdentity "clientId")) -}}
-      {{- fail "superset.extraEnvRaw OAUTH_CLIENT_ID must match global.identity.external.clients.superset.clientId." -}}
-    {{- end -}}
-  {{- end -}}
   {{- if eq (get $env "name") "OAUTH_CLIENT_SECRET" -}}
     {{- $hasSupersetOauthClientSecret = true -}}
+  {{- end -}}
+  {{- if eq (get $env "name") "TRINO_USER_OAUTH_CLIENT_SECRET" -}}
+    {{- $hasTrinoUserOauthClientSecret = true -}}
   {{- end -}}
 {{- end -}}
 
@@ -196,7 +194,7 @@
 {{- if and (default false $identity.enabled) (eq $providerMode "bundledKeycloak") (ne (default "" (get $keycloakConfigCli "extraEnvVarsSecret")) $configCliEnvSecretName) -}}
 {{- fail "keycloak.keycloakConfigCli.extraEnvVarsSecret must match global.identity.provider.keycloak.configCliEnvExistingSecret." -}}
 {{- end -}}
-{{- range $clientName := list "trino" "superset" "datahub" "platformHome" "minio" "vault" "jupyterhub" "cloudbeaverProxy" "rangerProxy" "prefectProxy" -}}
+{{- range $clientName := list "trino" "superset" "supersetTrinoUsers" "datahub" "platformHome" "minio" "vault" "jupyterhub" "cloudbeaverProxy" "rangerProxy" "prefectProxy" -}}
   {{- $client := get $clients $clientName | default dict -}}
   {{- if and (eq $providerMode "bundledKeycloak") (default false (get $client "enabled")) -}}
     {{- $redirectUris := get $client "redirectUris" | default list -}}
@@ -223,9 +221,6 @@
 {{- end -}}
 {{- if and (get $supersetIdentity "enabled") (not .Values.superset.enabled) -}}
 {{- fail "global.identity.external.clients.superset.enabled requires superset.enabled=true." -}}
-{{- end -}}
-{{- if and (get $supersetIdentity "enabled") (not $hasSupersetOauthClientId) -}}
-{{- fail "superset.extraEnvRaw must project OAUTH_CLIENT_ID when global.identity.external.clients.superset.enabled=true." -}}
 {{- end -}}
 {{- if and (get $supersetIdentity "enabled") (not $hasSupersetOauthClientSecret) -}}
 {{- fail "superset.extraEnvRaw must project OAUTH_CLIENT_SECRET when global.identity.external.clients.superset.enabled=true." -}}
@@ -256,6 +251,36 @@
   {{- end -}}
   {{- if not $hasSupersetCallback -}}
     {{- fail (printf "global.identity.external.clients.superset.redirectUris must include the Superset OAuth callback URL ending in %s, which Flask-AppBuilder derives from global.identity.external.clients.superset.providerName." $supersetCallbackPath) -}}
+  {{- end -}}
+{{- end -}}
+{{- if and (get $supersetTrinoUsersIdentity "enabled") (not .Values.superset.enabled) -}}
+{{- fail "global.identity.external.clients.supersetTrinoUsers.enabled requires superset.enabled=true." -}}
+{{- end -}}
+{{- /*
+  The client's audience mapper stamps the Trino client id into its tokens, so
+  the Trino client has to exist for those tokens to name an audience Trino
+  will accept.
+*/ -}}
+{{- if and (get $supersetTrinoUsersIdentity "enabled") (not (get $trinoIdentity "enabled")) -}}
+{{- fail "global.identity.external.clients.supersetTrinoUsers.enabled requires global.identity.external.clients.trino.enabled=true, whose clientId is the audience Superset's per-user tokens carry." -}}
+{{- end -}}
+{{- if and (get $supersetTrinoUsersIdentity "enabled") (not (default "" (get $supersetTrinoUsersIdentity "engineName"))) -}}
+{{- fail "global.identity.external.clients.supersetTrinoUsers.engineName must not be empty; Superset keys DATABASE_OAUTH2_CLIENTS by the database engine name." -}}
+{{- end -}}
+{{- if and (get $supersetTrinoUsersIdentity "enabled") (not $hasTrinoUserOauthClientSecret) -}}
+{{- fail "superset.extraEnvRaw must project TRINO_USER_OAUTH_CLIENT_SECRET when global.identity.external.clients.supersetTrinoUsers.enabled=true." -}}
+{{- end -}}
+{{- /*
+  Superset advertises redirectUrl to Keycloak as DATABASE_OAUTH2_REDIRECT_URI,
+  and Keycloak matches redirect URIs by exact string -- trailing slash and all
+  -- so the two values have to agree and the URL has to be registered.
+*/ -}}
+{{- if and (get $supersetTrinoUsersIdentity "enabled") (not (default "" (get $supersetTrinoUsersIdentity "redirectUrl"))) -}}
+{{- fail "global.identity.external.clients.supersetTrinoUsers.redirectUrl is required when Superset per-user Trino OAuth is enabled; it is Superset's DATABASE_OAUTH2_REDIRECT_URI." -}}
+{{- end -}}
+{{- if and (get $supersetTrinoUsersIdentity "enabled") (default "" (get $supersetTrinoUsersIdentity "redirectUrl")) -}}
+  {{- if not (has (get $supersetTrinoUsersIdentity "redirectUrl") (get $supersetTrinoUsersIdentity "redirectUris" | default list)) -}}
+    {{- fail "global.identity.external.clients.supersetTrinoUsers.redirectUrl must also be present in redirectUris." -}}
   {{- end -}}
 {{- end -}}
 {{- if and (get $datahubIdentity "enabled") (not .Values.datahub.enabled) -}}

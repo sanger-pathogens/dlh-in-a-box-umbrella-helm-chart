@@ -238,6 +238,43 @@
                     }
                   ]
                 },
+                "supersetTrinoUsers": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "properties": {
+                    "enabled": { "type": "boolean" },
+                    "clientId": { "type": "string" },
+                    "existingSecret": { "type": "string" },
+                    "clientSecretKey": { "type": "string" },
+                    "redirectUris": {
+                      "type": "array",
+                      "items": { "type": "string" }
+                    },
+                    "webOrigins": {
+                      "type": "array",
+                      "items": { "type": "string" }
+                    },
+                    "redirectUrl": { "type": "string" },
+                    "engineName": { "type": "string" },
+                    "scope": { "type": "string" }
+                  },
+                  "allOf": [
+                    {
+                      "if": {
+                        "properties": { "enabled": { "const": true } },
+                        "required": ["enabled"]
+                      },
+                      "then": {
+                        "required": [
+                          "clientId",
+                          "existingSecret",
+                          "redirectUrl",
+                          "engineName"
+                        ]
+                      }
+                    }
+                  ]
+                },
                 "datahub": {
                   "type": "object",
                   "additionalProperties": true,

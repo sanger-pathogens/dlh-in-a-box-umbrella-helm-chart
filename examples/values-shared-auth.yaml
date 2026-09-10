@@ -259,8 +259,6 @@ superset:
     create: false
   envFromSecret: superset-runtime-secrets
   extraEnvRaw:
-    - name: OAUTH_CLIENT_ID
-      value: dlh-superset
     - name: OAUTH_CLIENT_SECRET
       valueFrom:
         secretKeyRef:

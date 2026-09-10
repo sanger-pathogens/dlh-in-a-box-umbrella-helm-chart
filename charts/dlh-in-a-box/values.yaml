@@ -94,6 +94,28 @@ global:
           userInfoUrl: ""
           icon: fa-openid
           roleKeysPath: role_keys
+        # Per-user OAuth for Superset's Trino database connection, kept apart
+        # from the browser-login client above. Tokens minted here carry
+        # aud=<trino clientId> and are presented to Trino as the logged-in
+        # user, so Ranger sees a real identity rather than one shared service
+        # account. Superset holds each user's token in its metadata database,
+        # which is why this client is deliberately scoped to nothing else.
+        supersetTrinoUsers:
+          enabled: false
+          clientId: ""
+          existingSecret: dlh-oidc-clients
+          clientSecretKey: supersetTrinoUsersClientSecret
+          redirectUris: []
+          webOrigins: []
+          # Superset's database-OAuth callback. Keycloak matches redirect URIs
+          # exactly, so this must appear verbatim in redirectUris -- trailing
+          # slash included -- and is what Superset advertises as
+          # DATABASE_OAUTH2_REDIRECT_URI.
+          redirectUrl: ""
+          # Key Superset looks DATABASE_OAUTH2_CLIENTS up by: the engine's
+          # name, not its driver string, so "Trino" rather than "trino".
+          engineName: Trino
+          scope: openid profile email
         datahub:
           enabled: false
           provider: other
@@ -1142,6 +1164,30 @@ superset:
     image:
       repository: bitnamilegacy/redis
   configOverrides:
+    # Per-user OAuth for database connections, distinct from OAUTH_PROVIDERS
+    # above: that governs who may log into Superset, this governs the identity
+    # Superset presents to Trino. On the first query Trino answers 401,
+    # Superset walks the user through this client, stores the resulting tokens
+    # per user, and retries with `Authorization: Bearer ...`, so Trino and
+    # Ranger see the real user. The authorization URI is browser-facing; the
+    # token exchange is server-side and stays inside the cluster.
+    enable_database_oauth: |
+      {{- if .Values.global.identity.external.clients.supersetTrinoUsers.enabled }}
+      import os
+
+      DATABASE_OAUTH2_CLIENTS = {
+          {{ .Values.global.identity.external.clients.supersetTrinoUsers.engineName | quote }}: {
+              "id": {{ .Values.global.identity.external.clients.supersetTrinoUsers.clientId | quote }},
+              "secret": os.environ["TRINO_USER_OAUTH_CLIENT_SECRET"],
+              "scope": {{ .Values.global.identity.external.clients.supersetTrinoUsers.scope | quote }},
+              "authorization_request_uri": {{ include "dlh-in-a-box.identity.authorizeUrl" $ | quote }},
+              "token_request_uri": {{ include "dlh-in-a-box.identity.internalAccessTokenUrl" $ | quote }},
+              "request_content_type": "data",
+          },
+      }
+
+      DATABASE_OAUTH2_REDIRECT_URI = {{ .Values.global.identity.external.clients.supersetTrinoUsers.redirectUrl | quote }}
+      {{- end }}
     enable_oauth: |
       {{- if .Values.global.identity.external.clients.superset.enabled }}
       import os
@@ -1169,7 +1215,7 @@ superset:
               "icon": {{ .Values.global.identity.external.clients.superset.icon | quote }},
               "token_key": "access_token",
               "remote_app": {
-                  "client_id": os.environ.get("OAUTH_CLIENT_ID"),
+                  "client_id": {{ .Values.global.identity.external.clients.superset.clientId | quote }},
                   "client_secret": os.environ.get("OAUTH_CLIENT_SECRET"),
                   "api_base_url": {{ include "dlh-in-a-box.identity.internalApiBaseUrl" $ | quote }},
                   "client_kwargs": {
