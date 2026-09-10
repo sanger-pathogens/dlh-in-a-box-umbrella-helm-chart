@@ -194,7 +194,11 @@
 {{- if and (default false $identity.enabled) (eq $providerMode "bundledKeycloak") (ne (default "" (get $keycloakConfigCli "extraEnvVarsSecret")) $configCliEnvSecretName) -}}
 {{- fail "keycloak.keycloakConfigCli.extraEnvVarsSecret must match global.identity.provider.keycloak.configCliEnvExistingSecret." -}}
 {{- end -}}
-{{- range $clientName := list "trino" "superset" "supersetTrinoUsers" "datahub" "platformHome" "minio" "vault" "jupyterhub" "cloudbeaverProxy" "rangerProxy" "prefectProxy" -}}
+{{- /*
+  supersetTrinoUsers is absent by design: the chart derives its redirect URI
+  and web origin, so there is nothing here for an operator to get wrong.
+*/ -}}
+{{- range $clientName := list "trino" "superset" "datahub" "platformHome" "minio" "vault" "jupyterhub" "cloudbeaverProxy" "rangerProxy" "prefectProxy" -}}
   {{- $client := get $clients $clientName | default dict -}}
   {{- if and (eq $providerMode "bundledKeycloak") (default false (get $client "enabled")) -}}
     {{- $redirectUris := get $client "redirectUris" | default list -}}
@@ -264,24 +268,16 @@
 {{- if and (get $supersetTrinoUsersIdentity "enabled") (not (get $trinoIdentity "enabled")) -}}
 {{- fail "global.identity.external.clients.supersetTrinoUsers.enabled requires global.identity.external.clients.trino.enabled=true, whose clientId is the audience Superset's per-user tokens carry." -}}
 {{- end -}}
-{{- if and (get $supersetTrinoUsersIdentity "enabled") (not (default "" (get $supersetTrinoUsersIdentity "engineName"))) -}}
-{{- fail "global.identity.external.clients.supersetTrinoUsers.engineName must not be empty; Superset keys DATABASE_OAUTH2_CLIENTS by the database engine name." -}}
-{{- end -}}
 {{- if and (get $supersetTrinoUsersIdentity "enabled") (not $hasTrinoUserOauthClientSecret) -}}
 {{- fail "superset.extraEnvRaw must project TRINO_USER_OAUTH_CLIENT_SECRET when global.identity.external.clients.supersetTrinoUsers.enabled=true." -}}
 {{- end -}}
 {{- /*
-  Superset advertises redirectUrl to Keycloak as DATABASE_OAUTH2_REDIRECT_URI,
-  and Keycloak matches redirect URIs by exact string -- trailing slash and all
-  -- so the two values have to agree and the URL has to be registered.
+  The redirect URI and web origin are derived from Superset's browser-facing
+  origin, so the only way to get them wrong is to leave that origin
+  underivable -- no ingress host, and no externalUrl to stand in for it.
 */ -}}
-{{- if and (get $supersetTrinoUsersIdentity "enabled") (not (default "" (get $supersetTrinoUsersIdentity "redirectUrl"))) -}}
-{{- fail "global.identity.external.clients.supersetTrinoUsers.redirectUrl is required when Superset per-user Trino OAuth is enabled; it is Superset's DATABASE_OAUTH2_REDIRECT_URI." -}}
-{{- end -}}
-{{- if and (get $supersetTrinoUsersIdentity "enabled") (default "" (get $supersetTrinoUsersIdentity "redirectUrl")) -}}
-  {{- if not (has (get $supersetTrinoUsersIdentity "redirectUrl") (get $supersetTrinoUsersIdentity "redirectUris" | default list)) -}}
-    {{- fail "global.identity.external.clients.supersetTrinoUsers.redirectUrl must also be present in redirectUris." -}}
-  {{- end -}}
+{{- if and (get $supersetTrinoUsersIdentity "enabled") (not (include "dlh-in-a-box.superset.externalUrl" .)) -}}
+{{- fail "global.identity.external.clients.supersetTrinoUsers.enabled requires a browser-facing Superset URL: set superset.ingress.hosts, or global.identity.external.clients.supersetTrinoUsers.externalUrl when the public URL is not the ingress host." -}}
 {{- end -}}
 {{- if and (get $datahubIdentity "enabled") (not .Values.datahub.enabled) -}}
 {{- fail "global.identity.external.clients.datahub.enabled requires datahub.enabled=true." -}}

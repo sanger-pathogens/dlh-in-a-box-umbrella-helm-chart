@@ -246,17 +246,7 @@
                     "clientId": { "type": "string" },
                     "existingSecret": { "type": "string" },
                     "clientSecretKey": { "type": "string" },
-                    "redirectUris": {
-                      "type": "array",
-                      "items": { "type": "string" }
-                    },
-                    "webOrigins": {
-                      "type": "array",
-                      "items": { "type": "string" }
-                    },
-                    "redirectUrl": { "type": "string" },
-                    "engineName": { "type": "string" },
-                    "scope": { "type": "string" }
+                    "externalUrl": { "type": "string" }
                   },
                   "allOf": [
                     {
@@ -265,12 +255,7 @@
                         "required": ["enabled"]
                       },
                       "then": {
-                        "required": [
-                          "clientId",
-                          "existingSecret",
-                          "redirectUrl",
-                          "engineName"
-                        ]
+                        "required": ["clientId", "existingSecret"]
                       }
                     }
                   ]

@@ -105,17 +105,10 @@ global:
           clientId: ""
           existingSecret: dlh-oidc-clients
           clientSecretKey: supersetTrinoUsersClientSecret
-          redirectUris: []
-          webOrigins: []
-          # Superset's database-OAuth callback. Keycloak matches redirect URIs
-          # exactly, so this must appear verbatim in redirectUris -- trailing
-          # slash included -- and is what Superset advertises as
-          # DATABASE_OAUTH2_REDIRECT_URI.
-          redirectUrl: ""
-          # Key Superset looks DATABASE_OAUTH2_CLIENTS up by: the engine's
-          # name, not its driver string, so "Trino" rather than "trino".
-          engineName: Trino
-          scope: openid profile email
+          # Superset's browser-facing origin, e.g. https://superset.example.org.
+          # Leave empty to take it from superset.ingress; set it only where the
+          # public URL is not the ingress host.
+          externalUrl: ""
         datahub:
           enabled: false
           provider: other
@@ -1176,17 +1169,20 @@ superset:
       import os
 
       DATABASE_OAUTH2_CLIENTS = {
-          {{ .Values.global.identity.external.clients.supersetTrinoUsers.engineName | quote }}: {
+          # Keyed by the engine's name, which is how Superset looks this up --
+          # "Trino", not the driver string "trino".
+          "Trino": {
               "id": {{ .Values.global.identity.external.clients.supersetTrinoUsers.clientId | quote }},
               "secret": os.environ["TRINO_USER_OAUTH_CLIENT_SECRET"],
-              "scope": {{ .Values.global.identity.external.clients.supersetTrinoUsers.scope | quote }},
+              # openid is required for the exchange.
+              "scope": "openid profile email",
               "authorization_request_uri": {{ include "dlh-in-a-box.identity.authorizeUrl" $ | quote }},
               "token_request_uri": {{ include "dlh-in-a-box.identity.internalAccessTokenUrl" $ | quote }},
               "request_content_type": "data",
           },
       }
 
-      DATABASE_OAUTH2_REDIRECT_URI = {{ .Values.global.identity.external.clients.supersetTrinoUsers.redirectUrl | quote }}
+      DATABASE_OAUTH2_REDIRECT_URI = {{ include "dlh-in-a-box.superset.databaseOauthRedirectUrl" $ | quote }}
       {{- end }}
     enable_oauth: |
       {{- if .Values.global.identity.external.clients.superset.enabled }}
