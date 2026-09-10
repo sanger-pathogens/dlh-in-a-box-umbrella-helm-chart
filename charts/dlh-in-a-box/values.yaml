@@ -21,6 +21,11 @@ global:
     accessRoles:
       platform-admin:
         enabled: false
+        # appAccess opens the door; appRoles says what you are once inside.
+        # Only apps with their own role model appear here.
+        appRoles:
+          superset:
+            - Admin
         appAccess:
           superset: true
           datahub: true
@@ -1117,11 +1122,6 @@ datahubPrerequisites:
 
 superset:
   enabled: false
-  auth:
-    roleMappings:
-      Gamma: []
-      Alpha: []
-      Admin: []
   image:
     repository: apache/superset
   bootstrapScript: |
@@ -1196,10 +1196,15 @@ superset:
       ROLES_CLAIM = {{ .Values.global.identity.external.oidc.rolesClaim | quote }}
       PROVIDER_NAME = {{ .Values.global.identity.external.clients.superset.providerName | quote }}
       USERINFO_URL = {{ include "dlh-in-a-box.identity.internalUserInfoUrl" $ | quote }}
+      # Keyed by platform role, so the
+      # Keycloak role a user carries maps straight to the Superset roles it
+      # grants. `superset init` rewrites those built-ins from code on every upgrade, so
+      # capabilities are granted by listing roles here, never by editing them.
       AUTH_ROLES_MAPPING = {
-      {{- range $supersetRole, $platformRoles := .Values.auth.roleMappings }}
-        {{- range $platformRole := $platformRoles }}
-        {{ $platformRole | quote }}: ["{{ $supersetRole }}"],
+      {{- range $platformRole, $roleSpec := .Values.global.identity.accessRoles }}
+        {{- $supersetRoles := dig "appRoles" "superset" (list) ($roleSpec | default dict) }}
+        {{- if $supersetRoles }}
+        {{ $platformRole | quote }}: {{ toJson $supersetRoles }},
         {{- end }}
       {{- end }}
       }

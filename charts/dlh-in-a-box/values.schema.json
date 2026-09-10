@@ -48,6 +48,21 @@
             "keycloak": { "type": "boolean" },
             "minio": { "type": "boolean" }
           }
+        },
+        "appRoles": {
+          "type": "object",
+          "additionalProperties": false,
+          "description": "Roles this platform role receives inside an app, where appAccess only grants entry. Listed per app; only apps with an internal role model appear here.",
+          "properties": {
+            "superset": {
+              "type": "array",
+              "uniqueItems": true,
+              "description": "Superset built-in roles. Alpha and Gamma set data reach, Admin adds platform administration, and sql_lab is a separate capability rather than a rung on that ladder.",
+              "items": {
+                "enum": ["Admin", "Alpha", "Gamma", "sql_lab"]
+              }
+            }
+          }
         }
       }
     },
@@ -1418,20 +1433,7 @@
       "type": "object",
       "additionalProperties": true,
       "properties": {
-        "enabled": { "type": "boolean" },
-        "auth": {
-          "type": "object",
-          "additionalProperties": true,
-          "properties": {
-            "roleMappings": {
-              "type": "object",
-              "additionalProperties": {
-                "type": "array",
-                "items": { "type": "string" }
-              }
-            }
-          }
-        }
+        "enabled": { "type": "boolean" }
       }
     },
     "hive": {

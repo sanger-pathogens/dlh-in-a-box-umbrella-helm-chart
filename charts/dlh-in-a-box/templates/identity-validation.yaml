@@ -107,6 +107,16 @@
     {{- if hasKey $role "ranger" -}}
       {{- fail (printf "global.identity.accessRoles.%s.ranger is not supported. Keycloak roles control app access only; define Ranger data roles under global.authorization.ranger.dataRoles.roles." $roleKey) -}}
     {{- end -}}
+    {{- /*
+      appRoles says what a role is inside an app; appAccess says whether it may
+      open the app at all. Roles granted to someone who cannot reach the app
+      never take effect, so treat the combination as the authoring slip it is.
+    */ -}}
+    {{- range $appName, $appRoleList := get $role "appRoles" | default dict -}}
+      {{- if and $appRoleList (not (dig "appAccess" $appName false ($role | default dict))) -}}
+        {{- fail (printf "global.identity.accessRoles.%s.appRoles.%s is set but appAccess.%s is not true, so the role could never reach %s to use them." $roleKey $appName $appName $appName) -}}
+      {{- end -}}
+    {{- end -}}
     {{- range $appName, $_ := get $role "appAccess" | default dict -}}
       {{- if not (has $appName $supportedAccessModelApps) -}}
         {{- fail (printf "global.identity.accessRoles.%s.appAccess.%s is not supported. Allowed app access keys are superset, datahub, trinoUi, jupyterhub, cloudbeaver, prefect, ranger, keycloak, and minio." $roleKey $appName) -}}
