@@ -85,8 +85,11 @@ global:
           clientId: ""
           existingSecret: dlh-oidc-clients
           clientSecretKey: supersetClientSecret
-          redirectUris: []
-          webOrigins: []
+          # Superset's browser-facing origin, e.g. https://superset.example.org.
+          # Leave empty to take it from superset.ingress; set it only where the
+          # public URL is not the ingress host. The login callback and the
+          # database-OAuth callback are both derived from this.
+          externalUrl: ""
           authorizeUrl: ""
           accessTokenUrl: ""
           apiBaseUrl: ""
@@ -105,10 +108,6 @@ global:
           clientId: ""
           existingSecret: dlh-oidc-clients
           clientSecretKey: supersetTrinoUsersClientSecret
-          # Superset's browser-facing origin, e.g. https://superset.example.org.
-          # Leave empty to take it from superset.ingress; set it only where the
-          # public URL is not the ingress host.
-          externalUrl: ""
         datahub:
           enabled: false
           provider: other

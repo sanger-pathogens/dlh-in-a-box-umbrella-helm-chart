@@ -195,10 +195,11 @@
 {{- fail "keycloak.keycloakConfigCli.extraEnvVarsSecret must match global.identity.provider.keycloak.configCliEnvExistingSecret." -}}
 {{- end -}}
 {{- /*
-  supersetTrinoUsers is absent by design: the chart derives its redirect URI
-  and web origin, so there is nothing here for an operator to get wrong.
+  Both Superset clients are absent by design: the chart derives their redirect
+  URIs and web origins from Superset's own origin, so there is nothing here for
+  an operator to get wrong.
 */ -}}
-{{- range $clientName := list "trino" "superset" "datahub" "platformHome" "minio" "vault" "jupyterhub" "cloudbeaverProxy" "rangerProxy" "prefectProxy" -}}
+{{- range $clientName := list "trino" "datahub" "platformHome" "minio" "vault" "jupyterhub" "cloudbeaverProxy" "rangerProxy" "prefectProxy" -}}
   {{- $client := get $clients $clientName | default dict -}}
   {{- if and (eq $providerMode "bundledKeycloak") (default false (get $client "enabled")) -}}
     {{- $redirectUris := get $client "redirectUris" | default list -}}
@@ -232,31 +233,6 @@
 {{- if and (get $supersetIdentity "enabled") (not (default "" (get $supersetIdentity "providerName"))) -}}
 {{- fail "global.identity.external.clients.superset.providerName must not be empty; Flask-AppBuilder builds the Superset OAuth callback path from it." -}}
 {{- end -}}
-{{- /*
-  Flask-AppBuilder serves the Superset OAuth callback at
-  /oauth-authorized/<providerName>, so the registered Keycloak redirect URI has
-  to carry that exact suffix. Nothing links the two values at runtime: a drifted
-  providerName fails on the outbound leg with Keycloak's "Invalid parameter:
-  redirect_uri" and leaves no trace in Superset's logs, so catch it at render
-  time instead. This applies in every provider mode -- bundledKeycloak consumes
-  redirectUris directly, and under externalOidc they are still the contract an
-  external Keycloak admin registers by hand. Only non-empty lists are checked,
-  because externalOidc deployments may legitimately leave them unset. Wildcard
-  entries are accepted because Keycloak expands them -- the loop above already
-  confines those to local environments.
-*/ -}}
-{{- if and (get $supersetIdentity "enabled") (get $supersetIdentity "providerName") (gt (len (get $supersetIdentity "redirectUris" | default list)) 0) -}}
-  {{- $supersetCallbackPath := printf "/oauth-authorized/%s" (get $supersetIdentity "providerName") -}}
-  {{- $hasSupersetCallback := false -}}
-  {{- range $uri := (get $supersetIdentity "redirectUris" | default list) -}}
-    {{- if or (hasSuffix $supersetCallbackPath (toString $uri)) (contains "*" (toString $uri)) -}}
-      {{- $hasSupersetCallback = true -}}
-    {{- end -}}
-  {{- end -}}
-  {{- if not $hasSupersetCallback -}}
-    {{- fail (printf "global.identity.external.clients.superset.redirectUris must include the Superset OAuth callback URL ending in %s, which Flask-AppBuilder derives from global.identity.external.clients.superset.providerName." $supersetCallbackPath) -}}
-  {{- end -}}
-{{- end -}}
 {{- if and (get $supersetTrinoUsersIdentity "enabled") (not .Values.superset.enabled) -}}
 {{- fail "global.identity.external.clients.supersetTrinoUsers.enabled requires superset.enabled=true." -}}
 {{- end -}}
@@ -276,8 +252,8 @@
   origin, so the only way to get them wrong is to leave that origin
   underivable -- no ingress host, and no externalUrl to stand in for it.
 */ -}}
-{{- if and (get $supersetTrinoUsersIdentity "enabled") (not (include "dlh-in-a-box.superset.externalUrl" .)) -}}
-{{- fail "global.identity.external.clients.supersetTrinoUsers.enabled requires a browser-facing Superset URL: set superset.ingress.hosts, or global.identity.external.clients.supersetTrinoUsers.externalUrl when the public URL is not the ingress host." -}}
+{{- if and (or (get $supersetIdentity "enabled") (get $supersetTrinoUsersIdentity "enabled")) (not (include "dlh-in-a-box.superset.externalUrl" .)) -}}
+{{- fail "Superset's OIDC clients need a browser-facing Superset URL to derive their callbacks from: set superset.ingress.hosts, or global.identity.external.clients.superset.externalUrl when the public URL is not the ingress host." -}}
 {{- end -}}
 {{- if and (get $datahubIdentity "enabled") (not .Values.datahub.enabled) -}}
 {{- fail "global.identity.external.clients.datahub.enabled requires datahub.enabled=true." -}}

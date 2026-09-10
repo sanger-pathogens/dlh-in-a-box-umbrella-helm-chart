@@ -202,14 +202,7 @@
                     "clientId": { "type": "string" },
                     "existingSecret": { "type": "string" },
                     "clientSecretKey": { "type": "string" },
-                    "redirectUris": {
-                      "type": "array",
-                      "items": { "type": "string" }
-                    },
-                    "webOrigins": {
-                      "type": "array",
-                      "items": { "type": "string" }
-                    },
+                    "externalUrl": { "type": "string" },
                     "authorizeUrl": { "type": "string" },
                     "accessTokenUrl": { "type": "string" },
                     "apiBaseUrl": { "type": "string" },
@@ -245,8 +238,7 @@
                     "enabled": { "type": "boolean" },
                     "clientId": { "type": "string" },
                     "existingSecret": { "type": "string" },
-                    "clientSecretKey": { "type": "string" },
-                    "externalUrl": { "type": "string" }
+                    "clientSecretKey": { "type": "string" }
                   },
                   "allOf": [
                     {

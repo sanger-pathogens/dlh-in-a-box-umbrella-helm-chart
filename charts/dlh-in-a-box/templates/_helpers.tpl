@@ -410,7 +410,7 @@ app.kubernetes.io/managed-by: {{ .Release.Service }}
 */ -}}
 {{- define "dlh-in-a-box.superset.externalUrl" -}}
 {{- $identity := (.Values.global | default dict).identity | default dict -}}
-{{- $client := dig "external" "clients" "supersetTrinoUsers" dict $identity -}}
+{{- $client := dig "external" "clients" "superset" dict $identity -}}
 {{- $override := default "" (get $client "externalUrl") -}}
 {{- if $override -}}
 {{- trimSuffix "/" $override -}}
@@ -431,4 +431,15 @@ app.kubernetes.io/managed-by: {{ .Release.Service }}
 */ -}}
 {{- define "dlh-in-a-box.superset.databaseOauthRedirectUrl" -}}
 {{- printf "%s/api/v1/database/oauth2/" (include "dlh-in-a-box.superset.externalUrl" .) -}}
+{{- end -}}
+
+{{- /*
+  Flask-AppBuilder serves the login callback at /oauth-authorized/<provider>,
+  naming it after the entry in OAUTH_PROVIDERS. Deriving it here keeps the
+  registered redirect URI and providerName from drifting apart.
+*/ -}}
+{{- define "dlh-in-a-box.superset.loginRedirectUrl" -}}
+{{- $identity := (.Values.global | default dict).identity | default dict -}}
+{{- $client := dig "external" "clients" "superset" dict $identity -}}
+{{- printf "%s/oauth-authorized/%s" (include "dlh-in-a-box.superset.externalUrl" .) (get $client "providerName") -}}
 {{- end -}}
