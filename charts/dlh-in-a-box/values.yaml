@@ -474,6 +474,15 @@ keycloak:
       existingSecret: dlh-keycloak-postgresql
   ingress:
     enabled: false
+    annotations:
+      # Keycloak answers an authorization request by setting KC_RESTART, a
+      # cookie carrying the whole original request so the flow can be resumed
+      # -- the OAuth `state` included. Superset's database-OAuth state is a
+      # JWT, which pushes the response headers past ingress-nginx's 4k default
+      # and makes it reject Keycloak's reply with "upstream sent too big
+      # header", surfaced to the user as a 502 on the login page.
+      nginx.ingress.kubernetes.io/proxy-buffer-size: "16k"
+      nginx.ingress.kubernetes.io/proxy-buffers-number: "4"
 
 platformHome:
   enabled: false
