@@ -13,6 +13,8 @@ charts/dlh-in-a-box/charts/**/*.tgz
 *.log
 dist/
 node_modules/
+__pycache__/
+*.pyc
 
 # Local reference repositories (not part of the packaged chart)
 reference/
