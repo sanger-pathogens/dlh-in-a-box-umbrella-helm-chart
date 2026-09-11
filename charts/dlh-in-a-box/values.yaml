@@ -21,6 +21,11 @@ global:
     accessRoles:
       platform-admin:
         enabled: false
+        # appAccess opens the door; appRoles says what you are once inside.
+        # Only apps with their own role model appear here.
+        appRoles:
+          superset:
+            - Admin
         appAccess:
           superset: true
           datahub: true
@@ -85,8 +90,11 @@ global:
           clientId: ""
           existingSecret: dlh-oidc-clients
           clientSecretKey: supersetClientSecret
-          redirectUris: []
-          webOrigins: []
+          # Superset's browser-facing origin, e.g. https://superset.example.org.
+          # Leave empty to take it from superset.ingress; set it only where the
+          # public URL is not the ingress host. The login callback and the
+          # database-OAuth callback are both derived from this.
+          externalUrl: ""
           authorizeUrl: ""
           accessTokenUrl: ""
           apiBaseUrl: ""
@@ -94,6 +102,17 @@ global:
           userInfoUrl: ""
           icon: fa-openid
           roleKeysPath: role_keys
+        # Per-user OAuth for Superset's Trino database connection, kept apart
+        # from the browser-login client above. Tokens minted here carry
+        # aud=<trino clientId> and are presented to Trino as the logged-in
+        # user, so Ranger sees a real identity rather than one shared service
+        # account. Superset holds each user's token in its metadata database,
+        # which is why this client is deliberately scoped to nothing else.
+        supersetTrinoUsers:
+          enabled: false
+          clientId: ""
+          existingSecret: dlh-oidc-clients
+          clientSecretKey: supersetTrinoUsersClientSecret
         datahub:
           enabled: false
           provider: other
@@ -1103,11 +1122,6 @@ datahubPrerequisites:
 
 superset:
   enabled: false
-  auth:
-    roleMappings:
-      Gamma: []
-      Alpha: []
-      Admin: []
   image:
     repository: apache/superset
   bootstrapScript: |
@@ -1142,10 +1156,36 @@ superset:
     image:
       repository: bitnamilegacy/redis
   configOverrides:
+    # Per-user OAuth for database connections, distinct from OAUTH_PROVIDERS
+    # above: that governs who may log into Superset, this governs the identity
+    # Superset presents to Trino. On the first query Trino answers 401,
+    # Superset walks the user through this client, stores the resulting tokens
+    # per user, and retries with `Authorization: Bearer ...`, so Trino and
+    # Ranger see the real user. The authorization URI is browser-facing; the
+    # token exchange is server-side and stays inside the cluster.
+    enable_database_oauth: |
+      {{- if .Values.global.identity.external.clients.supersetTrinoUsers.enabled }}
+      import os
+
+      DATABASE_OAUTH2_CLIENTS = {
+          # Keyed by the engine's name, which is how Superset looks this up --
+          # "Trino", not the driver string "trino".
+          "Trino": {
+              "id": {{ .Values.global.identity.external.clients.supersetTrinoUsers.clientId | quote }},
+              "secret": os.environ["TRINO_USER_OAUTH_CLIENT_SECRET"],
+              # openid is required for the exchange.
+              "scope": "openid profile email",
+              "authorization_request_uri": {{ include "dlh-in-a-box.identity.authorizeUrl" $ | quote }},
+              "token_request_uri": {{ include "dlh-in-a-box.identity.internalAccessTokenUrl" $ | quote }},
+              "request_content_type": "data",
+          },
+      }
+
+      DATABASE_OAUTH2_REDIRECT_URI = {{ include "dlh-in-a-box.superset.databaseOauthRedirectUrl" $ | quote }}
+      {{- end }}
     enable_oauth: |
       {{- if .Values.global.identity.external.clients.superset.enabled }}
       import os
-      import jwt
       from flask_appbuilder.security.manager import AUTH_OAUTH
       from superset.security.manager import SupersetSecurityManager
 
@@ -1154,54 +1194,65 @@ superset:
       AUTH_USER_REGISTRATION = True
       AUTH_USER_REGISTRATION_ROLE = "Gamma"
       ROLES_CLAIM = {{ .Values.global.identity.external.oidc.rolesClaim | quote }}
+      PROVIDER_NAME = {{ .Values.global.identity.external.clients.superset.providerName | quote }}
+      USERINFO_URL = {{ include "dlh-in-a-box.identity.internalUserInfoUrl" $ | quote }}
+      # Keyed by platform role, so the
+      # Keycloak role a user carries maps straight to the Superset roles it
+      # grants. `superset init` rewrites those built-ins from code on every upgrade, so
+      # capabilities are granted by listing roles here, never by editing them.
       AUTH_ROLES_MAPPING = {
-      {{- range $supersetRole, $platformRoles := .Values.auth.roleMappings }}
-        {{- range $platformRole := $platformRoles }}
-        {{ $platformRole | quote }}: ["{{ $supersetRole }}"],
+      {{- range $platformRole, $roleSpec := .Values.global.identity.accessRoles }}
+        {{- $supersetRoles := dig "appRoles" "superset" (list) ($roleSpec | default dict) }}
+        {{- if $supersetRoles }}
+        {{ $platformRole | quote }}: {{ toJson $supersetRoles }},
         {{- end }}
       {{- end }}
       }
 
       OAUTH_PROVIDERS = [
           {
-              "name": {{ .Values.global.identity.external.clients.superset.providerName | quote }},
+              "name": PROVIDER_NAME,
               "icon": {{ .Values.global.identity.external.clients.superset.icon | quote }},
               "token_key": "access_token",
               "remote_app": {
-                  "client_id": os.environ.get("OAUTH_CLIENT_ID"),
+                  "client_id": {{ .Values.global.identity.external.clients.superset.clientId | quote }},
                   "client_secret": os.environ.get("OAUTH_CLIENT_SECRET"),
                   "api_base_url": {{ include "dlh-in-a-box.identity.internalApiBaseUrl" $ | quote }},
                   "client_kwargs": {
                       "scope": "openid profile email",
-                      "verify_signature": False,
                   },
                   "access_token_url": {{ include "dlh-in-a-box.identity.internalAccessTokenUrl" $ | quote }},
                   "authorize_url": {{ include "dlh-in-a-box.identity.authorizeUrl" $ | quote }},
                   "jwks_uri": {{ include "dlh-in-a-box.identity.internalJwksUri" $ | quote }},
-                  "userinfo_endpoint": {{ include "dlh-in-a-box.identity.internalUserInfoUrl" $ | quote }},
+                  "userinfo_endpoint": USERINFO_URL,
               },
           }
       ]
 
+      # Resolve identity by calling Keycloak's userinfo endpoint with the access
+      # token from the code exchange. Keycloak validates that token itself, so
+      # Superset needs no signature handling of its own -- which suits a
+      # deployment where the browser-facing issuer and the in-cluster endpoints
+      # are different URLs. The roles claim reaches userinfo via the realm's
+      # protocol mapper (userinfo.token.claim), see keycloak-realm-configmap.yaml.
       class DlhKeycloakSecurityManager(SupersetSecurityManager):
           def oauth_user_info(self, provider, response=None):
-              if provider == "keycloak" and response:
-                  token = response.get("id_token") or response.get("access_token")
-                  if token:
-                      claims = jwt.decode(
-                          token,
-                          options={
-                              "verify_signature": False,
-                              "verify_aud": False,
-                          },
-                      )
-                      return {
-                          "username": claims.get("preferred_username", claims.get("email", "")),
-                          "first_name": claims.get("given_name", ""),
-                          "last_name": claims.get("family_name", ""),
-                          "email": claims.get("email", ""),
-                          "role_keys": claims.get(ROLES_CLAIM) or [],
-                      }
+              if provider == PROVIDER_NAME and response:
+                  userinfo = self.appbuilder.sm.oauth_remotes[provider].get(
+                      USERINFO_URL,
+                      token=response,
+                  )
+                  # Fail loudly: a silent fall-through would hand the user the
+                  # AUTH_USER_REGISTRATION_ROLE default instead of their roles.
+                  userinfo.raise_for_status()
+                  claims = userinfo.json()
+                  return {
+                      "username": claims.get("preferred_username", claims.get("email", "")),
+                      "first_name": claims.get("given_name", ""),
+                      "last_name": claims.get("family_name", ""),
+                      "email": claims.get("email", ""),
+                      "role_keys": claims.get(ROLES_CLAIM) or [],
+                  }
               return super().oauth_user_info(provider, response)
 
       CUSTOM_SECURITY_MANAGER = DlhKeycloakSecurityManager

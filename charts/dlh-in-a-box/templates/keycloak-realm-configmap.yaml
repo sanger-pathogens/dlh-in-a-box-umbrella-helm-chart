@@ -189,18 +189,45 @@ data:
         serviceAccountsEnabled: false
         secret: "$(env:KC_SUPERSET_CLIENT_SECRET)"
         redirectUris:
-        {{- range .Values.global.identity.external.clients.superset.redirectUris }}
-          - {{ . | quote }}
-        {{- end }}
+          - {{ include "dlh-in-a-box.superset.loginRedirectUrl" $ | quote }}
         webOrigins:
-        {{- range .Values.global.identity.external.clients.superset.webOrigins }}
-          - {{ . | quote }}
-        {{- end }}
+          - {{ include "dlh-in-a-box.superset.externalUrl" $ | quote }}
         defaultClientScopes:
           - profile
           - email
           - roles
           - platform-access
+    {{- end }}
+    {{- if .Values.global.identity.external.clients.supersetTrinoUsers.enabled }}
+      - clientId: {{ .Values.global.identity.external.clients.supersetTrinoUsers.clientId | quote }}
+        name: Superset Trino Users
+        description: OIDC client for Superset per-user Trino database access
+        enabled: true
+        protocol: openid-connect
+        publicClient: false
+        standardFlowEnabled: true
+        directAccessGrantsEnabled: false
+        serviceAccountsEnabled: false
+        secret: "$(env:KC_SUPERSET_TRINO_USERS_CLIENT_SECRET)"
+        redirectUris:
+          - {{ include "dlh-in-a-box.superset.databaseOauthRedirectUrl" $ | quote }}
+        webOrigins:
+          - {{ include "dlh-in-a-box.superset.externalUrl" $ | quote }}
+        defaultClientScopes:
+          - profile
+          - email
+          - roles
+          - platform-access
+        protocolMappers:
+          - name: trino-audience
+            protocol: openid-connect
+            protocolMapper: oidc-audience-mapper
+            consentRequired: false
+            config:
+              access.token.claim: "true"
+              id.token.claim: "false"
+              introspection.token.claim: "true"
+              included.client.audience: {{ .Values.global.identity.external.clients.trino.clientId | quote }}
     {{- end }}
     {{- if .Values.global.identity.external.clients.datahub.enabled }}
       - clientId: {{ .Values.global.identity.external.clients.datahub.clientId | quote }}

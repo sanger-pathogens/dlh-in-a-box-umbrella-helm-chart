@@ -14,6 +14,7 @@
 {{- $trinoIdentity := get $clients "trino" | default dict -}}
 {{- $trinoDirectGrantIdentity := get $clients "trinoDirectGrant" | default dict -}}
 {{- $supersetIdentity := get $clients "superset" | default dict -}}
+{{- $supersetTrinoUsersIdentity := get $clients "supersetTrinoUsers" | default dict -}}
 {{- $datahubIdentity := get $clients "datahub" | default dict -}}
 {{- $platformHomeIdentity := get $clients "platformHome" | default dict -}}
 {{- $jupyterhubIdentity := get $clients "jupyterhub" | default dict -}}
@@ -58,8 +59,8 @@
 {{- $keycloakProvider := get $provider "keycloak" | default dict -}}
 {{- $keycloakRegistration := get $keycloakProvider "registration" | default dict -}}
 {{- $configCliEnvSecretName := default "" $keycloakProvider.configCliEnvExistingSecret -}}
-{{- $hasSupersetOauthClientId := false -}}
 {{- $hasSupersetOauthClientSecret := false -}}
+{{- $hasTrinoUserOauthClientSecret := false -}}
 {{- $supportedAccessModelApps := list "superset" "datahub" "trinoUi" "jupyterhub" "cloudbeaver" "prefect" "ranger" "keycloak" "minio" -}}
 {{- $accessModelRoleKeys := dict -}}
 {{- $accessModelAppAccess := dict -}}
@@ -106,6 +107,16 @@
     {{- if hasKey $role "ranger" -}}
       {{- fail (printf "global.identity.accessRoles.%s.ranger is not supported. Keycloak roles control app access only; define Ranger data roles under global.authorization.ranger.dataRoles.roles." $roleKey) -}}
     {{- end -}}
+    {{- /*
+      appRoles says what a role is inside an app; appAccess says whether it may
+      open the app at all. Roles granted to someone who cannot reach the app
+      never take effect, so treat the combination as the authoring slip it is.
+    */ -}}
+    {{- range $appName, $appRoleList := get $role "appRoles" | default dict -}}
+      {{- if and $appRoleList (not (dig "appAccess" $appName false ($role | default dict))) -}}
+        {{- fail (printf "global.identity.accessRoles.%s.appRoles.%s is set but appAccess.%s is not true, so the role could never reach %s to use them." $roleKey $appName $appName $appName) -}}
+      {{- end -}}
+    {{- end -}}
     {{- range $appName, $_ := get $role "appAccess" | default dict -}}
       {{- if not (has $appName $supportedAccessModelApps) -}}
         {{- fail (printf "global.identity.accessRoles.%s.appAccess.%s is not supported. Allowed app access keys are superset, datahub, trinoUi, jupyterhub, cloudbeaver, prefect, ranger, keycloak, and minio." $roleKey $appName) -}}
@@ -128,14 +139,11 @@
 {{- fail "global.identity.external.oidc.rolesClaim must not be empty when shared identity is enabled." -}}
 {{- end -}}
 {{- range $env := $supersetExtraEnvRaw -}}
-  {{- if eq (get $env "name") "OAUTH_CLIENT_ID" -}}
-    {{- $hasSupersetOauthClientId = true -}}
-    {{- if and (get $supersetIdentity "clientId") (get $env "value") (ne (get $env "value") (get $supersetIdentity "clientId")) -}}
-      {{- fail "superset.extraEnvRaw OAUTH_CLIENT_ID must match global.identity.external.clients.superset.clientId." -}}
-    {{- end -}}
-  {{- end -}}
   {{- if eq (get $env "name") "OAUTH_CLIENT_SECRET" -}}
     {{- $hasSupersetOauthClientSecret = true -}}
+  {{- end -}}
+  {{- if eq (get $env "name") "TRINO_USER_OAUTH_CLIENT_SECRET" -}}
+    {{- $hasTrinoUserOauthClientSecret = true -}}
   {{- end -}}
 {{- end -}}
 
@@ -196,7 +204,12 @@
 {{- if and (default false $identity.enabled) (eq $providerMode "bundledKeycloak") (ne (default "" (get $keycloakConfigCli "extraEnvVarsSecret")) $configCliEnvSecretName) -}}
 {{- fail "keycloak.keycloakConfigCli.extraEnvVarsSecret must match global.identity.provider.keycloak.configCliEnvExistingSecret." -}}
 {{- end -}}
-{{- range $clientName := list "trino" "superset" "datahub" "platformHome" "minio" "vault" "jupyterhub" "cloudbeaverProxy" "rangerProxy" "prefectProxy" -}}
+{{- /*
+  Both Superset clients are absent by design: the chart derives their redirect
+  URIs and web origins from Superset's own origin, so there is nothing here for
+  an operator to get wrong.
+*/ -}}
+{{- range $clientName := list "trino" "datahub" "platformHome" "minio" "vault" "jupyterhub" "cloudbeaverProxy" "rangerProxy" "prefectProxy" -}}
   {{- $client := get $clients $clientName | default dict -}}
   {{- if and (eq $providerMode "bundledKeycloak") (default false (get $client "enabled")) -}}
     {{- $redirectUris := get $client "redirectUris" | default list -}}
@@ -224,11 +237,33 @@
 {{- if and (get $supersetIdentity "enabled") (not .Values.superset.enabled) -}}
 {{- fail "global.identity.external.clients.superset.enabled requires superset.enabled=true." -}}
 {{- end -}}
-{{- if and (get $supersetIdentity "enabled") (not $hasSupersetOauthClientId) -}}
-{{- fail "superset.extraEnvRaw must project OAUTH_CLIENT_ID when global.identity.external.clients.superset.enabled=true." -}}
-{{- end -}}
 {{- if and (get $supersetIdentity "enabled") (not $hasSupersetOauthClientSecret) -}}
 {{- fail "superset.extraEnvRaw must project OAUTH_CLIENT_SECRET when global.identity.external.clients.superset.enabled=true." -}}
+{{- end -}}
+{{- if and (get $supersetIdentity "enabled") (not (default "" (get $supersetIdentity "providerName"))) -}}
+{{- fail "global.identity.external.clients.superset.providerName must not be empty; Flask-AppBuilder builds the Superset OAuth callback path from it." -}}
+{{- end -}}
+{{- if and (get $supersetTrinoUsersIdentity "enabled") (not .Values.superset.enabled) -}}
+{{- fail "global.identity.external.clients.supersetTrinoUsers.enabled requires superset.enabled=true." -}}
+{{- end -}}
+{{- /*
+  The client's audience mapper stamps the Trino client id into its tokens, so
+  the Trino client has to exist for those tokens to name an audience Trino
+  will accept.
+*/ -}}
+{{- if and (get $supersetTrinoUsersIdentity "enabled") (not (get $trinoIdentity "enabled")) -}}
+{{- fail "global.identity.external.clients.supersetTrinoUsers.enabled requires global.identity.external.clients.trino.enabled=true, whose clientId is the audience Superset's per-user tokens carry." -}}
+{{- end -}}
+{{- if and (get $supersetTrinoUsersIdentity "enabled") (not $hasTrinoUserOauthClientSecret) -}}
+{{- fail "superset.extraEnvRaw must project TRINO_USER_OAUTH_CLIENT_SECRET when global.identity.external.clients.supersetTrinoUsers.enabled=true." -}}
+{{- end -}}
+{{- /*
+  The redirect URI and web origin are derived from Superset's browser-facing
+  origin, so the only way to get them wrong is to leave that origin
+  underivable -- no ingress host, and no externalUrl to stand in for it.
+*/ -}}
+{{- if and (or (get $supersetIdentity "enabled") (get $supersetTrinoUsersIdentity "enabled")) (not (include "dlh-in-a-box.superset.externalUrl" .)) -}}
+{{- fail "Superset's OIDC clients need a browser-facing Superset URL to derive their callbacks from: set superset.ingress.hosts, or global.identity.external.clients.superset.externalUrl when the public URL is not the ingress host." -}}
 {{- end -}}
 {{- if and (get $datahubIdentity "enabled") (not .Values.datahub.enabled) -}}
 {{- fail "global.identity.external.clients.datahub.enabled requires datahub.enabled=true." -}}

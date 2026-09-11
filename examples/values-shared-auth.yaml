@@ -53,10 +53,6 @@ global:
           clientId: dlh-superset
           existingSecret: superset-oidc-client
           clientSecretKey: clientSecret
-          redirectUris:
-            - https://superset.shared.example.org/oauth-authorized/keycloak
-          webOrigins:
-            - https://superset.shared.example.org
           authorizeUrl: https://login.example.org/realms/dlh/protocol/openid-connect/auth
           accessTokenUrl: https://login.example.org/realms/dlh/protocol/openid-connect/token
           apiBaseUrl: https://login.example.org/realms/dlh/protocol/openid-connect
@@ -259,8 +255,6 @@ superset:
     create: false
   envFromSecret: superset-runtime-secrets
   extraEnvRaw:
-    - name: OAUTH_CLIENT_ID
-      value: dlh-superset
     - name: OAUTH_CLIENT_SECRET
       valueFrom:
         secretKeyRef:

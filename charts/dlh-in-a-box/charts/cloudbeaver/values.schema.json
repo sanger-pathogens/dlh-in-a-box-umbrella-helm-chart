@@ -113,7 +113,9 @@
               "description": { "type": "string" },
               "permissions": {
                 "type": "array",
-                "items": { "type": "string" }
+                "uniqueItems": true,
+                "description": "Subject-scope permissions granted to the team. CloudBeaver CE declares exactly one: id=admin; the granular data/SQL permissions are Enterprise and Team Edition only, so an empty list is an ordinary user team.",
+                "items": { "enum": ["admin"] }
               }
             }
           }

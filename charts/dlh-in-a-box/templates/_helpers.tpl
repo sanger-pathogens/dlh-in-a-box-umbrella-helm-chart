@@ -396,3 +396,50 @@ app.kubernetes.io/managed-by: {{ .Release.Service }}
 {{- define "dlh-in-a-box.datahubPrerequisites.mysqlFQDN" -}}
 {{- printf "%s.%s.svc.cluster.local" (include "dlh-in-a-box.datahubPrerequisites.mysqlService" .) .Release.Namespace -}}
 {{- end -}}
+
+{{- /*
+  Superset's browser-facing origin. Read from its ingress so operators state
+  the hostname once, with global.identity.external.clients.supersetTrinoUsers
+  .externalUrl as the override for topologies where the public URL is not the
+  ingress host (an external load balancer, say).
+
+  Resolves the ingress under both contexts this is called from: the umbrella's
+  own templates, where Superset's values sit under .Values.superset, and
+  superset.configOverrides, which the subchart renders through tpl with its own
+  values at the root.
+*/ -}}
+{{- define "dlh-in-a-box.superset.externalUrl" -}}
+{{- $identity := (.Values.global | default dict).identity | default dict -}}
+{{- $client := dig "external" "clients" "superset" dict $identity -}}
+{{- $override := default "" (get $client "externalUrl") -}}
+{{- if $override -}}
+{{- trimSuffix "/" $override -}}
+{{- else -}}
+{{- $ingress := get (.Values.superset | default dict) "ingress" | default (.Values.ingress | default dict) -}}
+{{- $hosts := get $ingress "hosts" | default list -}}
+{{- if gt (len $hosts) 0 -}}
+{{- printf "%s://%s" (ternary "https" "http" (gt (len (get $ingress "tls" | default list)) 0)) (first $hosts) -}}
+{{- end -}}
+{{- end -}}
+{{- end -}}
+
+{{- /*
+  Superset serves the database-OAuth callback at a fixed path, so only the
+  origin varies. Keycloak matches redirect URIs by exact string, which is why
+  this single definition feeds both the realm client and Superset's own
+  DATABASE_OAUTH2_REDIRECT_URI.
+*/ -}}
+{{- define "dlh-in-a-box.superset.databaseOauthRedirectUrl" -}}
+{{- printf "%s/api/v1/database/oauth2/" (include "dlh-in-a-box.superset.externalUrl" .) -}}
+{{- end -}}
+
+{{- /*
+  Flask-AppBuilder serves the login callback at /oauth-authorized/<provider>,
+  naming it after the entry in OAUTH_PROVIDERS. Deriving it here keeps the
+  registered redirect URI and providerName from drifting apart.
+*/ -}}
+{{- define "dlh-in-a-box.superset.loginRedirectUrl" -}}
+{{- $identity := (.Values.global | default dict).identity | default dict -}}
+{{- $client := dig "external" "clients" "superset" dict $identity -}}
+{{- printf "%s/oauth-authorized/%s" (include "dlh-in-a-box.superset.externalUrl" .) (get $client "providerName") -}}
+{{- end -}}
