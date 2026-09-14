@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import logging
 
+from datahub.metadata.schema_classes import GroupMembershipClass, RoleMembershipClass
 from datahub_actions.action.action import Action
 from datahub_actions.event.event_envelope import EventEnvelope
 from datahub_actions.pipeline.pipeline_context import PipelineContext
@@ -23,22 +24,6 @@ logger = logging.getLogger(__name__)
 
 MCL_EVENT_TYPE = "MetadataChangeLogEvent_v1"
 GROUP_MEMBERSHIP_ASPECT = "groupMembership"
-
-# One query for both sides of the decision, so there is no window where
-# groups and role are read from different points in time.
-USER_STATE_QUERY = """
-query userState($urn: String!) {
-  corpUser(urn: $urn) {
-    urn
-    groups: relationships(input: {types: ["IsMemberOfGroup"], direction: OUTGOING, start: 0, count: 200}) {
-      relationships { entity { urn } }
-    }
-    roles: relationships(input: {types: ["IsMemberOfRole"], direction: OUTGOING, start: 0, count: 10}) {
-      relationships { entity { urn } }
-    }
-  }
-}
-"""
 
 LIST_USERS_QUERY = """
 query listUsers($start: Int!, $count: Int!) {
@@ -55,15 +40,6 @@ mutation assignRole($role: String, $actors: [String!]!) {
   batchAssignRole(input: {roleUrn: $role, actors: $actors})
 }
 """
-
-
-def _related_urns(user: dict, key: str) -> list[str]:
-    relationships = ((user.get(key) or {}).get("relationships")) or []
-    return [
-        rel["entity"]["urn"]
-        for rel in relationships
-        if (rel or {}).get("entity", {}).get("urn")
-    ]
 
 
 class GroupRoleSyncAction(Action):
@@ -124,16 +100,35 @@ class GroupRoleSyncAction(Action):
                 return role_urn
         return None
 
+    def _groups_of(self, user_urn: str) -> list[str]:
+        # Read the aspect rather than the IsMemberOfGroup relationship. The
+        # relationship is served from Elasticsearch, which is indexed
+        # asynchronously, so immediately after the login that triggered this
+        # event it still reports no groups -- the user would then be judged
+        # unmapped and left without a role until the next restart sweep.
+        # Aspects are read from the metadata store and are already consistent
+        # by the time the change log event arrives.
+        aspect = self.graph.get_aspect(user_urn, GroupMembershipClass)
+        return list(aspect.groups) if aspect and aspect.groups else []
+
+    def _current_role(self, user_urn: str) -> str | None:
+        aspect = self.graph.get_aspect(user_urn, RoleMembershipClass)
+        roles = list(aspect.roles) if aspect and aspect.roles else []
+        return roles[0] if roles else None
+
     def _reconcile_user(self, user_urn: str) -> None:
         try:
-            state = self.graph.execute_graphql(USER_STATE_QUERY, {"urn": user_urn})
-            user = (state or {}).get("corpUser") or {}
-            groups = _related_urns(user, "groups")
-            current_roles = _related_urns(user, "roles")
-            current = current_roles[0] if current_roles else None
+            groups = self._groups_of(user_urn)
+            current = self._current_role(user_urn)
             desired = self._desired_role(user_urn, groups)
 
             if desired == current:
+                logger.debug(
+                    "group_role_sync: %s already holds %s (groups=%s)",
+                    user_urn,
+                    current,
+                    groups,
+                )
                 return
             if desired is None and not self.demote_unmapped:
                 return
