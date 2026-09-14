@@ -44,7 +44,6 @@ Run this when:
 What it does:
 
 - ensures secret-bearing templates do not accidentally render as ConfigMaps
-- ensures important GitHub Actions are pinned to immutable SHAs
 - prevents new `bitnamilegacy/` image references from spreading beyond the
   deliberately allowed places
 - blocks inline secrets in non-local example overlays

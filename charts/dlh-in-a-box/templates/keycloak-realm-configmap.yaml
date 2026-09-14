@@ -237,6 +237,12 @@ data:
         protocol: openid-connect
         publicClient: false
         standardFlowEnabled: true
+        # DataHub provisions a group per entry in the rolesClaim, so the claim
+        # has to carry accessModelRoles and nothing else -- without this,
+        # Keycloak's implicit offline_access/uma_authorization/default-roles-*
+        # would each become a DataHub group. Paired with the scopeMappings
+        # block below.
+        fullScopeAllowed: false
         directAccessGrantsEnabled: false
         serviceAccountsEnabled: false
         secret: "$(env:KC_DATAHUB_CLIENT_SECRET)"
@@ -513,16 +519,25 @@ data:
               access.token.claim: "true"
               id.token.claim: "false"
     {{- end }}
+    {{- $scopeRestrictedClients := list }}
     {{- if .Values.global.identity.external.clients.cloudbeaverProxy.enabled }}
-    # Makes accessModelRoles the authoritative list of realm roles the
-    # cloudbeaver client's tokens can ever contain, pairing with
-    # fullScopeAllowed=false on that client above.
+    {{- $scopeRestrictedClients = append $scopeRestrictedClients .Values.global.identity.external.clients.cloudbeaverProxy.clientId }}
+    {{- end }}
+    {{- if .Values.global.identity.external.clients.datahub.enabled }}
+    {{- $scopeRestrictedClients = append $scopeRestrictedClients .Values.global.identity.external.clients.datahub.clientId }}
+    {{- end }}
+    {{- if gt (len $scopeRestrictedClients) 0 }}
+    # Makes accessModelRoles the authoritative list of realm roles these
+    # clients' tokens can ever contain, pairing with fullScopeAllowed=false
+    # on each of them above.
     scopeMappings:
-      - client: {{ .Values.global.identity.external.clients.cloudbeaverProxy.clientId | quote }}
+    {{- range $clientId := $scopeRestrictedClients }}
+      - client: {{ $clientId | quote }}
         roles:
         {{- range $roleKey := keys $accessModelRoles | sortAlpha }}
           - {{ $roleKey | quote }}
         {{- end }}
+    {{- end }}
     {{- end }}
     {{- if .Values.global.identity.directory.ldap.enabled }}
     components:

@@ -15,15 +15,35 @@ search_with_fallback() {
   fi
 }
 
-if grep -Eq '^kind: ConfigMap$' charts/dlh-in-a-box/charts/trino/templates/configmap-catalog.yaml; then
-  echo "Trino catalog template must not render as a ConfigMap because it carries object-store credentials." >&2
-  exit 1
-fi
+# A missing target is treated as a failure rather than a pass: `grep -q` on a
+# path that no longer exists simply returns non-zero, which is how the Hive
+# guard below went on silently checking nothing after its template was split up.
+assert_not_configmap() {
+  local path="${1:?path required}"
+  local reason="${2:?reason required}"
 
-if grep -Eq '^kind: ConfigMap$' charts/dlh-in-a-box/charts/hive/templates/configmap.yaml; then
-  echo "Hive metastore configuration template must not render as a ConfigMap because it carries database and object-store credentials." >&2
-  exit 1
-fi
+  if [[ ! -f "${path}" ]]; then
+    echo "${path} does not exist, so this guard is checking nothing. Point it at the renamed template." >&2
+    exit 1
+  fi
+
+  if grep -Eq '^kind: ConfigMap$' "${path}"; then
+    echo "${reason}" >&2
+    exit 1
+  fi
+}
+
+assert_not_configmap \
+  "charts/dlh-in-a-box/charts/trino/templates/configmap-catalog.yaml" \
+  "Trino catalog template must not render as a ConfigMap because it carries object-store credentials."
+
+assert_not_configmap \
+  "charts/dlh-in-a-box/charts/hive/templates/postgres-secret.yaml" \
+  "Hive metastore database credentials must not render as a ConfigMap."
+
+assert_not_configmap \
+  "charts/dlh-in-a-box/charts/hive/templates/s3-secret.yaml" \
+  "Hive metastore object-store credentials must not render as a ConfigMap."
 
 non_local_examples=(
   "examples/values-dev.yaml"
