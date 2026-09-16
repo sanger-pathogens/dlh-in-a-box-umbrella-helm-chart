@@ -1,0 +1,91 @@
+{{- /*
+Checks the Prefect database password secret before anything is applied.
+
+That secret is an input: it is produced outside this chart, and
+prefect-shared-postgresql-connection.yaml has to read it to compose Prefect's
+connection string.
+
+The key is mounted with optional:true on purpose: a required secretKeyRef that
+cannot be resolved leaves the pod in CreateContainerConfigError until the hook
+times out. Letting the container start and testing the value ourselves turns
+that into an immediate, legible failure.
+*/ -}}
+{{- $sharedPostgresql := .Values.sharedPostgresql | default dict -}}
+{{- $prefectServer := .Values.prefectServer | default dict -}}
+{{- $prefectPostgresql := get $prefectServer "postgresql" | default dict -}}
+{{- $prefectPostgresqlEnabled := true -}}
+{{- if hasKey $prefectPostgresql "enabled" -}}
+{{- $prefectPostgresqlEnabled = $prefectPostgresql.enabled -}}
+{{- end -}}
+
+{{- if and $sharedPostgresql.enabled (not $prefectPostgresqlEnabled) -}}
+  {{- $provisioning := get $sharedPostgresql "provisioning" | default dict -}}
+  {{- $provisioningDatabases := get $provisioning "databases" | default dict -}}
+  {{- $prefectDb := get $provisioningDatabases "prefect" | default dict -}}
+  {{- $prefectPasswordConfig := get $prefectDb "password" | default dict -}}
+  {{- $prefectPasswordExistingSecret := default "" (get $prefectPasswordConfig "existingSecret") -}}
+  {{- $prefectPasswordKey := default "password" (get $prefectPasswordConfig "key") -}}
+
+  {{- /* Only an externally supplied secret needs checking; the generated path
+  cannot be missing. */ -}}
+  {{- if ne $prefectPasswordExistingSecret "" -}}
+  {{- $image := $provisioning.image | default dict -}}
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ .Release.Name }}-prefect-postgresql-preflight
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "dlh-in-a-box.labels" . | nindent 4 }}
+    app.kubernetes.io/component: prefect-postgresql-preflight
+  annotations:
+    "helm.sh/hook": pre-install,pre-upgrade
+    # Ahead of every other hook, including the prefect-server subchart's own
+    # pre-upgrade hook (weight -5), which consumes the connection string this
+    # validates the ingredients for.
+    "helm.sh/hook-weight": "-20"
+    "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded
+spec:
+  # Two retries rather than none: an ExternalSecret applied moments earlier may
+  # still be syncing, and each retry is a new pod that re-reads the secret.
+  backoffLimit: 2
+  template:
+    metadata:
+      labels:
+        {{- include "dlh-in-a-box.labels" . | nindent 8 }}
+        app.kubernetes.io/component: prefect-postgresql-preflight
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: preflight
+          image: "{{ default "docker.io" $image.registry }}/{{ default "postgres" $image.repository }}:{{ default "15" $image.tag }}"
+          imagePullPolicy: {{ default "IfNotPresent" $image.pullPolicy }}
+          env:
+            - name: PREFECT_DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $prefectPasswordExistingSecret | quote }}
+                  key: {{ $prefectPasswordKey | quote }}
+                  optional: true
+          command:
+            - /bin/bash
+            - -ec
+          args:
+            - |
+              set -uo pipefail
+
+              if [[ -z "${PREFECT_DB_PASSWORD:-}" ]]; then
+                echo "Secret {{ $prefectPasswordExistingSecret }} has no usable key {{ $prefectPasswordKey }} in namespace {{ .Release.Namespace }}." >&2
+                echo "" >&2
+                echo "Prefect's connection string is composed from it, so the release is" >&2
+                echo "stopped here rather than deploying Prefect against an empty password." >&2
+                echo "" >&2
+                echo "The secret is supplied by an ExternalSecret backed by Keeper, not by" >&2
+                echo "this chart. Check that it exists and has synced:" >&2
+                echo "  kubectl get externalsecret {{ $prefectPasswordExistingSecret }} -n {{ .Release.Namespace }}" >&2
+                exit 1
+              fi
+
+              echo "Secret {{ $prefectPasswordExistingSecret }} provides key {{ $prefectPasswordKey }}."
+  {{- end -}}
+{{- end -}}
