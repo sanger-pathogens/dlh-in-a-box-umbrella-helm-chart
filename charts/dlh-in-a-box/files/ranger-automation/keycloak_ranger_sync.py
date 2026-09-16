@@ -198,6 +198,50 @@ def delete_ranger_user(user_id):
     )
 
 
+def list_ranger_roles():
+    roles = []
+    start_index = 0
+    page_size = 200
+    while True:
+        payload = ranger_request(
+            "GET",
+            f"/service/roles/roles?startIndex={start_index}&pageSize={page_size}",
+            ok=(200,),
+        ) or {}
+        batch = payload.get("roles", []) or []
+        if not batch:
+            break
+        roles.extend(batch)
+        total_count = int(payload.get("totalCount", len(roles)) or len(roles))
+        if len(roles) >= total_count:
+            break
+        start_index += len(batch)
+    return roles
+
+
+def remove_user_from_roles(username, roles):
+    # forceDelete does not cascade to role membership: Ranger answers 400 with
+    # "Can Not Delete User ... as its present in Roles".
+    #
+    # A user Keycloak no longer has cannot hold a legitimate membership, so the
+    # memberships are stripped first. `roles` is mutated in place so a later
+    # user in the same run sees the updated membership lists.
+    stripped = []
+    for role in roles:
+        members = role.get("users") or []
+        remaining = [
+            member
+            for member in members
+            if str(member.get("name") or "").strip() != username
+        ]
+        if len(remaining) == len(members):
+            continue
+        role["users"] = remaining
+        ranger_request("PUT", f"/service/roles/roles/{role['id']}", role, ok=(200,))
+        stripped.append(str(role.get("name") or role.get("id")))
+    return stripped
+
+
 def keycloak_clients(config, token):
     realm = config["identity"]["keycloak"]["realm"]
     return keycloak_list(config, token, f"/admin/realms/{realm}/clients")
@@ -255,12 +299,32 @@ def sync_ranger_users(desired_users):
         ranger_request("POST", "/service/xusers/ugsync/users", {"vXUsers": list(missing.values())}, ok=(200, 201))
 
     removed = []
+    # Fetched lazily and once: most runs remove nobody and should not pay for
+    # the call.
+    roles = None
     for username, user in existing_by_name.items():
         if username in desired_users:
             continue
         if str(user.get("syncSource") or "").strip() != RANGER_SYNC_SOURCE:
             continue
-        delete_ranger_user(user["id"])
+
+        if roles is None:
+            roles = list_ranger_roles()
+
+        stripped = remove_user_from_roles(username, roles)
+        if stripped:
+            print(f"Removed {username} from roles: {', '.join(stripped)}")
+
+        # A delete that still fails is reported and skipped rather than raised.
+        try:
+            delete_ranger_user(user["id"])
+        except urllib.error.HTTPError as exc:
+            print(
+                f"Could not delete Ranger user {username} (HTTP {exc.code}); leaving it in place.",
+                file=sys.stderr,
+            )
+            continue
+
         removed.append(username)
 
     return len(missing), len(removed)
