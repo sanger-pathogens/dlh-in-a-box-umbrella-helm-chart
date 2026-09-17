@@ -26,6 +26,7 @@ global:
         appRoles:
           superset:
             - Admin
+          datahub: Admin
         appAccess:
           superset: true
           datahub: true
@@ -125,6 +126,20 @@ global:
           scope: ""
           userNameClaim: email
           userNameClaimRegex: "([^@]+)"
+          # Turns accessRoles[].appRoles.datahub into real DataHub role
+          # assignments. DataHub itself only provisions a group per roles-claim
+          # value and never derives a role from it, so a reconciler action runs
+          # inside the datahub-actions component and closes that gap on every
+          # login. See templates/datahub-group-role-sync-configmap.yaml.
+          roleSync:
+            enabled: true
+            # Take the role away again once a user's groups map to nothing, so
+            # revoking the platform role in Keycloak revokes in DataHub too (at
+            # the user's next login, which is when group membership re-syncs).
+            demoteUnmapped: true
+            # One full pass when the actions pod starts, covering events missed
+            # while it was down and users who never log in through OIDC.
+            reconcileOnStart: true
         platformHome:
           enabled: false
           clientId: ""
@@ -1118,6 +1133,77 @@ datahub:
   #   annotations:
   #     helm.sh/hook: post-install,post-upgrade
   #     helm.sh/hook-delete-policy: before-hook-creation
+  #
+  # What follows is the exception to that passthrough: the settings that carry
+  # this chart's identity integration into DataHub, rather than upstream
+  # defaults restated. Everything a deployment owns -- hostnames, ingress class,
+  # probes, service types, storage, discoveryUri, clientId -- stays out of here.
+  datahub-frontend:
+    # Upstream defaults the session cookie to non-Secure. Every umbrella
+    # deployment reaches DataHub through a TLS ingress, so that default is
+    # wrong here rather than merely conservative.
+    authCookies:
+      secure: "true"
+    ingress:
+      annotations:
+        # The OIDC callback carries an ID token holding the roles claim, which
+        # overflows nginx's default 4k proxy buffer and 502s the login.
+        nginx.ingress.kubernetes.io/proxy-buffer-size: "64k"
+        nginx.ingress.kubernetes.io/proxy-buffers-number: "8"
+    # The app half of the OIDC contract, whose other half is
+    # global.identity.external.clients.datahub -- that block declares the
+    # client this chart renders into the Keycloak realm, while these are the
+    # keys the upstream subchart actually reads. Nothing wires the two together
+    # (upstream renders extraEnvs and oidcAuthentication with a bare toYaml, so
+    # values here cannot be derived), so identity-validation.yaml fails the
+    # render when they disagree. Only settings with no upstream default are
+    # given one here; clientId, discoveryUri, scope and the username claims
+    # stay with the deployment that declares them identity-side.
+    oidcAuthentication:
+      provider: other
+      clientSecretRef:
+        secretRef: dlh-oidc-clients
+        secretKey: datahubClientSecret
+    # DataHub has no OIDC-claim-to-role mapping, so each value of
+    # global.identity.external.oidc.rolesClaim becomes a DataHub group instead
+    # (re-synced on every login, overwriting group membership edited in the
+    # DataHub UI). Those groups are turned into real DataHub roles by the
+    # reconciler under acryl-datahub-actions below, configured from
+    # accessRoles[].appRoles.datahub. The realm renders the datahub client with
+    # fullScopeAllowed=false and pins its scopeMappings to the access-model
+    # roles, so the claim carries those roles and nothing else.
+    #
+    # extraEnvs is a list, and Helm replaces lists wholesale: a consumer adding
+    # its own entries must restate these three. identity-validation.yaml fails
+    # the render if AUTH_OIDC_GROUPS_CLAIM goes missing or drifts from
+    # rolesClaim while group extraction is on; drop
+    # AUTH_OIDC_EXTRACT_GROUPS_ENABLED to opt out of group provisioning.
+    extraEnvs:
+      - name: AUTH_OIDC_JIT_PROVISIONING_ENABLED
+        value: "true"
+      - name: AUTH_OIDC_EXTRACT_GROUPS_ENABLED
+        value: "true"
+      - name: AUTH_OIDC_GROUPS_CLAIM
+        value: platform_roles
+  acryl-datahub-actions:
+    # Mounts the group-to-role reconciler into the directory
+    # /start_datahub_actions.sh already globs for user recipes, so it starts
+    # alongside the shipped system actions. The ConfigMap is rendered by
+    # templates/datahub-group-role-sync-configmap.yaml whenever DataHub and its
+    # Keycloak client are both enabled, so this mount always has a source.
+    extraVolumes:
+      - name: datahub-group-role-sync
+        configMap:
+          name: datahub-group-role-sync
+    extraVolumeMounts:
+      - name: datahub-group-role-sync
+        mountPath: /etc/datahub/actions/conf
+        readOnly: true
+    extraEnvs:
+      # Makes group_role_sync.py importable as the module named in the recipe's
+      # `action.type`.
+      - name: PYTHONPATH
+        value: /etc/datahub/actions/conf
 
 # Upstream DataHub prerequisites chart values. These are deployed alongside the
 # DataHub chart when DataHub is enabled so the umbrella release remains

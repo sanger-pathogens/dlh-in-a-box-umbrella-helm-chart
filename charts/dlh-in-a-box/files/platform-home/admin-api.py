@@ -29,7 +29,7 @@ class ApiError(Exception):
 
 
 def load_config():
-    with open(CONFIG_PATH, "r", encoding="utf-8") as handle:
+    with open(CONFIG_PATH, encoding="utf-8") as handle:
         return json.load(handle)
 
 

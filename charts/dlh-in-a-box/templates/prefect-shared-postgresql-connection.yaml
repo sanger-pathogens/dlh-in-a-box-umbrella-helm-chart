@@ -45,10 +45,17 @@
     {{- $prefectPasswordSecretObject := lookup "v1" "Secret" .Release.Namespace $prefectPasswordExistingSecret | default dict -}}
     {{- $prefectPasswordSecretData := get $prefectPasswordSecretObject "data" | default dict -}}
     {{- $prefectPasswordValue := index $prefectPasswordSecretData $prefectPasswordKey | default "" -}}
+    {{- /* An empty lookup means "unknown", not "absent": `lookup` returns
+    nothing whenever there is no cluster connection, which is always the case
+    under `helm template`. Failing here would make the chart unrenderable
+    offline, so whether the secret exists is checked by the pre-install
+    /pre-upgrade hook in prefect-shared-postgresql-preflight.yaml, which runs
+    before anything is applied. Rendered offline, the connection string below
+    therefore carries an empty password. */ -}}
     {{- if $prefectPasswordValue -}}
       {{- $prefectPassword = $prefectPasswordValue | b64dec -}}
-    {{- else -}}
-      {{- fail (printf "sharedPostgresql.provisioning.databases.prefect.password.existingSecret=%s must contain key %s." $prefectPasswordExistingSecret $prefectPasswordKey) -}}
+    {{- else if $prefectPasswordSecretObject -}}
+      {{- fail (printf "sharedPostgresql.provisioning.databases.prefect.password.existingSecret=%s exists but has no key %s." $prefectPasswordExistingSecret $prefectPasswordKey) -}}
     {{- end -}}
   {{- else -}}
     {{- if hasKey $prefectDb "password" -}}
