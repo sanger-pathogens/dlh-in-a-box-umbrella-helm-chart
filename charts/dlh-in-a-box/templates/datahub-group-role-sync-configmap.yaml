@@ -2,6 +2,18 @@
 {{- $identity := .Values.global.identity | default dict }}
 {{- $roleSync := dig "external" "clients" "datahub" "roleSync" dict $identity }}
 {{- /*
+  These three default to true, but `default true (get ...)` cannot express that:
+  Sprig's `default` substitutes on any falsy value, and `false` is falsy, so an
+  explicit `enabled: false` would read back as true and the flag could never be
+  turned off. Presence has to be tested with hasKey instead.
+*/ -}}
+{{- $roleSyncEnabled := true }}
+{{- if hasKey $roleSync "enabled" }}{{ $roleSyncEnabled = $roleSync.enabled }}{{ end }}
+{{- $demoteUnmapped := true }}
+{{- if hasKey $roleSync "demoteUnmapped" }}{{ $demoteUnmapped = $roleSync.demoteUnmapped }}{{ end }}
+{{- $reconcileOnStart := true }}
+{{- if hasKey $roleSync "reconcileOnStart" }}{{ $reconcileOnStart = $roleSync.reconcileOnStart }}{{ end }}
+{{- /*
   DataHub has no mapping from an OIDC claim to its own Admin/Editor/Reader
   roles: the login provisions a group per roles-claim value, and role assignment
   stays a manual UI action. This ConfigMap supplies that missing map to the
@@ -45,7 +57,7 @@ data:
   # `datahub-actions actions -c <file>` alongside the shipped system actions.
   group_role_sync.yaml: |
     name: datahub_group_role_sync
-    enabled: {{ and (default true (get $roleSync "enabled")) (gt (len $groupRoleMap) 0) }}
+    enabled: {{ and $roleSyncEnabled (gt (len $groupRoleMap) 0) }}
     source:
       type: kafka
       config:
@@ -76,10 +88,10 @@ data:
           - "urn:li:corpuser:datahub"
         # Strip the role from users whose groups map to nothing, so revoking a
         # platform role in Keycloak takes the DataHub role away at next login.
-        demote_unmapped: {{ default true (get $roleSync "demoteUnmapped") }}
+        demote_unmapped: {{ $demoteUnmapped }}
         # One full pass at startup: catches events missed while the pod was down
         # and applies always_admin to users who never log in through OIDC.
-        reconcile_on_start: {{ default true (get $roleSync "reconcileOnStart") }}
+        reconcile_on_start: {{ $reconcileOnStart }}
     # Required for ctx.graph to exist at all -- create_action_context() builds the
     # graph client only when a datahub config is present, and these credentials
     # make the mutations run as the system actor.
