@@ -234,7 +234,6 @@ Typical local services in this path include:
 - Prefect server and worker
 - MinIO
 - Hive Metastore plus its PostgreSQL backing service
-- Vault in dev mode
 - Spark Operator
 
 ### Common First-Time Failures
@@ -280,7 +279,7 @@ The chart can install many optional tools, but the easiest mental model is:
 - MinIO or external S3 stores lakehouse objects
 - Keycloak or an external OIDC provider handles browser sign-in
 - Ranger stores governance and authorization data
-- Prefect, CloudBeaver, JupyterHub, Superset, DataHub, Vault, and
+- Prefect, CloudBeaver, JupyterHub, Superset, DataHub, and
   `platformHome` are optional surrounding apps
 
 You do not need every component turned on.
@@ -312,7 +311,6 @@ flowchart TD
     JupyterUi[JupyterHub optional]
     SupersetUi[Superset optional]
     DataHubUi[DataHub optional]
-    VaultUi[Vault UI optional]
     MinioUi[MinIO console optional]
   end
 
@@ -342,9 +340,8 @@ flowchart TD
     SparkOperator[Spark Operator optional]
   end
 
-  subgraph Storage["Storage and secrets"]
+  subgraph Storage["Storage"]
     MinIO[MinIO optional]
-    Vault[Vault optional]
   end
 
   subgraph Backing["Backing services"]
@@ -365,13 +362,11 @@ flowchart TD
   JupyterUi --> Keycloak
   SupersetUi --> Keycloak
   DataHubUi --> Keycloak
-  VaultUi --> Keycloak
   MinioUi --> Keycloak
 
   Portal --> CloudBeaverProxy
   Portal --> PrefectProxy
   Portal --> JupyterUi
-  Portal --> VaultUi
 
   TrinoUi --> Trino
   CloudBeaverProxy --> CloudBeaver
@@ -382,7 +377,6 @@ flowchart TD
   JupyterHub --> Trino
   SupersetUi --> Superset
   DataHubUi --> DataHub
-  VaultUi --> Vault
   MinioUi --> MinIO
 
   Hive --> Trino
@@ -425,7 +419,6 @@ flowchart TD
     JupyterFlow[JupyterHub]
     SupersetFlow[Superset]
     DataHubFlow[DataHub]
-    VaultFlow[Vault UI]
     MinioFlow[MinIO console]
   end
 
@@ -445,7 +438,6 @@ flowchart TD
   Users --> JupyterFlow
   Users --> SupersetFlow
   Users --> DataHubFlow
-  Users --> VaultFlow
   Users --> MinioFlow
 
   PortalFlow --> KeycloakFlow
@@ -456,7 +448,6 @@ flowchart TD
   JupyterFlow --> KeycloakFlow
   SupersetFlow --> KeycloakFlow
   DataHubFlow --> KeycloakFlow
-  VaultFlow --> KeycloakFlow
   MinioFlow --> KeycloakFlow
 
   PortalFlow --> CloudBeaverProxyFlow
