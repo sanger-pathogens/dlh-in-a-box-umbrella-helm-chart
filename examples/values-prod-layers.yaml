@@ -47,9 +47,6 @@ prefectWorker:
       workQueues:
         - critical
 
-vault:
-  enabled: true
-
 minio:
   enabled: false
 

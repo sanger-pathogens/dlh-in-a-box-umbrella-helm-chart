@@ -277,6 +277,3 @@ superset:
 
 hive:
   enabled: false
-
-vault:
-  enabled: true
