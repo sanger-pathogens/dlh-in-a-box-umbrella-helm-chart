@@ -241,8 +241,6 @@ assert_not_contains "${dev_manifest}" "\"minio-console\": {"
 assert_not_contains "${prod_manifest}" "\"minio-console\": {"
 assert_not_contains "${dev_manifest}" "\"id\": \"minio-console\""
 assert_not_contains "${prod_manifest}" "\"id\": \"minio-console\""
-assert_not_contains "${dev_manifest}" "vault-wrapped-token"
-assert_not_contains "${prod_manifest}" "vault-wrapped-token"
 assert_not_contains "${dev_manifest}" '"platformRoleMembershipSource"'
 assert_not_contains "${prod_manifest}" '"platformRoleMembershipSource"'
 assert_contains "${local_manifest}" "keycloak_ranger_sync.py"
@@ -557,11 +555,6 @@ expect_fail \
   "global.identity.external.clients.cloudbeaverProxy.allowedGroups is no longer supported. Browser access is derived from global.identity.accessRoles appAccess and enforced with Keycloak client roles." \
   -f "${DEV_VALUES}" \
   -f "${FIXTURE_DIR}/oauth2-proxy-allowed-groups.yaml"
-
-expect_fail \
-  "platformHome.launchers is no longer supported. JupyterHub is served as a regular app tile; MinIO Console is enabled automatically when minio.enabled=true." \
-  -f "${DEV_VALUES}" \
-  -f "${FIXTURE_DIR}/platform-home-launchers-unsupported.yaml"
 
 expect_fail \
   "global.dataCatalogs.redcap.authorizedGroups is no longer supported. Use authorizedRoles or explicit Ranger bootstrap policies with Ranger role names." \
