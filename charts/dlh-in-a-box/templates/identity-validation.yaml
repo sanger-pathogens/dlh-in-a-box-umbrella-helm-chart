@@ -14,6 +14,7 @@
 {{- $trinoIdentity := get $clients "trino" | default dict -}}
 {{- $trinoDirectGrantIdentity := get $clients "trinoDirectGrant" | default dict -}}
 {{- $supersetIdentity := get $clients "superset" | default dict -}}
+{{- $supersetTrinoUsersIdentity := get $clients "supersetTrinoUsers" | default dict -}}
 {{- $datahubIdentity := get $clients "datahub" | default dict -}}
 {{- $platformHomeIdentity := get $clients "platformHome" | default dict -}}
 {{- $jupyterhubIdentity := get $clients "jupyterhub" | default dict -}}
@@ -58,8 +59,8 @@
 {{- $keycloakProvider := get $provider "keycloak" | default dict -}}
 {{- $keycloakRegistration := get $keycloakProvider "registration" | default dict -}}
 {{- $configCliEnvSecretName := default "" $keycloakProvider.configCliEnvExistingSecret -}}
-{{- $hasSupersetOauthClientId := false -}}
 {{- $hasSupersetOauthClientSecret := false -}}
+{{- $hasTrinoUserOauthClientSecret := false -}}
 {{- $supportedAccessModelApps := list "superset" "datahub" "trinoUi" "jupyterhub" "cloudbeaver" "prefect" "ranger" "keycloak" "minio" -}}
 {{- $accessModelRoleKeys := dict -}}
 {{- $accessModelAppAccess := dict -}}
@@ -106,6 +107,16 @@
     {{- if hasKey $role "ranger" -}}
       {{- fail (printf "global.identity.accessRoles.%s.ranger is not supported. Keycloak roles control app access only; define Ranger data roles under global.authorization.ranger.dataRoles.roles." $roleKey) -}}
     {{- end -}}
+    {{- /*
+      appRoles says what a role is inside an app; appAccess says whether it may
+      open the app at all. Roles granted to someone who cannot reach the app
+      never take effect, so treat the combination as the authoring slip it is.
+    */ -}}
+    {{- range $appName, $appRoleList := get $role "appRoles" | default dict -}}
+      {{- if and $appRoleList (not (dig "appAccess" $appName false ($role | default dict))) -}}
+        {{- fail (printf "global.identity.accessRoles.%s.appRoles.%s is set but appAccess.%s is not true, so the role could never reach %s to use them." $roleKey $appName $appName $appName) -}}
+      {{- end -}}
+    {{- end -}}
     {{- range $appName, $_ := get $role "appAccess" | default dict -}}
       {{- if not (has $appName $supportedAccessModelApps) -}}
         {{- fail (printf "global.identity.accessRoles.%s.appAccess.%s is not supported. Allowed app access keys are superset, datahub, trinoUi, jupyterhub, cloudbeaver, prefect, ranger, keycloak, and minio." $roleKey $appName) -}}
@@ -128,14 +139,11 @@
 {{- fail "global.identity.external.oidc.rolesClaim must not be empty when shared identity is enabled." -}}
 {{- end -}}
 {{- range $env := $supersetExtraEnvRaw -}}
-  {{- if eq (get $env "name") "OAUTH_CLIENT_ID" -}}
-    {{- $hasSupersetOauthClientId = true -}}
-    {{- if and (get $supersetIdentity "clientId") (get $env "value") (ne (get $env "value") (get $supersetIdentity "clientId")) -}}
-      {{- fail "superset.extraEnvRaw OAUTH_CLIENT_ID must match global.identity.external.clients.superset.clientId." -}}
-    {{- end -}}
-  {{- end -}}
   {{- if eq (get $env "name") "OAUTH_CLIENT_SECRET" -}}
     {{- $hasSupersetOauthClientSecret = true -}}
+  {{- end -}}
+  {{- if eq (get $env "name") "TRINO_USER_OAUTH_CLIENT_SECRET" -}}
+    {{- $hasTrinoUserOauthClientSecret = true -}}
   {{- end -}}
 {{- end -}}
 
@@ -196,7 +204,12 @@
 {{- if and (default false $identity.enabled) (eq $providerMode "bundledKeycloak") (ne (default "" (get $keycloakConfigCli "extraEnvVarsSecret")) $configCliEnvSecretName) -}}
 {{- fail "keycloak.keycloakConfigCli.extraEnvVarsSecret must match global.identity.provider.keycloak.configCliEnvExistingSecret." -}}
 {{- end -}}
-{{- range $clientName := list "trino" "superset" "datahub" "platformHome" "minio" "jupyterhub" "cloudbeaverProxy" "rangerProxy" "prefectProxy" -}}
+{{- /*
+  Both Superset clients are absent by design: the chart derives their redirect
+  URIs and web origins from Superset's own origin, so there is nothing here for
+  an operator to get wrong.
+*/ -}}
+{{- range $clientName := list "trino" "datahub" "platformHome" "minio" "vault" "jupyterhub" "cloudbeaverProxy" "rangerProxy" "prefectProxy" -}}
   {{- $client := get $clients $clientName | default dict -}}
   {{- if and (eq $providerMode "bundledKeycloak") (default false (get $client "enabled")) -}}
     {{- $redirectUris := get $client "redirectUris" | default list -}}
@@ -224,11 +237,33 @@
 {{- if and (get $supersetIdentity "enabled") (not .Values.superset.enabled) -}}
 {{- fail "global.identity.external.clients.superset.enabled requires superset.enabled=true." -}}
 {{- end -}}
-{{- if and (get $supersetIdentity "enabled") (not $hasSupersetOauthClientId) -}}
-{{- fail "superset.extraEnvRaw must project OAUTH_CLIENT_ID when global.identity.external.clients.superset.enabled=true." -}}
-{{- end -}}
 {{- if and (get $supersetIdentity "enabled") (not $hasSupersetOauthClientSecret) -}}
 {{- fail "superset.extraEnvRaw must project OAUTH_CLIENT_SECRET when global.identity.external.clients.superset.enabled=true." -}}
+{{- end -}}
+{{- if and (get $supersetIdentity "enabled") (not (default "" (get $supersetIdentity "providerName"))) -}}
+{{- fail "global.identity.external.clients.superset.providerName must not be empty; Flask-AppBuilder builds the Superset OAuth callback path from it." -}}
+{{- end -}}
+{{- if and (get $supersetTrinoUsersIdentity "enabled") (not .Values.superset.enabled) -}}
+{{- fail "global.identity.external.clients.supersetTrinoUsers.enabled requires superset.enabled=true." -}}
+{{- end -}}
+{{- /*
+  The client's audience mapper stamps the Trino client id into its tokens, so
+  the Trino client has to exist for those tokens to name an audience Trino
+  will accept.
+*/ -}}
+{{- if and (get $supersetTrinoUsersIdentity "enabled") (not (get $trinoIdentity "enabled")) -}}
+{{- fail "global.identity.external.clients.supersetTrinoUsers.enabled requires global.identity.external.clients.trino.enabled=true, whose clientId is the audience Superset's per-user tokens carry." -}}
+{{- end -}}
+{{- if and (get $supersetTrinoUsersIdentity "enabled") (not $hasTrinoUserOauthClientSecret) -}}
+{{- fail "superset.extraEnvRaw must project TRINO_USER_OAUTH_CLIENT_SECRET when global.identity.external.clients.supersetTrinoUsers.enabled=true." -}}
+{{- end -}}
+{{- /*
+  The redirect URI and web origin are derived from Superset's browser-facing
+  origin, so the only way to get them wrong is to leave that origin
+  underivable -- no ingress host, and no externalUrl to stand in for it.
+*/ -}}
+{{- if and (or (get $supersetIdentity "enabled") (get $supersetTrinoUsersIdentity "enabled")) (not (include "dlh-in-a-box.superset.externalUrl" .)) -}}
+{{- fail "Superset's OIDC clients need a browser-facing Superset URL to derive their callbacks from: set superset.ingress.hosts, or global.identity.external.clients.superset.externalUrl when the public URL is not the ingress host." -}}
 {{- end -}}
 {{- if and (get $datahubIdentity "enabled") (not .Values.datahub.enabled) -}}
 {{- fail "global.identity.external.clients.datahub.enabled requires datahub.enabled=true." -}}
@@ -413,4 +448,46 @@
 {{- end -}}
 {{- if and (eq $providerMode "bundledKeycloak") (default false $ldap.enabled) $ldapUsesLdaps (not (default false $ldap.allowInsecure)) (not $ldapUsesSystemTrustStore) .Values.keycloak.trustedCertsExistingSecret $trustedCaSecretName (ne .Values.keycloak.trustedCertsExistingSecret $trustedCaSecretName) -}}
 {{- fail "keycloak.trustedCertsExistingSecret must match global.identity.directory.ldap.trustedCaExistingSecret so Keycloak, Trino, and Ranger validate the same LDAP/AD CA." -}}
+{{- end -}}
+{{- /*
+  DataHub has no OIDC-claim-to-role mapping, so the access model reaches it as
+  groups: DataHub provisions one group per value of the roles claim. The claim
+  name is owned here, while the env var that consumes it can only be set through
+  the upstream subchart's extraEnvs list -- which Helm replaces wholesale -- so a
+  consumer restating extraEnvs can silently drop or outdate it. Fail loudly
+  instead. Opting out (no AUTH_OIDC_EXTRACT_GROUPS_ENABLED=true) stays allowed.
+*/ -}}
+{{- if and (default false .Values.datahub.enabled) (get $datahubIdentity "enabled") -}}
+{{- $datahubRolesClaim := default "platform_roles" (get $oidc "rolesClaim") -}}
+{{- $extractGroups := "" -}}
+{{- $groupsClaim := "" -}}
+{{- range $datahubEnv := (get $datahubFrontend "extraEnvs" | default list) -}}
+{{- if eq (default "" (get $datahubEnv "name")) "AUTH_OIDC_EXTRACT_GROUPS_ENABLED" -}}
+{{- $extractGroups = default "" (get $datahubEnv "value") -}}
+{{- end -}}
+{{- if eq (default "" (get $datahubEnv "name")) "AUTH_OIDC_GROUPS_CLAIM" -}}
+{{- $groupsClaim = default "" (get $datahubEnv "value") -}}
+{{- end -}}
+{{- end -}}
+{{- if and (eq $extractGroups "true") (ne $groupsClaim $datahubRolesClaim) -}}
+{{- fail (printf "datahub.datahub-frontend.extraEnvs sets AUTH_OIDC_EXTRACT_GROUPS_ENABLED=true with AUTH_OIDC_GROUPS_CLAIM=%q, but the Keycloak datahub client emits the access-model roles in %q (global.identity.external.oidc.rolesClaim). Restate AUTH_OIDC_GROUPS_CLAIM=%s alongside your other extraEnvs entries, or drop AUTH_OIDC_EXTRACT_GROUPS_ENABLED to opt out of group provisioning." $groupsClaim $datahubRolesClaim $datahubRolesClaim) -}}
+{{- end -}}
+{{- /*
+  The checks further up already pair enabled, clientId and the client-secret
+  Secret name across the two halves. These are the rest of that contract, left
+  unchecked until now: a username claim that disagrees hands the same person two
+  identities, and a provider or secret key that disagrees just fails the login.
+*/ -}}
+{{- $datahubOidcContract := list
+      (dict "identityKey" "provider" "identityValue" (default "" (get $datahubIdentity "provider")) "appKey" "provider" "appValue" (default "" (get $datahubOidc "provider")))
+      (dict "identityKey" "scope" "identityValue" (default "" (get $datahubIdentity "scope")) "appKey" "scope" "appValue" (default "" (get $datahubOidc "scope")))
+      (dict "identityKey" "userNameClaim" "identityValue" (default "" (get $datahubIdentity "userNameClaim")) "appKey" "user_name_claim" "appValue" (default "" (get $datahubOidc "user_name_claim")))
+      (dict "identityKey" "userNameClaimRegex" "identityValue" (default "" (get $datahubIdentity "userNameClaimRegex")) "appKey" "user_name_claim_regex" "appValue" (default "" (get $datahubOidc "user_name_claim_regex")))
+      (dict "identityKey" "clientSecretKey" "identityValue" (default "" (get $datahubIdentity "clientSecretKey")) "appKey" "clientSecretRef.secretKey" "appValue" (dig "clientSecretRef" "secretKey" "" $datahubOidc))
+-}}
+{{- range $datahubSetting := $datahubOidcContract -}}
+{{- if and $datahubSetting.identityValue (ne $datahubSetting.appValue $datahubSetting.identityValue) -}}
+{{- fail (printf "datahub.datahub-frontend.oidcAuthentication.%s=%q must match global.identity.external.clients.datahub.%s=%q: the first configures DataHub, the second the Keycloak client it authenticates against." $datahubSetting.appKey $datahubSetting.appValue $datahubSetting.identityKey $datahubSetting.identityValue) -}}
+{{- end -}}
+{{- end -}}
 {{- end -}}

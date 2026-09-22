@@ -63,3 +63,9 @@ repos:
         args:
           - --severity=warning
           - --external-sources
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.16.7
+    hooks:
+      - id: ruff-check
+        name: "Ruff (Python linter)"
+        files: ^charts/dlh-in-a-box/files/.*\.py$

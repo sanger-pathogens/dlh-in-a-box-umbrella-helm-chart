@@ -1,5 +1,4 @@
 import base64
-import datetime
 import json
 import os
 import re
@@ -14,7 +13,7 @@ RANGER_PASSWORD = os.environ["RANGER_ADMIN_PASSWORD"]
 
 
 def load_config():
-    with open(CONFIG_PATH, "r", encoding="utf-8") as handle:
+    with open(CONFIG_PATH, encoding="utf-8") as handle:
         return json.load(handle)
 
 
@@ -22,7 +21,7 @@ def request(method, path, payload=None, ok=(200, 201), parse_json=True):
     url = f"{RANGER_URL}{path}"
     headers = {
         "Authorization": "Basic "
-        + base64.b64encode(f"admin:{RANGER_PASSWORD}".encode("utf-8")).decode("ascii"),
+        + base64.b64encode(f"admin:{RANGER_PASSWORD}".encode()).decode("ascii"),
         "Accept": "application/json",
     }
     body = None

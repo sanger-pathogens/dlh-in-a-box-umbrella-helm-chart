@@ -160,7 +160,7 @@
 {{- end -}}
 {{- $apps := list -}}
 {{- if and .Values.superset.enabled (default false (dig "superset" "enabled" false $clients)) -}}
-  {{- $supersetOrigin := trimSuffix "/" (first (default (list) (dig "superset" "webOrigins" list $clients))) -}}
+  {{- $supersetOrigin := include "dlh-in-a-box.superset.externalUrl" $ -}}
   {{- $supersetProvider := default "keycloak" (dig "superset" "providerName" "" $clients) -}}
   {{- $appMeta := get $itemMeta "superset" | default dict -}}
   {{- $apps = append $apps (dict

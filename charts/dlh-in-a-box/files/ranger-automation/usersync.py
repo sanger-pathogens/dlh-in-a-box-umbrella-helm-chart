@@ -4,8 +4,8 @@ import os
 import ssl
 import time
 import urllib.error
-import urllib.request
 import urllib.parse
+import urllib.request
 
 from ldap3 import BASE, SUBTREE, Connection, Server, Tls
 from ldap3.core.exceptions import LDAPBindError
@@ -21,14 +21,14 @@ REST_CSRF_READY = False
 
 
 def load_config():
-    with open(CONFIG_PATH, "r", encoding="utf-8") as handle:
+    with open(CONFIG_PATH, encoding="utf-8") as handle:
         return json.load(handle)
 
 
 def ranger_headers():
     return {
         "Authorization": "Basic "
-        + base64.b64encode(f"admin:{RANGER_PASSWORD}".encode("utf-8")).decode("ascii"),
+        + base64.b64encode(f"admin:{RANGER_PASSWORD}".encode()).decode("ascii"),
         "Accept": "application/json",
     }
 

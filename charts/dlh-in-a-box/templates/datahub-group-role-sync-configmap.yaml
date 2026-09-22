@@ -1,0 +1,103 @@
+{{- if and .Values.datahub.enabled (dig "external" "clients" "datahub" "enabled" false (.Values.global.identity | default dict)) }}
+{{- $identity := .Values.global.identity | default dict }}
+{{- $roleSync := dig "external" "clients" "datahub" "roleSync" dict $identity }}
+{{- /*
+  These three default to true, but `default true (get ...)` cannot express that:
+  Sprig's `default` substitutes on any falsy value, and `false` is falsy, so an
+  explicit `enabled: false` would read back as true and the flag could never be
+  turned off. Presence has to be tested with hasKey instead.
+*/ -}}
+{{- $roleSyncEnabled := true }}
+{{- if hasKey $roleSync "enabled" }}{{ $roleSyncEnabled = $roleSync.enabled }}{{ end }}
+{{- $demoteUnmapped := true }}
+{{- if hasKey $roleSync "demoteUnmapped" }}{{ $demoteUnmapped = $roleSync.demoteUnmapped }}{{ end }}
+{{- $reconcileOnStart := true }}
+{{- if hasKey $roleSync "reconcileOnStart" }}{{ $reconcileOnStart = $roleSync.reconcileOnStart }}{{ end }}
+{{- /*
+  DataHub has no mapping from an OIDC claim to its own Admin/Editor/Reader
+  roles: the login provisions a group per roles-claim value, and role assignment
+  stays a manual UI action. This ConfigMap supplies that missing map to the
+  datahub-actions component, which already consumes MetadataChangeLog and holds
+  system credentials, so the reconciliation happens inside DataHub with nothing
+  polling Keycloak.
+
+  Each platform role names one DataHub role, because DataHub holds one role per
+  user. A user may still hold several platform roles, so the reconciler resolves
+  ties by the precedence below rather than by a plain lookup.
+
+  Changing either one updates the ConfigMap but does not restart the consumer:
+  the pod belongs to a subchart, so no checksum annotation can be injected into
+  it. Roll it by hand after a change --
+  `kubectl rollout restart deployment/<release>-acryl-datahub-actions` -- and
+  reconcileOnStart then re-reconciles every user.
+*/}}
+{{- $datahubRolePrecedence := list "Admin" "Editor" "Reader" }}
+{{- $roleUrnPrecedence := list }}
+{{- range $roleName := $datahubRolePrecedence }}
+{{- $roleUrnPrecedence = append $roleUrnPrecedence (printf "urn:li:dataHubRole:%s" $roleName) }}
+{{- end }}
+{{- $groupRoleMap := dict }}
+{{- range $platformRole, $roleSpec := (get $identity "accessRoles" | default dict) }}
+{{- $roleName := dig "appRoles" "datahub" "" ($roleSpec | default dict) }}
+{{- if $roleName }}
+{{- $_ := set $groupRoleMap (printf "urn:li:corpGroup:%s" $platformRole) (printf "urn:li:dataHubRole:%s" $roleName) }}
+{{- end }}
+{{- end }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: datahub-group-role-sync
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{ include "dlh-in-a-box.labels" . | nindent 4 }}
+    app.kubernetes.io/component: datahub-group-role-sync
+data:
+  # Loaded by /start_datahub_actions.sh, which globs
+  # ${DATAHUB_ACTIONS_USER_CONFIGS_PATH:-/etc/datahub/actions/conf}/*.yaml into
+  # `datahub-actions actions -c <file>` alongside the shipped system actions.
+  group_role_sync.yaml: |
+    name: datahub_group_role_sync
+    enabled: {{ and $roleSyncEnabled (gt (len $groupRoleMap) 0) }}
+    source:
+      type: kafka
+      config:
+        connection:
+          bootstrap: ${KAFKA_BOOTSTRAP_SERVER:-localhost:9092}
+          schema_registry_url: ${SCHEMA_REGISTRY_URL:-http://localhost:8081}
+        topic_routes:
+          mcl: ${METADATA_CHANGE_LOG_VERSIONED_TOPIC_NAME:-MetadataChangeLog_Versioned_v1}
+          pe: ${PLATFORM_EVENT_TOPIC_NAME:-PlatformEvent_v1}
+    action:
+      # A "module:Class" path rather than a registered plugin name; the module is
+      # this ConfigMap's group_role_sync.py, importable because the mount
+      # directory is on PYTHONPATH.
+      type: group_role_sync:GroupRoleSyncAction
+      config:
+        group_role_map:
+          {{- range $groupUrn, $roleUrn := $groupRoleMap }}
+          {{ $groupUrn | quote }}: {{ $roleUrn | quote }}
+          {{- end }}
+        role_precedence:
+          {{- range $roleUrn := $roleUrnPrecedence }}
+          - {{ $roleUrn | quote }}
+          {{- end }}
+        admin_role: {{ first $roleUrnPrecedence | quote }}
+        # Users that keep Admin no matter what the map says.
+        # DataHub's root user is hardcoded.
+        always_admin:
+          - "urn:li:corpuser:datahub"
+        # Strip the role from users whose groups map to nothing, so revoking a
+        # platform role in Keycloak takes the DataHub role away at next login.
+        demote_unmapped: {{ $demoteUnmapped }}
+        # One full pass at startup: catches events missed while the pod was down
+        # and applies always_admin to users who never log in through OIDC.
+        reconcile_on_start: {{ $reconcileOnStart }}
+    # Required for ctx.graph to exist at all -- create_action_context() builds the
+    # graph client only when a datahub config is present, and these credentials
+    # make the mutations run as the system actor.
+    datahub:
+      server: 'http://${DATAHUB_GMS_HOST:-localhost}:${DATAHUB_GMS_PORT:-8080}'
+      extra_headers:
+        Authorization: 'Basic ${DATAHUB_SYSTEM_CLIENT_ID:-__datahub_system}:${DATAHUB_SYSTEM_CLIENT_SECRET}'
+{{ (.Files.Glob "files/datahub-group-role-sync/*.py").AsConfig | indent 2 }}
+{{- end }}

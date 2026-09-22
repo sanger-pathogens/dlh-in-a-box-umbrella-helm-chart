@@ -1,0 +1,37 @@
+# The rule set is listed explicitly rather than left to ruff's defaults: those
+# defaults have grown between releases (0.16 selects parts of UP, I, B, BLE and
+# TRY that earlier versions did not), so with a pinned ruff and an explicit
+# select, upgrading the linter can never quietly change what CI enforces.
+#
+# ruff never imports the code it checks, so none of the runtime dependencies of
+# these files -- datahub_actions, ldap3, requests -- need to exist here or in
+# CI. That is also the limit of what it can catch: wrong call signatures and
+# missing attributes need a type checker, and a type checker would need those
+# packages installed.
+
+# Pre-commit pins ruff through its hook rev and CI installs it separately, so
+# this fails the run loudly if the two ever drift apart.
+required-version = "==0.16.7"
+
+# The oldest interpreter any of these files runs on. Ranger automation runs on
+# python:3.12-slim; raise this once the other images are confirmed, which lets
+# ruff suggest newer syntax.
+target-version = "py39"
+
+[lint]
+select = [
+  "E4",  # pycodestyle: imports
+  "E7",  # pycodestyle: statement errors
+  "E9",  # pycodestyle: syntax and IO errors
+  "F",   # pyflakes: undefined names, unused imports and variables
+  "I",   # isort: import ordering
+  "UP",  # pyupgrade: syntax kept current with target-version
+  "B",   # bugbear: mutable defaults, loop-variable capture, and similar traps
+]
+
+# Deliberately not selected:
+#   BLE001 (blind except) -- these files are long-running reconcilers where
+#     catching Exception around one item is the intended behaviour, so the rule
+#     would be suppressed at almost every site it fires.
+#   TRY, ANN, D -- opinionated style families that would need a broad cleanup
+#     before they could be enforced, with little to catch here.

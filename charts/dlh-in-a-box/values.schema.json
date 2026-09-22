@@ -48,6 +48,26 @@
             "keycloak": { "type": "boolean" },
             "minio": { "type": "boolean" }
           }
+        },
+        "appRoles": {
+          "type": "object",
+          "additionalProperties": false,
+          "description": "Roles this platform role receives inside an app, where appAccess only grants entry. Listed per app; only apps with an internal role model appear here.",
+          "properties": {
+            "superset": {
+              "type": "array",
+              "uniqueItems": true,
+              "description": "Superset built-in roles. Alpha and Gamma set data reach, Admin adds platform administration, and sql_lab is a separate capability rather than a rung on that ladder.",
+              "items": {
+                "enum": ["Admin", "Alpha", "Gamma", "sql_lab"]
+              }
+            },
+            "datahub": {
+              "type": "string",
+              "enum": ["Admin", "Editor", "Reader"],
+              "description": "DataHub built-in roles: Admin administers the platform, Editor may edit all metadata, Reader is read-only."
+            }
+          }
         }
       }
     },
@@ -202,14 +222,7 @@
                     "clientId": { "type": "string" },
                     "existingSecret": { "type": "string" },
                     "clientSecretKey": { "type": "string" },
-                    "redirectUris": {
-                      "type": "array",
-                      "items": { "type": "string" }
-                    },
-                    "webOrigins": {
-                      "type": "array",
-                      "items": { "type": "string" }
-                    },
+                    "externalUrl": { "type": "string" },
                     "authorizeUrl": { "type": "string" },
                     "accessTokenUrl": { "type": "string" },
                     "apiBaseUrl": { "type": "string" },
@@ -238,6 +251,27 @@
                     }
                   ]
                 },
+                "supersetTrinoUsers": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "properties": {
+                    "enabled": { "type": "boolean" },
+                    "clientId": { "type": "string" },
+                    "existingSecret": { "type": "string" },
+                    "clientSecretKey": { "type": "string" }
+                  },
+                  "allOf": [
+                    {
+                      "if": {
+                        "properties": { "enabled": { "const": true } },
+                        "required": ["enabled"]
+                      },
+                      "then": {
+                        "required": ["clientId", "existingSecret"]
+                      }
+                    }
+                  ]
+                },
                 "datahub": {
                   "type": "object",
                   "additionalProperties": true,
@@ -258,7 +292,17 @@
                     "discoveryUri": { "type": "string" },
                     "scope": { "type": "string" },
                     "userNameClaim": { "type": "string" },
-                    "userNameClaimRegex": { "type": "string" }
+                    "userNameClaimRegex": { "type": "string" },
+                    "roleSync": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "description": "Turns accessRoles[].appRoles.datahub into real DataHub role assignments. DataHub provisions a group per roles-claim value but never derives a role from it, so a reconciler action inside the datahub-actions component closes that gap whenever a user's group membership is written.",
+                      "properties": {
+                        "enabled": { "type": "boolean" },
+                        "demoteUnmapped": { "type": "boolean" },
+                        "reconcileOnStart": { "type": "boolean" }
+                      }
+                    }
                   },
                   "allOf": [
                     {
@@ -1375,20 +1419,7 @@
       "type": "object",
       "additionalProperties": true,
       "properties": {
-        "enabled": { "type": "boolean" },
-        "auth": {
-          "type": "object",
-          "additionalProperties": true,
-          "properties": {
-            "roleMappings": {
-              "type": "object",
-              "additionalProperties": {
-                "type": "array",
-                "items": { "type": "string" }
-              }
-            }
-          }
-        }
+        "enabled": { "type": "boolean" }
       }
     },
     "hive": {
