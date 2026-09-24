@@ -1,0 +1,25 @@
+suite: Identity configuration
+
+values:
+  - ../../../examples/values-dev.yaml
+
+tests:
+  - it: ensures global.identity.accessRoles has at least one role with access
+    set:
+      global.identity.accessRoles:
+        platform-admin:
+          enabled: false
+        platform-user:
+          enabled: false
+        platform-viewer:
+          enabled: false
+    asserts:
+      - failedTemplate:
+          errorMessage: "global.identity.accessRoles must have at least one role with enabled=true when shared identity is enabled."
+
+  - it: rejects data roles set alongside app access roles
+    set:
+      global.identity.accessRoles.platform-viewer.ranger.roleName: reader
+    asserts:
+      - failedTemplate:
+          errorMessage: "global.identity.accessRoles.platform-viewer.ranger is not supported. Keycloak roles control app access only; define Ranger data roles under global.authorization.ranger.dataRoles.roles."

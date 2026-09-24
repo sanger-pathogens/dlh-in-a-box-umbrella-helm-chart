@@ -31,12 +31,6 @@ repos:
         language: system
         always_run: true
         pass_filenames: false
-      - id: test-chart
-        name: "Test Helm Chart"
-        entry: test/render-contract.sh
-        language: system
-        files: ^charts/dlh-in-a-box/
-        pass_filenames: false
       - id: helm-lint
         name: "Lint Helm Chart"
         entry: scripts/helm/helm-lint.sh
@@ -46,6 +40,18 @@ repos:
       - id: render-chart
         name: "Render Helm Template"
         entry: scripts/helm/template.sh
+        language: system
+        files: ^(charts/dlh-in-a-box/|examples/)
+        pass_filenames: false
+      - id: test-chart
+        name: "Test Helm Chart"
+        entry: test/render-contract.sh
+        language: system
+        files: ^charts/dlh-in-a-box/
+        pass_filenames: false
+      - id: helm-unittest
+        name: "Unittest Helm Chart"
+        entry: helm unittest charts/dlh-in-a-box
         language: system
         files: ^(charts/dlh-in-a-box/|examples/)
         pass_filenames: false
