@@ -520,23 +520,11 @@ expect_fail \
   -f "${FIXTURE_DIR}/legacy-trino-authentication-type.yaml"
 
 expect_fail_any \
-  "global.authorization.platformRoles is no longer supported. Define platform roles under global.identity.accessRoles." \
-  "global.authorization.platformRoles is no longer supported" \
-  -- \
-  -f "${DEV_VALUES}" \
-  -f "${FIXTURE_DIR}/invalid-platform-role-app.yaml"
-
-expect_fail_any \
   "global.identity.accessRoles.platform-admin.appAccess: Additional property notARealApp is not allowed" \
   "additional properties 'notARealApp' not allowed" \
   -- \
   -f "${DEV_VALUES}" \
   -f "${FIXTURE_DIR}/invalid-access-model-app.yaml"
-
-expect_fail \
-  "global.identity.accessModel is no longer supported. Move platform roles directly under global.identity.accessRoles." \
-  -f "${DEV_VALUES}" \
-  -f "${FIXTURE_DIR}/access-model-group-role-mappings.yaml"
 
 expect_fail \
   "global.identity.accessRoles.platform-viewer.ranger is not supported. Keycloak roles control app access only; define Ranger data roles under global.authorization.ranger.dataRoles.roles." \
@@ -547,34 +535,3 @@ expect_fail \
   "global.identity.accessRoles must have at least one role with enabled=true when shared identity is enabled." \
   -f "${DEV_VALUES}" \
   -f "${FIXTURE_DIR}/all-access-roles-disabled.yaml"
-
-expect_fail \
-  "global.identity.external.clients.cloudbeaverProxy.allowedGroups is no longer supported. Browser access is derived from global.identity.accessRoles appAccess and enforced with Keycloak client roles." \
-  -f "${DEV_VALUES}" \
-  -f "${FIXTURE_DIR}/oauth2-proxy-allowed-groups.yaml"
-
-expect_fail \
-  "platformHome.launchers is no longer supported. JupyterHub is served as a regular app tile; MinIO Console is enabled automatically when minio.enabled=true." \
-  -f "${DEV_VALUES}" \
-  -f "${FIXTURE_DIR}/platform-home-launchers-unsupported.yaml"
-
-expect_fail \
-  "global.dataCatalogs.redcap.authorizedGroups is no longer supported. Use authorizedRoles or explicit Ranger bootstrap policies with Ranger role names." \
-  -f "${DEV_VALUES}" \
-  -f "${FIXTURE_DIR}/catalog-authorized-groups.yaml"
-
-expect_fail \
-  "jupyterhub.hub.extraEnv.JUPYTERHUB_ALLOWED_GROUP is no longer supported. Use JUPYTERHUB_ROLES_CLAIM, JUPYTERHUB_ALLOWED_ROLES, and JUPYTERHUB_ADMIN_ROLES." \
-  -f "${DEV_VALUES}" \
-  -f "${FIXTURE_DIR}/jupyterhub-group-env.yaml"
-
-expect_fail \
-  "datahub.auth.groupProvisioning is no longer supported. DataHub browser access must not depend on OIDC group claims; use global.identity.accessRoles and client roles." \
-  -f "${DEV_VALUES}" \
-  -f "${FIXTURE_DIR}/datahub-group-provisioning.yaml"
-
-expect_fail_any \
-  "global.authorization.platformRoleMembershipSource is no longer supported. Keycloak is the source of truth for platform roles and role membership." \
-  -- \
-  -f "${DEV_VALUES}" \
-  -f "${FIXTURE_DIR}/ranger-membership-source.yaml"

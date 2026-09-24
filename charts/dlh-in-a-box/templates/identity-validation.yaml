@@ -65,28 +65,6 @@
 {{- $accessModelRoleKeys := dict -}}
 {{- $accessModelAppAccess := dict -}}
 
-{{- if hasKey $authorization "platformRoleMembershipSource" -}}
-{{- fail "global.authorization.platformRoleMembershipSource is no longer supported. Keycloak is the source of truth for platform roles and role membership." -}}
-{{- end -}}
-{{- if hasKey $authorization "platformRoles" -}}
-{{- fail "global.authorization.platformRoles is no longer supported. Define platform roles under global.identity.accessRoles." -}}
-{{- end -}}
-{{- if hasKey $identity "accessModel" -}}
-{{- fail "global.identity.accessModel is no longer supported. Move platform roles directly under global.identity.accessRoles." -}}
-{{- end -}}
-{{- if hasKey $datahubAuth "groupProvisioning" -}}
-{{- fail "datahub.auth.groupProvisioning is no longer supported. DataHub browser access must not depend on OIDC group claims; use global.identity.accessRoles and client roles." -}}
-{{- end -}}
-{{- range $envName := list "JUPYTERHUB_GROUPS_CLAIM" "JUPYTERHUB_ALLOWED_GROUP" "JUPYTERHUB_ADMIN_GROUP" -}}
-  {{- if hasKey $jupyterhubExtraEnv $envName -}}
-    {{- fail (printf "jupyterhub.hub.extraEnv.%s is no longer supported. Use JUPYTERHUB_ROLES_CLAIM, JUPYTERHUB_ALLOWED_ROLES, and JUPYTERHUB_ADMIN_ROLES." $envName) -}}
-  {{- end -}}
-{{- end -}}
-{{- range $clientName, $clientConfig := dict "cloudbeaverProxy" $cloudbeaverIdentity "prefectProxy" $prefectIdentity "rangerProxy" $rangerProxyIdentity -}}
-  {{- if hasKey $clientConfig "allowedGroups" -}}
-    {{- fail (printf "global.identity.external.clients.%s.allowedGroups is no longer supported. Browser access is derived from global.identity.accessRoles appAccess and enforced with Keycloak client roles." $clientName) -}}
-  {{- end -}}
-{{- end -}}
 {{- if and (default false $identity.enabled) (eq (len $accessRoles) 0) -}}
 {{- fail "global.identity.accessRoles must define at least one role when shared identity is enabled." -}}
 {{- end -}}
@@ -122,9 +100,6 @@
   {{- end -}}
   {{- if and (default false $identity.enabled) (gt (len $accessRoles) 0) (eq (len $accessModelRoleKeys) 0) -}}
     {{- fail "global.identity.accessRoles must have at least one role with enabled=true when shared identity is enabled." -}}
-  {{- end -}}
-  {{- if hasKey $platformHomeValues "launchers" -}}
-    {{- fail "platformHome.launchers is no longer supported. JupyterHub is served as a regular app tile; MinIO Console is enabled automatically when minio.enabled=true." -}}
   {{- end -}}
 {{- if and (default false $identity.enabled) (or (not $hasEnvironment) (not (has $environment (list "local" "dev" "prod")))) -}}
 {{- fail "global.environment must be set to local, dev, or prod when shared identity is enabled." -}}

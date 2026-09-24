@@ -1,7 +1,0 @@
-datahub:
-  auth:
-    groupProvisioning:
-      enabled: true
-      groupsClaim: platform_groups
-      viewers:
-        - data-analyst
