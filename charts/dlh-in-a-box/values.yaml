@@ -152,13 +152,6 @@ global:
           clientSecretKey: minioClientSecret
           redirectUris: []
           webOrigins: []
-        vault:
-          enabled: false
-          clientId: ""
-          existingSecret: dlh-oidc-clients
-          clientSecretKey: vaultClientSecret
-          redirectUris: []
-          webOrigins: []
         jupyterhub:
           enabled: false
           clientId: ""
@@ -888,7 +881,7 @@ prefect:
       annotations: {}
       labels: {}
       # Use this for image pull secrets created outside this chart, such as
-      # Vault Secrets Operator or External Secrets Operator outputs. When
+      # External Secrets Operator outputs. When
       # pullSecret.create=true, the created pull secret is added automatically.
       imagePullSecrets: []
     pullSecret:
@@ -1400,12 +1393,3 @@ hive:
     enabled: false
     className: ""
     tlsSecretName: ""
-
-vault:
-  enabled: false
-  server:
-    readinessProbe:
-      # The upstream exec probe can take slightly more than 3 seconds on local
-      # kind clusters, which leads to readiness flapping even when Vault is
-      # healthy. Use a less brittle timeout as the umbrella default.
-      timeoutSeconds: 5

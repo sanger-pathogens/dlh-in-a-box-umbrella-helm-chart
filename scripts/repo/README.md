@@ -31,7 +31,6 @@ What it does:
 - checks for required bundled notice and license files
 - verifies dependencies in `Chart.lock` are documented in notice files
 - enforces modification notices on the locally patched Trino files
-- checks the Vault archive still contains its license
 
 Run this when:
 

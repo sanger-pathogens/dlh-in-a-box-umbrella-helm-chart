@@ -322,31 +322,6 @@ data:
               claim.value: "consoleAdmin"
               jsonType.label: String
     {{- end }}
-    {{- if .Values.global.identity.external.clients.vault.enabled }}
-      - clientId: {{ .Values.global.identity.external.clients.vault.clientId | quote }}
-        name: Vault
-        description: OIDC client for Vault UI browser login
-        enabled: true
-        protocol: openid-connect
-        publicClient: false
-        standardFlowEnabled: true
-        directAccessGrantsEnabled: false
-        serviceAccountsEnabled: false
-        secret: "$(env:KC_VAULT_CLIENT_SECRET)"
-        redirectUris:
-        {{- range .Values.global.identity.external.clients.vault.redirectUris }}
-          - {{ . | quote }}
-        {{- end }}
-        webOrigins:
-        {{- range .Values.global.identity.external.clients.vault.webOrigins }}
-          - {{ . | quote }}
-        {{- end }}
-        defaultClientScopes:
-          - profile
-          - email
-          - roles
-          - platform-access
-    {{- end }}
     {{- if .Values.global.identity.external.clients.jupyterhub.enabled }}
       - clientId: {{ .Values.global.identity.external.clients.jupyterhub.clientId | quote }}
         name: JupyterHub

@@ -69,9 +69,6 @@ datahub:
 hive:
   enabled: false
 
-vault:
-  enabled: false
-
 superset:
   enabled: true
   image:
