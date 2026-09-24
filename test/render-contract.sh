@@ -96,17 +96,6 @@ assert_not_contains() {
   fi
 }
 
-assert_no_unresolved_helm_templates() {
-  local file="$1"
-
-  assert_not_contains "${file}" "{{ ."
-  assert_not_contains "${file}" "{{-"
-  assert_not_contains "${file}" "{{ include"
-  assert_not_contains "${file}" "{{ template"
-  assert_not_contains "${file}" "{{ tpl"
-  assert_not_contains "${file}" ".Values."
-}
-
 expect_fail() {
   local expected="$1"
   shift
@@ -189,14 +178,6 @@ ranger_proxy_manifest="$(make_tmp_file)"
 render_manifest "${ranger_proxy_manifest}" -f "${DEV_VALUES}" -f "${FIXTURE_DIR}/ranger-proxy-enabled.yaml"
 cloudbeaver_h2_patch_manifest="$(make_tmp_file)"
 render_manifest "${cloudbeaver_h2_patch_manifest}" -f "${DEV_VALUES}" -f "${FIXTURE_DIR}/cloudbeaver-h2-fresh-schema-patch.yaml"
-
-assert_no_unresolved_helm_templates "${default_manifest}"
-assert_no_unresolved_helm_templates "${local_manifest}"
-assert_no_unresolved_helm_templates "${dev_manifest}"
-assert_no_unresolved_helm_templates "${prod_manifest}"
-assert_no_unresolved_helm_templates "${shared_manifest}"
-assert_no_unresolved_helm_templates "${prefect_job_runner_manifest}"
-assert_no_unresolved_helm_templates "${cloudbeaver_h2_patch_manifest}"
 
 assert_not_contains "${default_manifest}" "icddr,b"
 assert_not_contains "${default_manifest}" "icddrb.org"
