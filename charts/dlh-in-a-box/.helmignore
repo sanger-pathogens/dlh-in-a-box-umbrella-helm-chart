@@ -7,3 +7,7 @@ __pycache__/
 
 # Orphaned staging directories from an interrupted `helm dependency update`
 tmpcharts-*/
+
+# Test files don't need to be included in the packaged chart
+tests/
+*/__snapshot__/*
