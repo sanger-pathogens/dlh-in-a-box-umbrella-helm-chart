@@ -65,12 +65,6 @@
 {{- $accessModelRoleKeys := dict -}}
 {{- $accessModelAppAccess := dict -}}
 
-{{- if hasKey .Values "identity" -}}
-{{- fail "The top-level identity block is no longer supported. Move all shared identity settings under global.identity." -}}
-{{- end -}}
-{{- if hasKey .Values "authorization" -}}
-{{- fail "The top-level authorization block is no longer supported. Move all Ranger settings under global.authorization." -}}
-{{- end -}}
 {{- if hasKey $authorization "platformRoleMembershipSource" -}}
 {{- fail "global.authorization.platformRoleMembershipSource is no longer supported. Keycloak is the source of truth for platform roles and role membership." -}}
 {{- end -}}

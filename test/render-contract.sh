@@ -515,11 +515,6 @@ expect_fail_any \
   -f "${FIXTURE_DIR}/missing-identity-environment.yaml"
 
 expect_fail \
-  "The top-level identity block is no longer supported. Move all shared identity settings under global.identity." \
-  -f "${DEV_VALUES}" \
-  -f "${FIXTURE_DIR}/legacy-top-level-identity.yaml"
-
-expect_fail \
   "Use global.identity.external.clients.trino.passwordAuthEnabled instead of trino.server.config.authenticationType=PASSWORD when shared identity is enabled." \
   -f "${DEV_VALUES}" \
   -f "${FIXTURE_DIR}/legacy-trino-authentication-type.yaml"
