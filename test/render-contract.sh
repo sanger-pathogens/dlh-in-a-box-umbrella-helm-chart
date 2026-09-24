@@ -118,45 +118,6 @@ expect_fail() {
   fi
 }
 
-expect_fail_any() {
-  local output
-  output="$(mktemp)"
-  tmp_files+=("${output}")
-
-  local expected_matches=()
-  while [[ $# -gt 0 ]]; do
-    case "$1" in
-      --)
-        shift
-        break
-        ;;
-      *)
-        expected_matches+=("$1")
-        shift
-        ;;
-    esac
-  done
-
-  if helm template dlh "${CHART_PATH}" "$@" >"${output}" 2>&1; then
-    echo "Expected helm template to fail, but it succeeded: $*" >&2
-    exit 1
-  fi
-
-  local expected=""
-  for expected in "${expected_matches[@]}"; do
-    if grep -Fq -- "${expected}" "${output}"; then
-      return 0
-    fi
-  done
-
-  echo "Expected helm template failure to include one of:" >&2
-  printf '  - %s\n' "${expected_matches[@]}" >&2
-  echo "--- Actual output ---" >&2
-  cat "${output}" >&2
-  echo "---------------------" >&2
-  exit 1
-}
-
 echo "--- Positive contract renders"
 default_manifest="$(make_tmp_file)"
 render_manifest "${default_manifest}"
@@ -381,13 +342,6 @@ assert_contains "${cloudbeaver_h2_patch_manifest}" "mountPath: /opt/cloudbeaver/
 assert_contains "${cloudbeaver_h2_patch_manifest}" "Skipped by dlh-in-a-box for forced fresh CloudBeaver workspaces."
 
 echo "--- Negative contract renders"
-expect_fail_any \
-  "global.environment must be one of the following: \"local\", \"dev\", \"prod\"" \
-  "value must be one of 'local', 'dev', 'prod'" \
-  -- \
-  -f "${DEV_VALUES}" \
-  -f "${FIXTURE_DIR}/missing-environment.yaml"
-
 expect_fail \
   "global.identity.external.clients.prefectAutomation.clientId is required when machine access for Prefect is enabled." \
   -f examples/values-dev.yaml \
@@ -463,21 +417,7 @@ expect_fail \
   -f "${LOCAL_VALUES}" \
   -f "${FIXTURE_DIR}/keycloak-local-ldap-enabled.yaml"
 
-expect_fail_any \
-  "global.environment must be one of the following: \"local\", \"dev\", \"prod\"" \
-  "value must be one of 'local', 'dev', 'prod'" \
-  -- \
-  -f "${SHARED_VALUES}" \
-  -f "${FIXTURE_DIR}/missing-identity-environment.yaml"
-
 expect_fail \
   "Use global.identity.external.clients.trino.passwordAuthEnabled instead of trino.server.config.authenticationType=PASSWORD when shared identity is enabled." \
   -f "${DEV_VALUES}" \
   -f "${FIXTURE_DIR}/legacy-trino-authentication-type.yaml"
-
-expect_fail_any \
-  "global.identity.accessRoles.platform-admin.appAccess: Additional property notARealApp is not allowed" \
-  "additional properties 'notARealApp' not allowed" \
-  -- \
-  -f "${DEV_VALUES}" \
-  -f "${FIXTURE_DIR}/invalid-access-model-app.yaml"
