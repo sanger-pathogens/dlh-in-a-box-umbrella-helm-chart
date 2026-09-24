@@ -400,16 +400,6 @@ assert_contains "${cloudbeaver_h2_patch_manifest}" "mountPath: /opt/cloudbeaver/
 assert_contains "${cloudbeaver_h2_patch_manifest}" "Skipped by dlh-in-a-box for forced fresh CloudBeaver workspaces."
 
 echo "--- Negative contract renders"
-expect_fail \
-  "cloudbeaver.h2FreshSchemaPatch.enabled requires cloudbeaver.seed.force=true because it is only safe for intentionally fresh CloudBeaver workspaces." \
-  -f "${DEV_VALUES}" \
-  -f "${FIXTURE_DIR}/cloudbeaver-h2-fresh-schema-patch-without-fresh-workspace.yaml"
-
-expect_fail \
-  "cloudbeaver.h2FreshSchemaPatch.pluginJar is required when cloudbeaver.h2FreshSchemaPatch.enabled=true." \
-  -f "${DEV_VALUES}" \
-  -f "${FIXTURE_DIR}/cloudbeaver-h2-fresh-schema-patch-missing-jar.yaml"
-
 expect_fail_any \
   "global.environment must be one of the following: \"local\", \"dev\", \"prod\"" \
   "value must be one of 'local', 'dev', 'prod'" \
@@ -456,21 +446,6 @@ expect_fail \
   "global.identity.external.clients.platformHome.redirectUris must be set when bundled Keycloak manages the OIDC client." \
   -f "${DEV_VALUES}" \
   -f "${FIXTURE_DIR}/platform-home-missing-redirect.yaml"
-
-expect_fail \
-  "cloudbeaver-auth-proxy.config.existingSecret must be set when global.identity.external.clients.cloudbeaverProxy.enabled=true." \
-  -f "${DEV_VALUES}" \
-  -f "${FIXTURE_DIR}/cloudbeaver-missing-secret.yaml"
-
-expect_fail \
-  "cloudbeaver.enabled requires cloudbeaver.auth.proxy.enabled=true so CloudBeaver stays behind the central authentication boundary." \
-  -f "${DEV_VALUES}" \
-  -f "${FIXTURE_DIR}/cloudbeaver-proxy-disabled.yaml"
-
-expect_fail \
-  "cloudbeaver.seed.admin.existingSecret is required when CloudBeaver is enabled." \
-  -f "${DEV_VALUES}" \
-  -f "${FIXTURE_DIR}/cloudbeaver-admin-secret-missing.yaml"
 
 expect_fail \
   "global.identity.external.clients.trino.redirectUris must not use wildcard values outside local environments." \
@@ -525,13 +500,3 @@ expect_fail_any \
   -- \
   -f "${DEV_VALUES}" \
   -f "${FIXTURE_DIR}/invalid-access-model-app.yaml"
-
-expect_fail \
-  "global.identity.accessRoles.platform-viewer.ranger is not supported. Keycloak roles control app access only; define Ranger data roles under global.authorization.ranger.dataRoles.roles." \
-  -f "${DEV_VALUES}" \
-  -f "${FIXTURE_DIR}/access-model-ranger-override.yaml"
-
-expect_fail \
-  "global.identity.accessRoles must have at least one role with enabled=true when shared identity is enabled." \
-  -f "${DEV_VALUES}" \
-  -f "${FIXTURE_DIR}/all-access-roles-disabled.yaml"

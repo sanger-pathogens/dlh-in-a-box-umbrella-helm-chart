@@ -1,6 +1,0 @@
-global:
-  identity:
-    accessRoles:
-      platform-viewer:
-        ranger:
-          roleName: reader

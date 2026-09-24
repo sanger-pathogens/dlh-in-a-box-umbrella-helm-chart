@@ -1,0 +1,57 @@
+suite: Tests for Cloudbeaver integration
+
+values:
+  - ../../../examples/values-dev.yaml
+
+tests:
+  - it: asserts that the Cloudbeaver admin secret must be provided if Cloudbeaver is enabled
+    set:
+      cloudbeaver.seed.admin.existingSecret: ""
+    asserts:
+      - failedTemplate:
+          errorMessage: "cloudbeaver.seed.admin.existingSecret is required when CloudBeaver is enabled."
+  - it: asserts that the Cloudbeaver auth proxy secret must be provided if Cloudbeaver proxy is enabled
+    set:
+      global:
+        identity:
+          external:
+            clients:
+              cloudbeaverProxy:
+                existingSecret: ""
+
+      cloudbeaver-auth-proxy:
+        config:
+          existingSecret: ""
+    asserts:
+      - failedTemplate:
+          errorMessage: "cloudbeaver-auth-proxy.config.existingSecret must be set when global.identity.external.clients.cloudbeaverProxy.enabled=true."
+  - it: asserts that the Cloudbeaver auth proxy is enabled if Cloudbeaver is enabled
+    set:
+      cloudbeaver:
+        auth:
+          proxy:
+            enabled: false
+          local:
+            enabled: true
+    asserts:
+      - failedTemplate:
+          errorMessage: "cloudbeaver.enabled requires cloudbeaver.auth.proxy.enabled=true so CloudBeaver stays behind the central authentication boundary."
+  - it: asserts that cloudbeaver.h2FreshSchemaPatch.enabled requires cloudbeaver.seed.force=true
+    set:
+      cloudbeaver:
+        h2FreshSchemaPatch:
+          enabled: true
+          pluginJar: io.cloudbeaver.service.security_1.0.89.202511171057.jar
+    asserts:
+      - failedTemplate:
+          errorMessage: "cloudbeaver.h2FreshSchemaPatch.enabled requires cloudbeaver.seed.force=true because it is only safe for intentionally fresh CloudBeaver workspaces."
+  - it: asserts that the plugin JAR is provided when cloudbeaver.h2FreshSchemaPatch.enabled=true
+    set:
+      cloudbeaver:
+        seed:
+          force: true
+        h2FreshSchemaPatch:
+          enabled: true
+    asserts:
+      - failedTemplate:
+          errorMessage: "cloudbeaver.h2FreshSchemaPatch.pluginJar is required when cloudbeaver.h2FreshSchemaPatch.enabled=true."
