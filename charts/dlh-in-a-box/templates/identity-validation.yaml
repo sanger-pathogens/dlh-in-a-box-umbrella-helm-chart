@@ -209,7 +209,7 @@
   URIs and web origins from Superset's own origin, so there is nothing here for
   an operator to get wrong.
 */ -}}
-{{- range $clientName := list "trino" "datahub" "platformHome" "minio" "vault" "jupyterhub" "cloudbeaverProxy" "rangerProxy" "prefectProxy" -}}
+{{- range $clientName := list "trino" "datahub" "platformHome" "minio" "jupyterhub" "cloudbeaverProxy" "rangerProxy" "prefectProxy" -}}
   {{- $client := get $clients $clientName | default dict -}}
   {{- if and (eq $providerMode "bundledKeycloak") (default false (get $client "enabled")) -}}
     {{- $redirectUris := get $client "redirectUris" | default list -}}

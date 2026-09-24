@@ -31,7 +31,6 @@ node "Developer laptop" as laptop {
           database "Hive PostgreSQL\nmetastore database" as hive_db
           component "Prefect Server + Worker\nworkflow orchestration" as prefect
           component "Spark Operator\nSpark jobs on Kubernetes" as spark_operator
-          component "Vault dev mode\ndemo secret store" as vault
         }
       }
     }
@@ -59,7 +58,6 @@ hive --> hive_db : Store metastore state
 trino --> minio : Query objects through S3 API
 prefect --> cluster : Schedule and monitor workflow pods
 spark_operator --> cluster : Manage SparkApplication pods
-vault --> namespace : Provide demo local secrets
 
 note left of tools
 Local install flow:

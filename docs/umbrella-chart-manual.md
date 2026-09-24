@@ -87,7 +87,7 @@ This repo does not:
 - generate safe production secrets
 - decide your institution's governance policy for you
 - replace upstream documentation for Trino, Keycloak, Superset, Prefect,
-  JupyterHub, DataHub, Vault, or MinIO
+  JupyterHub, DataHub, or MinIO
 
 It is a platform assembly layer, not a cluster bootstrap toolkit and not a
 generic replacement for the upstream products it packages.
@@ -195,7 +195,6 @@ The local minimal path is primarily proving:
 - MinIO-backed storage
 - Prefect server and worker
 - Spark Operator
-- Vault in dev mode
 
 ### Common First-Time Failures
 
@@ -225,7 +224,6 @@ flowchart TD
     JupyterUi[JupyterHub optional]
     SupersetUi[Superset optional]
     DataHubUi[DataHub optional]
-    VaultUi[Vault UI optional]
     MinioUi[MinIO console optional]
   end
 
@@ -256,10 +254,9 @@ flowchart TD
     SparkOperator[Spark Operator optional]
   end
 
-  subgraph Storage["Storage and secrets"]
+  subgraph Storage["Storage"]
     MinIO[MinIO optional]
     ExternalS3[External S3 optional]
-    Vault[Vault optional]
   end
 
   subgraph Backing["Backing services"]
@@ -288,15 +285,12 @@ flowchart TD
   SupersetUi --> ExternalOidc
   DataHubUi --> Keycloak
   DataHubUi --> ExternalOidc
-  VaultUi --> Keycloak
-  VaultUi --> ExternalOidc
   MinioUi --> Keycloak
   MinioUi --> ExternalOidc
 
   Portal --> CloudBeaverProxy
   Portal --> PrefectProxy
   Portal --> JupyterUi
-  Portal --> VaultUi
 
   TrinoUi --> Trino
   CloudBeaverProxy --> CloudBeaver
@@ -305,7 +299,6 @@ flowchart TD
   JupyterUi --> JupyterHub
   SupersetUi --> Superset
   DataHubUi --> DataHub
-  VaultUi --> Vault
   MinioUi --> MinIO
 
   CloudBeaver --> Trino
@@ -425,16 +418,16 @@ flowchart TD
 
 ### Full Install Profiles
 
-| File | Auth model | Storage model | Main components | Use it when | Avoid it when |
-| --- | --- | --- | --- | --- | --- |
-| `values-local.yaml` | no shared identity contract | MinIO | Trino, Hive, Prefect, Spark Operator, Vault | you want the cleanest first local install | you need browser auth or Ranger |
+| File | Auth model | Storage model | Main components                                                                    | Use it when | Avoid it when |
+| --- | --- | --- |------------------------------------------------------------------------------------| --- | --- |
+| `values-local.yaml` | no shared identity contract | MinIO | Trino, Hive, Prefect, Spark Operator                                               | you want the cleanest first local install | you need browser auth or Ranger |
 | `values-local-auth.yaml` | bundled Keycloak plus `keycloakLocal` | MinIO | local stack plus Keycloak, Ranger, `platformHome`, CloudBeaver, Prefect auth proxy | you are testing auth, proxies, and local governance | you want the easiest first install |
-| `values-local-layers.yaml` | no shared identity contract | MinIO | local stack with layered bronze, silver, gold, and geospatial catalogs | you are testing catalog iteration or layered datasets | you need shared-auth behavior |
-| `values-local-superset.yaml` | local Superset bootstrap rather than shared OIDC pattern | MinIO | Trino plus Superset-focused local stack | you are focusing on a local BI-only path | you need the broader shared browser stack |
-| `values-dev.yaml` | bundled Keycloak plus external LDAP | external S3 | Trino, Ranger, `platformHome`, JupyterHub, CloudBeaver, Prefect | you want the main shared development baseline | you already have an external OIDC provider |
-| `values-prod.yaml` | bundled Keycloak plus external LDAP | external S3 | production-shaped shared stack with stricter assumptions | you want the main production-shaped baseline | you want a fully turnkey production deployment with no external prep |
-| `values-shared-auth.yaml` | external OIDC plus external LDAP | external S3 | shared browser stack without bundled Keycloak, including Superset and DataHub | your organization already has an OIDC provider | you need the bundled Keycloak path |
-| `values-prod-layers.yaml` | layered production-shaped shared auth inherited from its profile | external S3 | governed layered catalogs plus Hive and Vault | you are modeling layered governed production datasets | you need a minimal starting point |
+| `values-local-layers.yaml` | no shared identity contract | MinIO | local stack with layered bronze, silver, gold, and geospatial catalogs             | you are testing catalog iteration or layered datasets | you need shared-auth behavior |
+| `values-local-superset.yaml` | local Superset bootstrap rather than shared OIDC pattern | MinIO | Trino plus Superset-focused local stack                                            | you are focusing on a local BI-only path | you need the broader shared browser stack |
+| `values-dev.yaml` | bundled Keycloak plus external LDAP | external S3 | Trino, Ranger, `platformHome`, JupyterHub, CloudBeaver, Prefect                    | you want the main shared development baseline | you already have an external OIDC provider |
+| `values-prod.yaml` | bundled Keycloak plus external LDAP | external S3 | production-shaped shared stack with stricter assumptions                           | you want the main production-shaped baseline | you want a fully turnkey production deployment with no external prep |
+| `values-shared-auth.yaml` | external OIDC plus external LDAP | external S3 | shared browser stack without bundled Keycloak, including Superset and DataHub      | your organization already has an OIDC provider | you need the bundled Keycloak path |
+| `values-prod-layers.yaml` | layered production-shaped shared auth inherited from its profile | external S3 | governed layered catalogs plus Hive                                                | you are modeling layered governed production datasets | you need a minimal starting point |
 
 ### Specialist Overlays
 
@@ -513,7 +506,6 @@ The most important dependencies are:
 | DataHub and DataHub prerequisites | metadata and discovery UI plus Kafka, Zookeeper, and MySQL-facing dependencies |
 | JupyterHub | notebook environment with shared identity |
 | Superset | BI application |
-| Vault | optional secrets tooling and UI |
 | PostgreSQL aliases | backing databases for Ranger and Hive |
 
 ### Files That Move Together During Dependency Changes
@@ -565,7 +557,6 @@ These mostly expose upstream chart values at the umbrella level:
 - `datahubPrerequisites`
 - `superset`
 - `jupyterhub`
-- `vault`
 - `rangerPostgresql`
 - `sharedPostgresql`
 
@@ -736,7 +727,6 @@ flowchart TD
     JupyterHub[JupyterHub]
     Superset[Superset]
     DataHub[DataHub]
-    VaultUi[Vault UI]
     MinioUi[MinIO console]
   end
 
@@ -764,7 +754,6 @@ flowchart TD
   Users --> JupyterHub
   Users --> Superset
   Users --> DataHub
-  Users --> VaultUi
   Users --> MinioUi
 
   Portal --> Keycloak
@@ -783,8 +772,6 @@ flowchart TD
   Superset --> ExternalOidc
   DataHub --> Keycloak
   DataHub --> ExternalOidc
-  VaultUi --> Keycloak
-  VaultUi --> ExternalOidc
   MinioUi --> Keycloak
   MinioUi --> ExternalOidc
 
@@ -840,7 +827,6 @@ The chart's identity model has two different axes.
 | JupyterHub | direct OIDC | JupyterHub is configured as an OIDC client |
 | Superset | direct OIDC | Superset is configured as an OIDC client |
 | DataHub | direct OIDC | DataHub frontend uses OIDC configuration |
-| Vault UI | direct OIDC when enabled that way | the chart can wire Vault UI into shared identity |
 | MinIO console | direct OIDC when enabled that way | the chart can wire MinIO into shared identity |
 | CloudBeaver | oauth2-proxy in front of the app | the browser boundary is handled by the proxy |
 | Prefect | oauth2-proxy in front of the app | the browser boundary is handled by the proxy |
@@ -1086,7 +1072,6 @@ identical service names and secret shapes on their own.
 | Superset | optional | upstream dependency | BI application | direct OIDC client in shared environments |
 | DataHub | optional | upstream dependency plus repo-owned compatibility glue | metadata discovery UI | internal auth secrets are generated and preserved across upgrades |
 | MinIO | optional | upstream dependency | in-cluster object store | common local default |
-| Vault | optional | upstream dependency | optional secrets tooling and UI | can be part of the shared browser-auth story |
 | Spark Operator | optional | upstream dependency | Spark CRD and operator support | present in several local and shared profiles |
 
 ### Behavior-Heavy Components Worth Reading In Code
