@@ -1,0 +1,55 @@
+suite: Trino
+
+tests:
+  - it: Assert Trino redirect URIs cannot use wildcard values in a non-local environment
+    values:
+      - ../../../examples/values-prod.yaml
+    set:
+      global.identity.external.clients.trino.redirectUris:
+                  - https://*.data-platform.example.org/oauth2/callback
+    asserts:
+      - failedTemplate:
+          errorMessage: "global.identity.external.clients.trino.redirectUris must not use wildcard values outside local environments."
+  - it: Test Trino redirect URIs using wildcard values in a local environment
+    values:
+      - ../../../examples/values-local-auth.yaml
+    set:
+      global.identity.external.clients.trino.redirectUris:
+                  - https://*.data-platform.example.org/oauth2/callback
+    asserts:
+      - notFailedTemplate: {}
+  - it: Assert LDAP URL is required when Trino identity integration is enabled
+    values:
+      - ../../../examples/values-dev.yaml
+    set:
+      global.identity.directory.ldap.url: ""
+    asserts:
+      - failedTemplate:
+          errorMessage: "global.identity.directory.ldap.url is required when Trino identity integration is enabled."
+  - it: Test password auth mode must be file when keycloakLocal is used
+    values:
+      - ../../../examples/values-local-auth.yaml
+    set:
+      global:
+        identity:
+          directory:
+            mode: keycloakLocal
+            ldap:
+              enabled: false
+          external:
+            clients:
+              trino:
+                enabled: true
+                passwordAuthEnabled: true
+                passwordAuthMode: ldap-file
+    asserts:
+      - failedTemplate:
+          errorMessage: "global.identity.external.clients.trino.passwordAuthMode must be file when global.identity.directory.mode=keycloakLocal. LDAP PASSWORD auth is not allowed in that mode."
+  - it: Test legacy Trino authentication mode is not supported with shared identity
+    values:
+      - ../../../examples/values-dev.yaml
+    set:
+      trino.server.config.authenticationType: PASSWORD
+    asserts:
+      - failedTemplate:
+          errorMessage: "Use global.identity.external.clients.trino.passwordAuthEnabled instead of trino.server.config.authenticationType=PASSWORD when shared identity is enabled."

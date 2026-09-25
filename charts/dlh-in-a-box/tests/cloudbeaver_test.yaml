@@ -1,4 +1,4 @@
-suite: Tests for Cloudbeaver integration
+suite: Cloudbeaver
 
 values:
   - ../../../examples/values-dev.yaml

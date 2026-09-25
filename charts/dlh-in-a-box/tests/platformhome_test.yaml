@@ -1,0 +1,12 @@
+suite: PlatformHome
+
+values:
+  - ../../../examples/values-dev.yaml
+
+tests:
+  - it: Assert redirectUris required when bundled Keycloak used
+    set:
+      global.identity.external.clients.platformHome.redirectUris: [ ]
+    asserts:
+      - failedTemplate:
+          errorMessage: "global.identity.external.clients.platformHome.redirectUris must be set when bundled Keycloak manages the OIDC client."

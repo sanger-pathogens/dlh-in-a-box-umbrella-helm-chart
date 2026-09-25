@@ -1,0 +1,116 @@
+suite: Prefect
+
+values:
+  - ../../../examples/values-dev.yaml
+
+tests:
+  - it: Assert Client ID required when Prefect Automation is enabled
+    set:
+      global:
+        identity:
+          external:
+            clients:
+              prefectAutomation:
+                enabled: true
+                clientId: ""
+    asserts:
+      - failedTemplate:
+          errorMessage: "global.identity.external.clients.prefectAutomation.clientId is required when machine access for Prefect is enabled."
+  - it: Assert Prefect AuthProxy required when Prefect Automation is enabled
+    set:
+      prefect:
+        authProxy:
+          enabled: false
+      global:
+        identity:
+          external:
+            clients:
+              prefectProxy:
+                enabled: false
+              prefectAutomation:
+                enabled: true
+                clientId: prefect-automation
+    asserts:
+      - failedTemplate:
+          errorMessage: "global.identity.external.clients.prefectAutomation.enabled requires prefect.authProxy.enabled=true."
+  - it: Assert Prefect Automation enabled requires PrefectProxy to be enabled
+    set:
+      global:
+        identity:
+          external:
+            clients:
+              prefectProxy:
+                enabled: false
+              prefectAutomation:
+                enabled: true
+                clientId: prefect-automation
+    asserts:
+      - failedTemplate:
+          errorMessage: "global.identity.external.clients.prefectAutomation.enabled requires global.identity.external.clients.prefectProxy.enabled=true."
+  - it: Assert developer access to Prefect via Direct Grant requires client ID to be set
+    set:
+      global:
+        identity:
+          external:
+            clients:
+              prefectDirectGrant:
+                enabled: true
+                clientId: ""
+                tokenAudience: prefect-api
+    asserts:
+      - failedTemplate:
+          errorMessage: "global.identity.external.clients.prefectDirectGrant.clientId is required when developer access for Prefect is enabled."
+  - it: Assert developer access to Prefect via Direct Grant requires Prefect AuthProxy to be enabled
+    set:
+      prefect:
+        authProxy:
+          enabled: false
+      global:
+        identity:
+          external:
+            clients:
+              prefectProxy:
+                enabled: false
+              prefectDirectGrant:
+                enabled: true
+                clientId: prefect-cli
+                tokenAudience: prefect-api
+    asserts:
+      - failedTemplate:
+          errorMessage: "global.identity.external.clients.prefectDirectGrant.enabled requires prefect.authProxy.enabled=true."
+  - it: Assert developer access to Prefect via Direct Grant requires PrefectProxy to be enabled
+    set:
+      global:
+        identity:
+          external:
+            clients:
+              prefectProxy:
+                enabled: false
+              prefectDirectGrant:
+                enabled: true
+                clientId: prefect-cli
+                tokenAudience: prefect-api
+    asserts:
+      - failedTemplate:
+          errorMessage: "global.identity.external.clients.prefectDirectGrant.enabled requires global.identity.external.clients.prefectProxy.enabled=true."
+  - it: Assert token audiences must match when both token clients are enabled
+    set:
+      global:
+        identity:
+          external:
+            clients:
+              prefectAutomation:
+                enabled: true
+                clientId: prefect-automation
+                configCliSecretKey: KC_PREFECT_AUTOMATION_CLIENT_SECRET
+                tokenAudience: prefect-api
+                serviceAccountsEnabled: true
+                standardFlowEnabled: false
+                directAccessGrantsEnabled: false
+              prefectDirectGrant:
+                enabled: true
+                clientId: prefect-cli
+                tokenAudience: some-other-audience
+    asserts:
+      - failedTemplate:
+          errorMessage: "global.identity.external.clients.prefectAutomation.tokenAudience must match global.identity.external.clients.prefectDirectGrant.tokenAudience when both Prefect bearer-token clients are enabled."

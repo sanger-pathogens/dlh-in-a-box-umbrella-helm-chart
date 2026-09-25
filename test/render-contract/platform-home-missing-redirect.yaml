@@ -1,6 +1,0 @@
-global:
-  identity:
-    external:
-      clients:
-        platformHome:
-          redirectUris: []

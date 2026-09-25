@@ -1,0 +1,24 @@
+suite: Ranger
+
+tests:
+  - it: Test Ranger UserSync is not enabled when keycloakLocal is used
+    values:
+      - ../../../examples/values-local-auth.yaml
+    set:
+      global:
+        identity:
+          directory:
+            mode: keycloakLocal
+            ldap:
+              enabled: false
+          external:
+            clients:
+              trino:
+                enabled: false
+        authorization:
+          ranger:
+            usersync:
+              enabled: true
+    asserts:
+      - failedTemplate:
+          errorMessage: "global.authorization.ranger.usersync.enabled must be false when global.identity.directory.mode=keycloakLocal."
