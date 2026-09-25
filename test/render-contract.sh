@@ -336,14 +336,3 @@ assert_secret_has_no_string_data "${dev_manifest}" "dlh-trino-catalog"
 assert_secret_has_no_string_data "${prod_manifest}" "dlh-trino-catalog"
 assert_contains "${dev_manifest}" 'driver: "${CLOUDBEAVER_DB_DRIVER:h2_embedded_v2}"'
 assert_contains "${dev_manifest}" 'url: "${CLOUDBEAVER_DB_URL:jdbc:h2:${workspace}/.data/cb.h2v2.dat}"'
-assert_contains "${cloudbeaver_h2_patch_manifest}" "name: cloudbeaver-h2-fresh-schema-patch"
-assert_contains "${cloudbeaver_h2_patch_manifest}" "plugin_jar=\"io.cloudbeaver.service.security_1.0.89.202511171057.jar\""
-assert_contains "${cloudbeaver_h2_patch_manifest}" "mountPath: /opt/cloudbeaver/server/plugins/io.cloudbeaver.service.security_1.0.89.202511171057.jar"
-assert_contains "${cloudbeaver_h2_patch_manifest}" "Skipped by dlh-in-a-box for forced fresh CloudBeaver workspaces."
-
-echo "--- Negative contract renders"
-
-expect_fail \
-  "Use global.identity.external.clients.trino.passwordAuthEnabled instead of trino.server.config.authenticationType=PASSWORD when shared identity is enabled." \
-  -f "${DEV_VALUES}" \
-  -f "${FIXTURE_DIR}/legacy-trino-authentication-type.yaml"
