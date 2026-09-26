@@ -1,5 +1,0 @@
-cloudbeaver:
-  seed:
-    force: true
-  h2FreshSchemaPatch:
-    enabled: true

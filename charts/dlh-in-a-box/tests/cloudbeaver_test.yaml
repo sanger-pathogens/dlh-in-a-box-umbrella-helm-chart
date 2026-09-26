@@ -61,7 +61,13 @@ tests:
       name: dlh
     values:
       - ../../../examples/values-dev.yaml
-      - ../../../test/render-contract/cloudbeaver-h2-fresh-schema-patch.yaml
+    set:
+      cloudbeaver:
+        seed:
+          force: true
+        h2FreshSchemaPatch:
+          enabled: true
+          pluginJar: io.cloudbeaver.service.security_1.0.89.202511171057.jar
     documentSelector:
       path: metadata.name
       value: dlh-cloudbeaver

@@ -111,35 +111,6 @@ render_manifest "${prefect_job_runner_manifest}" --namespace dlh-dev -f "${DEV_V
 ranger_proxy_manifest="$(make_tmp_file)"
 render_manifest "${ranger_proxy_manifest}" -f "${DEV_VALUES}" -f "${FIXTURE_DIR}/ranger-proxy-enabled.yaml"
 
-# --- Platform Home & Security Headers ---
-assert_contains "${local_manifest}" 'add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;'
-assert_contains "${local_manifest}" 'add_header X-Content-Type-Options "nosniff" always;'
-assert_contains "${local_manifest}" 'add_header Referrer-Policy "strict-origin-when-cross-origin" always;'
-assert_contains "${dev_manifest}" 'add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;'
-assert_contains "${prod_manifest}" 'add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;'
-assert_contains "${dev_manifest}" 'add_header X-Content-Type-Options "nosniff" always;'
-assert_contains "${prod_manifest}" 'add_header X-Content-Type-Options "nosniff" always;'
-assert_contains "${dev_manifest}" 'add_header Referrer-Policy "strict-origin-when-cross-origin" always;'
-assert_contains "${prod_manifest}" 'add_header Referrer-Policy "strict-origin-when-cross-origin" always;'
-
-# --- Platform Home Launcher Matrix ---
-assert_contains "${local_manifest}" "\"minio-console\": {"
-assert_contains "${local_manifest}" "\"mode\": \"minio-sso\""
-assert_contains "${local_manifest}" "\"internalApiUrl\": \"http://dlh-minio:9001\""
-assert_contains "${local_manifest}" "\"id\": \"minio-console\""
-assert_contains "${local_manifest}" "\"url\": \"/launch/minio-console\""
-assert_not_contains "${dev_manifest}" "\"minio-console\": {"
-assert_not_contains "${prod_manifest}" "\"minio-console\": {"
-assert_not_contains "${dev_manifest}" "\"id\": \"minio-console\""
-assert_not_contains "${prod_manifest}" "\"id\": \"minio-console\""
-
-# --- Platform Home Roles & Claims ---
-assert_contains "${dev_manifest}" "\"rolesClaim\": \"platform_roles\""
-assert_contains "${prod_manifest}" "\"rolesClaim\": \"platform_roles\""
-assert_contains "${dev_manifest}" "\"requiredRoles\": ["
-assert_contains "${prod_manifest}" "\"requiredRoles\": ["
-assert_contains "${dev_manifest}" "OIDC_ROLES_CLAIM"
-assert_contains "${dev_manifest}" "PLATFORM_ADMIN_ROLES"
 
 # --- Ranger Keycloak Sync & Browser Proxy ---
 assert_contains "${dev_manifest}" "wait_for_ranger_keycloak.py"

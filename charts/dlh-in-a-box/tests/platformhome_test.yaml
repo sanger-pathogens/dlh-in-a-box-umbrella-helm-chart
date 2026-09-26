@@ -10,3 +10,134 @@ tests:
     asserts:
       - failedTemplate:
           errorMessage: "global.identity.external.clients.platformHome.redirectUris must be set when bundled Keycloak manages the OIDC client."
+  - it: Assert security headers are configured on Platform Home Nginx ConfigMap
+    template: templates/platform-home.yaml
+    release:
+      name: dlh
+    documentSelector:
+      path: metadata.name
+      value: dlh-platform-home-nginx
+    asserts:
+      - isKind:
+          of: ConfigMap
+      - matchRegex:
+          path: data["default.conf"]
+          pattern: 'add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;'
+      - matchRegex:
+          path: data["default.conf"]
+          pattern: 'add_header X-Content-Type-Options "nosniff" always;'
+      - matchRegex:
+          path: data["default.conf"]
+          pattern: 'add_header Referrer-Policy "strict-origin-when-cross-origin" always;'
+  - it: Assert MinIO console SSO launcher and admin tool rendered when MinIO is enabled
+    template: templates/platform-home.yaml
+    release:
+      name: dlh
+    set:
+      minio.enabled: true
+    documentSelector:
+      path: metadata.name
+      value: dlh-platform-home-api
+    asserts:
+      - isKind:
+          of: ConfigMap
+      - matchRegex:
+          path: data["admin-config.json"]
+          pattern: '"minio-console":\s*\{'
+      - matchRegex:
+          path: data["admin-config.json"]
+          pattern: '"mode":\s*"minio-sso"'
+      - matchRegex:
+          path: data["admin-config.json"]
+          pattern: '"internalApiUrl":\s*"http://dlh-minio:9001"'
+      - matchRegex:
+          path: data["admin-config.json"]
+          pattern: '"url":\s*"/launch/minio-console"'
+  - it: Assert MinIO console SSO launcher and admin tool omitted when MinIO is disabled
+    template: templates/platform-home.yaml
+    release:
+      name: dlh
+    values:
+      - ../../../examples/values-dev.yaml
+    documentSelector:
+      path: metadata.name
+      value: dlh-platform-home-api
+    asserts:
+      - isKind:
+          of: ConfigMap
+      - notMatchRegex:
+          path: data["admin-config.json"]
+          pattern: '"minio-console"'
+      - notMatchRegex:
+          path: data["admin-config.json"]
+          pattern: '"id":\s*"minio-console"'
+  - it: Assert MinIO console admin tool rendered in portal assets when MinIO is enabled
+    template: templates/platform-home.yaml
+    release:
+      name: dlh
+    set:
+      minio.enabled: true
+    documentSelector:
+      path: metadata.name
+      value: dlh-platform-home-assets
+    asserts:
+      - isKind:
+          of: ConfigMap
+      - matchRegex:
+          path: data["config.json"]
+          pattern: '"id":\s*"minio-console"'
+      - matchRegex:
+          path: data["config.json"]
+          pattern: '"url":\s*"/launch/minio-console"'
+  - it: Assert MinIO console admin tool omitted from portal assets when MinIO is disabled
+    template: templates/platform-home.yaml
+    release:
+      name: dlh
+    documentSelector:
+      path: metadata.name
+      value: dlh-platform-home-assets
+    asserts:
+      - isKind:
+          of: ConfigMap
+      - notMatchRegex:
+          path: data["config.json"]
+          pattern: '"minio-console"'
+      - notMatchRegex:
+          path: data["config.json"]
+          pattern: '"id":\s*"minio-console"'
+  - it: Assert Platform Home OIDC roles claim and admin roles in portal config
+    template: templates/platform-home.yaml
+    release:
+      name: dlh
+    documentSelector:
+      path: metadata.name
+      value: dlh-platform-home-assets
+    asserts:
+      - isKind:
+          of: ConfigMap
+      - matchRegex:
+          path: data["config.json"]
+          pattern: '"rolesClaim":\s*"platform_roles"'
+      - matchRegex:
+          path: data["config.json"]
+          pattern: '"requiredRoles":\s*\[\s*"platform-admin"\s*\]'
+  - it: Assert Platform Home Admin API container environment variables for RBAC
+    template: templates/platform-home.yaml
+    release:
+      name: dlh
+    documentSelector:
+      path: kind
+      value: Deployment
+    asserts:
+      - isKind:
+          of: Deployment
+      - contains:
+          path: 'spec.template.spec.containers[?(@.name == "platform-home-admin-api")].env'
+          content:
+            name: OIDC_ROLES_CLAIM
+            value: "platform_roles"
+      - contains:
+          path: 'spec.template.spec.containers[?(@.name == "platform-home-admin-api")].env'
+          content:
+            name: PLATFORM_ADMIN_ROLES
+            value: "platform-admin"
