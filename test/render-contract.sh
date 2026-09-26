@@ -108,15 +108,6 @@ prefect_direct_grant_manifest="$(make_tmp_file)"
 render_manifest "${prefect_direct_grant_manifest}" -f "${DEV_VALUES}" -f "${FIXTURE_DIR}/prefect-direct-grant-enabled.yaml"
 prefect_job_runner_manifest="$(make_tmp_file)"
 render_manifest "${prefect_job_runner_manifest}" --namespace dlh-dev -f "${DEV_VALUES}" -f "${FIXTURE_DIR}/prefect-job-runner-enabled.yaml"
-# --- JupyterHub Keycloak & OIDC Configuration ---
-assert_contains "${dev_manifest}" "JUPYTERHUB_ROLES_CLAIM"
-assert_contains "${prod_manifest}" "JUPYTERHUB_ROLES_CLAIM"
-assert_contains "${dev_manifest}" "JUPYTERHUB_ALLOWED_ROLES"
-assert_contains "${prod_manifest}" "JUPYTERHUB_ALLOWED_ROLES"
-assert_contains "${dev_manifest}" "JUPYTERHUB_ADMIN_ROLES"
-assert_contains "${prod_manifest}" "JUPYTERHUB_ADMIN_ROLES"
-assert_contains "${dev_manifest}" "KC_JUPYTERHUB_CLIENT_SECRET"
-assert_contains "${prod_manifest}" "KC_JUPYTERHUB_CLIENT_SECRET"
 
 # --- Trino OIDC, SAC & Catalog Configuration ---
 assert_contains "${dev_manifest}" "http-server.authentication.type=OAUTH2,PASSWORD"

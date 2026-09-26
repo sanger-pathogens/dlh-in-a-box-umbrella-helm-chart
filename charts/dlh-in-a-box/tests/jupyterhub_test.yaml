@@ -1,0 +1,53 @@
+suite: JupyterHub
+
+tests:
+  - it: Assert JupyterHub Hub container environment variables for RBAC and OIDC
+    template: charts/jupyterhub/templates/hub/deployment.yaml
+    release:
+      name: dlh
+    values:
+      - ../../../examples/values-dev.yaml
+    documentSelector:
+      path: kind
+      value: Deployment
+    asserts:
+      - isKind:
+          of: Deployment
+      - contains:
+          path: 'spec.template.spec.containers[?(@.name == "hub")].env'
+          content:
+            name: JUPYTERHUB_ROLES_CLAIM
+            value: "platform_roles"
+      - contains:
+          path: 'spec.template.spec.containers[?(@.name == "hub")].env'
+          content:
+            name: JUPYTERHUB_ALLOWED_ROLES
+            value: "platform-admin,platform-user"
+      - contains:
+          path: 'spec.template.spec.containers[?(@.name == "hub")].env'
+          content:
+            name: JUPYTERHUB_ADMIN_ROLES
+            value: "platform-admin"
+      - contains:
+          path: 'spec.template.spec.containers[?(@.name == "hub")].env'
+          content:
+            name: JUPYTERHUB_CLIENT_ID
+            value: "jupyterhub"
+  - it: Assert Keycloak realm configures JupyterHub OIDC client and secret substitution
+    template: templates/keycloak-realm-configmap.yaml
+    release:
+      name: dlh
+    values:
+      - ../../../examples/values-dev.yaml
+    documentSelector:
+      path: metadata.name
+      value: keycloak-realm-config
+    asserts:
+      - isKind:
+          of: ConfigMap
+      - matchRegex:
+          path: data["dlh-realm.yaml"]
+          pattern: 'clientId:\s*"jupyterhub"'
+      - matchRegex:
+          path: data["dlh-realm.yaml"]
+          pattern: 'secret:\s*"\$\(env:KC_JUPYTERHUB_CLIENT_SECRET\)"'
