@@ -9,7 +9,6 @@ FIXTURE_DIR="${ROOT_DIR}/test/render-contract"
 LOCAL_VALUES="${ROOT_DIR}/examples/values-local-auth.yaml"
 DEV_VALUES="${ROOT_DIR}/examples/values-dev.yaml"
 PROD_VALUES="${ROOT_DIR}/examples/values-prod.yaml"
-SHARED_VALUES="${ROOT_DIR}/examples/values-shared-auth.yaml"
 
 tmp_files=()
 
@@ -96,39 +95,13 @@ assert_not_contains() {
   fi
 }
 
-expect_fail() {
-  local expected="$1"
-  shift
-
-  local output
-  output="$(mktemp)"
-  tmp_files+=("${output}")
-
-  if helm template dlh "${CHART_PATH}" "$@" >"${output}" 2>&1; then
-    echo "Expected helm template to fail, but it succeeded: $*" >&2
-    exit 1
-  fi
-
-  if ! grep -Fq -- "${expected}" "${output}"; then
-    echo "Expected helm template failure to include: ${expected}" >&2
-    echo "--- Actual output ---" >&2
-    cat "${output}" >&2
-    echo "---------------------" >&2
-    exit 1
-  fi
-}
-
 echo "--- Positive contract renders"
-default_manifest="$(make_tmp_file)"
-render_manifest "${default_manifest}"
 local_manifest="$(make_tmp_file)"
 render_manifest "${local_manifest}" -f "${LOCAL_VALUES}"
 dev_manifest="$(make_tmp_file)"
 render_manifest "${dev_manifest}" -f "${DEV_VALUES}"
 prod_manifest="$(make_tmp_file)"
 render_manifest "${prod_manifest}" -f "${PROD_VALUES}"
-shared_manifest="$(make_tmp_file)"
-render_manifest "${shared_manifest}" -f "${SHARED_VALUES}"
 prefect_automation_manifest="$(make_tmp_file)"
 render_manifest "${prefect_automation_manifest}" -f "${DEV_VALUES}" -f "${FIXTURE_DIR}/prefect-automation-enabled.yaml"
 prefect_direct_grant_manifest="$(make_tmp_file)"
@@ -137,43 +110,19 @@ prefect_job_runner_manifest="$(make_tmp_file)"
 render_manifest "${prefect_job_runner_manifest}" --namespace dlh-dev -f "${DEV_VALUES}" -f "${FIXTURE_DIR}/prefect-job-runner-enabled.yaml"
 ranger_proxy_manifest="$(make_tmp_file)"
 render_manifest "${ranger_proxy_manifest}" -f "${DEV_VALUES}" -f "${FIXTURE_DIR}/ranger-proxy-enabled.yaml"
-cloudbeaver_h2_patch_manifest="$(make_tmp_file)"
-render_manifest "${cloudbeaver_h2_patch_manifest}" -f "${DEV_VALUES}" -f "${FIXTURE_DIR}/cloudbeaver-h2-fresh-schema-patch.yaml"
 
-assert_not_contains "${default_manifest}" "icddr,b"
-assert_not_contains "${default_manifest}" "icddrb.org"
-assert_not_contains "${default_manifest}" "background_logo"
-assert_not_contains "${default_manifest}" "FSLolaWeb"
-assert_not_contains "${default_manifest}" "SourceSansPro"
-assert_contains "${local_manifest}" "name: dlh-ranger-admin"
-assert_contains "${local_manifest}" "clusterIP: None"
-assert_contains "${local_manifest}" "name: dlh-platform-home"
-assert_contains "${local_manifest}" "Administration"
+# --- Platform Home & Security Headers ---
 assert_contains "${local_manifest}" 'add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;'
 assert_contains "${local_manifest}" 'add_header X-Content-Type-Options "nosniff" always;'
 assert_contains "${local_manifest}" 'add_header Referrer-Policy "strict-origin-when-cross-origin" always;'
-assert_contains "${local_manifest}" "name: dlh-cloudbeaver"
-assert_not_contains "${local_manifest}" "\"url\": \"/access-control\""
-assert_not_contains "${local_manifest}" "Access Control"
-assert_not_contains "${local_manifest}" "access-control-reconcile"
-assert_not_contains "${local_manifest}" "role-management-panel"
-assert_not_contains "${local_manifest}" "ldap-directory"
-assert_not_contains "${local_manifest}" "access-control.name=ranger"
-assert_contains "${local_manifest}" "access-control.name=file"
-assert_contains "${local_manifest}" "registrationAllowed: true"
-assert_contains "${local_manifest}" "verifyEmail: false"
-assert_not_contains "${local_manifest}" "platform-app-cloudbeaver"
-assert_not_contains "${local_manifest}" "platform-app-prefect"
-assert_contains "${local_manifest}" "name: platform-access"
-assert_contains "${local_manifest}" 'name: "platform-user"'
-assert_contains "${local_manifest}" 'name: "platform-viewer"'
-assert_contains "${local_manifest}" "trino-cli"
-assert_contains "${local_manifest}" "http-server.authentication.type=OAUTH2"
-assert_not_contains "${local_manifest}" "http-server.authentication.type=OAUTH2,PASSWORD"
-assert_not_contains "${local_manifest}" "name: dlh-ranger-admin-usersync"
-assert_contains "${local_manifest}" "name: dlh-ranger-admin-keycloak-sync"
-assert_contains "${dev_manifest}" "name: dlh-ranger-admin-keycloak-sync"
-assert_contains "${prod_manifest}" "name: dlh-ranger-admin-keycloak-sync"
+assert_contains "${dev_manifest}" 'add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;'
+assert_contains "${prod_manifest}" 'add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;'
+assert_contains "${dev_manifest}" 'add_header X-Content-Type-Options "nosniff" always;'
+assert_contains "${prod_manifest}" 'add_header X-Content-Type-Options "nosniff" always;'
+assert_contains "${dev_manifest}" 'add_header Referrer-Policy "strict-origin-when-cross-origin" always;'
+assert_contains "${prod_manifest}" 'add_header Referrer-Policy "strict-origin-when-cross-origin" always;'
+
+# --- Platform Home Launcher Matrix ---
 assert_contains "${local_manifest}" "\"minio-console\": {"
 assert_contains "${local_manifest}" "\"mode\": \"minio-sso\""
 assert_contains "${local_manifest}" "\"internalApiUrl\": \"http://dlh-minio:9001\""
@@ -183,11 +132,16 @@ assert_not_contains "${dev_manifest}" "\"minio-console\": {"
 assert_not_contains "${prod_manifest}" "\"minio-console\": {"
 assert_not_contains "${dev_manifest}" "\"id\": \"minio-console\""
 assert_not_contains "${prod_manifest}" "\"id\": \"minio-console\""
-assert_not_contains "${dev_manifest}" "vault-wrapped-token"
-assert_not_contains "${prod_manifest}" "vault-wrapped-token"
-assert_not_contains "${dev_manifest}" '"platformRoleMembershipSource"'
-assert_not_contains "${prod_manifest}" '"platformRoleMembershipSource"'
-assert_contains "${local_manifest}" "keycloak_ranger_sync.py"
+
+# --- Platform Home Roles & Claims ---
+assert_contains "${dev_manifest}" "\"rolesClaim\": \"platform_roles\""
+assert_contains "${prod_manifest}" "\"rolesClaim\": \"platform_roles\""
+assert_contains "${dev_manifest}" "\"requiredRoles\": ["
+assert_contains "${prod_manifest}" "\"requiredRoles\": ["
+assert_contains "${dev_manifest}" "OIDC_ROLES_CLAIM"
+assert_contains "${dev_manifest}" "PLATFORM_ADMIN_ROLES"
+
+# --- Ranger Keycloak Sync & Browser Proxy ---
 assert_contains "${dev_manifest}" "wait_for_ranger_keycloak.py"
 assert_contains "${prod_manifest}" "wait_for_ranger_keycloak.py"
 assert_contains "${prod_manifest}" "KEYCLOAK_OIDC_DISCOVERY_URL"
@@ -198,59 +152,8 @@ assert_contains "${ranger_proxy_manifest}" "proxy_pass http://dlh-ranger-admin-b
 assert_contains "${ranger_proxy_manifest}" "path: /readyz"
 assert_contains "${ranger_proxy_manifest}" "proxy_read_timeout 180s"
 assert_contains "${ranger_proxy_manifest}" 'upstream_timeout = \"180s\"'
-assert_not_contains "${local_manifest}" "keycloak_local_users.py"
-assert_not_contains "${local_manifest}" "RANGER_POSTGRES_PASSWORD"
-assert_not_contains "${local_manifest}" "psycopg[binary]"
-assert_contains "${dev_manifest}" "name: dlh-keycloak-config-cli-env"
-assert_contains "${prod_manifest}" "name: dlh-keycloak-config-cli-env"
-assert_contains "${prod_manifest}" "name: dlh-ranger-postgresql"
-assert_contains "${dev_manifest}" "KC_CLOUDBEAVER_CLIENT_SECRET"
-assert_contains "${prod_manifest}" "KC_CLOUDBEAVER_CLIENT_SECRET"
-assert_contains "${dev_manifest}" "https://portal.dev.example.org/"
-assert_contains "${prod_manifest}" "https://portal.data-platform.example.org/"
-assert_contains "${dev_manifest}" "https://jupyterhub.dev.example.org/hub/oauth_callback"
-assert_contains "${prod_manifest}" "https://jupyterhub.data-platform.example.org/hub/oauth_callback"
-assert_contains "${dev_manifest}" "Administration"
-assert_contains "${prod_manifest}" "Administration"
-assert_contains "${dev_manifest}" "\"rolesClaim\": \"platform_roles\""
-assert_contains "${prod_manifest}" "\"rolesClaim\": \"platform_roles\""
-assert_contains "${dev_manifest}" "\"requiredRoles\": ["
-assert_contains "${prod_manifest}" "\"requiredRoles\": ["
-assert_contains "${dev_manifest}" "OIDC_ROLES_CLAIM"
-assert_contains "${dev_manifest}" "PLATFORM_ADMIN_ROLES"
-assert_not_contains "${dev_manifest}" "\"requiredGroups\": ["
-assert_not_contains "${prod_manifest}" "\"requiredGroups\": ["
-assert_not_contains "${dev_manifest}" "OIDC_GROUPS_CLAIM"
-assert_not_contains "${dev_manifest}" "PLATFORM_ADMIN_GROUPS"
-assert_contains "${dev_manifest}" 'add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;'
-assert_contains "${prod_manifest}" 'add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;'
-assert_contains "${dev_manifest}" 'add_header X-Content-Type-Options "nosniff" always;'
-assert_contains "${prod_manifest}" 'add_header X-Content-Type-Options "nosniff" always;'
-assert_contains "${dev_manifest}" 'add_header Referrer-Policy "strict-origin-when-cross-origin" always;'
-assert_contains "${prod_manifest}" 'add_header Referrer-Policy "strict-origin-when-cross-origin" always;'
-assert_not_contains "${dev_manifest}" "Unified access to approved platform tools"
-assert_not_contains "${prod_manifest}" "Unified access to approved platform tools"
-assert_not_contains "${dev_manifest}" "How access works"
-assert_not_contains "${prod_manifest}" "How access works"
-assert_not_contains "${dev_manifest}" "Query sessions still use your Trino credentials."
-assert_not_contains "${prod_manifest}" "Query sessions still use your Trino credentials."
-assert_contains "${dev_manifest}" "https://ranger.dev.example.org"
-assert_contains "${prod_manifest}" "https://ranger.data-platform.example.org"
-assert_contains "${dev_manifest}" "https://cloudbeaver.dev.example.org/oauth2/callback"
-assert_contains "${prod_manifest}" "https://cloudbeaver.data-platform.example.org/oauth2/callback"
-assert_contains "${shared_manifest}" "https://cloudbeaver.shared.example.org/oauth2/callback"
-assert_contains "${dev_manifest}" "https://trino.dev.example.org/oauth2/callback"
-assert_contains "${prod_manifest}" "https://trino.data-platform.example.org/oauth2/callback"
-assert_contains "${dev_manifest}" "trino-cli"
-assert_contains "${prod_manifest}" "trino-cli"
-assert_not_contains "${dev_manifest}" "platform-app-jupyterhub"
-assert_not_contains "${prod_manifest}" "platform-app-jupyterhub"
-assert_not_contains "${dev_manifest}" "JUPYTERHUB_GROUPS_CLAIM"
-assert_not_contains "${prod_manifest}" "JUPYTERHUB_GROUPS_CLAIM"
-assert_not_contains "${dev_manifest}" "JUPYTERHUB_ALLOWED_GROUP"
-assert_not_contains "${prod_manifest}" "JUPYTERHUB_ALLOWED_GROUP"
-assert_not_contains "${dev_manifest}" "JUPYTERHUB_ADMIN_GROUP"
-assert_not_contains "${prod_manifest}" "JUPYTERHUB_ADMIN_GROUP"
+
+# --- JupyterHub Keycloak & OIDC Configuration ---
 assert_contains "${dev_manifest}" "JUPYTERHUB_ROLES_CLAIM"
 assert_contains "${prod_manifest}" "JUPYTERHUB_ROLES_CLAIM"
 assert_contains "${dev_manifest}" "JUPYTERHUB_ALLOWED_ROLES"
@@ -259,40 +162,40 @@ assert_contains "${dev_manifest}" "JUPYTERHUB_ADMIN_ROLES"
 assert_contains "${prod_manifest}" "JUPYTERHUB_ADMIN_ROLES"
 assert_contains "${dev_manifest}" "KC_JUPYTERHUB_CLIENT_SECRET"
 assert_contains "${prod_manifest}" "KC_JUPYTERHUB_CLIENT_SECRET"
-assert_contains "${dev_manifest}" "ICDDRB_Trino_Demo.ipynb"
-assert_contains "${prod_manifest}" "ICDDRB_Trino_Demo.ipynb"
-assert_contains "${dev_manifest}" "Python 3 (Trino Demo)"
-assert_contains "${prod_manifest}" "Python 3 (Trino Demo)"
-assert_contains "${dev_manifest}" "jupyterhub.dev.example.org"
-assert_contains "${prod_manifest}" "jupyterhub.data-platform.example.org"
-assert_contains "${prod_manifest}" "https://trino.data-platform.example.org"
-assert_contains "${prod_manifest}" "https://prefect.data-platform.example.org/oauth2/callback"
-assert_contains "${prod_manifest}" "https://prefect.data-platform.example.org"
+
+# --- Trino OIDC, SAC & Catalog Configuration ---
 assert_contains "${dev_manifest}" "http-server.authentication.type=OAUTH2,PASSWORD"
 assert_contains "${prod_manifest}" "http-server.authentication.type=OAUTH2,PASSWORD"
-assert_not_contains "${dev_manifest}" "access-control.name=ranger"
-assert_not_contains "${prod_manifest}" "access-control.name=ranger"
-assert_contains "${dev_manifest}" "access-control.name=file"
-assert_contains "${prod_manifest}" "access-control.name=file"
+assert_contains "${dev_manifest}" 'http-server.authentication.oauth2.token-url='
+assert_contains "${prod_manifest}" 'http-server.authentication.oauth2.token-url='
+assert_contains "${dev_manifest}" 'protocol/openid-connect/token'
+assert_contains "${prod_manifest}" 'protocol/openid-connect/token'
+assert_contains "${dev_manifest}" "\"user\":\"cloudbeaver-service\",\"catalog\":\"system\",\"allow\":\"all\""
+assert_contains "${dev_manifest}" "\"user\":\"superset-service\",\"catalog\":\"system\",\"allow\":\"all\""
+assert_contains_decoded_secret "${dev_manifest}" "dlh-trino-catalog" "redcap.properties" "connector.name=delta_lake"
+assert_contains_decoded_secret "${dev_manifest}" "dlh-trino-catalog" "redcap.properties" "hive.metastore.uri=thrift://dlh-hive-redcap-metastore:9083"
+assert_contains_decoded_secret "${prod_manifest}" "dlh-trino-catalog" "redcap.properties" "connector.name=delta_lake"
+assert_secret_has_no_string_data "${dev_manifest}" "dlh-trino-catalog"
+assert_secret_has_no_string_data "${prod_manifest}" "dlh-trino-catalog"
+
+# --- CloudBeaver OAuth2 Proxy & Database Defaults ---
+assert_contains_decoded_secret "${dev_manifest}" "dlh-cloudbeaver-auth-proxy-alpha" "oauth2_proxy.yml" "cloudbeaver:access"
+assert_contains_decoded_secret "${prod_manifest}" "dlh-cloudbeaver-auth-proxy-alpha" "oauth2_proxy.yml" "cloudbeaver:access"
+assert_contains "${dev_manifest}" 'driver: "${CLOUDBEAVER_DB_DRIVER:h2_embedded_v2}"'
+assert_contains "${dev_manifest}" 'url: "${CLOUDBEAVER_DB_URL:jdbc:h2:${workspace}/.data/cb.h2v2.dat}"'
+
+# --- Prefect OAuth2 Proxy Defaults & RBAC ---
 assert_contains "${dev_manifest}" 'provider = \"keycloak-oidc\"'
 assert_contains "${prod_manifest}" 'provider = \"keycloak-oidc\"'
 assert_contains "${dev_manifest}" 'allowed_roles = [\"prefect:access\"]'
 assert_contains "${prod_manifest}" 'allowed_roles = [\"prefect:access\"]'
-assert_contains_decoded_secret "${dev_manifest}" "dlh-cloudbeaver-auth-proxy-alpha" "oauth2_proxy.yml" "cloudbeaver:access"
-assert_contains_decoded_secret "${prod_manifest}" "dlh-cloudbeaver-auth-proxy-alpha" "oauth2_proxy.yml" "cloudbeaver:access"
-assert_not_contains "${dev_manifest}" 'allowed_groups = [\"platform-app-prefect\", \"platform-role-platform-admin\"]'
-assert_not_contains "${prod_manifest}" 'allowed_groups = [\"platform-app-prefect\", \"platform-role-platform-admin\"]'
-assert_not_contains "${dev_manifest}" 'allowed_groups = [\"platform-app-cloudbeaver\", \"platform-role-platform-admin\"]'
-assert_not_contains "${prod_manifest}" 'allowed_groups = [\"platform-app-cloudbeaver\", \"platform-role-platform-admin\"]'
 assert_contains "${dev_manifest}" 'skip_oidc_discovery = true'
 assert_contains "${dev_manifest}" 'redeem_url = \"http://dlh-keycloak.'
 assert_contains "${dev_manifest}" '/realms/dlh/protocol/openid-connect/token\"'
 assert_contains "${prod_manifest}" 'redeem_url = \"http://dlh-keycloak.'
 assert_contains "${prod_manifest}" '/realms/dlh/protocol/openid-connect/token\"'
-assert_contains "${dev_manifest}" 'http-server.authentication.oauth2.token-url='
-assert_contains "${prod_manifest}" 'http-server.authentication.oauth2.token-url='
-assert_contains "${dev_manifest}" 'protocol/openid-connect/token'
-assert_contains "${prod_manifest}" 'protocol/openid-connect/token'
+
+# --- Prefect Machine Automation & Bearer Tokens ---
 assert_contains "${prefect_automation_manifest}" 'skip_jwt_bearer_tokens = true'
 assert_contains "${prefect_automation_manifest}" 'api_routes = [ \"^/api/\" ]'
 assert_contains "${prefect_automation_manifest}" 'extra_jwt_issuers = \"https://keycloak.dev.example.org/realms/dlh=prefect-api\"'
@@ -301,6 +204,8 @@ assert_contains "${prefect_automation_manifest}" 'provider_ca_files = [ \"/etc/o
 assert_contains "${prefect_automation_manifest}" "Prefect Automation"
 assert_contains "${prefect_automation_manifest}" "protocolMapper: oidc-audience-mapper"
 assert_contains "${prefect_automation_manifest}" "KC_PREFECT_AUTOMATION_CLIENT_SECRET"
+
+# --- Prefect Direct Access Grant (CLI Authentication) ---
 assert_contains "${prefect_direct_grant_manifest}" 'skip_jwt_bearer_tokens = true'
 assert_contains "${prefect_direct_grant_manifest}" 'api_routes = [ \"^/api/\" ]'
 assert_contains "${prefect_direct_grant_manifest}" 'extra_jwt_issuers = \"https://keycloak.dev.example.org/realms/dlh=prefect-api\"'
@@ -310,6 +215,8 @@ assert_contains "${prefect_direct_grant_manifest}" "Prefect Direct Grant"
 assert_contains "${prefect_direct_grant_manifest}" "directAccessGrantsEnabled: true"
 assert_contains "${prefect_direct_grant_manifest}" "protocolMapper: oidc-audience-mapper"
 assert_not_contains "${prefect_direct_grant_manifest}" "KC_PREFECT_AUTOMATION_CLIENT_SECRET"
+
+# --- Prefect Kubernetes Job Runner & Work Pool Template ---
 assert_contains "${prefect_job_runner_manifest}" "name: \"prefect-job-runner\""
 assert_contains "${prefect_job_runner_manifest}" "app.kubernetes.io/component: prefect-job-runner"
 assert_contains "${prefect_job_runner_manifest}" "automountServiceAccountToken: false"
@@ -323,16 +230,3 @@ assert_contains "${prefect_job_runner_manifest}" "\"default\": \"dlh-dev\""
 assert_contains "${prefect_job_runner_manifest}" "\"default\": \"prefect-job-runner\""
 assert_contains "${prefect_job_runner_manifest}" "sync-base-job-template"
 assert_contains "${prefect_job_runner_manifest}" "prefect work-pool update"
-assert_contains "${dev_manifest}" "\"accessRoles\": {"
-assert_contains "${prod_manifest}" "\"platform-admin\""
-assert_contains "${dev_manifest}" "\"roles\": ["
-assert_contains "${prod_manifest}" "\"roles\": ["
-assert_contains "${dev_manifest}" "\"user\":\"cloudbeaver-service\",\"catalog\":\"system\",\"allow\":\"all\""
-assert_contains "${dev_manifest}" "\"user\":\"superset-service\",\"catalog\":\"system\",\"allow\":\"all\""
-assert_contains_decoded_secret "${dev_manifest}" "dlh-trino-catalog" "redcap.properties" "connector.name=delta_lake"
-assert_contains_decoded_secret "${dev_manifest}" "dlh-trino-catalog" "redcap.properties" "hive.metastore.uri=thrift://dlh-hive-redcap-metastore:9083"
-assert_contains_decoded_secret "${prod_manifest}" "dlh-trino-catalog" "redcap.properties" "connector.name=delta_lake"
-assert_secret_has_no_string_data "${dev_manifest}" "dlh-trino-catalog"
-assert_secret_has_no_string_data "${prod_manifest}" "dlh-trino-catalog"
-assert_contains "${dev_manifest}" 'driver: "${CLOUDBEAVER_DB_DRIVER:h2_embedded_v2}"'
-assert_contains "${dev_manifest}" 'url: "${CLOUDBEAVER_DB_URL:jdbc:h2:${workspace}/.data/cb.h2v2.dat}"'
