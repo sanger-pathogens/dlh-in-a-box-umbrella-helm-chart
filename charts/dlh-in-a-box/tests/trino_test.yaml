@@ -53,3 +53,58 @@ tests:
     asserts:
       - failedTemplate:
           errorMessage: "Use global.identity.external.clients.trino.passwordAuthEnabled instead of trino.server.config.authenticationType=PASSWORD when shared identity is enabled."
+  - it: Assert Trino coordinator hybrid authentication and Keycloak token URL
+    template: charts/trino/templates/configmap-coordinator.yaml
+    release:
+      name: dlh
+    values:
+      - ../../../examples/values-dev.yaml
+    documentSelector:
+      path: metadata.name
+      value: dlh-trino-coordinator
+    asserts:
+      - isKind:
+          of: ConfigMap
+      - matchRegex:
+          path: data["config.properties"]
+          pattern: 'http-server\.authentication\.type=OAUTH2,PASSWORD'
+      - matchRegex:
+          path: data["config.properties"]
+          pattern: 'http-server\.authentication\.oauth2\.token-url=http://dlh-keycloak\.[^/]+/realms/dlh/protocol/openid-connect/token'
+  - it: Assert Trino coordinator system access control rules for service accounts
+    template: charts/trino/templates/configmap-access-control-coordinator.yaml
+    release:
+      name: dlh
+    values:
+      - ../../../examples/values-dev.yaml
+    documentSelector:
+      path: metadata.name
+      value: dlh-trino-access-control-volume-coordinator
+    asserts:
+      - isKind:
+          of: ConfigMap
+      - matchRegex:
+          path: data["rules.json"]
+          pattern: '"user":\s*"cloudbeaver-service",\s*"catalog":\s*"system",\s*"allow":\s*"all"'
+      - matchRegex:
+          path: data["rules.json"]
+          pattern: '"user":\s*"superset-service",\s*"catalog":\s*"system",\s*"allow":\s*"all"'
+  - it: Assert Trino catalog Secret stores base64 properties and no stringData
+    template: charts/trino/templates/configmap-catalog.yaml
+    release:
+      name: dlh
+    values:
+      - ../../../examples/values-dev.yaml
+    documentSelector:
+      path: metadata.name
+      value: dlh-trino-catalog
+    asserts:
+      - isKind:
+          of: Secret
+      - isNull:
+          path: stringData
+      - isNotNull:
+          path: data["redcap.properties"]
+      - matchRegex:
+          path: data["redcap.properties"]
+          pattern: '^Y29ubmVjdG9yLm5hbWU9ZGVsdGFfbGFrZQ'

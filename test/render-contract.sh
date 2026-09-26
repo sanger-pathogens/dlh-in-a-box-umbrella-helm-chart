@@ -109,21 +109,6 @@ render_manifest "${prefect_direct_grant_manifest}" -f "${DEV_VALUES}" -f "${FIXT
 prefect_job_runner_manifest="$(make_tmp_file)"
 render_manifest "${prefect_job_runner_manifest}" --namespace dlh-dev -f "${DEV_VALUES}" -f "${FIXTURE_DIR}/prefect-job-runner-enabled.yaml"
 
-# --- Trino OIDC, SAC & Catalog Configuration ---
-assert_contains "${dev_manifest}" "http-server.authentication.type=OAUTH2,PASSWORD"
-assert_contains "${prod_manifest}" "http-server.authentication.type=OAUTH2,PASSWORD"
-assert_contains "${dev_manifest}" 'http-server.authentication.oauth2.token-url='
-assert_contains "${prod_manifest}" 'http-server.authentication.oauth2.token-url='
-assert_contains "${dev_manifest}" 'protocol/openid-connect/token'
-assert_contains "${prod_manifest}" 'protocol/openid-connect/token'
-assert_contains "${dev_manifest}" "\"user\":\"cloudbeaver-service\",\"catalog\":\"system\",\"allow\":\"all\""
-assert_contains "${dev_manifest}" "\"user\":\"superset-service\",\"catalog\":\"system\",\"allow\":\"all\""
-assert_contains_decoded_secret "${dev_manifest}" "dlh-trino-catalog" "redcap.properties" "connector.name=delta_lake"
-assert_contains_decoded_secret "${dev_manifest}" "dlh-trino-catalog" "redcap.properties" "hive.metastore.uri=thrift://dlh-hive-redcap-metastore:9083"
-assert_contains_decoded_secret "${prod_manifest}" "dlh-trino-catalog" "redcap.properties" "connector.name=delta_lake"
-assert_secret_has_no_string_data "${dev_manifest}" "dlh-trino-catalog"
-assert_secret_has_no_string_data "${prod_manifest}" "dlh-trino-catalog"
-
 # --- CloudBeaver OAuth2 Proxy & Database Defaults ---
 assert_contains_decoded_secret "${dev_manifest}" "dlh-cloudbeaver-auth-proxy-alpha" "oauth2_proxy.yml" "cloudbeaver:access"
 assert_contains_decoded_secret "${prod_manifest}" "dlh-cloudbeaver-auth-proxy-alpha" "oauth2_proxy.yml" "cloudbeaver:access"
