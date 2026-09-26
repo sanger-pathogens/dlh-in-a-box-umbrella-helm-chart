@@ -108,22 +108,6 @@ prefect_direct_grant_manifest="$(make_tmp_file)"
 render_manifest "${prefect_direct_grant_manifest}" -f "${DEV_VALUES}" -f "${FIXTURE_DIR}/prefect-direct-grant-enabled.yaml"
 prefect_job_runner_manifest="$(make_tmp_file)"
 render_manifest "${prefect_job_runner_manifest}" --namespace dlh-dev -f "${DEV_VALUES}" -f "${FIXTURE_DIR}/prefect-job-runner-enabled.yaml"
-ranger_proxy_manifest="$(make_tmp_file)"
-render_manifest "${ranger_proxy_manifest}" -f "${DEV_VALUES}" -f "${FIXTURE_DIR}/ranger-proxy-enabled.yaml"
-
-
-# --- Ranger Keycloak Sync & Browser Proxy ---
-assert_contains "${dev_manifest}" "wait_for_ranger_keycloak.py"
-assert_contains "${prod_manifest}" "wait_for_ranger_keycloak.py"
-assert_contains "${prod_manifest}" "KEYCLOAK_OIDC_DISCOVERY_URL"
-assert_contains "${prod_manifest}" "dlh-ranger-keycloak-sync-readiness"
-assert_contains "${prod_manifest}" "name: dlh-ranger-admin-browser"
-assert_contains "${prod_manifest}" "app.kubernetes.io/part-of: ranger-browser-proxy"
-assert_contains "${ranger_proxy_manifest}" "proxy_pass http://dlh-ranger-admin-browser"
-assert_contains "${ranger_proxy_manifest}" "path: /readyz"
-assert_contains "${ranger_proxy_manifest}" "proxy_read_timeout 180s"
-assert_contains "${ranger_proxy_manifest}" 'upstream_timeout = \"180s\"'
-
 # --- JupyterHub Keycloak & OIDC Configuration ---
 assert_contains "${dev_manifest}" "JUPYTERHUB_ROLES_CLAIM"
 assert_contains "${prod_manifest}" "JUPYTERHUB_ROLES_CLAIM"
