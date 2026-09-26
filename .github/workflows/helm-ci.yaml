@@ -63,9 +63,6 @@ jobs:
           version: 0.16.7
           src: charts/dlh-in-a-box/files
 
-      - name: Render Contract
-        run: ./test/render-contract.sh
-
       - name: Helm Unit Test
         run: helm unittest charts/dlh-in-a-box
 

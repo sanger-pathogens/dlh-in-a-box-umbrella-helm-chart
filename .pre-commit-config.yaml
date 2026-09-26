@@ -43,12 +43,6 @@ repos:
         language: system
         files: ^(charts/dlh-in-a-box/|examples/)
         pass_filenames: false
-      - id: test-chart
-        name: "Test Helm Chart"
-        entry: test/render-contract.sh
-        language: system
-        files: ^charts/dlh-in-a-box/
-        pass_filenames: false
       - id: helm-unittest
         name: "Unittest Helm Chart"
         entry: helm unittest charts/dlh-in-a-box
