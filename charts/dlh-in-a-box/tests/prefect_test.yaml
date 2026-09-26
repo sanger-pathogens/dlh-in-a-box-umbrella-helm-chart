@@ -114,3 +114,161 @@ tests:
     asserts:
       - failedTemplate:
           errorMessage: "global.identity.external.clients.prefectAutomation.tokenAudience must match global.identity.external.clients.prefectDirectGrant.tokenAudience when both Prefect bearer-token clients are enabled."
+  - it: Assert Prefect OAuth2 Proxy defaults and RBAC roles
+    template: charts/prefect-auth-proxy/templates/configmap.yaml
+    release:
+      name: dlh
+    documentSelector:
+      path: metadata.name
+      value: dlh-prefect-auth-proxy
+    asserts:
+      - isKind:
+          of: ConfigMap
+      - matchRegex:
+          path: data["oauth2_proxy.cfg"]
+          pattern: 'provider = "keycloak-oidc"'
+      - matchRegex:
+          path: data["oauth2_proxy.cfg"]
+          pattern: 'allowed_roles = \["prefect:access"\]'
+      - matchRegex:
+          path: data["oauth2_proxy.cfg"]
+          pattern: 'skip_oidc_discovery = true'
+      - matchRegex:
+          path: data["oauth2_proxy.cfg"]
+          pattern: 'redeem_url = "http://dlh-keycloak\.[^/]+/realms/dlh/protocol/openid-connect/token"'
+  - it: Assert Prefect machine automation OAuth2 Proxy bearer token config
+    template: charts/prefect-auth-proxy/templates/configmap.yaml
+    release:
+      name: dlh
+    values:
+      - fixtures/prefect-automation-enabled.yaml
+    documentSelector:
+      path: metadata.name
+      value: dlh-prefect-auth-proxy
+    asserts:
+      - isKind:
+          of: ConfigMap
+      - matchRegex:
+          path: data["oauth2_proxy.cfg"]
+          pattern: 'skip_jwt_bearer_tokens = true'
+      - matchRegex:
+          path: data["oauth2_proxy.cfg"]
+          pattern: 'api_routes = \[ "\^/api/" \]'
+      - matchRegex:
+          path: data["oauth2_proxy.cfg"]
+          pattern: 'extra_jwt_issuers = "https://keycloak\.dev\.example\.org/realms/dlh=prefect-api"'
+      - matchRegex:
+          path: data["oauth2_proxy.cfg"]
+          pattern: 'oidc_extra_audiences = \[ "prefect-api" \]'
+      - matchRegex:
+          path: data["oauth2_proxy.cfg"]
+          pattern: 'provider_ca_files = \[ "/etc/oauth2-proxy/keycloak-ca/ca\.crt" \]'
+  - it: Assert Prefect machine automation Keycloak client configuration
+    template: templates/keycloak-realm-configmap.yaml
+    release:
+      name: dlh
+    values:
+      - fixtures/prefect-automation-enabled.yaml
+    documentSelector:
+      path: metadata.name
+      value: keycloak-realm-config
+    asserts:
+      - isKind:
+          of: ConfigMap
+      - matchRegex:
+          path: data["dlh-realm.yaml"]
+          pattern: 'clientId:\s*"prefect-automation"'
+      - matchRegex:
+          path: data["dlh-realm.yaml"]
+          pattern: 'secret:\s*"\$\(env:KC_PREFECT_AUTOMATION_CLIENT_SECRET\)"'
+      - matchRegex:
+          path: data["dlh-realm.yaml"]
+          pattern: 'protocolMapper:\s*oidc-audience-mapper'
+  - it: Assert Prefect direct access grant Keycloak client configuration
+    template: templates/keycloak-realm-configmap.yaml
+    release:
+      name: dlh
+    values:
+      - fixtures/prefect-direct-grant-enabled.yaml
+    documentSelector:
+      path: metadata.name
+      value: keycloak-realm-config
+    asserts:
+      - isKind:
+          of: ConfigMap
+      - matchRegex:
+          path: data["dlh-realm.yaml"]
+          pattern: 'clientId:\s*"prefect-cli"'
+      - matchRegex:
+          path: data["dlh-realm.yaml"]
+          pattern: 'directAccessGrantsEnabled:\s*true'
+      - matchRegex:
+          path: data["dlh-realm.yaml"]
+          pattern: 'protocolMapper:\s*oidc-audience-mapper'
+      - notMatchRegex:
+          path: data["dlh-realm.yaml"]
+          pattern: 'KC_PREFECT_AUTOMATION_CLIENT_SECRET'
+  - it: Assert Prefect Job Runner ServiceAccount and Registry Secret
+    template: templates/prefect-job-runner.yaml
+    release:
+      name: dlh
+      namespace: dlh-dev
+    values:
+      - fixtures/prefect-job-runner-enabled.yaml
+    asserts:
+      - equal:
+          path: automountServiceAccountToken
+          value: false
+        documentSelector:
+          path: kind
+          value: ServiceAccount
+      - equal:
+          path: type
+          value: kubernetes.io/dockerconfigjson
+        documentSelector:
+          path: kind
+          value: Secret
+      - matchRegex:
+          path: stringData[".dockerconfigjson"]
+          pattern: 'ghcr\.io'
+        documentSelector:
+          path: kind
+          value: Secret
+  - it: Assert Prefect Worker Base Job Template ConfigMap
+    template: templates/prefect-worker-base-job-template.yaml
+    release:
+      name: dlh
+      namespace: dlh-dev
+    values:
+      - fixtures/prefect-job-runner-enabled.yaml
+    documentSelector:
+      path: metadata.name
+      value: prefect-worker-base-job-template
+    asserts:
+      - isKind:
+          of: ConfigMap
+      - matchRegex:
+          path: data["baseJobTemplate.json"]
+          pattern: '"serviceAccountName":\s*"\{\{\s*service_account_name\s*\}\}"'
+      - matchRegex:
+          path: data["baseJobTemplate.json"]
+          pattern: '"default":\s*"dlh-dev"'
+      - matchRegex:
+          path: data["baseJobTemplate.json"]
+          pattern: '"default":\s*"prefect-job-runner"'
+  - it: Assert Prefect Worker sync-base-job-template initContainer executes work-pool update
+    template: charts/prefectWorker/templates/deployment.yaml
+    release:
+      name: dlh
+      namespace: dlh-dev
+    values:
+      - fixtures/prefect-job-runner-enabled.yaml
+    documentSelector:
+      path: kind
+      value: Deployment
+    asserts:
+      - isKind:
+          of: Deployment
+      - matchRegex:
+          path: 'spec.template.spec.initContainers[?(@.name == "sync-base-job-template")].args[0]'
+          pattern: 'prefect work-pool update'
