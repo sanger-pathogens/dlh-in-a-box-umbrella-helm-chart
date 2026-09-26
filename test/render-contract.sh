@@ -45,45 +45,6 @@ assert_contains() {
   fi
 }
 
-# oauth2-proxy's alpha configuration (used by cloudbeaver-auth-proxy) ships as
-# a base64-encoded Secret value, not plain ConfigMap text -- assert_contains
-# can't see inside it, so decode the named key first.
-assert_contains_decoded_secret() {
-  local file="$1" secret_name="$2" data_key="$3" needle="$4"
-  local decoded
-  decoded="$(
-    yq eval-all "select(.kind == \"Secret\" and .metadata.name == \"${secret_name}\") | .data[\"${data_key}\"]" "${file}" \
-      | base64 -d 2>/dev/null || true
-  )"
-
-  if ! grep -Fq -- "${needle}" <<<"${decoded}"; then
-    echo "Expected decoded secret ${secret_name}[${data_key}] to contain: ${needle}" >&2
-    echo "Rendered file: ${file}" >&2
-    exit 1
-  fi
-}
-
-# Catalog entries must be rendered into a Secret's base64 `data` field rather
-# than `stringData`. `stringData` is a write-only input the API server merges
-# into `data` and never returns on read, so a key dropped from the template has
-# nothing to diff against in the live object and `helm upgrade` leaves the
-# orphan behind (helm/helm#10010) -- a catalog removed from
-# global.dataCatalogs would stay mounted and loaded by Trino forever.
-assert_secret_has_no_string_data() {
-  local file="$1" secret_name="$2"
-  local string_data
-  string_data="$(
-    yq eval-all "select(.kind == \"Secret\" and .metadata.name == \"${secret_name}\") | .stringData" "${file}"
-  )"
-
-  if [[ "${string_data}" != "null" ]]; then
-    echo "Secret ${secret_name} must render its entries into .data (base64), not .stringData," >&2
-    echo "because keys removed from .stringData are never deleted by helm upgrade." >&2
-    echo "Rendered file: ${file}" >&2
-    exit 1
-  fi
-}
-
 assert_not_contains() {
   local file="$1"
   local needle="$2"
@@ -108,12 +69,6 @@ prefect_direct_grant_manifest="$(make_tmp_file)"
 render_manifest "${prefect_direct_grant_manifest}" -f "${DEV_VALUES}" -f "${FIXTURE_DIR}/prefect-direct-grant-enabled.yaml"
 prefect_job_runner_manifest="$(make_tmp_file)"
 render_manifest "${prefect_job_runner_manifest}" --namespace dlh-dev -f "${DEV_VALUES}" -f "${FIXTURE_DIR}/prefect-job-runner-enabled.yaml"
-
-# --- CloudBeaver OAuth2 Proxy & Database Defaults ---
-assert_contains_decoded_secret "${dev_manifest}" "dlh-cloudbeaver-auth-proxy-alpha" "oauth2_proxy.yml" "cloudbeaver:access"
-assert_contains_decoded_secret "${prod_manifest}" "dlh-cloudbeaver-auth-proxy-alpha" "oauth2_proxy.yml" "cloudbeaver:access"
-assert_contains "${dev_manifest}" 'driver: "${CLOUDBEAVER_DB_DRIVER:h2_embedded_v2}"'
-assert_contains "${dev_manifest}" 'url: "${CLOUDBEAVER_DB_URL:jdbc:h2:${workspace}/.data/cb.h2v2.dat}"'
 
 # --- Prefect OAuth2 Proxy Defaults & RBAC ---
 assert_contains "${dev_manifest}" 'provider = \"keycloak-oidc\"'

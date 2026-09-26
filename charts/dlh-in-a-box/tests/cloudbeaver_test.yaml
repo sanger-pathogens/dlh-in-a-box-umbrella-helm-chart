@@ -94,3 +94,21 @@ tests:
             name: cloudbeaver-security-plugin-patch
             emptyDir: {}
           any: true
+  - it: Assert Cloudbeaver configures H2 database driver and URL defaults
+    template: charts/cloudbeaver/templates/configmap.yaml
+    release:
+      name: dlh
+    values:
+      - ../../../examples/values-dev.yaml
+    documentSelector:
+      path: metadata.name
+      value: dlh-cloudbeaver-config
+    asserts:
+      - isKind:
+          of: ConfigMap
+      - matchRegex:
+          path: data["cloudbeaver.conf"]
+          pattern: 'driver:\s*"\$\{CLOUDBEAVER_DB_DRIVER:h2_embedded_v2\}"'
+      - matchRegex:
+          path: data["cloudbeaver.conf"]
+          pattern: 'url:\s*"\$\{CLOUDBEAVER_DB_URL:jdbc:h2:\$\{workspace\}/\.data/cb\.h2v2\.dat\}"'
