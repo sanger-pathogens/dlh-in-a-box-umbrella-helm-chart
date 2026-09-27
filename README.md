@@ -540,7 +540,7 @@ Convenience targets from `Makefile`:
 make help
 make deps
 make docs-check
-make render-contract
+make test
 make lint
 make template
 make package
@@ -553,8 +553,7 @@ What these do:
 - `verify` runs all the other targets except actual installation steps
 - `deps` refreshes dependency archives and `Chart.lock`
 - `docs-check` verifies guide coverage, local links, and Mermaid rendering
-- `render-contract` proves supported render combinations still succeed and bad
-  inputs still fail
+- `test` run helm-unittest against the chart
 - `lint` runs the main validation path
 - `template` renders the chart against the tracked overlays
 - `package` builds the chart package under `dist/`
