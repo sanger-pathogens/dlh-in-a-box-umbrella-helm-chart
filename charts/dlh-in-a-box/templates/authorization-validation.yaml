@@ -9,17 +9,6 @@
   {{- fail "global.environment must be set to local, dev, or prod when global.dataCatalogs is not empty." -}}
 {{- end -}}
 
-{{- if and (gt (len $catalogs) 0) (ne $environment "local") -}}
-  {{- range $catalogName, $catalog := $catalogs -}}
-    {{- if hasKey $catalog "authorizedGroups" -}}
-      {{- fail (printf "global.dataCatalogs.%s.authorizedGroups is no longer supported. Use authorizedRoles or explicit Ranger bootstrap policies with Ranger role names." $catalogName) -}}
-    {{- end -}}
-    {{- if hasKey $catalog "authorizedUsers" -}}
-      {{- fail (printf "global.dataCatalogs.%s.authorizedUsers is no longer supported. Grant catalog access to Ranger roles only, via authorizedRoles or explicit Ranger bootstrap policies with Ranger role names." $catalogName) -}}
-    {{- end -}}
-  {{- end -}}
-{{- end -}}
-
 {{- $dataRoles := get $ranger "dataRoles" | default dict -}}
 {{- if and (default false $ranger.enabled) (default false $dataRoles.manage) -}}
   {{- $declaredRoleNames := keys (get $dataRoles "roles" | default dict) -}}

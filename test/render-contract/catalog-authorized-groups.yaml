@@ -1,6 +1,0 @@
-global:
-  dataCatalogs:
-    redcap:
-      authorizedGroups:
-        read:
-          - admins

@@ -1,5 +1,0 @@
-global:
-  identity:
-    directory:
-      ldap:
-        url: ""

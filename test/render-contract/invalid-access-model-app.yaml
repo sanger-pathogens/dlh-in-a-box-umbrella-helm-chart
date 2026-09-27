@@ -1,6 +1,0 @@
-global:
-  identity:
-    accessRoles:
-      platform-admin:
-        appAccess:
-          notARealApp: true

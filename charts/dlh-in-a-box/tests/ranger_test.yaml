@@ -1,0 +1,103 @@
+suite: Ranger
+
+tests:
+  - it: Test Ranger UserSync is not enabled when keycloakLocal is used
+    values:
+      - ../../../examples/values-local-auth.yaml
+    set:
+      global:
+        identity:
+          directory:
+            mode: keycloakLocal
+            ldap:
+              enabled: false
+          external:
+            clients:
+              trino:
+                enabled: false
+        authorization:
+          ranger:
+            usersync:
+              enabled: true
+    asserts:
+      - failedTemplate:
+          errorMessage: "global.authorization.ranger.usersync.enabled must be false when global.identity.directory.mode=keycloakLocal."
+  - it: Assert Ranger Admin browser Service is rendered and labeled for proxying
+    template: templates/ranger-admin.yaml
+    release:
+      name: dlh
+    values:
+      - ../../../examples/values-dev.yaml
+    documentSelector:
+      path: metadata.name
+      value: dlh-ranger-admin-browser
+    asserts:
+      - isKind:
+          of: Service
+      - equal:
+          path: metadata.labels["app.kubernetes.io/part-of"]
+          value: ranger-browser-proxy
+      - contains:
+          path: spec.ports
+          content:
+            name: http
+            port: 6080
+            targetPort: http
+  - it: Assert Ranger Keycloak sync Job executes wait script with OIDC discovery URL
+    template: templates/ranger-automation.yaml
+    release:
+      name: dlh
+    values:
+      - ../../../examples/values-dev.yaml
+    documentIndex: 3
+    asserts:
+      - isKind:
+          of: Job
+      - matchRegex:
+          path: 'spec.template.spec.containers[?(@.name == "ranger-keycloak-sync")].command[2]'
+          pattern: 'wait_for_ranger_keycloak\.py'
+      - contains:
+          path: 'spec.template.spec.containers[?(@.name == "ranger-keycloak-sync")].env'
+          content:
+            name: KEYCLOAK_OIDC_DISCOVERY_URL
+            value: "http://dlh-keycloak.NAMESPACE.svc.cluster.local/realms/dlh/.well-known/openid-configuration"
+  - it: Assert Ranger browser reverse proxy configuration and readiness probe
+    template: templates/ranger-browser-proxy.yaml
+    release:
+      name: dlh
+    values:
+      - ../../../examples/values-dev.yaml
+    set:
+      global:
+        identity:
+          external:
+            clients:
+              rangerProxy:
+                enabled: true
+                clientId: ranger
+                existingSecret: dlh-ranger-oauth2-proxy
+                clientSecretKey: client-secret
+                cookieExistingSecret: dlh-ranger-oauth2-proxy
+                cookieSecretKey: cookie-secret
+                redirectUrl: https://ranger.dev.example.org/oauth2/callback
+                redirectUris:
+                  - https://ranger.dev.example.org/oauth2/callback
+                webOrigins:
+                  - https://ranger.dev.example.org
+                emailDomains:
+                  - "*"
+    documentSelector:
+      path: kind
+      value: Deployment
+    asserts:
+      - isKind:
+          of: Deployment
+      - matchRegex:
+          path: 'spec.template.spec.containers[?(@.name == "ranger-browser-proxy")].command[2]'
+          pattern: 'proxy_pass http://dlh-ranger-admin-browser'
+      - matchRegex:
+          path: 'spec.template.spec.containers[?(@.name == "ranger-browser-proxy")].command[2]'
+          pattern: 'proxy_read_timeout 180s;'
+      - equal:
+          path: 'spec.template.spec.containers[?(@.name == "ranger-browser-proxy")].readinessProbe.httpGet.path'
+          value: /readyz

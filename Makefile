@@ -7,7 +7,7 @@ NAMESPACE ?= data-lakehouse-local
 
 .DEFAULT_GOAL := help
 
-.PHONY: help deps docs-check render-contract template package smoke-install local-install \
+.PHONY: help deps docs-check test template package smoke-install local-install \
 	script-check license-check security-check helm-lint precommit
 
 help: ## Show common maintainer targets.
@@ -19,8 +19,8 @@ deps: ## Refresh Helm dependencies and Chart.lock.
 docs-check: ## Verify maintained directories still have local guide files.
 	./scripts/repo/docs-check.sh
 
-render-contract: ## Prove supported renders succeed and unsafe values fail.
-	./test/render-contract.sh
+test: ## Run unit tests
+	helm unittest charts/dlh-in-a-box
 
 template: ## Render the chart against all example overlays.
 	./scripts/helm/template.sh
@@ -49,4 +49,4 @@ security-check: ## Scan for common security issues (secrets, unsafe patterns).
 helm-lint: ## Run `helm lint` against the chart and all example overlays.
 	./scripts/helm/helm-lint.sh
 
-verify: script-check deps license-check security-check docs-check render-contract helm-lint template package ## Run every check the pre-commit hooks run, in the same order.
+verify: script-check deps license-check security-check docs-check test helm-lint template package ## Run every check the pre-commit hooks run, in the same order.

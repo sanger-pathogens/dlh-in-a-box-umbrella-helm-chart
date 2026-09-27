@@ -1,0 +1,58 @@
+suite: Keycloak
+
+tests:
+  - it: Test configCliExistingSecret is required when Keycloak is enabled
+    values:
+      - ../../../examples/values-dev.yaml
+    set:
+      global:
+        identity:
+          provider:
+            keycloak:
+              configCliEnvExistingSecret: ""
+      keycloak:
+        keycloakConfigCli:
+          extraEnvVarsSecret: ""
+    asserts:
+      - failedTemplate:
+          errorMessage: "global.identity.provider.keycloak.configCliEnvExistingSecret is required when bundled Keycloak is enabled."
+  - it: Test Keycloak registration must be enabled when keycloakLocal is used
+    values:
+      - ../../../examples/values-local-auth.yaml
+    set:
+      global:
+        identity:
+          directory:
+            mode: keycloakLocal
+            ldap:
+              enabled: false
+          external:
+            clients:
+              trino:
+                enabled: false
+              trinoDirectGrant:
+                enabled: false
+          provider:
+            keycloak:
+              registration:
+                enabled: false
+    asserts:
+      - failedTemplate:
+          errorMessage: "global.identity.provider.keycloak.registration.enabled must be true when global.identity.directory.mode=keycloakLocal."
+  - it: Test LDAP identity provider is not supported when keycloakLocal is used
+    values:
+      - ../../../examples/values-local-auth.yaml
+    set:
+      global:
+        identity:
+          directory:
+            mode: keycloakLocal
+            ldap:
+              enabled: true
+          external:
+            clients:
+              trino:
+                enabled: false
+    asserts:
+      - failedTemplate:
+          errorMessage: "global.identity.directory.ldap.enabled must be false when global.identity.directory.mode=keycloakLocal."

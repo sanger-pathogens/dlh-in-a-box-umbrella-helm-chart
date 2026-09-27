@@ -1,7 +1,0 @@
-global:
-  identity:
-    external:
-      clients:
-        cloudbeaverProxy:
-          allowedGroups:
-            - admins

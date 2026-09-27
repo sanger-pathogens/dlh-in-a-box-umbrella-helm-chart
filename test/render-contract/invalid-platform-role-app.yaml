@@ -1,6 +1,0 @@
-global:
-  authorization:
-    platformRoles:
-      platform-admin:
-        apps:
-          notARealApp: true
