@@ -1097,6 +1097,9 @@ ranger-auth-proxy:
       allowed_roles = [{{ printf "%s:access" .Values.global.identity.external.clients.rangerProxy.clientId | quote }}]
       oidc_groups_claim = "{{ .Values.global.identity.external.oidc.groupsClaim }}"
       redirect_url = "{{ .Values.global.identity.external.clients.rangerProxy.redirectUrl }}"
+      {{- with (urlParse (include "dlh-in-a-box.identity.issuer" $)).host }}
+      whitelist_domains = [{{ . | quote }}]
+      {{- end }}
       approval_prompt = "auto"
       skip_provider_button = true
       cookie_secure = {{ hasPrefix "https://" .Values.global.identity.external.clients.rangerProxy.redirectUrl }}
