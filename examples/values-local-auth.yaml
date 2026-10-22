@@ -332,9 +332,3 @@ datahub:
 
 superset:
   enabled: false
-
-vault:
-  enabled: true
-  server:
-    dev:
-      enabled: true

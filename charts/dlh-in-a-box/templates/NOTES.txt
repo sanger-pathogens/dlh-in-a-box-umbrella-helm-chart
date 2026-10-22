@@ -13,7 +13,6 @@ Enabled components:
 - DataHub prerequisites: bundled in this release
 {{- end }}
 - Hive Metastore: {{ .Values.hive.enabled }}
-- Vault: {{ .Values.vault.enabled }}
 
 Storage backend: {{ .Values.global.storage.backend }}
 
@@ -31,7 +30,4 @@ Common local access patterns:
 {{- end }}
 {{- if .Values.minio.enabled }}
 - MinIO console: kubectl port-forward -n {{ .Release.Namespace }} svc/{{ .Release.Name }}-minio 9001:9001
-{{- end }}
-{{- if .Values.vault.enabled }}
-- Vault: kubectl port-forward -n {{ .Release.Namespace }} svc/{{ .Release.Name }}-vault 8200:8200
 {{- end }}

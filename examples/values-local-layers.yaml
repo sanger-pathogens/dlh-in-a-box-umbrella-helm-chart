@@ -176,9 +176,3 @@ sharedPostgresql:
 
 datahub:
   enabled: false
-
-vault:
-  enabled: true
-  server:
-    dev:
-      enabled: true

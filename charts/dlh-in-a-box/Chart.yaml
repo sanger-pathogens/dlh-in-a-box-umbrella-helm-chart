@@ -23,7 +23,6 @@ sources:
   - https://github.com/bitnami/charts
   - https://github.com/kubeflow/spark-operator
   - https://github.com/acryldata/datahub-helm
-  - https://github.com/hashicorp/vault-helm
   - https://github.com/dbeaver/cloudbeaver
   - https://github.com/jupyterhub/zero-to-jupyterhub-k8s
 keywords:
@@ -36,7 +35,6 @@ keywords:
   - prefect
   - spark
   - datahub
-  - vault
   - jupyterhub
 maintainers:
   - name: Sanger Pathogens
@@ -110,11 +108,6 @@ dependencies:
     version: "0.2.3"
     repository: https://helm.datahubproject.io
     condition: datahub.enabled
-
-  - name: vault
-    version: "0.32.0"
-    repository: https://helm.releases.hashicorp.com
-    condition: vault.enabled
 
   - name: jupyterhub
     version: "4.3.3"

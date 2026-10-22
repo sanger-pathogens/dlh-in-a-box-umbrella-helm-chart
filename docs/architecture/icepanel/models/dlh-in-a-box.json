@@ -1027,40 +1027,6 @@
       ]
     },
     {
-      "id": "DLH-X-VAULT-CHART",
-      "name": "Upstream Vault Helm Chart",
-      "type": "system",
-      "parent": null,
-      "status": "live",
-      "external": true,
-      "description": "Canonical upstream chart source for optional secret management included with the chart.\n\nModel metadata: source ID DLH-X-VAULT-CHART; IcePanel type system-level object; Top-level object in the DLH-in-a-box domain. IcePanel group membership: Upstream Sources. Lifecycle status: Live in the current IcePanel model. Ownership or stewardship: No internal IcePanel owner is assigned because the upstream project is externally maintained; Sanger PaM Data Engineering and Integration stewards the packaging decision. Location or hosting context: Cloud. Reality links: GitHub: packaged Vault chart. Source of truth: docs/architecture/icepanel/models/dlh-in-a-box.json in the DLH-in-a-box chart repository.",
-      "labels": {
-        "dlhTechnology": "Helm"
-      },
-      "layout": {
-        "chart-product": {
-          "x": 20,
-          "y": 320,
-          "width": 256,
-          "height": 128
-        }
-      },
-      "groups": [
-        "DLH-G-chart-product-UPSTREAM-SOURCES"
-      ],
-      "links": [
-        {
-          "name": "GitHub: packaged Vault chart",
-          "url": "https://github.com/sanger-pathogens/dlh-in-a-box-umbrella-helm-chart/blob/main/charts/dlh-in-a-box/charts/vault-0.32.0.tgz"
-        }
-      ],
-      "caption": "Canonical upstream chart source for optional secret management included with the chart.",
-      "teamIds": [],
-      "tagIds": [
-        "S193ciAwZE82mjfqMqis"
-      ]
-    },
-    {
       "id": "DLH-X-JUPYTERHUB-CHART",
       "name": "Upstream JupyterHub Helm Chart",
       "type": "system",
@@ -1701,51 +1667,6 @@
         }
       ],
       "caption": "Kubernetes operator that manages Spark applications submitted by pipeline jobs for distributed processing.",
-      "teamIds": [
-        "YD4KdnnwJtWane4R039f",
-        "yNlfFPPI683RFZ2aq3bk"
-      ],
-      "tagIds": [
-        "WO7YSm1hYmsluPUMBazn"
-      ]
-    },
-    {
-      "id": "DLH-R-VAULT",
-      "name": "Vault",
-      "type": "app",
-      "parent": "DLH-L1-RUNTIME",
-      "status": "live",
-      "external": false,
-      "description": "Optional secret-management service included with the chart; deployments may instead integrate with an external Vault or equivalent secret provider.\n\nModel metadata: source ID DLH-R-VAULT; IcePanel type application or executable service; Child of Deployed DLH-in-a-box Runtime (DLH-L1-RUNTIME). IcePanel group membership: Identity And Secrets. Lifecycle status: Live in the current IcePanel model. Ownership or stewardship: Sanger PaM Data Engineering and Integration, icddr,b IT. Location or hosting context: icddr,b. Reality links: GitHub: Vault chart archive. Source of truth: docs/architecture/icepanel/models/dlh-in-a-box.json in the DLH-in-a-box chart repository.",
-      "labels": {
-        "dlhTechnology": "HashiCorp Vault",
-        "dlhEnabledBy": "vault.enabled",
-        "dlhDefault": "On"
-      },
-      "layout": {
-        "runtime": {
-          "x": 80,
-          "y": 120,
-          "width": 256,
-          "height": 128
-        },
-        "runtime-identity-access-secrets": {
-          "x": 400,
-          "y": 400,
-          "width": 256,
-          "height": 128
-        }
-      },
-      "groups": [
-        "DLH-G-runtime-IDENTITY-AND-SECRETS"
-      ],
-      "links": [
-        {
-          "name": "GitHub: Vault chart archive",
-          "url": "https://github.com/sanger-pathogens/dlh-in-a-box-umbrella-helm-chart/blob/main/charts/dlh-in-a-box/charts/vault-0.32.0.tgz"
-        }
-      ],
-      "caption": "Optional secret-management service included with the chart; deployments may instead integrate with an external Vault or equivalent secret provider.",
       "teamIds": [
         "YD4KdnnwJtWane4R039f",
         "yNlfFPPI683RFZ2aq3bk"
@@ -3696,40 +3617,6 @@
       ]
     },
     {
-      "id": "DLH-C3-PKG-VAULT",
-      "name": "Vault Chart Archive",
-      "type": "component",
-      "parent": "DLH-C2-UPSTREAM-ARCHIVES",
-      "status": "live",
-      "external": false,
-      "description": "Bundled Helm archive for optional Vault secret-management deployment included with the chart.\n\nModel metadata: source ID DLH-C3-PKG-VAULT; IcePanel type component within a parent object; Child of Packaged Upstream Dependency Helm Charts (DLH-C2-UPSTREAM-ARCHIVES). No IcePanel group membership is assigned. Lifecycle status: Live in the current IcePanel model. Ownership or stewardship: Sanger PaM Data Engineering and Integration. Location or hosting context: Wellcome Sanger Institute, Cloud. Reality links: GitHub: charts/dlh-in-a-box/charts/vault-0.32.0.tgz. Source of truth: docs/architecture/icepanel/models/dlh-in-a-box.json in the DLH-in-a-box chart repository.",
-      "labels": {
-        "dlhPath": "charts/dlh-in-a-box/charts/vault-0.32.0.tgz"
-      },
-      "layout": {
-        "packaged-dependencies": {
-          "x": 420,
-          "y": 680,
-          "width": 300,
-          "height": 130
-        }
-      },
-      "links": [
-        {
-          "name": "GitHub: charts/dlh-in-a-box/charts/vault-0.32.0.tgz",
-          "url": "https://github.com/sanger-pathogens/dlh-in-a-box-umbrella-helm-chart/blob/main/charts/dlh-in-a-box/charts/vault-0.32.0.tgz"
-        }
-      ],
-      "caption": "Bundled Helm archive for optional Vault secret-management deployment included with the chart.",
-      "teamIds": [
-        "YD4KdnnwJtWane4R039f"
-      ],
-      "tagIds": [
-        "PpEgyQQaEuEyVUQB4LjJ",
-        "S193ciAwZE82mjfqMqis"
-      ]
-    },
-    {
       "id": "DLH-C3-PKG-JUPYTERHUB",
       "name": "JupyterHub Chart Archive",
       "type": "component",
@@ -5199,39 +5086,6 @@
       }
     },
     {
-      "id": "DLH-CONN-39b6a4a6eee0",
-      "origin": "DLH-X-VAULT-CHART",
-      "target": "DLH-C2-UPSTREAM-ARCHIVES",
-      "label": "is packaged into",
-      "direction": "outgoing",
-      "layout": {
-        "chart-product": {
-          "originConnector": "right-middle",
-          "targetConnector": "right-middle",
-          "points": [
-            {
-              "x": 276,
-              "y": 384
-            },
-            {
-              "x": 606,
-              "y": 384
-            },
-            {
-              "x": 606,
-              "y": -176
-            },
-            {
-              "x": 936,
-              "y": -176
-            }
-          ],
-          "lineShape": "square",
-          "labelPosition": 51
-        }
-      }
-    },
-    {
       "id": "DLH-CONN-3c8e6c7e17be",
       "origin": "DLH-X-JUPYTERHUB-CHART",
       "target": "DLH-C2-UPSTREAM-ARCHIVES",
@@ -5792,63 +5646,6 @@
       }
     },
     {
-      "id": "DLH-CONN-abbfa0c22ce3",
-      "origin": "DLH-X-INGRESS-CONTROLLER",
-      "target": "DLH-R-VAULT",
-      "label": "routes Vault UI traffic when enabled",
-      "direction": "outgoing",
-      "layout": {
-        "runtime": {
-          "originConnector": "right-middle",
-          "targetConnector": "right-middle",
-          "points": [
-            {
-              "x": 696,
-              "y": -836
-            },
-            {
-              "x": 696,
-              "y": 0
-            },
-            {
-              "x": 336,
-              "y": 0
-            },
-            {
-              "x": 336,
-              "y": 184
-            }
-          ],
-          "lineShape": "square",
-          "labelPosition": 65
-        },
-        "runtime-identity-access-secrets": {
-          "originConnector": "right-middle",
-          "targetConnector": "left-middle",
-          "points": [
-            {
-              "x": 296,
-              "y": -476
-            },
-            {
-              "x": 348,
-              "y": -476
-            },
-            {
-              "x": 348,
-              "y": 464
-            },
-            {
-              "x": 400,
-              "y": 464
-            }
-          ],
-          "lineShape": "square",
-          "labelPosition": 65
-        }
-      }
-    },
-    {
       "id": "DLH-CONN-411e11cda1cf",
       "origin": "DLH-R-PLATFORM-HOME",
       "target": "DLH-R-KEYCLOAK",
@@ -6280,112 +6077,6 @@
       }
     },
     {
-      "id": "DLH-CONN-bc09b01dd50e",
-      "origin": "DLH-R-VAULT",
-      "target": "DLH-R-KEYCLOAK",
-      "label": "authenticates Vault users when bundled Keycloak is used",
-      "direction": "outgoing",
-      "layout": {
-        "runtime": {
-          "originConnector": "right-middle",
-          "targetConnector": "bottom-center",
-          "points": [
-            {
-              "x": 336,
-              "y": 184
-            },
-            {
-              "x": 372,
-              "y": 184
-            },
-            {
-              "x": 372,
-              "y": -112
-            },
-            {
-              "x": 408,
-              "y": -112
-            }
-          ],
-          "lineShape": "square",
-          "labelPosition": 71
-        },
-        "runtime-identity-access-secrets": {
-          "originConnector": "top-center",
-          "targetConnector": "bottom-center",
-          "points": [
-            {
-              "x": 528,
-              "y": 400
-            },
-            {
-              "x": 528,
-              "y": 208
-            }
-          ],
-          "lineShape": "square",
-          "labelPosition": 67
-        }
-      }
-    },
-    {
-      "id": "DLH-CONN-77220a26e766",
-      "origin": "DLH-R-VAULT",
-      "target": "DLH-X-OIDC",
-      "label": "authenticates Vault users when external OIDC is used",
-      "direction": "outgoing",
-      "layout": {
-        "runtime": {
-          "originConnector": "right-middle",
-          "targetConnector": "left-middle",
-          "points": [
-            {
-              "x": 336,
-              "y": 184
-            },
-            {
-              "x": 336,
-              "y": 0
-            },
-            {
-              "x": 900,
-              "y": 0
-            },
-            {
-              "x": 900,
-              "y": -836
-            }
-          ],
-          "lineShape": "square",
-          "labelPosition": 46
-        },
-        "runtime-identity-access-secrets": {
-          "originConnector": "left-middle",
-          "targetConnector": "right-middle",
-          "points": [
-            {
-              "x": 400,
-              "y": 464
-            },
-            {
-              "x": 348,
-              "y": 464
-            },
-            {
-              "x": 348,
-              "y": 24
-            },
-            {
-              "x": 296,
-              "y": 24
-            }
-          ],
-          "lineShape": "square",
-          "labelPosition": 42
-        }
-      }
-    },
-    {
       "id": "DLH-CONN-272141bdee94",
       "origin": "DLH-R-KEYCLOAK",
       "target": "DLH-X-LDAP",
@@ -6492,55 +6183,6 @@
           ],
           "lineShape": "square",
           "labelPosition": 60
-        }
-      }
-    },
-    {
-      "id": "DLH-CONN-625e85abf0d7",
-      "origin": "DLH-X-SECRET-SYNC",
-      "target": "DLH-R-VAULT",
-      "label": "reads selected secrets when included Vault is used",
-      "direction": "outgoing",
-      "layout": {
-        "runtime": {
-          "originConnector": "right-middle",
-          "targetConnector": "left-middle",
-          "points": [
-            {
-              "x": -64,
-              "y": 184
-            },
-            {
-              "x": 80,
-              "y": 184
-            }
-          ],
-          "lineShape": "square",
-          "labelPosition": 39
-        },
-        "runtime-identity-access-secrets": {
-          "originConnector": "right-middle",
-          "targetConnector": "left-middle",
-          "points": [
-            {
-              "x": 296,
-              "y": 524
-            },
-            {
-              "x": 348,
-              "y": 524
-            },
-            {
-              "x": 348,
-              "y": 464
-            },
-            {
-              "x": 400,
-              "y": 464
-            }
-          ],
-          "lineShape": "square",
-          "labelPosition": 69
         }
       }
     },
@@ -8437,39 +8079,6 @@
       }
     },
     {
-      "id": "DLH-CONN-8d312098b4f8",
-      "origin": "DLH-C3-PKG-LOCK",
-      "target": "DLH-C3-PKG-VAULT",
-      "label": "locks",
-      "direction": "outgoing",
-      "layout": {
-        "packaged-dependencies": {
-          "originConnector": "bottom-center",
-          "targetConnector": "right-middle",
-          "points": [
-            {
-              "x": 760,
-              "y": 170
-            },
-            {
-              "x": 740,
-              "y": 170
-            },
-            {
-              "x": 740,
-              "y": 745
-            },
-            {
-              "x": 720,
-              "y": 745
-            }
-          ],
-          "lineShape": "square",
-          "labelPosition": 51
-        }
-      }
-    },
-    {
       "id": "DLH-CONN-198bd2d6a3dd",
       "origin": "DLH-C3-PKG-LOCK",
       "target": "DLH-C3-PKG-JUPYTERHUB",
@@ -9621,7 +9230,6 @@
         "DLH-R-PREFECT-DB",
         "DLH-R-PREFECT-WORKER",
         "DLH-R-SPARK-OPERATOR",
-        "DLH-R-VAULT",
         "DLH-R-PLATFORM-HOME",
         "DLH-R-KEYCLOAK",
         "DLH-R-KEYCLOAK-DB",
@@ -9779,7 +9387,6 @@
         "DLH-C3-PKG-MINIO",
         "DLH-C3-PKG-DATAHUB",
         "DLH-C3-PKG-DATAHUB-PREREQS",
-        "DLH-C3-PKG-VAULT",
         "DLH-C3-PKG-JUPYTERHUB",
         "DLH-C3-PKG-POSTGRESQL"
       ],
@@ -9940,7 +9547,6 @@
         "DLH-R-PLATFORM-HOME",
         "DLH-R-AUTH-PROXIES",
         "DLH-R-KEYCLOAK",
-        "DLH-R-VAULT",
         "DLH-R-RANGER",
         "DLH-R-KEYCLOAK-DB",
         "DLH-R-RANGER-DB"
