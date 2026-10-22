@@ -256,6 +256,11 @@ assert_contains "${ranger_proxy_manifest}" "proxy_pass http://dlh-ranger-admin-b
 assert_contains "${ranger_proxy_manifest}" "path: /readyz"
 assert_contains "${ranger_proxy_manifest}" "proxy_read_timeout 180s"
 assert_contains "${ranger_proxy_manifest}" 'upstream_timeout = \"180s\"'
+assert_contains "${ranger_proxy_manifest}" "location = /locallogin"
+assert_contains "${ranger_proxy_manifest}" "absolute_redirect off;"
+assert_contains "${ranger_proxy_manifest}" "return 302 /oauth2/sign_out?rd=https%3A%2F%2Fkeycloak.dev.example.org%2Frealms%2Fdlh%2Fprotocol%2Fopenid-connect%2Flogout%3Fclient_id%3Dranger%26post_logout_redirect_uri%3Dhttps%253A%252F%252Franger.dev.example.org%252F;"
+assert_contains "${ranger_proxy_manifest}" 'whitelist_domains = [\"keycloak.dev.example.org\"]'
+assert_contains "${ranger_proxy_manifest}" 'post.logout.redirect.uris: "https://ranger.dev.example.org/"'
 assert_not_contains "${local_manifest}" "keycloak_local_users.py"
 assert_not_contains "${local_manifest}" "RANGER_POSTGRES_PASSWORD"
 assert_not_contains "${local_manifest}" "psycopg[binary]"

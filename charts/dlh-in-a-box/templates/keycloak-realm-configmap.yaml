@@ -429,6 +429,10 @@ data:
         directAccessGrantsEnabled: false
         serviceAccountsEnabled: false
         secret: "$(env:KC_RANGER_CLIENT_SECRET)"
+        {{- with include "dlh-in-a-box.ranger.browserProxy.publicUrl" . }}
+        attributes:
+          post.logout.redirect.uris: {{ printf "%s/" . | quote }}
+        {{- end }}
         redirectUris:
         {{- range .Values.global.identity.external.clients.rangerProxy.redirectUris }}
           - {{ . | quote }}

@@ -344,6 +344,26 @@ app.kubernetes.io/managed-by: {{ .Release.Service }}
 {{- printf "%s-ranger-browser-proxy" .Release.Name -}}
 {{- end -}}
 
+{{- define "dlh-in-a-box.ranger.browserProxy.publicUrl" -}}
+{{- $rangerProxy := dig "external" "clients" "rangerProxy" dict (.Values.global.identity | default dict) -}}
+{{- with $rangerProxy.redirectUrl -}}
+{{- $parsed := urlParse . -}}
+{{- printf "%s://%s" $parsed.scheme $parsed.host -}}
+{{- end -}}
+{{- end -}}
+
+{{/*
+Ranger Admin has no notion of the Keycloak session in front of it, so its
+logout and session-expiry redirects to /locallogin are sent here instead: clear
+the oauth2-proxy cookie, then end the Keycloak session and return to Ranger.
+*/}}
+{{- define "dlh-in-a-box.ranger.browserProxy.signOutUrl" -}}
+{{- $rangerProxy := dig "external" "clients" "rangerProxy" dict (.Values.global.identity | default dict) -}}
+{{- $publicUrl := include "dlh-in-a-box.ranger.browserProxy.publicUrl" . -}}
+{{- $endSessionUrl := printf "%s/protocol/openid-connect/logout?client_id=%s&post_logout_redirect_uri=%s" (include "dlh-in-a-box.identity.issuer" .) (urlquery $rangerProxy.clientId) (urlquery (printf "%s/" $publicUrl)) -}}
+{{- printf "/oauth2/sign_out?rd=%s" (urlquery $endSessionUrl) -}}
+{{- end -}}
+
 {{- define "dlh-in-a-box.ranger.admin.url" -}}
 {{- printf "http://%s.%s.svc.cluster.local:6080" (include "dlh-in-a-box.ranger.admin.serviceName" .) .Release.Namespace -}}
 {{- end -}}
