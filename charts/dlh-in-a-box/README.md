@@ -341,25 +341,23 @@ They can be used for:
 
 ## Where Access Control Actually Happens
 
-This is the most subtle part of the chart.
-
-Ranger can be enabled in the platform without Trino necessarily using the
-Ranger plugin for query-time enforcement.
+`global.authorization.ranger.enabled` alone decides which policy source Trino
+uses, so there is never more than one.
 
 ### Trino/Ranger control matrix
 
 | Situation | What you get |
 | --- | --- |
-| Ranger disabled | Trino uses generated file-based access rules only |
-| Ranger enabled, `global.authorization.ranger.trino.enabled=false` | Ranger Admin, roles, policies, and sync can still exist, but Trino remains on generated file-based rules |
-| Ranger enabled, `global.authorization.ranger.trino.enabled=true`, compatible Trino image | Trino can use the Ranger plugin and fetch policy data from Ranger Admin |
+| Ranger disabled | Trino uses generated file-based access rules |
+| Ranger enabled | Trino uses the Ranger plugin and fetches policies from Ranger Admin; no file-based rules are rendered |
 
-This distinction exists in the actual code:
+This lives in the actual code:
 
-- `identity-validation.yaml` and `authorization-validation.yaml` guard the
-  supported combinations
-- the Trino chart patch points generate file access rules by default
-- the Trino Ranger plugin path is only configured when the explicit flag is on
+- the Trino chart patch points render either the Ranger plugin config or the
+  generated file rules, keyed on `global.authorization.ranger.enabled`
+- `authorization-validation.yaml` rejects the removed
+  `global.authorization.ranger.trino.enabled` switch
+- `global.authorization.ranger.trino.auditMode` still controls Ranger plugin auditing
 
 If you change authorization behavior, always verify which control plane is
 actually authoritative for the path you are testing.

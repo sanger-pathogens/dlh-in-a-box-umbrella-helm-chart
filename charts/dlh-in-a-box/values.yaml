@@ -344,8 +344,9 @@ global:
           repository: python
           tag: 3.12-slim
           pullPolicy: IfNotPresent
+      # Enabling Ranger makes it the only query-time authorizer for Trino; the
+      # generated file-based rules are used only while Ranger is disabled.
       trino:
-        enabled: false
         auditMode: log4j
   storage:
     backend: externalS3
