@@ -216,8 +216,10 @@ assert_not_contains "${local_manifest}" "Access Control"
 assert_not_contains "${local_manifest}" "access-control-reconcile"
 assert_not_contains "${local_manifest}" "role-management-panel"
 assert_not_contains "${local_manifest}" "ldap-directory"
-assert_not_contains "${local_manifest}" "access-control.name=ranger"
-assert_contains "${local_manifest}" "access-control.name=file"
+assert_contains "${local_manifest}" "access-control.name=ranger"
+assert_not_contains "${local_manifest}" "access-control.name=file"
+assert_contains "${default_manifest}" "access-control.name=file"
+assert_not_contains "${default_manifest}" "access-control.name=ranger"
 assert_contains "${local_manifest}" "registrationAllowed: true"
 assert_contains "${local_manifest}" "verifyEmail: false"
 assert_not_contains "${local_manifest}" "platform-app-cloudbeaver"
@@ -333,10 +335,10 @@ assert_contains "${prod_manifest}" "https://prefect.data-platform.example.org/oa
 assert_contains "${prod_manifest}" "https://prefect.data-platform.example.org"
 assert_contains "${dev_manifest}" "http-server.authentication.type=OAUTH2,PASSWORD"
 assert_contains "${prod_manifest}" "http-server.authentication.type=OAUTH2,PASSWORD"
-assert_not_contains "${dev_manifest}" "access-control.name=ranger"
-assert_not_contains "${prod_manifest}" "access-control.name=ranger"
-assert_contains "${dev_manifest}" "access-control.name=file"
-assert_contains "${prod_manifest}" "access-control.name=file"
+assert_contains "${dev_manifest}" "access-control.name=ranger"
+assert_contains "${prod_manifest}" "access-control.name=ranger"
+assert_not_contains "${dev_manifest}" "access-control.name=file"
+assert_not_contains "${prod_manifest}" "access-control.name=file"
 assert_contains "${dev_manifest}" 'provider = \"keycloak-oidc\"'
 assert_contains "${prod_manifest}" 'provider = \"keycloak-oidc\"'
 assert_contains "${dev_manifest}" 'allowed_roles = [\"prefect:access\"]'
@@ -390,8 +392,9 @@ assert_contains "${dev_manifest}" "\"accessRoles\": {"
 assert_contains "${prod_manifest}" "\"platform-admin\""
 assert_contains "${dev_manifest}" "\"roles\": ["
 assert_contains "${prod_manifest}" "\"roles\": ["
-assert_contains "${dev_manifest}" "\"user\":\"cloudbeaver-service\",\"catalog\":\"system\",\"allow\":\"all\""
-assert_contains "${dev_manifest}" "\"user\":\"superset-service\",\"catalog\":\"system\",\"allow\":\"all\""
+assert_contains "${default_manifest}" "\"user\":\"cloudbeaver-service\",\"catalog\":\"system\",\"allow\":\"all\""
+assert_contains "${default_manifest}" "\"user\":\"superset-service\",\"catalog\":\"system\",\"allow\":\"all\""
+assert_not_contains "${dev_manifest}" "\"user\":\"cloudbeaver-service\",\"catalog\":\"system\",\"allow\":\"all\""
 assert_contains_decoded_secret "${dev_manifest}" "dlh-trino-catalog" "redcap.properties" "connector.name=delta_lake"
 assert_contains_decoded_secret "${dev_manifest}" "dlh-trino-catalog" "redcap.properties" "hive.metastore.uri=thrift://dlh-hive-redcap-metastore:9083"
 assert_contains_decoded_secret "${prod_manifest}" "dlh-trino-catalog" "redcap.properties" "connector.name=delta_lake"
@@ -582,6 +585,11 @@ expect_fail \
   "datahub.auth.groupProvisioning is no longer supported. DataHub browser access must not depend on OIDC group claims; use global.identity.accessRoles and client roles." \
   -f "${DEV_VALUES}" \
   -f "${FIXTURE_DIR}/datahub-group-provisioning.yaml"
+
+expect_fail \
+  "global.authorization.ranger.trino.enabled is no longer supported. Trino uses Ranger for query-time authorization whenever global.authorization.ranger.enabled=true, and generated file-based rules otherwise; remove the key." \
+  -f "${DEV_VALUES}" \
+  -f "${FIXTURE_DIR}/ranger-trino-enabled-flag.yaml"
 
 expect_fail_any \
   "global.authorization.platformRoleMembershipSource is no longer supported. Keycloak is the source of truth for platform roles and role membership." \

@@ -1,6 +1,5 @@
 {{- $authorization := .Values.global.authorization | default dict -}}
 {{- $ranger := get $authorization "ranger" | default dict -}}
-{{- $rangerTrino := get $ranger "trino" | default dict -}}
 {{- $identity := .Values.global.identity | default dict -}}
 {{- $provider := get $identity "provider" | default dict -}}
 {{- $providerMode := default "externalOidc" $provider.mode -}}
@@ -62,7 +61,6 @@ data:
         "superUsers" ($ranger.superUsers | default (list))
         "superGroups" ($ranger.superGroups | default (list))
         "dataRoles" ($ranger.dataRoles | default dict)
-        "trinoEnabled" (and (default false $ranger.enabled) (default false $rangerTrino.enabled))
         "baselinePolicies" $baselinePolicies
       )
       "accessRoles" $accessRoles

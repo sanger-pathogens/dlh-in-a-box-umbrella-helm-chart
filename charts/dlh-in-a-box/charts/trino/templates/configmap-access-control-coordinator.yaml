@@ -5,9 +5,8 @@ is provided in values.
 */}}
 {{- $authorization := get .Values.global "authorization" | default (dict) -}}
 {{- $ranger := get $authorization "ranger" | default (dict) -}}
-{{- $rangerTrino := get $ranger "trino" | default (dict) -}}
-{{- $rangerTrinoEnabled := and (default false $ranger.enabled) (default false $rangerTrino.enabled) -}}
-{{- if and (not $rangerTrinoEnabled) (eq .Values.accessControl.type "configmap") }}
+{{- $rangerEnabled := default false $ranger.enabled -}}
+{{- if and (not $rangerEnabled) (eq .Values.accessControl.type "configmap") }}
 apiVersion: v1
 kind: ConfigMap
 metadata:

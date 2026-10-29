@@ -86,6 +86,7 @@ These fixtures exercise the governance validation template:
 | `platform-home-required-groups.yaml` | deprecated Platform Home launcher `requiredGroups` setting is rejected |
 | `catalog-authorized-groups.yaml` | deprecated catalog `authorizedGroups` ACL setting is rejected |
 | `ranger-membership-source.yaml` | deprecated Ranger-owned platform role membership source is rejected |
+| `ranger-trino-enabled-flag.yaml` | removed `global.authorization.ranger.trino.enabled` switch is rejected; Trino follows `ranger.enabled` |
 | `exception-missing-metadata.yaml` | platform role exception missing required approval metadata |
 
 ### Identity and environment failures

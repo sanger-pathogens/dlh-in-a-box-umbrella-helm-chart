@@ -473,18 +473,16 @@ flowchart TD
 
   RangerAdminFlow --> RangerPolicies
   GeneratedRules --> TrinoFlow
-  RangerPolicies -. Trino plugin mode optional .-> TrinoFlow
+  RangerPolicies -. when Ranger is enabled .-> TrinoFlow
 ```
 
-Important nuance:
+Trino has exactly one policy source at a time:
 
-- enabling Ranger does not automatically move Trino onto the Ranger plugin
-- the chart can still generate file-based Trino access rules
-- the Trino plugin path only becomes real when
-  `global.authorization.ranger.trino.enabled=true` and the Trino image actually
-  contains the Ranger plugin
+- Ranger disabled: Trino uses the generated file-based access rules
+- Ranger enabled: Trino uses the Ranger plugin for query-time authorization,
+  and no file-based rules are rendered
 
-The detailed explanation of that distinction lives in
+The detailed explanation lives in
 [charts/dlh-in-a-box/README.md](charts/dlh-in-a-box/README.md).
 
 ## Repo Map: If You Need To Change X

@@ -13,7 +13,6 @@ through environment variables.
 {{- $ldap := get $directory "ldap" | default (dict) -}}
 {{- $authorization := get .Values.global "authorization" | default (dict) -}}
 {{- $ranger := get $authorization "ranger" | default (dict) -}}
-{{- $rangerTrino := get $ranger "trino" | default (dict) -}}
 {{- $identityEnabled := and (default false $identity.enabled) (default false $trinoIdentity.enabled) -}}
 {{- $legacyPasswordAuthRequested := contains "PASSWORD" (default "" .Values.server.config.authenticationType) -}}
 {{- $passwordAuthRequested := or (default false $trinoIdentity.passwordAuthEnabled) $legacyPasswordAuthRequested -}}
@@ -27,7 +26,6 @@ through environment variables.
 {{- $ldapHostAliases := default (list) $ldap.hostAliases -}}
 {{- $mountTrustedLdapCa := and $ldapDirectoryEnabled (not $ldapAllowInsecure) $ldapTrustedCaSecretName -}}
 {{- $rangerEnabled := default false $ranger.enabled -}}
-{{- $rangerTrinoEnabled := and $rangerEnabled (default false $rangerTrino.enabled) -}}
 {{- $filePasswordAuthConfigured := or .Values.auth.passwordAuth .Values.auth.passwordAuthSecret -}}
 {{- $renderFilePasswordAuth := and $filePasswordAuthConfigured (or $legacyPasswordAuthRequested $filePasswordAuthEnabled (not (and $identityEnabled $passwordAuthRequested))) -}}
 {{- $env := .Values.env | default (list) -}}
@@ -58,7 +56,7 @@ spec:
   template:
     metadata:
       annotations:
-        {{- if and (not $rangerTrinoEnabled) (eq .Values.accessControl.type "configmap") (not .Values.accessControl.refreshPeriod) }}
+        {{- if and (not $rangerEnabled) (eq .Values.accessControl.type "configmap") (not .Values.accessControl.refreshPeriod) }}
         checksum/access-control-config: {{ include (print $.Template.BasePath "/configmap-access-control-coordinator.yaml") . | sha256sum }}
         {{- end }}
         {{- if or .Values.global.dataCatalogs .Values.catalogs .Values.additionalCatalogs }}
@@ -101,7 +99,7 @@ spec:
         - name: schemas-volume
           configMap:
             name: {{ template "trino.fullname" . }}-schemas-volume-coordinator
-        {{- if and (not $rangerTrinoEnabled) (eq .Values.accessControl.type "configmap") }}
+        {{- if and (not $rangerEnabled) (eq .Values.accessControl.type "configmap") }}
         - name: access-control-volume
           configMap:
             name: {{ template "trino.fullname" . }}-access-control-volume-coordinator
@@ -216,7 +214,7 @@ spec:
             {{- end }}
             - mountPath: {{ .Values.kafka.mountPath }}
               name: schemas-volume
-            {{- if and (not $rangerTrinoEnabled) (eq .Values.accessControl.type "configmap") }}
+            {{- if and (not $rangerEnabled) (eq .Values.accessControl.type "configmap") }}
             - mountPath: {{ .Values.server.config.path }}/access-control
               name: access-control-volume
             {{- end }}
