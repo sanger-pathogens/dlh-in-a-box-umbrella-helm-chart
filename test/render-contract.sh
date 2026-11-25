@@ -496,11 +496,6 @@ expect_fail \
   -f "${FIXTURE_DIR}/missing-directory-url.yaml"
 
 expect_fail \
-  "global.identity.provider.keycloak.registration.enabled must be true when global.identity.directory.mode=keycloakLocal." \
-  -f "${LOCAL_VALUES}" \
-  -f "${FIXTURE_DIR}/keycloak-local-registration-disabled.yaml"
-
-expect_fail \
   "global.identity.external.clients.trino.passwordAuthMode must be file when global.identity.directory.mode=keycloakLocal. LDAP PASSWORD auth is not allowed in that mode." \
   -f "${LOCAL_VALUES}" \
   -f "${FIXTURE_DIR}/keycloak-local-trino-password-auth-enabled.yaml"

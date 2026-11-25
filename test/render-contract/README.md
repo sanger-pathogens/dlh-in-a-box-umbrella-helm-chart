@@ -128,7 +128,6 @@ These fixtures target the local auth-heavy modes:
 
 | File | What it targets |
 | --- | --- |
-| `keycloak-local-registration-disabled.yaml` | `keycloakLocal` mode without self-registration enabled |
 | `keycloak-local-trino-password-auth-enabled.yaml` | `keycloakLocal` mode trying to use LDAP-style Trino password auth |
 | `keycloak-local-usersync-enabled.yaml` | `keycloakLocal` mode with Ranger LDAP usersync still enabled |
 | `keycloak-local-ldap-enabled.yaml` | `keycloakLocal` mode with LDAP directory mode still enabled |
