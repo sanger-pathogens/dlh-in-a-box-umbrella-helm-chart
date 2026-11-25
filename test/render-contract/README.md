@@ -86,6 +86,7 @@ These fixtures exercise the governance validation template:
 | `platform-home-required-groups.yaml` | deprecated Platform Home launcher `requiredGroups` setting is rejected |
 | `catalog-authorized-groups.yaml` | deprecated catalog `authorizedGroups` ACL setting is rejected |
 | `ranger-membership-source.yaml` | deprecated Ranger-owned platform role membership source is rejected |
+| `ranger-trino-enabled-flag.yaml` | removed `global.authorization.ranger.trino.enabled` switch is rejected; Trino follows `ranger.enabled` |
 | `exception-missing-metadata.yaml` | platform role exception missing required approval metadata |
 
 ### Identity and environment failures
@@ -127,7 +128,6 @@ These fixtures target the local auth-heavy modes:
 
 | File | What it targets |
 | --- | --- |
-| `keycloak-local-registration-disabled.yaml` | `keycloakLocal` mode without self-registration enabled |
 | `keycloak-local-trino-password-auth-enabled.yaml` | `keycloakLocal` mode trying to use LDAP-style Trino password auth |
 | `keycloak-local-usersync-enabled.yaml` | `keycloakLocal` mode with Ranger LDAP usersync still enabled |
 | `keycloak-local-ldap-enabled.yaml` | `keycloakLocal` mode with LDAP directory mode still enabled |

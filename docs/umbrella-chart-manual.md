@@ -802,7 +802,7 @@ flowchart TD
 
   RangerAdmin --> RangerPolicies
   GeneratedRules --> Trino
-  RangerPolicies -. Ranger plugin mode optional .-> Trino
+  RangerPolicies -. when Ranger is enabled .-> Trino
 ```
 
 ### Two Identity Axes
@@ -948,26 +948,18 @@ flowchart TD
 
 ### Where Authorization Actually Happens
 
-This is the most important subtlety in the repo.
-
-Ranger can be enabled in the platform without Trino necessarily using the
-Ranger plugin for query-time enforcement.
+`global.authorization.ranger.enabled` alone decides which policy source Trino
+uses, so Trino never has two.
 
 #### Trino And Ranger Control Matrix
 
 | Situation | Ranger Admin exists? | What authorizes Trino queries? | Practical consequence |
 | --- | --- | --- | --- |
 | Ranger disabled | no | generated file-based Trino rules | Trino is entirely on the file-rules path |
-| Ranger enabled, `global.authorization.ranger.trino.enabled=false` | yes | generated file-based Trino rules | Ranger may still own roles, policies, and audits, but Trino is not yet asking Ranger at query time |
-| Ranger enabled, `global.authorization.ranger.trino.enabled=true`, compatible Trino image | yes | Ranger plugin path | Trino can fetch policy data from Ranger Admin |
+| Ranger enabled | yes | Ranger plugin | Trino fetches policies from Ranger Admin; no file-based rules are rendered |
 
-The chart currently has to document this distinction so often because it is
-easy to misread:
-
-- Ranger as a broader governance service
-- Trino query-time authorization
-
-They are related, but not identical.
+The former `global.authorization.ranger.trino.enabled` switch has been removed,
+and the render fails if it is still set.
 
 ## Query Storage And Metadata Path
 
@@ -1051,7 +1043,7 @@ the umbrella-specific glue the repo depends on:
 - generate catalog properties from `global.dataCatalogs`
 - read storage secrets for generated catalogs
 - mount generated catalog config into coordinator and workers
-- generate file-based access rules when the Ranger plugin path is not active
+- generate file-based access rules when Ranger is disabled
 - inject shared identity secrets and LDAP bind secrets into the coordinator
 
 ### Storage Modes
@@ -1334,14 +1326,13 @@ exist in the cluster.
 
 ### Ranger Is Enabled But Trino Still Looks Like File Rules
 
-That may be correct.
+That is not expected: with Ranger enabled the coordinator should render
+`access-control.name=ranger`. Confirm:
 
-Ranger being enabled at the platform level does not automatically mean Trino is
-using the Ranger plugin path. Confirm:
-
-- `global.authorization.ranger.trino.enabled`
+- `global.authorization.ranger.enabled` in the merged values
 - the effective coordinator config
-- the Trino image support for the Ranger plugin path
+- that no stale packaged `charts/trino-*.tgz` sits next to the vendored
+  `charts/trino/` directory, since Helm then loads both copies
 
 ### Shared Examples Fail Immediately
 

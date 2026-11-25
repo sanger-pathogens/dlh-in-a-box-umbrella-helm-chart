@@ -20,6 +20,10 @@
   {{- end -}}
 {{- end -}}
 
+{{- if hasKey (get $ranger "trino" | default dict) "enabled" -}}
+  {{- fail "global.authorization.ranger.trino.enabled is no longer supported. Trino uses Ranger for query-time authorization whenever global.authorization.ranger.enabled=true, and generated file-based rules otherwise; remove the key." -}}
+{{- end -}}
+
 {{- $dataRoles := get $ranger "dataRoles" | default dict -}}
 {{- if and (default false $ranger.enabled) (default false $dataRoles.manage) -}}
   {{- $declaredRoleNames := keys (get $dataRoles "roles" | default dict) -}}

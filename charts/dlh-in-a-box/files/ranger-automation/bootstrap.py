@@ -366,9 +366,6 @@ BASELINE_TRINO_POLICIES = {
 
 def build_trino_baseline_policies(config):
     service_name = config["ranger"]["serviceName"]
-    if not config["ranger"].get("trinoEnabled", False):
-        return [], []
-
     toggles = config["ranger"].get("baselinePolicies") or {}
     policies = []
     removed_names = []

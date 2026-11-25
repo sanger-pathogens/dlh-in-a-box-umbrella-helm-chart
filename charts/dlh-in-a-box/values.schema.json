@@ -843,7 +843,6 @@
               "type": "object",
               "additionalProperties": true,
               "properties": {
-                "enabled": { "type": "boolean" },
                 "auditMode": { "type": "string" }
               }
             }
