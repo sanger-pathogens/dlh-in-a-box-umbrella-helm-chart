@@ -130,7 +130,6 @@ product. It should not include Sanger or icddr,b deployment-specific settings.
 | `DLH-X-MINIO-CHART` | Upstream MinIO Helm Chart | `System` | Helm | Canonical upstream chart source for the optional in-cluster S3-compatible object store. |
 | `DLH-X-DATAHUB-CHART` | Upstream DataHub Helm Chart | `System` | Helm | Canonical upstream chart source for optional metadata catalog and discovery services. |
 | `DLH-X-DATAHUB-PREREQS-CHART` | Upstream DataHub Prerequisites Chart | `System` | Helm | Canonical upstream chart source for the persistence, messaging, and search services required by DataHub. |
-| `DLH-X-VAULT-CHART` | Upstream Vault Helm Chart | `System` | Helm | Canonical upstream chart source for optional secret management included with the chart. |
 | `DLH-X-JUPYTERHUB-CHART` | Upstream JupyterHub Helm Chart | `System` | Helm | Canonical upstream chart source for the optional multi-user notebook service. |
 | `DLH-X-POSTGRESQL-CHART` | Upstream PostgreSQL Helm Chart | `System` | Helm | Canonical upstream chart source for relational stores used by several platform services. |
 | `DLH-X-TRINO-CHART` | Upstream Trino Helm Chart | `System` | Helm | Canonical upstream Trino chart source from which the local Trino chart is derived. |
@@ -150,7 +149,6 @@ product. It should not include Sanger or icddr,b deployment-specific settings.
 | `DLH-X-MINIO-CHART` | `DLH-C2-UPSTREAM-ARCHIVES` | is packaged into |
 | `DLH-X-DATAHUB-CHART` | `DLH-C2-UPSTREAM-ARCHIVES` | is packaged into |
 | `DLH-X-DATAHUB-PREREQS-CHART` | `DLH-C2-UPSTREAM-ARCHIVES` | is packaged into |
-| `DLH-X-VAULT-CHART` | `DLH-C2-UPSTREAM-ARCHIVES` | is packaged into |
 | `DLH-X-JUPYTERHUB-CHART` | `DLH-C2-UPSTREAM-ARCHIVES` | is packaged into |
 | `DLH-X-POSTGRESQL-CHART` | `DLH-C2-UPSTREAM-ARCHIVES` | is packaged into |
 | `DLH-X-TRINO-CHART` | `DLH-C2-TRINO-VENDORED` | is adapted as local Trino chart |
@@ -181,7 +179,7 @@ It is not an icddr,b development or production deployment diagram; treat
 environment-specific infrastructure as external infrastructure.
 
 The default settings in upstream `values.yaml` are intentionally modular:
-`trino`, `prefect`, `sparkOperator`, and `vault` are enabled by default, while
+`trino`, `prefect`, and `sparkOperator` are enabled by default, while
 browser identity, Ranger governance, MinIO, Hive, Superset, JupyterHub,
 CloudBeaver, and DataHub are turned on by install profiles or
 institution-specific settings as needed.
@@ -191,7 +189,7 @@ institution-specific settings as needed.
 | Group | Contains | Notes |
 | --- | --- | --- |
 | Browser Entry | Platform Home and browser-facing application endpoints | The ingress controller itself is usually cluster infrastructure. |
-| Identity And Secrets | Keycloak, external OIDC integration, optional Vault, auth proxy instances | External secret delivery may be cluster infrastructure in some deployments. |
+| Identity And Secrets | Keycloak, external OIDC integration, auth proxy instances | External secret delivery may be cluster infrastructure in some deployments. |
 | Governance | Ranger | Optional governed Trino access. |
 | Lakehouse Core | Trino, optional Hive Metastore, MinIO or external S3, and their stores | Primary analytical data plane. |
 | Analysis Tools | Superset, JupyterHub, CloudBeaver | Human-facing analytics tools. |
@@ -208,7 +206,6 @@ institution-specific settings as needed.
 | `DLH-R-PREFECT-DB` | Prefect Database | `Store` | PostgreSQL | `prefectServer.postgresql.enabled` | On | PostgreSQL store that persists Prefect orchestration metadata, including flow runs, schedules, and state transitions. |
 | `DLH-R-PREFECT-WORKER` | Prefect Worker | `App` | Prefect Kubernetes worker | `prefect.enabled`; `prefect.workers.enabled` | On | Kubernetes-based execution worker that retrieves approved flow runs from Prefect Server and launches the corresponding pipeline jobs. |
 | `DLH-R-SPARK-OPERATOR` | Spark Operator | `App` | Kubeflow Spark Operator | `sparkOperator.enabled` | On | Kubernetes operator that manages Spark applications submitted by pipeline jobs for distributed processing. |
-| `DLH-R-VAULT` | Vault | `App` | HashiCorp Vault | `vault.enabled` | On | Optional secret-management service included with the chart; deployments may instead integrate with an external Vault or equivalent secret provider. |
 | `DLH-R-PLATFORM-HOME` | Platform Home | `App` | nginx + API | `platformHome.enabled` | Off | Browser portal that presents authenticated launch links and health information for deployed platform services; the current implementation assumes bundled Keycloak. |
 | `DLH-R-KEYCLOAK` | Keycloak | `App` | Keycloak | `keycloak.enabled`; `global.identity.provider.mode=bundledKeycloak` | Off | Optional in-chart OIDC identity provider that issues browser and service authentication tokens and supplies role or group claims. |
 | `DLH-R-KEYCLOAK-DB` | Keycloak Database | `Store` | PostgreSQL | `keycloak.postgresql.enabled` | Conditional | PostgreSQL persistence layer for Keycloak realms, clients, users, sessions, and configuration when bundled Keycloak is enabled. |
@@ -249,7 +246,6 @@ institution-specific settings as needed.
 | `DLH-X-USERS` | `DLH-X-INGRESS-CONTROLLER` | access platform over HTTPS |
 | `DLH-X-INGRESS-CONTROLLER` | `DLH-R-PLATFORM-HOME` | routes portal traffic |
 | `DLH-X-INGRESS-CONTROLLER` | `DLH-R-AUTH-PROXIES` | routes protected application traffic |
-| `DLH-X-INGRESS-CONTROLLER` | `DLH-R-VAULT` | routes Vault UI traffic when enabled |
 | `DLH-R-PLATFORM-HOME` | `DLH-R-KEYCLOAK` | authenticates portal users with bundled Keycloak |
 | `DLH-R-AUTH-PROXIES` | `DLH-R-KEYCLOAK` | validates sessions when bundled Keycloak is used |
 | `DLH-R-AUTH-PROXIES` | `DLH-X-OIDC` | validates sessions when external OIDC is used |
@@ -261,11 +257,8 @@ institution-specific settings as needed.
 | `DLH-R-SUPERSET` | `DLH-X-OIDC` | authenticates dashboard users when external OIDC is used |
 | `DLH-R-DATAHUB` | `DLH-R-KEYCLOAK` | authenticates catalog users when bundled Keycloak is used |
 | `DLH-R-DATAHUB` | `DLH-X-OIDC` | authenticates catalog users when external OIDC is used |
-| `DLH-R-VAULT` | `DLH-R-KEYCLOAK` | authenticates Vault users when bundled Keycloak is used |
-| `DLH-R-VAULT` | `DLH-X-OIDC` | authenticates Vault users when external OIDC is used |
 | `DLH-R-KEYCLOAK` | `DLH-X-LDAP` | federates users and groups when external LDAP is configured |
 | `DLH-R-KEYCLOAK` | `DLH-R-KEYCLOAK-DB` | persists identity state |
-| `DLH-X-SECRET-SYNC` | `DLH-R-VAULT` | reads selected secrets when included Vault is used |
 | `DLH-X-SECRET-SYNC` | `DLH-R-KEYCLOAK` | provides Kubernetes Secrets |
 | `DLH-X-SECRET-SYNC` | `DLH-R-RANGER` | provides Kubernetes Secrets |
 | `DLH-X-SECRET-SYNC` | `DLH-R-TRINO` | provides Kubernetes Secrets |
@@ -369,7 +362,6 @@ Parent Level 2 object: `DLH-C2-UPSTREAM-ARCHIVES`.
 | `DLH-C3-PKG-MINIO` | MinIO Chart Archive | `charts/dlh-in-a-box/charts/minio-15.0.7.tgz` | Bundled Helm archive for the upstream MinIO object store used when lakehouse data is stored inside the cluster. |
 | `DLH-C3-PKG-DATAHUB` | DataHub Chart Archive | `charts/dlh-in-a-box/charts/datahub-0.8.21.tgz` | Bundled Helm archive for optional DataHub metadata catalog and discovery services. |
 | `DLH-C3-PKG-DATAHUB-PREREQS` | DataHub Prerequisites Chart Archive | `charts/dlh-in-a-box/charts/datahub-prerequisites-0.2.3.tgz` | Bundled Helm archive for optional DataHub support services, including persistence, messaging, and search dependencies. |
-| `DLH-C3-PKG-VAULT` | Vault Chart Archive | `charts/dlh-in-a-box/charts/vault-0.32.0.tgz` | Bundled Helm archive for optional Vault secret-management deployment included with the chart. |
 | `DLH-C3-PKG-JUPYTERHUB` | JupyterHub Chart Archive | `charts/dlh-in-a-box/charts/jupyterhub-4.3.3.tgz` | Bundled Helm archive for the upstream JupyterHub service, enabling authenticated multi-user notebook environments. |
 | `DLH-C3-PKG-POSTGRESQL` | PostgreSQL Chart Archive | `charts/dlh-in-a-box/charts/postgresql-14.3.3.tgz` | Bundled Helm archive for the upstream PostgreSQL chart reused by service-specific database components. |
 

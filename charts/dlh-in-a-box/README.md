@@ -56,7 +56,7 @@ flowchart TD
     AccessRuntime[Ranger and access rules]
     DataRuntime[Trino Hive and catalogs]
     AppRuntime[Prefect CloudBeaver JupyterHub Superset DataHub]
-    PlatformRuntime[platformHome MinIO Vault Spark Operator]
+    PlatformRuntime[platformHome MinIO Spark Operator]
   end
 
   Identity --> Validation
@@ -125,7 +125,6 @@ This repo bundles upstream charts for reproducibility and packaging, including:
 - Spark Operator
 - MinIO
 - DataHub and DataHub prerequisites
-- Vault
 - JupyterHub
 - PostgreSQL variants
 
@@ -158,7 +157,6 @@ Important dependencies and what they are used for:
 | MinIO | `minio` | in-cluster S3-compatible object store |
 | DataHub | `datahub` | metadata catalog and discovery UI |
 | DataHub prerequisites | `datahubPrerequisites` | bundled Kafka, Zookeeper, MySQL-facing prerequisite wiring |
-| Vault | `vault` | optional secrets tooling and browser UI |
 | JupyterHub | `jupyterhub` | notebook environment with OIDC login |
 | Superset | `superset` | optional BI application |
 
@@ -216,7 +214,6 @@ These sections are mostly upstream chart values exposed at the umbrella level:
 - `datahubPrerequisites`
 - `superset`
 - `jupyterhub`
-- `vault`
 - `rangerPostgresql`
 
 ### Prefect Job Runner Pull Identity

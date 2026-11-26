@@ -29,7 +29,6 @@
     "prefect",
     "spark",
     "datahub",
-    "vault",
     "jupyterhub"
   ],
   "related_identifiers": [

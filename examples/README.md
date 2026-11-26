@@ -40,7 +40,7 @@ Important rule:
 flowchart TD
   subgraph LocalOverlays["Local overlays"]
     LocalFile[values-local.yaml]
-    LocalNote[Auth minimal or disabled / Storage MinIO / Components Trino Prefect Spark Operator Hive Vault]
+    LocalNote[Auth minimal or disabled / Storage MinIO / Components Trino Prefect Spark Operator Hive]
     LocalAuthFile[values-local-auth.yaml]
     LocalAuthNote[Auth bundled Keycloak local users / Storage MinIO / Components add Ranger platformHome CloudBeaver]
     LocalLayersFile[values-local-layers.yaml]
@@ -53,11 +53,11 @@ flowchart TD
     DevFile[values-dev.yaml]
     DevNote[Auth bundled Keycloak plus LDAP / Storage external S3 / Components Trino Ranger platformHome JupyterHub CloudBeaver Prefect]
     ProdFile[values-prod.yaml]
-    ProdNote[Auth bundled Keycloak plus LDAP / Storage external S3 / Components prod shaped browser stack plus Vault]
+    ProdNote[Auth bundled Keycloak plus LDAP / Storage external S3 / Components prod shaped browser stack]
     SharedAuthFile[values-shared-auth.yaml]
-    SharedAuthNote[Auth external OIDC plus LDAP / Storage external S3 / Components Trino Ranger Prefect CloudBeaver Superset DataHub Vault]
+    SharedAuthNote[Auth external OIDC plus LDAP / Storage external S3 / Components Trino Ranger Prefect CloudBeaver Superset DataHub]
     ProdLayersFile[values-prod-layers.yaml]
-    ProdLayersNote[Auth inherited layered production shape / Storage external S3 / Components layered catalogs plus Hive and Vault]
+    ProdLayersNote[Auth inherited layered production shape / Storage external S3 / Components layered catalogs plus Hive]
   end
 
   subgraph SpecialistOverlays["Specialist overlays"]
@@ -166,7 +166,6 @@ Main components enabled:
 - Spark Operator
 - MinIO
 - Hive Metastore and Hive PostgreSQL
-- Vault in dev mode
 
 What it tests:
 
@@ -262,7 +261,6 @@ Main components enabled:
 - Spark Operator
 - MinIO
 - Hive
-- Vault
 
 What it tests:
 
@@ -307,7 +305,6 @@ Main components disabled:
 - Spark Operator
 - Hive
 - DataHub
-- Vault
 
 What it tests:
 
@@ -393,7 +390,6 @@ Main components enabled:
 - JupyterHub
 - CloudBeaver plus auth proxy
 - Keycloak
-- Vault
 
 Main components disabled by default here:
 
@@ -437,7 +433,6 @@ Main components enabled:
 
 - Ranger
 - Hive
-- Vault
 
 Main behavior emphasized:
 
@@ -480,7 +475,6 @@ Main components enabled:
 - CloudBeaver plus auth proxy
 - Superset
 - DataHub
-- Vault
 
 Main components disabled:
 

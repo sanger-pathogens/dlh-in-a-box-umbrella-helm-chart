@@ -35,9 +35,6 @@ dependencies:
 - name: datahub-prerequisites
   repository: https://helm.datahubproject.io
   version: 0.2.3
-- name: vault
-  repository: https://helm.releases.hashicorp.com
-  version: 0.32.0
 - name: jupyterhub
   repository: https://jupyterhub.github.io/helm-chart
   version: 4.3.3
@@ -53,5 +50,5 @@ dependencies:
 - name: postgresql
   repository: https://charts.bitnami.com/bitnami
   version: 14.3.3
-digest: sha256:0fcb23e350ed3359e769149c73f9ed0004e188fe1c710518bbe2d17b76bfb5ef
-generated: "2026-08-26T17:06:31.090163+01:00"
+digest: sha256:96be29cee5b2b6d90b3de8eeab138cac0f7edc0f9d5e0639faf625f1d22bf38e
+generated: "2026-09-10T23:50:42.190187558+01:00"

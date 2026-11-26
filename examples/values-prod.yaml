@@ -313,9 +313,6 @@ datahub:
 superset:
   enabled: false
 
-vault:
-  enabled: true
-
 minio:
   enabled: false
 

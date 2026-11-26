@@ -376,35 +376,6 @@
                     }
                   ]
                 },
-                "vault": {
-                  "type": "object",
-                  "additionalProperties": true,
-                  "properties": {
-                    "enabled": { "type": "boolean" },
-                    "clientId": { "type": "string" },
-                    "existingSecret": { "type": "string" },
-                    "clientSecretKey": { "type": "string" },
-                    "redirectUris": {
-                      "type": "array",
-                      "items": { "type": "string" }
-                    },
-                    "webOrigins": {
-                      "type": "array",
-                      "items": { "type": "string" }
-                    }
-                  },
-                  "allOf": [
-                    {
-                      "if": {
-                        "properties": { "enabled": { "const": true } },
-                        "required": ["enabled"]
-                      },
-                      "then": {
-                        "required": ["clientId", "existingSecret"]
-                      }
-                    }
-                  ]
-                },
                 "rangerProxy": {
                   "type": "object",
                   "additionalProperties": true,
@@ -1556,13 +1527,6 @@
           }
         }
       }
-    },
-    "vault": {
-      "description": "Pass-through values for the Vault dependency.",
-      "type": "object",
-      "properties": {
-        "enabled": { "type": "boolean" }
-      }
     }
   },
   "required": [
@@ -1572,7 +1536,6 @@
     "sparkOperator",
     "minio",
     "datahub",
-    "hive",
-    "vault"
+    "hive"
   ]
 }
